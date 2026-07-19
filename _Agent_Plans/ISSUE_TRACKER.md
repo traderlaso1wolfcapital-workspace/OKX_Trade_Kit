@@ -1,0 +1,40 @@
+# Hệ thống Lưu vết Lỗi (Bug Tracker)
+
+File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) hoặc vấn đề (issues) phát sinh trong quá trình Bot giao dịch thực tế. 
+**QUY TẮC BẮT BUỘC DÀNH CHO CÁC AI AGENT:** 
+- Bất cứ khi nào Agent bắt đầu một phiên làm việc mới liên quan đến việc sửa lỗi hoặc cập nhật tính năng, Agent **PHẢI** đọc file này trước tiên để xem có lỗi nào đang tồn tại hay không.
+- Sau khi fix xong một lỗi, Agent **PHẢI** tự động xóa (hoặc đánh dấu hoàn thành) lỗi đó khỏi danh sách này.
+- Bất kỳ lỗi mới nào phát sinh chưa được giải quyết phải được ghi chú vào đây.
+
+---
+
+## 🐞 CÁC LỖI HIỆN TẠI ĐANG CHỜ XỬ LÝ (PENDING BUGS)
+
+*Hiện tại hệ thống đang vận hành trơn tru và chưa có lỗi nào được ghi nhận. Phiên Audit 6 Patches của Gemini & DeepSeek đã dọn sạch các lỗi tồn đọng.*
+
+*(Thêm lỗi mới vào đây)*
+
+
+
+---
+
+## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[16/07/2026]** - Lỗi `bot_sub1` Altcoin Neo BTC entry bị đẩy cao hơn giá live khi BTC sát EMA200 hoặc bị overshoots sâu qua EMA. Đã fix: Bỏ `volatility_mult` khỏi base offset và áp dụng cơ chế **EMA Floor Clamp**: Giới hạn entry của Altcoin không vượt quá ngưỡng an toàn `EMA200_Altcoin * (1 +/- base_buffer)` của chính nó (Mã patch: `z3318`).
+- **[16/07/2026]** - Lỗi `bot_sub1` rải lưới DCA quá sát nhau ở các khung lớn do khoảng cách chặn (DCA_GAP) tính toán sai. Đã fix: Chuyển hệ số nhân từ `TF_VOLUME_MULTIPLIERS` sang `TF_MULTIPLIERS` và set lại Base Gap về chuẩn 0.5% (`0.0050`) để các lưới H1, H2, H4 giãn ra đúng cấp số nhân (Mã patch: `z3319`).
+- **[16/07/2026]** - Tối ưu Giao diện UI: Lệnh BTC và Altcoin hiển thị lộn xộn trong bảng trạng thái. Đã fix: Sửa logic sort trong `bot_ui.py` để ép hạng mục `BTC` luôn được ưu tiên in ra đầu tiên trong bảng `✜ TÌNH TRẠNG VỊ THẾ` dù đang pending hay đã khớp (Mã patch: `z3320`).
+- **[16/07/2026]** - Dọn dẹp Code: Loại bỏ triệt để 3 biến cấu hình rác không còn sử dụng trong logic (`EMA_SQUEEZE_TOLERANCE_PCT`, `EMA200_DRIFT_THRESHOLD_PCT`, `ALTCOIN_DIFF_THRESHOLD_PCT`) giúp làm sạch `bot_config.py` (Mã patch: `z3321`).
+
+- **[13/07/2026]** - Lỗi syntax (unexpected indent, expected indented block) và lỗi runtime `name '_cur_pp_tf' is not defined`, `name '_pp_tf_grid' is not defined`, `name '_lever' is not defined` trong `bot_sub1.py` sau khi gỡ bỏ cơ chế Ping-Pong. Đã fix: Xóa bỏ triệt để các biến, các dòng code liên quan đến `_cur_pp_tf`, `_pp_tf_grid`, `is_pp_tf` và dọn dẹp lại thụt lề chuẩn xác tại các block if/elif. Định nghĩa lại `_lever` bằng `str(_get_leverage(tf))`. (Mã patch: `z3310`, `z3311`, `z3312`).
+
+- **[14/07/2026]** - Lỗi `bot_sub1` không đặt lệnh TP/SL khi khớp lệnh do crash ngầm `UnboundLocalError` (tàn dư biến `pp_long_pos` từ đợt gỡ Ping-Pong). Đã fix: Xóa bỏ hoàn toàn phần đọc vị thế isolated của Ping-Pong trong vòng lặp `fetch_positions` (Mã patch: `z3317`).
+- **[14/07/2026]** - Lỗi `bot_sub1` DCA vô số lệnh cùng 1 TF do API OKX delay (nhân bản Limit Order) và Volume rung lắc liên tục do tính theo `live_price`. Đã fix: Thêm thuật toán `🧹 [CLEANUP]` dọn dẹp các lệnh duplicates trực tiếp trong `actual_pending` và đổi công thức tính Khối lượng Limit (`sz_for_tf`) dựa trên giá Limit (`px_tf`) thay vì `live_price` để ổn định size (Mã patch: `z3316`).
+
+- **[09/07/2026]** - Lỗi `bot_sub1` vào 18 lệnh DCA cùng 1 TF do tính năng "Copy Trade / Dẫn đầu" của OKX tách các lệnh DCA thành từng vị thế độc lập. Đã fix: Code lại hàm đọc vị thế trên OKX để cộng gộp (sum) tất cả các vị thế cùng chiều thay vì bị ghi đè bởi vị thế cuối cùng (Mã patch: `z2425`).
+- **[09/07/2026]** - Lỗi `bot_sub1` DCA trùng lặp do thuật toán xác định TF quên nhân với `vol_mult` của từng Altcoin. Đã fix: Chèn `_coin_vol_mult` vào `expected_vol` trong hàm `determine_filled_tf` (Mã patch: `z2426`).
+- **[09/07/2026]** - Lỗi `bot_sub1` DCA trùng lặp liên tục tại cùng 1 TF do tính sai khối lượng lệnh vừa khớp trong `determine_filled_tf` (tính theo tổng vị thế thay vì phần chênh lệch). Đã fix: Trừ đi khối lượng cũ (`new_pos_amt - old_pos_amt`) để so sánh chính xác với khối lượng cấu hình của TF (Mã patch: `z2423`).
+- **[09/07/2026]** - Lỗi `bot_sub1` DCA trùng lặp liên tục tại cùng 1 TF (Race condition limit order). Đã fix: Ưu tiên TF nhỏ nhất trong `determine_filled_tf`, loại trừ các TF đã filled ở fallback, và thêm safety check `actual_pending` trước khi `place_pure_limit` (Mã patch: `z2418`).
+
+
+## 🆕 TASK CẦN XỬ LÝ (TEST CHO CLINE)
+- **[Task-Test-01]**: Mở file `sys_bot_sub2.py`. Tìm hàm `main()` (khoảng dòng 70-80). Thêm một dòng `print('🚀 TLS1_COMPANY: BOT SUB2 ĐÃ ĐƯỢC CẬP NHẬT KIẾN TRÚC V2!')` vào ngay đầu hàm đó để in ra màn hình thông báo mỗi khi Bot khởi động. Lưu ý không sửa phá vỡ logic đang có.

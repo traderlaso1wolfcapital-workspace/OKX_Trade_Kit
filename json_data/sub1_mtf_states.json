@@ -1,0 +1,165 @@
+{
+  "BTC-USDT-SWAP": {
+    "mtf_states": {
+      "M5": {
+        "accum": 494,
+        "fail": 1,
+        "back": 34,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784163600000,
+        "locked": false,
+        "recovery_count": 0,
+        "cycle_fail_triggered": true
+      },
+      "M15": {
+        "accum": 146,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784162700000,
+        "locked": false,
+        "recovery_count": 146
+      },
+      "M30": {
+        "accum": 72,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784161800000,
+        "locked": false,
+        "recovery_count": 72
+      },
+      "H1": {
+        "accum": 33,
+        "fail": 1,
+        "back": 36,
+        "forth": 0,
+        "side": "under",
+        "ts": 1784160000000,
+        "locked": false,
+        "recovery_count": 0,
+        "cycle_fail_triggered": true
+      },
+      "H2": {
+        "accum": 17,
+        "fail": 1,
+        "back": 17,
+        "forth": 0,
+        "side": "under",
+        "ts": 1784152800000,
+        "locked": false,
+        "recovery_count": 0,
+        "cycle_fail_triggered": true
+      },
+      "H4": {
+        "accum": 346,
+        "fail": 0,
+        "back": 8,
+        "forth": 0,
+        "side": "under",
+        "ts": 1784145600000,
+        "locked": false,
+        "recovery_count": 3
+      }
+    },
+    "max_roi_long": "0",
+    "max_roi_short": "0",
+    "mae_max_pct_long": "0",
+    "mae_max_pct_short": "4.001110670368901229670765569",
+    "last_entry_l": "0",
+    "last_entry_s": "63689.65",
+    "open_reason_long": "",
+    "open_reason_short": "DCA Khung L\u1edbn Gi\u1ea3m t\u1ea1i [H4]: C\u1eadp nh\u1eadt trung b\u00ecnh gi\u00e1",
+    "last_closed_side": "SHORT",
+    "last_closed_roi": "1.658753530861229705300182280",
+    "last_closed_reason": "[Exchange_TP_Hit] \u0110\u00f3ng b\u1eb1ng tay / SL-TP ngo\u00e0i s\u00e0n (L\u00e3i)",
+    "pos_cycle_filled_tfs": [
+      "M30",
+      "H4"
+    ],
+    "active_pos_tf": "H4"
+  },
+  "ETH-USDT-SWAP": {
+    "mtf_states": {
+      "M5": {
+        "accum": 583,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784163600000,
+        "locked": false,
+        "recovery_count": 558
+      },
+      "M15": {
+        "accum": 159,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784162700000,
+        "locked": false,
+        "recovery_count": 159
+      },
+      "M30": {
+        "accum": 78,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784161800000,
+        "locked": false,
+        "recovery_count": 78
+      },
+      "H1": {
+        "accum": 346,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784160000000,
+        "locked": false,
+        "recovery_count": 48
+      },
+      "H2": {
+        "accum": 163,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784152800000,
+        "locked": false,
+        "recovery_count": 24
+      },
+      "H4": {
+        "accum": 76,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784145600000,
+        "locked": false,
+        "recovery_count": 12
+      }
+    },
+    "max_roi_long": "0",
+    "max_roi_short": "0",
+    "mae_max_pct_long": "0",
+    "mae_max_pct_short": "3.736906419923052705161658689",
+    "last_entry_l": "0",
+    "last_entry_s": "1887.9850197628458499",
+    "open_reason_long": "",
+    "open_reason_short": "DCA Khung L\u1edbn Gi\u1ea3m t\u1ea1i [H4]: C\u1eadp nh\u1eadt trung b\u00ecnh gi\u00e1",
+    "last_closed_side": "SHORT",
+    "last_closed_roi": "-297.5788586765469022894544481",
+    "last_closed_reason": "[Exchange_SL_Hit] \u0110\u00f3ng b\u1eb1ng tay / SL-TP ngo\u00e0i s\u00e0n (L\u1ed7)",
+    "pos_cycle_filled_tfs": [
+      "H2",
+      "H4"
+    ],
+    "active_pos_tf": "H4"
+  }
+}
