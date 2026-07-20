@@ -82,7 +82,7 @@ jobs:
       - name: Create DMG
         run: |
           cd TLS1_Trading_App/dist
-          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "TLS1_Trading_Mac.dmg"
+          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "TLS1_Trading_Mac_Universal.dmg"
 
       - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
@@ -114,8 +114,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            windows_artifacts/*.exe
-            mac_artifacts/*.dmg
-            windows_artifacts/version.json
+            windows_artifacts/**/*.exe
+            mac_artifacts/**/*.dmg
+            windows_artifacts/**/version.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
