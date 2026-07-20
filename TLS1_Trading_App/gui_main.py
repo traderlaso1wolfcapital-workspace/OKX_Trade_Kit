@@ -53,8 +53,8 @@ sys.path.insert(0, PROJECT_DIR)
 def get_app_version():
     try:
         if getattr(sys, 'frozen', False):
-            # version.json nằm cùng thư mục với file .exe sau khi cài đặt
-            base_dir = os.path.dirname(sys.executable)
+            # version.json được đóng gói vào sys._MEIPASS bởi PyInstaller --onefile
+            base_dir = sys._MEIPASS
         else:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             for _ in range(4):
@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.92"
+APP_VERSION = "1.0.93"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1592,6 +1592,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Tìm đường dẫn media thông minh tùy thuộc vào vị trí chạy file exe
         def get_media_path(img_name):
+            if getattr(sys, 'frozen', False):
+                return os.path.join(sys._MEIPASS, "media", img_name)
             p1 = os.path.join(PROJECT_DIR, "media", img_name)
             if os.path.exists(p1):
                 return p1
@@ -2039,6 +2041,7 @@ class LoginDialog(QtWidgets.QDialog):
             IS_LOGGED_IN = True
             CURRENT_USER = "Admin TLS1"
             CURRENT_UID = "admtls12021"
+            self.logged_in_name = CURRENT_USER
             self.accept()
             return
         # -------------------------------------
