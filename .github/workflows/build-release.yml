@@ -81,9 +81,8 @@ jobs:
 
       - name: Create DMG
         run: |
-          npm install -g create-dmg
           cd TLS1_Trading_App/dist
-          create-dmg "TLS1 Trading.app"
+          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "TLS1_Trading_Mac.dmg"
 
       - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
