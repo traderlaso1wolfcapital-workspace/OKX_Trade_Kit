@@ -1,0 +1,150 @@
+{
+  "BTC-USDT-SWAP": {
+    "mtf_states": {
+      "M5": {
+        "accum": 25,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784566800000,
+        "locked": false,
+        "recovery_count": 1
+      },
+      "M15": {
+        "accum": 22,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784565900000,
+        "locked": false
+      },
+      "M30": {
+        "accum": 144,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784565000000,
+        "locked": false
+      },
+      "H1": {
+        "accum": 72,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784563200000,
+        "locked": false
+      },
+      "H2": {
+        "accum": 218,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784556000000,
+        "locked": false
+      },
+      "H4": {
+        "accum": 64,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784548800000,
+        "locked": false
+      }
+    },
+    "max_roi_long": "161.0435865792987693356871783",
+    "max_roi_short": "0",
+    "mae_max_pct_long": "0",
+    "mae_max_pct_short": "0",
+    "last_entry_l": "64384.8237068965517242",
+    "last_entry_s": "0",
+    "open_reason_long": "Xu h\u01b0\u1edbng T\u0103ng t\u1ea1i [H4]: \u0110\u1ed3ng pha EMA34/89/200 x\u1ebfp l\u1edbp",
+    "open_reason_short": "",
+    "last_closed_side": "",
+    "last_closed_roi": "0",
+    "last_closed_reason": "",
+    "pos_cycle_filled_tfs": [
+      "H4"
+    ],
+    "active_pos_tf": "H4"
+  },
+  "ETH-USDT-SWAP": {
+    "mtf_states": {
+      "M5": {
+        "accum": 25,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784566800000,
+        "locked": false,
+        "recovery_count": 1
+      },
+      "M15": {
+        "accum": 189,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784565900000,
+        "locked": false
+      },
+      "M30": {
+        "accum": 95,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784565000000,
+        "locked": false
+      },
+      "H1": {
+        "accum": 458,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784563200000,
+        "locked": false
+      },
+      "H2": {
+        "accum": 219,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784556000000,
+        "locked": false
+      },
+      "H4": {
+        "accum": 104,
+        "fail": 0,
+        "back": 0,
+        "forth": 0,
+        "side": "above",
+        "ts": 1784548800000,
+        "locked": false
+      }
+    },
+    "max_roi_long": "192.1972045894608258547459590",
+    "max_roi_short": "0",
+    "mae_max_pct_long": "0",
+    "mae_max_pct_short": "0",
+    "last_entry_l": "1861.0216834755624516",
+    "last_entry_s": "0",
+    "open_reason_long": "Xu h\u01b0\u1edbng T\u0103ng t\u1ea1i [H4]: \u0110\u1ed3ng pha EMA34/89/200 x\u1ebfp l\u1edbp",
+    "open_reason_short": "",
+    "last_closed_side": "",
+    "last_closed_roi": "0",
+    "last_closed_reason": "",
+    "pos_cycle_filled_tfs": [
+      "H4"
+    ],
+    "active_pos_tf": "H4"
+  }
+}
