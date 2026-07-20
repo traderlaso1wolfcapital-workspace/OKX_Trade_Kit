@@ -5,3 +5,4 @@ requests
 numpy
 pandas
 python-dotenv
+PyQt6-WebEngine
