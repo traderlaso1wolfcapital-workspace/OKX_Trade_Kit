@@ -118,6 +118,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           repository: traderlaso1wolfcapital-creator/TLS1_App_Releases
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           target_commitish: main
@@ -125,5 +126,3 @@ jobs:
             windows_artifacts/**/*.exe
             mac_artifacts/**/*.dmg
             windows_artifacts/**/version.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
