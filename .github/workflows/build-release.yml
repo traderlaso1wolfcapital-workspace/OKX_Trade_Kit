@@ -26,8 +26,11 @@ jobs:
 
       - name: Run Windows Build Script
         run: |
+          python build_cython.py
           cd TLS1_Trading_App
-          call auto_update_app.bat
+          python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
+          set /p CHART_JS_DIR=<chart_dir.txt
+          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1 Trading Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" gui_main.py
         shell: cmd
 
       - name: Upload Windows Artifacts
@@ -35,9 +38,8 @@ jobs:
         with:
           name: Windows-Release
           path: |
-            TLS1_Trading_App/Output/TLS1 Trading Setup.exe
-            TLS1_Trading_App/Output/update.zip
-            TLS1_Trading_App/Output/version.json
+            TLS1_Trading_App/dist/TLS1 Trading Setup.exe
+            TLS1_Trading_App/version.json
 
   build-mac:
     runs-on: macos-latest
@@ -65,6 +67,7 @@ jobs:
           cd TLS1_Trading_App
           CHART_JS_DIR=$(python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))")
           pyinstaller --noconfirm --onedir --windowed --icon "media/logo.icns" --name "TLS1 Trading" \
+            --paths .. \
             --add-data "version.json:." \
             --add-data "media:media" \
             --add-data "$CHART_JS_DIR:lightweight_charts/js" \

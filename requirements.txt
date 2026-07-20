@@ -1,0 +1,7 @@
+PyQt6
+lightweight-charts
+ccxt
+requests
+numpy
+pandas
+python-dotenv
