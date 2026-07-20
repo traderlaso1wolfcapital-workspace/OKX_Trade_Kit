@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.99"
+APP_VERSION = "1.0.100"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -317,7 +317,47 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.load_current_settings()
 
     def set_welcome_name(self, name):
-        pass # Đã chuyển nút Đăng Xuất lên thanh Header của App chính
+    def reload_accounts(self):
+        self.env_files = [f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')]
+        if '.env' not in self.env_files:
+            self.env_files.insert(0, '.env')
+        
+        self.account_dropdown.blockSignals(True)
+        self.account_dropdown.clear()
+        if self.strategy_id in ["trinhsat", "quansu"]:
+            self.account_dropdown.addItem("Mặc định (Không cần API)", ".env")
+            self.account_dropdown.setDisabled(True)
+        else:
+            for env in self.env_files:
+                display = "Tài khoản chính (.env)" if env == ".env" else f"Sub ({env})"
+                self.account_dropdown.addItem(display, env)
+        self.account_dropdown.blockSignals(False)
+
+    def create_new_account(self):
+        text, ok = QtWidgets.QInputDialog.getText(self, "Tạo Tài Khoản Mới", "Nhập tên tài khoản (viết liền không dấu, ví dụ: account2):")
+        if ok and text:
+            text = text.strip()
+            if not text: return
+            env_name = f".env_{text}"
+            env_path = os.path.join(PROJECT_DIR, env_name)
+            if not os.path.exists(env_path):
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
+                self.reload_accounts()
+                idx = self.account_dropdown.findData(env_name)
+                if idx >= 0:
+                    self.account_dropdown.setCurrentIndex(idx)
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Thành Công")
+                msg.setText(f"Đã tạo tài khoản: {env_name}\nHãy nhập API Key cho tài khoản này!")
+                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+                msg.exec()
+            else:
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Lỗi")
+                msg.setText(f"Tài khoản {env_name} đã tồn tại!")
+                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+                msg.exec()
 
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -550,6 +590,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         acc_layout = QtWidgets.QHBoxLayout()
         acc_layout.addWidget(QtWidgets.QLabel("Chọn tài khoản đang cấu hình:"))
         acc_layout.addWidget(self.account_dropdown)
+        
+        self.btn_add_account = QtWidgets.QPushButton("+")
+        self.btn_add_account.setFixedWidth(30)
+        self.btn_add_account.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; border-radius: 4px;")
+        self.btn_add_account.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_add_account.clicked.connect(self.create_new_account)
+        acc_layout.addWidget(self.btn_add_account)
+        
         acc_layout.addStretch(1)
         layout.addLayout(acc_layout)
         
@@ -579,9 +627,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_passphrase.setStyleSheet("min-width: 600px; max-width: 600px;")
         
         form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
-        form_layout.addRow("OKX_API_KEY:", self.input_api_key)
-        form_layout.addRow("OKX_SECRET_KEY:", self.input_secret_key)
-        form_layout.addRow("OKX_PASSPHRASE:", self.input_passphrase)
+        form_layout.addRow("OKX_API_KEY (Mã API):", self.input_api_key)
+        form_layout.addRow("OKX_SECRET_KEY (Khóa bí mật):", self.input_secret_key)
+        form_layout.addRow("OKX_PASSPHRASE (Cụm mật khẩu):", self.input_passphrase)
         
         # Đặt Form vào một layout ngang có lò xo dồn sang trái
         h_container = QtWidgets.QHBoxLayout()
@@ -1145,14 +1193,21 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     display_err = "Giờ máy tính của bạn chạy KHÔNG ĐÚNG thực tế!\nVui lòng đồng bộ lại giờ đồng hồ của Windows (Sync Time) trước khi sử dụng."
                 elif "APIKey does not match" in err_msg or "Invalid Sign" in err_msg:
                     display_err = "API Key/Secret Key sai hoặc không phải của sàn OKX!"
-                
-                QtWidgets.QMessageBox.critical(self, "Lỗi API Key", f"{display_err}\n\nChi tiết OKX: {err_msg}")
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Lỗi API Key")
+                msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
+                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+                msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
                 return
                 
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Lỗi API Key", f"Không thể xác thực API Key:\n{str(e)}")
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Lỗi API Key")
+                msg.setText(f"Không thể xác thực API Key:\n{str(e)}")
+                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+                msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
                 return
@@ -1168,7 +1223,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             f.write(f"OKX_API_KEY=\"{api_key}\"\n")
             f.write(f"OKX_SECRET_KEY=\"{secret_key}\"\n")
             f.write(f"OKX_PASSPHRASE=\"{passphrase}\"\n")
-        QtWidgets.QMessageBox.information(self, "Thành Công", f"Đã xác thực và lưu API Key vào {env_file}!")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("Thành Công")
+        msg.setText(f"Đã xác thực và lưu API Key vào {env_file}!")
+        msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+        msg.exec()
 
     def save_strategy_settings(self):
         env_file = self.get_selected_env()
@@ -1289,7 +1348,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
             
-        QtWidgets.QMessageBox.information(self, "Thành Công", f"Đã lưu Cấu Hình Chiến Thuật cho {acc_name}!\\n\\nBot sẽ tự động nạp cấu hình mới này vào chu kỳ tiếp theo.")
+        msg = QtWidgets.QMessageBox(self)
+        msg.setWindowTitle("Thành Công")
+        msg.setText(f"Đã lưu Cấu Hình Chiến Thuật cho {acc_name}!\n\nBot sẽ tự động nạp cấu hình mới này vào chu kỳ tiếp theo.")
+        msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+        msg.exec()
 
     def start_bot(self):
         env_file = self.get_selected_env()
