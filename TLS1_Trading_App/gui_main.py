@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.95"
+APP_VERSION = "1.0.96"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1698,13 +1698,75 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def run_update_app(self):
         url = "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest"
+        remote_version = None
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
             url_win = self.remote_update_data.get("update_url_win")
             url_mac = self.remote_update_data.get("update_url_mac")
             url = url_win if os.name == 'nt' else url_mac
             if not url:
                 url = self.remote_update_data.get("update_url", "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest")
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
+            remote_version = self.remote_update_data.get("version")
+
+        # Tự động tải ngầm nếu chạy file .exe trên Windows
+        if os.name == 'nt' and getattr(sys, 'frozen', False) and remote_version:
+            import urllib.request
+            import subprocess
+            
+            download_url = f"https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/download/v{remote_version}/TLS1%20Trading%20Setup.exe"
+            
+            dlg = QtWidgets.QProgressDialog("Đang kết nối tải bản cập nhật...", "Hủy", 0, 100, self)
+            dlg.setWindowTitle("Cập nhật tự động")
+            dlg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+            dlg.setMinimumDuration(0)
+            dlg.show()
+            
+            current_exe_path = sys.executable
+            base_dir = os.path.dirname(current_exe_path)
+            current_exe_name = os.path.basename(current_exe_path)
+            
+            new_exe_path = os.path.join(base_dir, "TLS1_Trading_Update.exe")
+            bat_path = os.path.join(base_dir, "update_app.bat")
+            
+            def reporthook(blocknum, blocksize, totalsize):
+                if dlg.wasCanceled():
+                    raise Exception("Đã huỷ tải xuống.")
+                if totalsize > 0:
+                    percent = int(blocknum * blocksize * 100 / totalsize)
+                    dlg.setLabelText(f"Đang tải bản cập nhật mới v{remote_version}... {percent}%")
+                    dlg.setValue(percent)
+                    QtWidgets.QApplication.processEvents()
+                    
+            try:
+                urllib.request.urlretrieve(download_url, new_exe_path, reporthook)
+                dlg.setValue(100)
+                
+                bat_content = f"""@echo off
+echo Dang cap nhat phien ban moi... Vui long doi...
+timeout /t 2 /nobreak >nul
+del /f /q "{current_exe_name}"
+rename "TLS1_Trading_Update.exe" "{current_exe_name}"
+start "" "{current_exe_name}"
+del /f /q "%~f0"
+"""
+                with open(bat_path, "w", encoding="utf-8") as f:
+                    f.write(bat_content)
+                
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                subprocess.Popen([bat_path], startupinfo=startupinfo)
+                
+                sys.exit(0)
+            except Exception as e:
+                if os.path.exists(new_exe_path):
+                    try: os.remove(new_exe_path)
+                    except: pass
+                if "huỷ" in str(e).lower():
+                    return
+                QtWidgets.QMessageBox.critical(self, "Lỗi cập nhật", f"Tải xuống tự động thất bại: {str(e)}\n\nHệ thống sẽ mở trình duyệt để bạn tải thủ công.")
+                QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
+        else:
+            # Fallback mở trình duyệt nếu chạy code hoặc trên Mac
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def closeEvent(self, event):
         for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
