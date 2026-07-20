@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.100"
+APP_VERSION = "1.0.101"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -317,6 +317,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.load_current_settings()
 
     def set_welcome_name(self, name):
+        pass
+        
     def reload_accounts(self):
         self.env_files = [f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')]
         if '.env' not in self.env_files:
