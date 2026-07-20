@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.102"
+APP_VERSION = "1.0.103"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1612,7 +1612,7 @@ class MainWindow(QtWidgets.QMainWindow):
         header_layout.addStretch()
 
         self.lbl_main_welcome = QtWidgets.QLabel("")
-        self.lbl_main_welcome.setStyleSheet("color: #ffaa00; font-size: 14px; font-weight: bold; font-style: italic; margin-right: 15px;")
+        self.lbl_main_welcome.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; font-style: italic; margin-right: 15px;")
         self.lbl_main_welcome.hide()
         
         self.btn_main_logout = QtWidgets.QPushButton("Đăng Xuất")
@@ -1638,7 +1638,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 
         self.btn_main_logout.clicked.connect(on_main_logout)
         
-        header_layout.addWidget(self.lbl_main_welcome)
 
         self.btn_update = QtWidgets.QPushButton("⏳ Đang kiểm tra cập nhật...")
         self.btn_update.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
@@ -1696,6 +1695,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.outer_hover_filter = HoverSoundFilter(self.bot_tabs.tabBar())
         self.bot_tabs.tabBar().installEventFilter(self.outer_hover_filter)
         self.bot_tabs.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.bot_tabs.setCornerWidget(self.lbl_main_welcome, QtCore.Qt.Corner.TopRightCorner)
         main_layout.addWidget(self.bot_tabs)
 
         self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.env_files)
