@@ -1,6 +1,20 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+
+# --- FIX WEBENGINE FORK BOMB ---
+# Bắt lỗi QtWebEngine tự động spawn process ảo trên Mac/Win.
+# Khi QtWebEngine khởi tạo render process, nó gọi lại sys.executable với argument --type=...
+if any(arg.startswith('--type=') for arg in sys.argv):
+    # Tránh việc chạy lại toàn bộ script, tạo ra vô hạn cửa sổ.
+    # Phải gọi QtWebEngineCore để nó chiếm quyền process renderer.
+    try:
+        from PyQt6 import QtWebEngineCore
+    except:
+        pass
+    sys.exit(0)
+# -------------------------------
+
 import time
 import ctypes
 import json

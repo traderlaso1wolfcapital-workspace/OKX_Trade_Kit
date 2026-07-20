@@ -30,7 +30,7 @@ jobs:
           cd TLS1_Trading_App
           python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
           set /p CHART_JS_DIR=<chart_dir.txt
-          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1 Trading Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" gui_main.py
+          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1 Trading Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" --hidden-import "PyQt6.QtWebEngineCore" --hidden-import "PyQt6.QtWebEngineWidgets" gui_main.py
         shell: cmd
 
       - name: Upload Windows Artifacts
@@ -77,6 +77,8 @@ jobs:
             --hidden-import "z_bot_sub2.bot_strategy" \
             --hidden-import "sys_bot_sub1" \
             --hidden-import "sys_bot_sub2" \
+            --hidden-import "PyQt6.QtWebEngineCore" \
+            --hidden-import "PyQt6.QtWebEngineWidgets" \
             gui_main.py
 
       - name: Create DMG
