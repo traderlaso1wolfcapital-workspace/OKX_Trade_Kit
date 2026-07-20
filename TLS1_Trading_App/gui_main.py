@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.94"
+APP_VERSION = "1.0.95"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1663,7 +1663,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 import urllib.request, json
                 from packaging import version
-                url = "https://raw.githubusercontent.com/traderlaso1wolfcapital-creator/BotVip/main/TLS1_Trading_App/version.json"
+                url = "https://raw.githubusercontent.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/main/TLS1_Trading_App/version.json"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'})
                 with urllib.request.urlopen(req, timeout=5) as response:
                     remote_data = json.loads(response.read().decode('utf-8'))
@@ -1697,13 +1697,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_update.setEnabled(False)
 
     def run_update_app(self):
-        url = "https://github.com/traderlaso1wolfcapital-creator/BotVip/releases/latest"
+        url = "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest"
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
             url_win = self.remote_update_data.get("update_url_win")
             url_mac = self.remote_update_data.get("update_url_mac")
             url = url_win if os.name == 'nt' else url_mac
             if not url:
-                url = self.remote_update_data.get("update_url", "https://github.com/traderlaso1wolfcapital-creator/BotVip/releases/latest")
+                url = self.remote_update_data.get("update_url", "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest")
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def closeEvent(self, event):
