@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.105"
+APP_VERSION = "1.0.106"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -229,7 +229,7 @@ class LiveChartWorker(QtCore.QThread):
         import time
         while self._is_running:
             try:
-                resp = requests.get(f"https://www.okx.com/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=100", timeout=5)
+                resp = requests.get(f"https://www.okx.com/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300", timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == "0":
@@ -523,6 +523,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         try:
             self.chart_widget = QtChart()
+            self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2)
             chart_layout.addWidget(self.chart_widget.get_webview())
             
             self.chart_widget.layout(background_color='#0c0c0c', text_color='#e0e0e0', font_size=12)
@@ -1423,12 +1424,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     for col in ['open', 'high', 'low', 'close', 'volume']:
                         df[col] = pd.to_numeric(df[col])
                     
+                    df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
+                    
                     if not getattr(self, '_chart_initialized', False):
                         self.chart_widget.set(df)
+                        self.ema_line.set(df[['time', 'EMA 200']].dropna())
                         self._chart_initialized = True
                         self.chart_widget.spinner(False)
                     else:
                         self.chart_widget.update(df.iloc[-1])
+                        self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
             except Exception as e:
                 import traceback
                 traceback.print_exc()
