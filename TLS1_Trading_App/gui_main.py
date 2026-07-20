@@ -13,8 +13,10 @@ import dotenv
 
 if getattr(sys, 'frozen', False):
     _base = os.path.dirname(sys.executable)
+    USER_DATA_DIR = _base
 else:
     _base = os.path.dirname(os.path.abspath(__file__))
+    USER_DATA_DIR = None
 
 # Tìm ngược lên thư mục gốc OKX_Trade_Kit (chứa z_bot_sub1)
 PROJECT_DIR = _base
@@ -22,6 +24,11 @@ for _ in range(4):
     if os.path.isdir(os.path.join(PROJECT_DIR, "z_bot_sub1")):
         break
     PROJECT_DIR = os.path.dirname(PROJECT_DIR)
+
+if not USER_DATA_DIR:
+    USER_DATA_DIR = PROJECT_DIR
+
+FIREBASE_URL = "https://botvip-e5772-default-rtdb.asia-southeast1.firebasedatabase.app"
 
 sys.path.insert(0, PROJECT_DIR)
 
@@ -52,7 +59,7 @@ CURRENT_UID = None
 
 def exception_hook(exctype, value, traceback):
     import traceback as tb
-    log_path = os.path.join(PROJECT_DIR, "crash_log.txt")
+    log_path = os.path.join(USER_DATA_DIR, "crash_log.txt")
     with open(log_path, "w", encoding="utf-8") as f:
         f.write("=== CRASH LOG ===\n")
         tb.print_exception(exctype, value, traceback, file=f)
@@ -178,7 +185,7 @@ class BotSubprocessWorker(QtCore.QThread):
         if self.process:
             self.log_signal.emit("\n🛑 Đang gửi tín hiệu dừng tiến trình...")
             try:
-                flag_path = os.path.join(PROJECT_DIR, "json_data", f"stop_{self.strategy}.flag")
+                flag_path = os.path.join(USER_DATA_DIR, "json_data", f"stop_{self.strategy}.flag")
                 with open(flag_path, "w") as f: f.write("stop")
                 
                 for _ in range(15):
@@ -861,7 +868,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         acc_name = self.get_acc_name()
 
         if env_file:
-            env_path = os.path.join(PROJECT_DIR, f"z_bot_{self.strategy_id}", env_file)
+            env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
             if os.path.exists(env_path):
                 with open(env_path, "r", encoding="utf-8") as f:
                     for line in f:
@@ -875,7 +882,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
         import importlib.util
         bot_dir = f"z_bot_{self.strategy_id}"
-        bot_config_path = os.path.join(PROJECT_DIR, bot_dir, "bot_config.py")
+        bot_config_path = os.path.join(USER_DATA_DIR, bot_dir, "bot_config.py")
         
         try:
             if os.path.exists(bot_config_path):
@@ -903,7 +910,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     return 0
             bot_config = DummyConfig()
         cfg = {}
-        config_path = os.path.join(PROJECT_DIR, "json_data", f"{acc_name}_global_config.json")
+        config_path = os.path.join(USER_DATA_DIR, "json_data", f"{acc_name}_global_config.json")
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f: cfg = json.load(f)
@@ -1087,7 +1094,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_save_api.setEnabled(True)
         # -------------------------------
         
-        env_path = os.path.join(PROJECT_DIR, f"z_bot_{self.strategy_id}", env_file)
+        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         with open(env_path, "w", encoding="utf-8") as f:
             f.write(f"OKX_IS_DEMO=\"{is_demo}\"\n")
@@ -1100,7 +1107,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_file = self.get_selected_env()
         if not env_file: return
         acc_name = self.get_acc_name()
-        json_data_dir = os.path.join(PROJECT_DIR, "json_data")
+        json_data_dir = os.path.join(USER_DATA_DIR, "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
         config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         
@@ -1221,7 +1228,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_file = self.get_selected_env()
         if not env_file: return
         
-        flag_path = os.path.join(PROJECT_DIR, "json_data", f"stop_{self.strategy_id}.flag")
+        flag_path = os.path.join(USER_DATA_DIR, "json_data", f"stop_{self.strategy_id}.flag")
         if os.path.exists(flag_path):
             try: os.remove(flag_path)
             except: pass
@@ -1246,12 +1253,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.worker.stop()
 
     def reset_wallet(self):
-        flag = os.path.join(PROJECT_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
+        flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Kiểm Toán Vốn Gốc.")
 
     def reset_nen(self):
-        flag = os.path.join(PROJECT_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
+        flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
 
@@ -1362,28 +1369,19 @@ class MainWindow(QtWidgets.QMainWindow):
             
         try:
             import urllib.request
-            import csv
+            import json
             
-            url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
+            base_url = FIREBASE_URL.rstrip('/')
+            url = f"{base_url}/users/{CURRENT_UID}.json"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=10) as response:
-                content = response.read().decode('utf-8')
+                user_info = json.loads(response.read().decode('utf-8'))
                 
-            reader = csv.reader(content.splitlines())
-            next(reader, None) # Bỏ qua dòng tiêu đề
-            
-            valid_uids = {}
-            for row in reader:
-                if row and len(row) >= 2 and row[0].strip().isdigit():
-                    uid_str = row[0].strip()
-                    hwid = row[3].strip() if len(row) > 3 else ""
-                    valid_uids[uid_str] = hwid
-                    
-            if CURRENT_UID not in valid_uids:
+            if user_info is None:
                 self.force_exit_unauthorized("UID của bạn ĐÃ BỊ LOẠI khỏi danh sách hợp lệ (Có thể bạn đã gỡ Ref TLS1).")
                 return
                 
-            registered_hwid = valid_uids[CURRENT_UID]
+            registered_hwid = user_info.get('hwid', '')
             if registered_hwid and registered_hwid != "None" and registered_hwid != get_hwid():
                 self.force_exit_unauthorized("Tài khoản của bạn đang được truy cập trên một thiết bị không hợp lệ.")
                 
@@ -1399,23 +1397,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         try:
             import urllib.request
-            import csv
+            import json
 
-            url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
+            base_url = FIREBASE_URL.rstrip('/')
+            url = f"{base_url}/users/{CURRENT_UID}.json"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=10) as response:
-                content = response.read().decode('utf-8')
+                user_info = json.loads(response.read().decode('utf-8'))
 
-            reader = csv.reader(content.splitlines())
-            next(reader, None)
-
-            for row in reader:
-                if row and len(row) >= 2 and row[0].strip() == CURRENT_UID:
-                    registered_hwid = row[3].strip() if len(row) > 3 else ""
-                    current_hwid = get_hwid()
-                    if registered_hwid and registered_hwid != "None" and registered_hwid != current_hwid:
-                        self.force_exit_unauthorized("Phát hiện truy cập từ thiết bị không hợp lệ.\nTài khoản của bạn đã bị khóa vì lý do bảo mật.")
-                    break
+            if user_info is not None:
+                registered_hwid = user_info.get('hwid', '')
+                current_hwid = get_hwid()
+                if registered_hwid and registered_hwid != "None" and registered_hwid != current_hwid:
+                    self.force_exit_unauthorized("Phát hiện truy cập từ thiết bị không hợp lệ.\nTài khoản của bạn đã bị khóa vì lý do bảo mật.")
 
         except Exception:
             pass
@@ -1526,13 +1520,7 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_telegram.installEventFilter(self.telegram_hover)
         header_layout.addWidget(btn_telegram)
 
-        self.btn_update = QtWidgets.QPushButton("🚀 Cập nhật App (Có bản mới)")
-        self.btn_update.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.btn_update.setStyleSheet("background-color: #00BFFF; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px;")
-        self.btn_update.clicked.connect(self.run_update_app)
-        self.btn_update.hide()
-        
-        header_layout.addWidget(self.btn_update)
+        # Removed duplicate btn_update
         main_layout.addLayout(header_layout)
         
         self.update_timer = QtCore.QTimer(self)
@@ -1938,41 +1926,47 @@ class LoginDialog(QtWidgets.QDialog):
         QtWidgets.QApplication.processEvents()
         
         try:
+            if "your-firebase-database-url" in FIREBASE_URL:
+                QtWidgets.QMessageBox.warning(self, "Chưa cấu hình", "Vui lòng thay thế FIREBASE_URL trong mã nguồn bằng Link Firebase của bạn trước khi chạy.")
+                self.btn_login.setText("Đăng Nhập")
+                self.btn_login.setEnabled(True)
+                return
+
+            import json
             import urllib.request
-            import csv
+            import urllib.error
             
-            url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
+            base_url = FIREBASE_URL.rstrip('/')
+            url = f"{base_url}/users/{uid}.json"
+            
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                content = response.read().decode('utf-8')
-                
-            reader = csv.reader(content.splitlines())
-            next(reader, None) # Bỏ qua dòng tiêu đề
-            
-            valid_uids = {}
-            for row in reader:
-                if row and len(row) >= 2 and row[0].strip().isdigit():
-                    uid_str = row[0].strip()
-                    discord_id = row[1].strip() if len(row) > 1 else ""
-                    nickname = row[2].strip() if len(row) > 2 else ""
-                    hwid = row[3].strip() if len(row) > 3 else ""
-                    valid_uids[uid_str] = {
-                        "discord_id": discord_id,
-                        "nickname": nickname,
-                        "hwid": hwid
-                    }
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    user_info = json.loads(response.read().decode('utf-8'))
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    user_info = None
+                else:
+                    raise e
                     
-            if uid in valid_uids:
-                user_info = valid_uids[uid]
-                registered_hwid = user_info['hwid']
+            if user_info is not None:
+                registered_hwid = user_info.get('hwid', "")
                 current_hwid = get_hwid()
                 
-                if registered_hwid == "":
-                    dialog = HWIDAuthDialog(current_hwid, self)
-                    dialog.exec()
-                    self.btn_login.setText("Đăng Nhập")
-                    self.btn_login.setEnabled(True)
-                    return
+                if not registered_hwid:
+                    # Tự động ghi nhận HWID lên Firebase (lần đầu đăng nhập)
+                    patch_url = f"{base_url}/users/{uid}.json"
+                    data = json.dumps({"hwid": current_hwid}).encode('utf-8')
+                    patch_req = urllib.request.Request(patch_url, data=data, method='PATCH', headers={'Content-Type': 'application/json'})
+                    try:
+                        with urllib.request.urlopen(patch_req, timeout=10):
+                            pass
+                    except Exception as ex:
+                        QtWidgets.QMessageBox.critical(self, "Lỗi", f"Không thể lưu HWID lên hệ thống.\nChi tiết: {ex}")
+                        self.btn_login.setText("Đăng Nhập")
+                        self.btn_login.setEnabled(True)
+                        return
+                        
                 elif registered_hwid != current_hwid:
                     QtWidgets.QMessageBox.critical(
                         self,
@@ -1985,10 +1979,8 @@ class LoginDialog(QtWidgets.QDialog):
                     self.btn_login.setEnabled(True)
                     return
                 
-                name = user_info['nickname'] if user_info['nickname'] else user_info['discord_id']
-                if not name:
-                    name = "bạn"
-                    
+                name = user_info.get('nickname', '') or user_info.get('discord_id', '') or "bạn"
+                
                 CURRENT_UID = uid
                 
                 self.logged_in_name = name
@@ -1997,14 +1989,14 @@ class LoginDialog(QtWidgets.QDialog):
                 QtWidgets.QMessageBox.warning(
                     self, 
                     "Từ chối truy cập", 
-                    "UID của bạn CHƯA đăng ký dưới Ref TLS1 hoặc chưa được Admin cập nhật vào danh sách VIP.\n\n"
+                    "UID của bạn CHƯA đăng ký dưới Ref TLS1 hoặc chưa được Admin tạo trên hệ thống.\n\n"
                     "Vui lòng nhấn nút 'Đăng ký OKX' hoặc 'Hướng dẫn chuyển Ref' bên dưới để tham gia hệ thống."
                 )
                 self.btn_login.setText("Đăng Nhập")
                 self.btn_login.setEnabled(True)
                 
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Lỗi kết nối", f"Không thể lấy dữ liệu danh sách UID từ hệ thống:\n{str(e)}\n\nVui lòng kiểm tra lại mạng!")
+            QtWidgets.QMessageBox.critical(self, "Lỗi kết nối", f"Không thể lấy dữ liệu từ hệ thống:\n{str(e)}\n\nVui lòng kiểm tra lại mạng!")
             self.btn_login.setText("Đăng Nhập")
             self.btn_login.setEnabled(True)
 

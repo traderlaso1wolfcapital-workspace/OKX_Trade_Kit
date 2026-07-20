@@ -85,7 +85,15 @@ def main():
     system_config["SHOULD_RESET_NEN"] = False
     system_config["LAST_EVOLUTION_TIMESTAMP"] = 0.0
     
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        for _ in range(4):
+            if os.path.isdir(os.path.join(base_dir, "z_bot_sub2")):
+                break
+            base_dir = os.path.dirname(base_dir)
+
     env_arg = sys.argv[1] if len(sys.argv) > 1 else ".env_sub2"
     env_file = os.path.join(base_dir, "z_bot_sub2", os.path.basename(env_arg))
     
