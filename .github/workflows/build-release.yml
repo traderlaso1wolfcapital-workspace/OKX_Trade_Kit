@@ -90,3 +90,32 @@ jobs:
           name: Mac-Release
           path: |
             TLS1_Trading_App/dist/*.dmg
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Windows-Release
+          path: windows_artifacts
+
+      - name: Download Mac Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Mac-Release
+          path: mac_artifacts
+
+      - name: Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows_artifacts/*.exe
+            mac_artifacts/*.dmg
+            windows_artifacts/version.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
