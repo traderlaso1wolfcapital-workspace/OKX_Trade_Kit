@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.103"
+APP_VERSION = "1.0.104"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -533,6 +533,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chart_widget.watermark('BTC-USDT-SWAP (Live)', color='rgba(255, 153, 0, 0.1)')
             self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='#2a2a2a')
             self.chart_widget.time_scale(right_offset=30)
+            self.chart_widget.spinner(True)
             
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
@@ -1404,6 +1405,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self._chart_initialized = False
             if getattr(self, 'chart_widget', None):
                 self.chart_widget.watermark(f'{self.live_chart_worker.inst_id} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
+                self.chart_widget.spinner(True)
 
     def update_live_chart(self, data):
         if getattr(self, 'chart_widget', None):
@@ -1422,6 +1424,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     if not getattr(self, '_chart_initialized', False):
                         self.chart_widget.set(df)
                         self._chart_initialized = True
+                        self.chart_widget.spinner(False)
                     else:
                         self.chart_widget.update(df.iloc[-1])
             except Exception as e:
@@ -1604,7 +1607,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("Setup by: Cộng đồng Trader Là Số 1 - VN")
+        title = QtWidgets.QLabel("Cộng đồng TRADER LÀ SỐ 1 - Việt Nam")
         title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
         title.setStyleSheet("color: #FF9900;")
         header_layout.addWidget(title)
@@ -1679,7 +1682,8 @@ class MainWindow(QtWidgets.QMainWindow):
         social_layout.setSpacing(0)
         social_layout.addWidget(btn_discord)
         social_layout.addWidget(btn_telegram)
-        header_layout.addLayout(social_layout)
+        social_layout.setContentsMargins(15, 0, 0, 0)
+        header_layout.insertLayout(1, social_layout)
         header_layout.addWidget(self.btn_update)
         header_layout.addWidget(self.btn_main_logout)
 
