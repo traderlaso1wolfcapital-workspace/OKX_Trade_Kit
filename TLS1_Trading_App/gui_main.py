@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.101"
+APP_VERSION = "1.0.102"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -352,13 +352,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Thành Công")
                 msg.setText(f"Đã tạo tài khoản: {env_name}\nHãy nhập API Key cho tài khoản này!")
-                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
                 msg.exec()
             else:
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi")
                 msg.setText(f"Tài khoản {env_name} đã tồn tại!")
-                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
                 msg.exec()
 
     def init_ui(self):
@@ -1198,7 +1196,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
-                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1208,7 +1205,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"Không thể xác thực API Key:\n{str(e)}")
-                msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1228,7 +1224,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
         msg.setText(f"Đã xác thực và lưu API Key vào {env_file}!")
-        msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
         msg.exec()
 
     def save_strategy_settings(self):
@@ -1352,8 +1347,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
-        msg.setText(f"Đã lưu Cấu Hình Chiến Thuật cho {acc_name}!\n\nBot sẽ tự động nạp cấu hình mới này vào chu kỳ tiếp theo.")
-        msg.setStyleSheet("QMessageBox { background-color: white; } QLabel { color: black; font-weight: bold; } QPushButton { color: black; background-color: #f0f0f0; }")
+        msg.setText(f"Đã lưu Cấu Hình Chiến Thuật vào {env_file}!")
         msg.exec()
 
     def start_bot(self):
@@ -1387,7 +1381,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def reset_wallet(self):
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
-        self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Kiểm Toán Vốn Gốc.")
+        self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
@@ -1455,7 +1449,6 @@ class MainWindow(QtWidgets.QMainWindow):
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle(title)
         msg.setText(text)
-        msg.setStyleSheet("QMessageBox { background-color: #2b2b2b; } QLabel { color: #ff8c00; font-size: 13px; font-weight: bold; } QPushButton { background-color: #ff8c00; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; }")
         msg.exec()
 
     def __init__(self):
@@ -1518,7 +1511,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.force_exit_unauthorized("Tài khoản của bạn đang được truy cập trên một thiết bị không hợp lệ.")
                 
         except Exception:
-            # Bỏ qua lỗi mạng ngầm để không làm phiền khách hàng
             pass
 
     def verify_hwid_background(self):
@@ -1847,7 +1839,25 @@ del /f /q "%~f0"
             QMainWindow { background-color: #121212; }
 QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00; padding: 5px; font-weight: bold; }
             QWidget { color: #e0e0e0; font-family: "Segoe UI"; font-size: 13px; }
-            QMessageBox QLabel { color: #000000; font-weight: normal; }
+            
+            QDialog, QMessageBox, QProgressDialog, QInputDialog {
+                background-color: #ffffff;
+            }
+            QDialog QLabel, QMessageBox QLabel, QProgressDialog QLabel, QInputDialog QLabel {
+                color: #000000;
+                font-size: 13px;
+                font-weight: normal;
+            }
+            QDialog QPushButton, QMessageBox QPushButton, QProgressDialog QPushButton, QInputDialog QPushButton {
+                background-color: #f0f0f0;
+                color: #000000;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                padding: 5px 15px;
+            }
+            QDialog QPushButton:hover, QMessageBox QPushButton:hover, QProgressDialog QPushButton:hover, QInputDialog QPushButton:hover {
+                background-color: #e0e0e0;
+            }
             
             QTabWidget#OuterTabs::pane { border: 1px solid #2d2d2d; background-color: #151515; border-radius: 4px; }
             QTabWidget#OuterTabs > QTabBar::tab { background-color: #111111; border: 1px solid #2d2d2d; padding: 10px 20px; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; font-size: 13px; }
@@ -2338,7 +2348,6 @@ def main():
                 msgBox.setWindowTitle("Chào mừng")
                 msgBox.setText(f"    Chào mừng \"{name}\" đã đến với TLS1 Trading App v{APP_VERSION}    ")
                 msgBox.setIcon(QtWidgets.QMessageBox.Icon.NoIcon)
-                msgBox.setStyleSheet("QMessageBox { background-color: #1e1e1e; } QLabel { color: #ffffff; font-size: 15px; } QPushButton { background-color: #ff9900; color: black; padding: 6px 20px; border-radius: 4px; font-weight: bold; } QPushButton:hover { background-color: #e68a00; }")
                 msgBox.exec()
         else:
             sys.exit(0)
