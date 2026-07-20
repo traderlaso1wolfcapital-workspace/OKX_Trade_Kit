@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.104"
+APP_VERSION = "1.0.105"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -533,6 +533,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chart_widget.watermark('BTC-USDT-SWAP (Live)', color='rgba(255, 153, 0, 0.1)')
             self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='#2a2a2a')
             self.chart_widget.time_scale(right_offset=30)
+            self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
             self.chart_widget.spinner(True)
             
             # Khởi chạy luồng lấy dữ liệu chart auto
@@ -1405,6 +1406,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self._chart_initialized = False
             if getattr(self, 'chart_widget', None):
                 self.chart_widget.watermark(f'{self.live_chart_worker.inst_id} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
+                self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
                 self.chart_widget.spinner(True)
 
     def update_live_chart(self, data):
