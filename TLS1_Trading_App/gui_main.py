@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.96"
+APP_VERSION = "1.0.97"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1585,10 +1585,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.btn_update = QtWidgets.QPushButton("⏳ Đang kiểm tra cập nhật...")
         self.btn_update.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px;")
+        self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
         self.btn_update.clicked.connect(self.run_update_app)
         self.btn_update.setEnabled(False)
-        header_layout.addWidget(self.btn_update)
 
         # Tìm đường dẫn media thông minh tùy thuộc vào vị trí chạy file exe
         def get_media_path(img_name):
@@ -1625,7 +1624,7 @@ class MainWindow(QtWidgets.QMainWindow):
         social_layout.addWidget(btn_discord)
         social_layout.addWidget(btn_telegram)
         header_layout.addLayout(social_layout)
-        
+        header_layout.addWidget(self.btn_update)
         header_layout.addWidget(self.btn_main_logout)
 
         # Removed duplicate btn_update
@@ -1684,16 +1683,19 @@ class MainWindow(QtWidgets.QMainWindow):
         has_update, remote_version, remote_data = result
         if has_update is True:
             self.btn_update.setText(f"🚀 Cập nhật App (v{remote_version})")
-            self.btn_update.setStyleSheet("background-color: #00FF00; color: black; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px;")
+            self.btn_update.setStyleSheet("""
+                QPushButton { background-color: #3b82f6; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; }
+                QPushButton:hover { background-color: #2563eb; }
+            """)
             self.btn_update.setEnabled(True)
             self.remote_update_data = remote_data
         elif has_update is False:
             self.btn_update.setText(f"✅ Bản mới nhất (v{APP_VERSION})")
-            self.btn_update.setStyleSheet("background-color: #003300; color: #aaaaaa; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px;")
+            self.btn_update.setStyleSheet("background-color: #333333; color: #aaaaaa; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
             self.btn_update.setEnabled(False)
         else:
             self.btn_update.setText("❌ Lỗi kiểm tra cập nhật")
-            self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px;")
+            self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
             self.btn_update.setEnabled(False)
 
     def run_update_app(self):
