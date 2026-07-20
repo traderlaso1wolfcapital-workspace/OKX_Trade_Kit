@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.93"
+APP_VERSION = "1.0.94"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1707,8 +1707,9 @@ class MainWindow(QtWidgets.QMainWindow):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def closeEvent(self, event):
-        for panel in [self.panel_main, self.panel_sub1, self.panel_sub2, self.panel_sub3]:
-            if panel.worker and panel.worker.process:
+        for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
+            panel = getattr(self, attr, None)
+            if panel and hasattr(panel, 'worker') and getattr(panel.worker, 'process', None):
                 try:
                     panel.worker.process.kill()
                 except:
