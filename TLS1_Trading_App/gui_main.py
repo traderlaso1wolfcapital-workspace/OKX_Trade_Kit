@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.97"
+APP_VERSION = "1.0.98"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1702,12 +1702,9 @@ class MainWindow(QtWidgets.QMainWindow):
         url = "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest"
         remote_version = None
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
-            url_win = self.remote_update_data.get("update_url_win")
-            url_mac = self.remote_update_data.get("update_url_mac")
-            url = url_win if os.name == 'nt' else url_mac
-            if not url:
-                url = self.remote_update_data.get("update_url", "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest")
             remote_version = self.remote_update_data.get("version")
+            if remote_version:
+                url = f"https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/download/v{remote_version}/TLS1%20Trading%20Setup.exe"
 
         # Tự động tải ngầm nếu chạy file .exe trên Windows
         if os.name == 'nt' and getattr(sys, 'frozen', False) and remote_version:
