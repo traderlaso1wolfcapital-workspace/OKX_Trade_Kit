@@ -47,5 +47,5 @@ Thumbs.db
 *.sw?
 
 # Local configuration
-.env
+.env*
 *.log

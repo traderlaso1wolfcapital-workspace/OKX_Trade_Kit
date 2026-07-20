@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.106"
+APP_VERSION = "1.0.107"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -359,6 +359,38 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg.setText(f"Tài khoản {env_name} đã tồn tại!")
                 msg.exec()
 
+    def delete_account(self):
+        env_name = self.account_dropdown.currentData()
+        if not env_name:
+            return
+        if env_name == ".env":
+            msg = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle("Lỗi")
+            msg.setText("Không thể xoá Tài khoản chính (.env)!")
+            msg.exec()
+            return
+        
+        reply = QtWidgets.QMessageBox.question(self, 'Xác nhận xoá',
+                                             f"Bạn có chắc chắn muốn xoá tài khoản {env_name} không?\nHành động này không thể hoàn tác!",
+                                             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                                             QtWidgets.QMessageBox.StandardButton.No)
+        
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            env_path = os.path.join(PROJECT_DIR, env_name)
+            if os.path.exists(env_path):
+                try:
+                    os.remove(env_path)
+                    self.reload_accounts()
+                    msg = QtWidgets.QMessageBox(self)
+                    msg.setWindowTitle("Thành Công")
+                    msg.setText(f"Đã xoá tài khoản: {env_name}")
+                    msg.exec()
+                except Exception as e:
+                    msg = QtWidgets.QMessageBox(self)
+                    msg.setWindowTitle("Lỗi")
+                    msg.setText(f"Lỗi khi xoá: {str(e)}")
+                    msg.exec()
+
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -366,7 +398,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Khởi tạo dropdown (sẽ được add vào tab API)
         self.account_dropdown = QtWidgets.QComboBox()
         self.account_dropdown.setView(QtWidgets.QListView())
-        self.account_dropdown.setMinimumWidth(180)
+        self.account_dropdown.setMinimumWidth(300)
         
         if self.strategy_id in ["trinhsat", "quansu"]:
             self.account_dropdown.addItem("Mặc định (Không cần API)", ".env")
@@ -595,11 +627,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         acc_layout.addWidget(self.account_dropdown)
         
         self.btn_add_account = QtWidgets.QPushButton("+")
-        self.btn_add_account.setFixedWidth(30)
-        self.btn_add_account.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; border-radius: 4px;")
+        self.btn_add_account.setFixedWidth(40)
+        self.btn_add_account.setStyleSheet("background-color: #28a745; color: white; font-size: 18px; font-weight: bold; border-radius: 4px; padding: 0px;")
         self.btn_add_account.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.btn_add_account.clicked.connect(self.create_new_account)
         acc_layout.addWidget(self.btn_add_account)
+        
+        self.btn_delete_account = QtWidgets.QPushButton("-")
+        self.btn_delete_account.setFixedWidth(40)
+        self.btn_delete_account.setStyleSheet("background-color: #dc3545; color: white; font-size: 18px; font-weight: bold; border-radius: 4px; padding: 0px;")
+        self.btn_delete_account.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_delete_account.clicked.connect(self.delete_account)
+        acc_layout.addWidget(self.btn_delete_account)
         
         acc_layout.addStretch(1)
         layout.addLayout(acc_layout)
