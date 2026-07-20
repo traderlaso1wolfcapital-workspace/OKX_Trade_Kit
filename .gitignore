@@ -13,6 +13,8 @@ TLS1_Trading_App/dist/
 TLS1_Trading_App/Update_Package/
 TLS1_Trading_App/cython_build/
 TLS1_Trading_App/obf_dist/
+build/
+build_cython/
 
 # Compiled files and binaries
 *.exe
