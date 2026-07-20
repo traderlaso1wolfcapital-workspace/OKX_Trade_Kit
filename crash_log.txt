@@ -1,6 +1,0 @@
-=== CRASH LOG ===
-Traceback (most recent call last):
-  File "d:\4. Trade Coin - TLS1\4. Cursor - IDE\TLS1_Company\zProjects\OKX_Trade_Kit\TLS1_Trading_App\gui_main.py", line 1708, in closeEvent
-    for panel in [self.panel_main, self.panel_sub1, self.panel_sub2, self.panel_sub3]:
-                                                                     ^^^^^^^^^^^^^^^
-AttributeError: 'MainWindow' object has no attribute 'panel_sub3'. Did you mean: 'panel_sub1'?
