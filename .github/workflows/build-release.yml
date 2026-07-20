@@ -117,9 +117,10 @@ jobs:
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
+          repository: traderlaso1wolfcapital-creator/TLS1_App_Releases
           files: |
             windows_artifacts/**/*.exe
             mac_artifacts/**/*.dmg
             windows_artifacts/**/version.json
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
