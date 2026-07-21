@@ -133,8 +133,8 @@ def main():
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
     # =========================================================================
-    lock_file = os.path.join("json_data", f"{acc_name}.pid")
-    os.makedirs("json_data", exist_ok=True)
+    lock_file = os.path.join(user_data_dir, "json_data", f"{acc_name}.pid")
+    os.makedirs(os.path.join(user_data_dir, "json_data"), exist_ok=True)
     
     if HAS_PSUTIL:
         if os.path.exists(lock_file):
@@ -176,12 +176,7 @@ def main():
     else:
         print(f"⚠️ [LOCK] Single Instance Lock bị vô hiệu hóa (thiếu psutil). Không thể ngăn chặn chạy trùng.")
 
-    if getattr(sys, 'frozen', False):
-        CURRENT_DIR = os.path.dirname(sys.executable)
-    else:
-        CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    
-    JSON_DATA_DIR = os.path.join(CURRENT_DIR, "json_data")
+    JSON_DATA_DIR = os.path.join(user_data_dir, "json_data")
     os.makedirs(JSON_DATA_DIR, exist_ok=True)
 
     env_paths = {
