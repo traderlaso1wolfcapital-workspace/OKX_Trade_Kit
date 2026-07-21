@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.136"
+APP_VERSION = "1.0.140"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2514,29 +2514,24 @@ if __name__ == "__main__":
                     app_dir = sys._MEIPASS
                 else:
                     app_dir = os.path.dirname(os.path.abspath(__file__))
-                sys.path.insert(0, app_dir)
+                    parent_dir = os.path.dirname(app_dir)
+                    if parent_dir not in sys.path:
+                        sys.path.insert(0, parent_dir)
+                        
+                if app_dir not in sys.path:
+                    sys.path.insert(0, app_dir)
+                        
                 sys.argv = [file_name, env]
-                file_path = os.path.join(app_dir, file_name)
+                import importlib
                 
-                # If the file is not at the root (like bot_sub2.py in z_bot_sub2)
-                if not os.path.exists(file_path):
-                    # fallback to check in the specific z_ folder
+                try:
+                    module = importlib.import_module(module_name)
+                except ImportError:
+                    # Fallback to check inside z_ subfolder for local dev
                     fallback_folder = f"z_{module_name}" if "sys_" not in module_name else f"z_{module_name.replace('sys_', '')}"
-                    file_path = os.path.join(app_dir, fallback_folder, file_name)
+                    module = importlib.import_module(f"{fallback_folder}.{module_name}")
                     
-                    if not getattr(sys, 'frozen', False) and not os.path.exists(file_path):
-                        # For local development, bots are in the parent directory (OKX_Trade_Kit)
-                        parent_dir = os.path.dirname(app_dir)
-                        if parent_dir not in sys.path:
-                            sys.path.insert(0, parent_dir)
-                        file_path = os.path.join(parent_dir, file_name)
-                        if not os.path.exists(file_path):
-                            file_path = os.path.join(parent_dir, fallback_folder, file_name)
-                
-                spec = importlib.util.spec_from_file_location(module_name, file_path)
-                module = importlib.util.module_from_spec(spec)
                 sys.modules[module_name] = module
-                spec.loader.exec_module(module)
                 module.main()
 
             if strategy == "sub1":
