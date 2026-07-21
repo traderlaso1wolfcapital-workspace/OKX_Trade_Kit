@@ -94,6 +94,11 @@ def main():
             base_dir = os.path.dirname(base_dir)
         user_data_dir = base_dir
 
+    if getattr(sys, 'frozen', False):
+        CURRENT_DIR = os.path.dirname(sys.executable)
+    else:
+        CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+
     env_arg = sys.argv[1] if len(sys.argv) > 1 else ".env_sub1"
     env_basename = os.path.basename(env_arg)
     
