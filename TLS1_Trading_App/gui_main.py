@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.112"
+APP_VERSION = "1.0.113"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1769,7 +1769,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 import urllib.request, json
                 from packaging import version
-                url = "https://github.com/traderlaso1wolfcapital-creator/TLS1_App_Releases/releases/latest/download/version.json"
+                url = "https://github.com/traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases/releases/latest/download/version.json"
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache'})
                 with urllib.request.urlopen(req, timeout=5) as response:
                     remote_data = json.loads(response.read().decode('utf-8'))
@@ -1806,19 +1806,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_update.setEnabled(False)
 
     def run_update_app(self):
-        url = "https://github.com/traderlaso1wolfcapital-creator/TLS1_App_Releases/releases/latest"
+        url = "https://github.com/traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases/releases/latest"
         remote_version = None
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
             remote_version = self.remote_update_data.get("version")
             if remote_version:
-                url = f"https://github.com/traderlaso1wolfcapital-creator/TLS1_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
+                url = f"https://github.com/traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
 
         # Tự động tải ngầm nếu chạy file .exe trên Windows
         if os.name == 'nt' and getattr(sys, 'frozen', False) and remote_version:
             import urllib.request
             import subprocess
             
-            download_url = f"https://github.com/traderlaso1wolfcapital-creator/TLS1_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
+            download_url = f"https://github.com/traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
             
             dlg = QtWidgets.QProgressDialog("Đang kết nối tải bản cập nhật...", "Hủy", 0, 100, self)
             dlg.setWindowTitle("Cập nhật tự động")
