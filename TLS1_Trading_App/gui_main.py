@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.124"
+APP_VERSION = "1.0.125"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -323,7 +323,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pass
         
     def reload_accounts(self):
-        self.env_files = [f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')]
+        self.env_files = []
+        if os.path.exists(PROJECT_DIR):
+            self.env_files.extend([f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')])
+        bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+        if os.path.exists(bot_dir):
+            self.env_files.extend([f for f in os.listdir(bot_dir) if f.startswith('.env') and not f.endswith('.bak') and f not in self.env_files])
         if '.env' not in self.env_files:
             self.env_files.insert(0, '.env')
         
