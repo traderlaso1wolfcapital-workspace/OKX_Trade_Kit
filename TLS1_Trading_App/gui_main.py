@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.114"
+APP_VERSION = "1.0.115"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1653,7 +1653,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("Cộng đồng TRADER LÀ SỐ 1 - Việt Nam")
+        title = QtWidgets.QLabel("Phát hành bởi: Cộng đồng TRADER LÀ SỐ 1 - VIỆT NAM")
         title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
         title.setStyleSheet("color: #FF9900;")
         header_layout.addWidget(title)
