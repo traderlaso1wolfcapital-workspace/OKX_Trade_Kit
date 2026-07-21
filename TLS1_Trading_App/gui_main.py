@@ -1,5 +1,6 @@
 import sys
 import os
+# Trigger build v129 for crisp icon
 import multiprocessing
 
 if __name__ == '__main__':
@@ -70,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.128"
+APP_VERSION = "1.0.129"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
