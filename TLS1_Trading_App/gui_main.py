@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.127"
+APP_VERSION = "1.0.128"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1674,7 +1674,13 @@ class MainWindow(QtWidgets.QMainWindow):
                                 env_files.add(f)
                     except Exception:
                         pass
-        return sorted(list(env_files))
+        result = sorted(list(env_files))
+        if '.env' not in result:
+            result.insert(0, '.env')
+        else:
+            result.remove('.env')
+            result.insert(0, '.env')
+        return result
 
     def init_ui(self):
         central_widget = QtWidgets.QWidget()
