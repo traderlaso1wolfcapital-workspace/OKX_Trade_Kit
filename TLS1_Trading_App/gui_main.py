@@ -1253,7 +1253,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     'OK-ACCESS-SIGN': sign,
                     'OK-ACCESS-TIMESTAMP': timestamp,
                     'OK-ACCESS-PASSPHRASE': passphrase,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 }
                 if is_demo:
                     headers['x-simulated-trading'] = '1'
