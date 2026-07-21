@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.131"
+APP_VERSION = "1.0.132"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2360,6 +2360,7 @@ class LoginDialog(QtWidgets.QDialog):
                 CURRENT_UID = uid
                 
                 self.logged_in_name = name
+                self.logged_in_status = status
                 self.accept()
             else:
                 QtWidgets.QMessageBox.warning(
@@ -2413,6 +2414,9 @@ def main():
             if hasattr(login, 'logged_in_name'):
                 name = login.logged_in_name
                 window.set_welcome_name(name)
+                
+            if hasattr(login, 'logged_in_status') and login.logged_in_status == 'PENDING 24H':
+                window.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")
                 
                 # Play meme sound
                 try:
