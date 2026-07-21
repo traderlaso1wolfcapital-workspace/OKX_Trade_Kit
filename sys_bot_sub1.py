@@ -82,15 +82,25 @@ def main():
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
+        # Khi đóng gói, file cấu hình API nằm trong thư mục dữ liệu người dùng
+        # (cùng chỗ mà GUI lưu vào), KHÔNG nằm trong app bundle
+        local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+        user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         for _ in range(4):
             if os.path.isdir(os.path.join(base_dir, "z_bot_sub1")):
                 break
             base_dir = os.path.dirname(base_dir)
+        user_data_dir = base_dir
 
     env_arg = sys.argv[1] if len(sys.argv) > 1 else ".env_sub1"
-    env_file = os.path.join(base_dir, "z_bot_sub1", os.path.basename(env_arg))
+    env_basename = os.path.basename(env_arg)
+    
+    # Thử tìm file ở user_data_dir trước (nơi GUI lưu), rồi mới fallback về base_dir
+    env_file = os.path.join(user_data_dir, "z_bot_sub1", env_basename)
+    if not os.path.exists(env_file):
+        env_file = os.path.join(base_dir, "z_bot_sub1", env_basename)
     
     if not os.path.exists(env_file):
         print(f"❌ [LỖI] Không tìm thấy file cấu hình API: {env_file}")

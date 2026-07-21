@@ -1317,7 +1317,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             f.write(f"OKX_PASSPHRASE=\"{passphrase}\"\n")
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
-        msg.setText(f"Đã xác thực và lưu API Key vào {env_file}!")
+        msg.setText("Đã xác thực và lưu API Key thành công!")
         msg.exec()
 
     def save_strategy_settings(self):
