@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.119"
+APP_VERSION = "1.0.120"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -670,10 +670,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         form_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
         form_layout.setFormAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         form_layout.setSpacing(5)
-
-        self.input_api_key.setFixedWidth(400)
-        self.input_secret_key.setFixedWidth(400)
-        self.input_passphrase.setFixedWidth(400)
+        
+        self.input_api_key.setFixedWidth(500)
+        self.input_secret_key.setFixedWidth(500)
+        self.input_passphrase.setFixedWidth(500)
+        
+        self.input_api_key.setStyleSheet("min-width: 500px; max-width: 500px;")
+        self.input_secret_key.setStyleSheet("min-width: 500px; max-width: 500px;")
+        self.input_passphrase.setStyleSheet("min-width: 500px; max-width: 500px;")
         
         form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
         form_layout.addRow("Mã API (API Key):", self.input_api_key)
@@ -1932,7 +1936,7 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             QGroupBox { border: 1px solid #2d2d2d; margin-top: 10px; font-weight: bold; color: #ff9900; border-radius: 4px; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; background-color: #1a1a1a; padding: 0 4px; margin-top: 2px; }
             
-            QSpinBox, QDoubleSpinBox, QLineEdit, QComboBox {
+            QSpinBox, QDoubleSpinBox, QComboBox {
                 background-color: #252525;
                 color: #ffffff;
                 border: 1px solid #444444;
@@ -1940,6 +1944,13 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
                 padding: 4px;
                 min-width: 80px;
                 max-width: 150px;
+            }
+            QLineEdit {
+                background-color: #252525;
+                color: #ffffff;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 4px;
             }
             QComboBox QAbstractItemView {
                 background-color: #1a1a1a;
@@ -2130,7 +2141,7 @@ class LoginDialog(QtWidgets.QDialog):
         self.input_uid = QtWidgets.QLineEdit()
         self.input_uid.setPlaceholderText("Ví dụ: 12345678")
         self.input_uid.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.input_uid.setFixedWidth(360)
+        self.input_uid.setFixedWidth(200)
         self.input_uid.returnPressed.connect(self.check_login)
         layout.addWidget(self.input_uid, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
         
