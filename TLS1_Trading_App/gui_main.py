@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.117"
+APP_VERSION = "1.0.118"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -341,7 +341,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
             text = text.strip()
             if not text: return
             env_name = f".env_{text}"
-            env_path = os.path.join(PROJECT_DIR, env_name)
+            bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+            os.makedirs(bot_dir, exist_ok=True)
+            env_path = os.path.join(bot_dir, env_name)
             if not os.path.exists(env_path):
                 with open(env_path, "w", encoding="utf-8") as f:
                     f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
@@ -376,20 +378,29 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                              QtWidgets.QMessageBox.StandardButton.No)
         
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-            env_path = os.path.join(PROJECT_DIR, env_name)
-            if os.path.exists(env_path):
-                try:
-                    os.remove(env_path)
-                    self.reload_accounts()
-                    msg = QtWidgets.QMessageBox(self)
-                    msg.setWindowTitle("Thành Công")
-                    msg.setText(f"Đã xoá tài khoản: {env_name}")
-                    msg.exec()
-                except Exception as e:
-                    msg = QtWidgets.QMessageBox(self)
-                    msg.setWindowTitle("Lỗi")
-                    msg.setText(f"Lỗi khi xoá: {str(e)}")
-                    msg.exec()
+            deleted_any = False
+            for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
+                if not os.path.exists(root_dir): continue
+                for d in os.listdir(root_dir):
+                    if d.startswith("z_bot_") and os.path.isdir(os.path.join(root_dir, d)):
+                        env_path = os.path.join(root_dir, d, env_name)
+                        if os.path.exists(env_path):
+                            try:
+                                os.remove(env_path)
+                                deleted_any = True
+                            except: pass
+            
+            if deleted_any:
+                self.reload_accounts()
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Thành Công")
+                msg.setText(f"Đã xoá tài khoản: {env_name}")
+                msg.exec()
+            else:
+                msg = QtWidgets.QMessageBox(self)
+                msg.setWindowTitle("Lỗi")
+                msg.setText(f"Không tìm thấy tài khoản {env_name} để xoá!")
+                msg.exec()
 
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
@@ -1631,14 +1642,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def scan_env_files(self):
         env_files = set()
-        for d in os.listdir(PROJECT_DIR):
-            if d.startswith("z_bot_") and os.path.isdir(os.path.join(PROJECT_DIR, d)):
-                try:
-                    for f in os.listdir(os.path.join(PROJECT_DIR, d)):
-                        if f.startswith(".env") and not f.endswith(".example"):
-                            env_files.add(f)
-                except Exception:
-                    pass
+        for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
+            if not os.path.exists(root_dir): continue
+            for d in os.listdir(root_dir):
+                if d.startswith("z_bot_") and os.path.isdir(os.path.join(root_dir, d)):
+                    try:
+                        for f in os.listdir(os.path.join(root_dir, d)):
+                            if f.startswith(".env") and not f.endswith(".example"):
+                                env_files.add(f)
+                    except Exception:
+                        pass
         return sorted(list(env_files))
 
     def init_ui(self):
