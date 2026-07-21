@@ -357,7 +357,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.account_dropdown.setDisabled(True)
         else:
             for env in self.env_files:
-                display = "Tài khoản chính (.env)" if env == ".env" else f"Sub ({env})"
+                if env == ".env":
+                    display = "Tài khoản chính (Main)"
+                else:
+                    sub_name = env.replace(".env_sub", "")
+                    display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
                 self.account_dropdown.addItem(display, env)
         self.account_dropdown.blockSignals(False)
 
@@ -394,7 +398,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if env_name == ".env":
             msg = QtWidgets.QMessageBox(self)
             msg.setWindowTitle("Lỗi")
-            msg.setText("Không thể xoá Tài khoản chính (.env)!")
+            msg.setText("Không thể xoá Tài khoản chính!")
             msg.exec()
             return
         
@@ -442,7 +446,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.account_dropdown.setDisabled(True)
         else:
             for env in self.env_files:
-                display = "Tài khoản chính (.env)" if env == ".env" else f"Sub ({env})"
+                if env == ".env":
+                    display = "Tài khoản chính (Main)"
+                else:
+                    sub_name = env.replace(".env_sub", "")
+                    display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
                 self.account_dropdown.addItem(display, env)
 
         target_env = ".env" if self.strategy_id == "main" else f".env_{self.strategy_id}"
