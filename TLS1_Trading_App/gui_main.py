@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.133"
+APP_VERSION = "1.0.134"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1641,9 +1641,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def trigger_humane_warning(self, reason):
         # Cảnh báo nhân đạo: Thay đổi dòng chào mừng, 24 tiếng sau mới tự đóng app (24 * 60 * 60 * 1000 = 86400000 ms)
-        warning_msg = f"⚠ {reason} Vui lòng liên hệ Admin TLS1 xử lý khiếu nại. App sẽ tự đóng sau 24h!"
+        warning_msg = f'⚠ {reason} Vui lòng <b><a href="login" style="color:#ff3333;text-decoration:underline;">Click vào đây để mở bảng Liên hệ Admin TLS1</a></b> xử lý khiếu nại. App sẽ tự đóng sau 24h!'
         if hasattr(self, 'lbl_main_welcome'):
             self.lbl_main_welcome.setText(warning_msg)
+            self.lbl_main_welcome.setTextFormat(QtCore.Qt.TextFormat.RichText)
+            self.lbl_main_welcome.setOpenExternalLinks(False)
+            try: self.lbl_main_welcome.linkActivated.disconnect()
+            except: pass
+            
+            def open_login(link):
+                if link == "login":
+                    dlg = LoginDialog()
+                    dlg.exec()
+                    
+            self.lbl_main_welcome.linkActivated.connect(open_login)
             self.lbl_main_welcome.setStyleSheet("color: #ff3333; font-weight: bold; font-size: 13px; background-color: #ffe6e6; padding: 5px; border-radius: 4px; border: 1px solid #ff3333;")
             
         if hasattr(self, 'license_check_timer'):
@@ -1736,12 +1747,18 @@ class MainWindow(QtWidgets.QMainWindow):
         def on_main_logout():
             reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                import sys, subprocess
+                import sys, subprocess, os
                 self.close()
+                env = os.environ.copy()
+                env.pop("_MEIPASS2", None)
+                kwargs = {}
+                if sys.platform == 'win32':
+                    kwargs['creationflags'] = 0x00000008
+                    kwargs['close_fds'] = True
                 if getattr(sys, 'frozen', False):
-                    subprocess.Popen([sys.executable] + sys.argv[1:])
+                    subprocess.Popen([sys.executable] + sys.argv[1:], env=env, **kwargs)
                 else:
-                    subprocess.Popen([sys.executable] + sys.argv)
+                    subprocess.Popen([sys.executable] + sys.argv, env=env, **kwargs)
                 sys.exit(0)
                 
         self.btn_main_logout.clicked.connect(on_main_logout)
@@ -2407,9 +2424,9 @@ def main():
     app.setStyle("Fusion")
     
     if getattr(sys, 'frozen', False):
-        global_logo = os.path.join(sys._MEIPASS, "media", "logo.ico")
+        global_logo = os.path.join(sys._MEIPASS, "media", "logo_rounded.png")
     else:
-        global_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "logo.ico")
+        global_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "logo_rounded.png")
     try:
         if os.path.exists(global_logo):
             app.setWindowIcon(QtGui.QIcon(global_logo))
