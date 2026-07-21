@@ -1,5 +1,13 @@
 import sys
 import os
+import multiprocessing
+import ssl
+import certifi
+
+# Fix SSL for macOS / PyInstaller with urllib.request
+os.environ['SSL_CERT_FILE'] = certifi.where()
+ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
+
 # Trigger build v129 for crisp icon
 import multiprocessing
 
