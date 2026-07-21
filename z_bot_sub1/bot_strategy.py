@@ -2472,3 +2472,4 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # z3320 | Fix khẩn cấp lỗi Race Condition đẻ ra hàng chục lệnh Limit cùng 1 TF do API OKX trả về lệnh trễ bằng cách khôi phục cơ chế missing_count (đợi 3 chu kỳ).
 # z3306 | Refactor: Xóa stub functions, gộp _is_alt_synced, xóa get_ema200_for_tf_target trùng lặp, sắp xếp lại thứ tự code
 # z3350 | Clean up: Xoá các imports (traceback, time) và các biến (tolerance_pct, live_high, live_low, lot_sz, tf_tol, von_goc, v.v.) không sử dụng để tối ưu code.
+# z7713 | Thuật toán reload limit EMA200: Nhúng hàm get_current_candle_start_ms lấy giờ UTC chuẩn, bắt chính xác sát giây nến đóng để tính lại Limit.
