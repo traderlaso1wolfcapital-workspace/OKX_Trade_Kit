@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.116"
+APP_VERSION = "1.0.117"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -660,18 +660,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         form_layout.setFormAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         form_layout.setSpacing(5)
 
-        self.input_api_key.setFixedWidth(600)
-        self.input_secret_key.setFixedWidth(600)
-        self.input_passphrase.setFixedWidth(600)
-        
-        self.input_api_key.setStyleSheet("min-width: 600px; max-width: 600px;")
-        self.input_secret_key.setStyleSheet("min-width: 600px; max-width: 600px;")
-        self.input_passphrase.setStyleSheet("min-width: 600px; max-width: 600px;")
+        self.input_api_key.setMinimumWidth(400)
+        self.input_secret_key.setMinimumWidth(400)
+        self.input_passphrase.setMinimumWidth(400)
         
         form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
-        form_layout.addRow("OKX_API_KEY (Mã API):", self.input_api_key)
-        form_layout.addRow("OKX_SECRET_KEY (Khóa bí mật):", self.input_secret_key)
-        form_layout.addRow("OKX_PASSPHRASE (Cụm mật khẩu):", self.input_passphrase)
+        form_layout.addRow("Mã API (API Key):", self.input_api_key)
+        form_layout.addRow("Khóa Bí Mật (Secret):", self.input_secret_key)
+        form_layout.addRow("Cụm Mật Khẩu (Pass):", self.input_passphrase)
         
         # Đặt Form vào một layout ngang có lò xo dồn sang trái
         h_container = QtWidgets.QHBoxLayout()
