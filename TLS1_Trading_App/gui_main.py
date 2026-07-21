@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.122"
+APP_VERSION = "1.0.123"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1544,95 +1544,77 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_check_timer.timeout.connect(self.check_update_background)
         self.update_check_timer.start(2000)
 
-        # Setup background UID verification timer
-        self.uid_check_timer = QtCore.QTimer(self)
-        self.uid_check_timer.timeout.connect(self.verify_uid_background)
-        # 10 seconds = 10000 ms
-        self.uid_check_timer.start(10000)
+        # Setup background License verification timer (quét Google Sheet 30p 1 lần)
+        self.license_check_timer = QtCore.QTimer(self)
+        self.license_check_timer.timeout.connect(self.verify_license_background)
+        # 30 phút = 30 * 60 * 1000 = 1800000 ms
+        self.license_check_timer.start(1800000)
+        
+        # Quét lần đầu tiên sau khi app mở 5 giây để cập nhật trạng thái PENDING 24H nếu có
+        QtCore.QTimer.singleShot(5000, self.verify_license_background)
 
-        # Setup background HWID verification timer
-        self.hwid_check_timer = QtCore.QTimer(self)
-        self.hwid_check_timer.timeout.connect(self.verify_hwid_background)
-        # 30 seconds = 30000 ms
-        self.hwid_check_timer.start(30000)
-
-    def verify_uid_background(self):
+    def verify_license_background(self):
         global CURRENT_UID
         if not CURRENT_UID or CURRENT_UID == "admtls12021":
             return
-            
+
         try:
             import urllib.request
-            import json
+            import csv
             
-            base_url = FIREBASE_URL.rstrip('/')
-            url = f"{base_url}/users/{CURRENT_UID}.json"
+            url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=10) as response:
-                user_info = json.loads(response.read().decode('utf-8'))
-                
+                content = response.read().decode('utf-8')
+            
+            reader = csv.reader(content.splitlines())
+            next(reader, None)
+            
+            user_info = None
+            for row in reader:
+                if row and len(row) >= 6 and row[0].strip().isdigit():
+                    if row[0].strip() == CURRENT_UID:
+                        user_info = {
+                            "hwid": row[4].strip(),
+                            "status": row[5].strip().upper()
+                        }
+                        break
+            
             if user_info is None:
-                self.force_exit_unauthorized("UID của bạn ĐÃ BỊ LOẠI khỏi danh sách hợp lệ (Có thể bạn đã gỡ Ref TLS1).")
-                return
+                # Không có trong hệ thống -> Đóng ngay lập tức
+                sys.exit(0)
                 
+            status = user_info.get('status', 'ON')
+            
+            if status == 'LOCK':
+                # Bị khóa -> Đóng ngay lập tức
+                sys.exit(0)
+                
+            if status == 'PENDING 24H':
+                # Chờ xử lý -> Cảnh báo nhân đạo 24h
+                self.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")
+                return
+
             registered_hwid = user_info.get('hwid', '')
             if registered_hwid and registered_hwid != "None" and registered_hwid != get_hwid():
-                self.force_exit_unauthorized("Tài khoản của bạn đang được truy cập trên một thiết bị không hợp lệ.")
-                
-        except Exception:
-            pass
-
-    def verify_hwid_background(self):
-        """Kiểm tra HWID ngầm mỗi 30 giây - đảm bảo máy khách không bị thay đổi."""
-        global CURRENT_UID
-        if not CURRENT_UID or CURRENT_UID == "admtls12021":
-            return
-
-        try:
-            import urllib.request
-            import json
-
-            base_url = FIREBASE_URL.rstrip('/')
-            url = f"{base_url}/users/{CURRENT_UID}.json"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                user_info = json.loads(response.read().decode('utf-8'))
-
-            if user_info is not None:
-                registered_hwid = user_info.get('hwid', '')
-                current_hwid = get_hwid()
-                if registered_hwid and registered_hwid != "None" and registered_hwid != current_hwid:
-                    self.force_exit_unauthorized("Phát hiện truy cập từ thiết bị không hợp lệ.\nTài khoản của bạn đã bị khóa vì lý do bảo mật.")
+                # Xóa HWID hoặc đổi máy -> Đóng ngay lập tức
+                sys.exit(0)
 
         except Exception:
             pass
 
-    def force_exit_unauthorized(self, reason):
-        msg = QtWidgets.QMessageBox(self)
-        msg.setWindowTitle("Cảnh báo vi phạm bảo mật")
-        msg.setText(f"{reason}\n\nỨng dụng sẽ tự động đóng. Vui lòng liên hệ Admin để giải quyết!")
-        msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
-        msg.setStyleSheet("""
-            QMessageBox {
-                background-color: #ffffff;
-            }
-            QMessageBox QLabel {
-                color: #000000;
-                font-size: 13px;
-            }
-            QPushButton {
-                background-color: #333333;
-                color: #ffffff;
-                border-radius: 4px;
-                padding: 6px 20px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #555555;
-            }
-        """)
-        msg.exec()
-        sys.exit(0)
+    def trigger_humane_warning(self, reason):
+        # Cảnh báo nhân đạo: Thay đổi dòng chào mừng, 24 tiếng sau mới tự đóng app (24 * 60 * 60 * 1000 = 86400000 ms)
+        warning_msg = f"⚠ {reason} Vui lòng liên hệ Admin TLS1 xử lý khiếu nại. App sẽ tự đóng sau 24h!"
+        if hasattr(self, 'lbl_main_welcome'):
+            self.lbl_main_welcome.setText(warning_msg)
+            self.lbl_main_welcome.setStyleSheet("color: #ff3333; font-weight: bold; font-size: 13px; background-color: #ffe6e6; padding: 5px; border-radius: 4px; border: 1px solid #ff3333;")
+            
+        if hasattr(self, 'license_check_timer'):
+            self.license_check_timer.stop()
+            
+        # Hẹn giờ 24h (86,400,000 ms) sau thoát app
+        QtCore.QTimer.singleShot(86400000, lambda: sys.exit(0))
 
 
     def update_tab_icons(self, index):

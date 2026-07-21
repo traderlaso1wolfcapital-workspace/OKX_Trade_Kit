@@ -373,6 +373,18 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
 # ==============================================================================
 # 🧠 ĐỘNG CƠ CỐT LÕI (CHẠY CHIẾN LƯỢC MỖI VÒNG LẶP)
 # ==============================================================================
+def get_current_candle_start_ms(tf_str: str) -> int:
+    import time
+    ts_sec = int(time.time())
+    if tf_str == "M5": period = 300
+    elif tf_str == "M15": period = 900
+    elif tf_str == "M30": period = 1800
+    elif tf_str == "H1": period = 3600
+    elif tf_str == "H2": period = 7200
+    elif tf_str == "H4": period = 14400
+    else: period = 300
+    return (ts_sec // period) * period * 1000
+
 def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
 
@@ -2135,8 +2147,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới
-                        last_closed_ts_for_tf = tracker.mtf_states.get(tf, {}).get("ts", 0)
+                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
+                        last_closed_ts_for_tf = get_current_candle_start_ms(tf)
                         
                         if old_sz == new_sz:
                             # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
@@ -2319,8 +2331,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới
-                        last_closed_ts_for_tf_s = tracker.mtf_states.get(tf, {}).get("ts", 0)
+                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
+                        last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
                         
                         if old_sz == new_sz:
                             # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
