@@ -227,9 +227,12 @@ def main():
     bot_sub2.load_global_config_from_json(env_paths, bot_config)
 
     last_realtime_scan, last_limit_setup, last_dashboard_update = 0.0, 0.0, 0.0
-    last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_sub2.py"))
-    last_ui_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_ui.py"))
-    last_cfg_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_config.py"))
+    try:
+        last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_sub2.py"))
+        last_ui_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_ui.py"))
+        last_cfg_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_config.py"))
+    except FileNotFoundError:
+        last_logic_mtime, last_ui_mtime, last_cfg_mtime = 0.0, 0.0, 0.0
 
     last_config_mtime = 0.0
     config_path = env_paths.get("FILE_GLOBAL_CONFIG", "")
@@ -263,9 +266,12 @@ def main():
             now = time.time()
             
             # 2. HOT RELOADER
-            curr_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_sub2.py"))
-            curr_ui_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_ui.py"))
-            curr_cfg_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_config.py"))
+            try:
+                curr_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_sub2.py"))
+                curr_ui_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_ui.py"))
+                curr_cfg_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_config.py"))
+            except FileNotFoundError:
+                curr_logic_mtime, curr_ui_mtime, curr_cfg_mtime = 0.0, 0.0, 0.0
             
             if curr_logic_mtime > last_logic_mtime:
                 try:

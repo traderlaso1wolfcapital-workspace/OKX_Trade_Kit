@@ -230,7 +230,10 @@ def main():
     bot_sub1.send_telegram_notification(f"🤖 Bot v23.0 PURE LIMIT CROSS đã kích hoạt trên {env_file}! Cấu trúc Dual-Core chống mất trạng thái.")
 
     last_realtime_scan, last_limit_setup, last_dashboard_update = 0.0, 0.0, 0.0
-    last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub1", "bot_sub1.py"))
+    try:
+        last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub1", "bot_sub1.py"))
+    except FileNotFoundError:
+        last_logic_mtime = 0.0
     
     last_config_mtime = 0.0
     config_path = env_paths["FILE_GLOBAL_CONFIG"]
@@ -303,7 +306,10 @@ def main():
 
             # 🔥 HOT-RELOAD CHECKER
             logic_path = os.path.join(CURRENT_DIR, "z_bot_sub1", "bot_sub1.py")
-            current_mtime = os.path.getmtime(logic_path)
+            try:
+                current_mtime = os.path.getmtime(logic_path)
+            except FileNotFoundError:
+                current_mtime = 0.0
             
             config_path_hot = os.path.join(CURRENT_DIR, "z_bot_sub1", "bot_config.py")
             ui_path_hot = os.path.join(CURRENT_DIR, "z_bot_sub1", "bot_ui.py")
