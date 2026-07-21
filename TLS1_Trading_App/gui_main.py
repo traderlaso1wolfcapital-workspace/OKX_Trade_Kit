@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.129"
+APP_VERSION = "1.0.130"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1553,11 +1553,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.init_ui()
         self.apply_dark_theme()
         
-        # Check for updates in background
+        # Check for updates in background (Quét định kỳ mỗi 30 phút)
         self.update_check_timer = QtCore.QTimer(self)
-        self.update_check_timer.setSingleShot(True)
+        self.update_check_timer.setSingleShot(False)
         self.update_check_timer.timeout.connect(self.check_update_background)
-        self.update_check_timer.start(2000)
+        self.update_check_timer.start(1800000) # 30 phút = 1800000 ms
+        
+        # Vẫn giữ lịch quét lần đầu tiên sau khi app mở 2 giây cho nóng
+        QtCore.QTimer.singleShot(2000, self.check_update_background)
 
         # Setup background License verification timer (quét Google Sheet 30p 1 lần)
         self.license_check_timer = QtCore.QTimer(self)
