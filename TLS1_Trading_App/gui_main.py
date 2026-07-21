@@ -29,7 +29,10 @@ import dotenv
 
 if getattr(sys, 'frozen', False):
     _base = os.path.dirname(sys.executable)
-    USER_DATA_DIR = _base
+    # Sử dụng AppData/Local để đảm bảo luôn có quyền ghi file, tránh lỗi PermissionError
+    local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+    USER_DATA_DIR = os.path.join(local_app_data, 'TLS1_Trading')
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
 else:
     _base = os.path.dirname(os.path.abspath(__file__))
     USER_DATA_DIR = None
@@ -67,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.120"
+APP_VERSION = "1.0.121"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
