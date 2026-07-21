@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.126"
+APP_VERSION = "1.0.127"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1651,6 +1651,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def scan_env_files(self):
         env_files = set()
+        
+        # Tự động lót ổ 5 tài khoản phụ lúc khởi động
+        bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+        os.makedirs(bot_dir, exist_ok=True)
+        for i in range(1, 6):
+            default_env = os.path.join(bot_dir, f".env_sub{i}")
+            if not os.path.exists(default_env):
+                try:
+                    with open(default_env, "w", encoding="utf-8") as f:
+                        f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
+                except: pass
+                
+        # Tiếp tục quét như bình thường
         for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
             if not os.path.exists(root_dir): continue
             for d in os.listdir(root_dir):
