@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.121"
+APP_VERSION = "1.0.122"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -599,7 +599,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         self.split_view.addWidget(self.tab_logs)
         self.split_view.addWidget(self.tab_chart)
-        self.split_view.setSizes([550, 550])
+        self.split_view.setSizes([500, 500])
+        self.split_view.setStretchFactor(0, 5)
+        self.split_view.setStretchFactor(1, 5)
 
         self.tab_live_view.addTab(self.split_view, "📊 TỔNG QUAN (CHART & LOGS)")
 
@@ -614,12 +616,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Horizontal)
                 self.split_view.insertWidget(0, self.tab_logs)
                 self.split_view.insertWidget(1, self.tab_chart)
-                self.split_view.setSizes([550, 550])
+                self.split_view.setSizes([500, 500])
+                self.split_view.setStretchFactor(0, 5)
+                self.split_view.setStretchFactor(1, 5)
             else:
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Vertical)
                 self.split_view.insertWidget(0, self.tab_chart)
                 self.split_view.insertWidget(1, self.tab_logs)
-                self.split_view.setSizes([750, 350])
+                self.split_view.setSizes([400, 600])
+                self.split_view.setStretchFactor(0, 4)
+                self.split_view.setStretchFactor(1, 6)
                 
         self.combo_layout_mode.currentTextChanged.connect(on_layout_mode_changed)
         
@@ -1846,7 +1852,8 @@ class MainWindow(QtWidgets.QMainWindow):
             base_dir = os.path.dirname(current_exe_path)
             current_exe_name = os.path.basename(current_exe_path)
             
-            new_exe_path = os.path.join(base_dir, "TLS1_Trading_Update.exe")
+            import time
+            new_exe_path = os.path.join(base_dir, f"TLS1_Update_Temp_{int(time.time())}.exe")
             bat_path = os.path.join(base_dir, "update_app.bat")
             
             def reporthook(blocknum, blocksize, totalsize):
@@ -1865,9 +1872,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 bat_content = f"""@echo off
 echo Dang cap nhat phien ban moi... Vui long doi...
 timeout /t 2 /nobreak >nul
-del /f /q "{current_exe_name}"
-rename "TLS1_Trading_Update.exe" "{current_exe_name}"
-start "" "{current_exe_name}"
+del /f /q "{current_exe_path}"
+move /y "{new_exe_path}" "{current_exe_path}"
+start "" "{current_exe_path}"
 del /f /q "%~f0"
 """
                 with open(bat_path, "w", encoding="utf-8") as f:
