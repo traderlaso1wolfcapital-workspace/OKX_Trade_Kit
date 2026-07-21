@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.134"
+APP_VERSION = "1.0.135"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2424,9 +2424,9 @@ def main():
     app.setStyle("Fusion")
     
     if getattr(sys, 'frozen', False):
-        global_logo = os.path.join(sys._MEIPASS, "media", "logo_rounded.png")
+        global_logo = os.path.join(sys._MEIPASS, "media", "logo.png")
     else:
-        global_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "logo_rounded.png")
+        global_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "logo.png")
     try:
         if os.path.exists(global_logo):
             app.setWindowIcon(QtGui.QIcon(global_logo))
