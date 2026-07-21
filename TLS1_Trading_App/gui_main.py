@@ -67,7 +67,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.118"
+APP_VERSION = "1.0.119"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -671,9 +671,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         form_layout.setFormAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
         form_layout.setSpacing(5)
 
-        self.input_api_key.setMinimumWidth(400)
-        self.input_secret_key.setMinimumWidth(400)
-        self.input_passphrase.setMinimumWidth(400)
+        self.input_api_key.setFixedWidth(400)
+        self.input_secret_key.setFixedWidth(400)
+        self.input_passphrase.setFixedWidth(400)
         
         form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
         form_layout.addRow("Mã API (API Key):", self.input_api_key)
