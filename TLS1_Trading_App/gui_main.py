@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.130"
+APP_VERSION = "1.0.131"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1890,8 +1890,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 
                 bat_content = f"""@echo off
 echo Dang cap nhat phien ban moi... Vui long doi...
+:retry
 timeout /t 2 /nobreak >nul
 del /f /q "{current_exe_path}"
+if exist "{current_exe_path}" goto retry
 move /y "{new_exe_path}" "{current_exe_path}"
 start "" "{current_exe_path}"
 del /f /q "%~f0"
@@ -1903,7 +1905,7 @@ del /f /q "%~f0"
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 subprocess.Popen([bat_path], startupinfo=startupinfo)
                 
-                sys.exit(0)
+                os._exit(0)
             except Exception as e:
                 if os.path.exists(new_exe_path):
                     try: os.remove(new_exe_path)
