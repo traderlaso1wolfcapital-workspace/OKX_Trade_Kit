@@ -70,7 +70,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.125"
+APP_VERSION = "1.0.126"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -327,6 +327,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if os.path.exists(PROJECT_DIR):
             self.env_files.extend([f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')])
         bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+        os.makedirs(bot_dir, exist_ok=True)
+        # Tự động tạo 5 tài khoản phụ rỗng mặc định nếu chưa có
+        for i in range(1, 6):
+            default_env = os.path.join(bot_dir, f".env_sub{i}")
+            if not os.path.exists(default_env):
+                try:
+                    with open(default_env, "w", encoding="utf-8") as f:
+                        f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
+                except: pass
         if os.path.exists(bot_dir):
             self.env_files.extend([f for f in os.listdir(bot_dir) if f.startswith('.env') and not f.endswith('.bak') and f not in self.env_files])
         if '.env' not in self.env_files:
