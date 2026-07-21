@@ -214,10 +214,18 @@ def main():
 
     print(f"\n✅  SMC ORDER BLOCK BOT KHỞI ĐỘNG TRÊN [{env_file}]...")
 
+    # Nạp cấu hình JSON ngay khi khởi động
+    bot_sub2.load_global_config_from_json(env_paths, bot_config)
+
     last_realtime_scan, last_limit_setup, last_dashboard_update = 0.0, 0.0, 0.0
     last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_sub2.py"))
     last_ui_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_ui.py"))
     last_cfg_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "z_bot_sub2", "bot_config.py"))
+
+    last_config_mtime = 0.0
+    config_path = env_paths.get("FILE_GLOBAL_CONFIG", "")
+    if config_path and os.path.exists(config_path):
+        last_config_mtime = os.path.getmtime(config_path)
 
     import z_bot_sub2.bot_ui as bot_ui
 
@@ -291,7 +299,18 @@ def main():
                         json_cfg_mtime = os.path.getmtime(json_config_path)
                         if cfg_py_mtime > json_cfg_mtime:
                             bot_sub2.sync_config_to_json(env_paths, bot_config)
+                            last_config_mtime = os.path.getmtime(json_config_path)
                 except Exception as e: print(f"❌ Lỗi Hot-Reload bot_config: {e}")
+
+            # ⚙️ ĐỒNG BỘ CẤU HÌNH ĐỘNG TỪ FILE JSON CỦA GUI (Sub2 SMC)
+            if config_path and os.path.exists(config_path):
+                cfg_mtime = os.path.getmtime(config_path)
+                if cfg_mtime > last_config_mtime:
+                    try:
+                        bot_sub2.load_global_config_from_json(env_paths, bot_config)
+                        last_config_mtime = cfg_mtime
+                        print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới từ file JSON (Sub2 SMC)!")
+                    except Exception as e: print(f"❌ Lỗi Hot-Reload JSON: {e}")
 
             # 3. STATIC HEARTBEAT: RUN_STRATEGY_CYCLE (2 giây)
             if now - last_realtime_scan >= 2.0:

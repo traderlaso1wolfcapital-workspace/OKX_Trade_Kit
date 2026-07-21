@@ -71,7 +71,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.132"
+APP_VERSION = "1.0.133"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1552,6 +1552,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.env_files = self.scan_env_files()
         self.init_ui()
         self.apply_dark_theme()
+        
+        # --- Clean up garbage update files ---
+        try:
+            current_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+            for f in os.listdir(current_dir):
+                if f.startswith("TLS1_Update_Temp_") and f.endswith(".exe"):
+                    try:
+                        os.remove(os.path.join(current_dir, f))
+                    except:
+                        pass
+                elif f == "update_app.bat":
+                    try:
+                        os.remove(os.path.join(current_dir, f))
+                    except:
+                        pass
+        except:
+            pass
+        # -------------------------------------
         
         # Check for updates in background (Quét định kỳ mỗi 30 phút)
         self.update_check_timer = QtCore.QTimer(self)
