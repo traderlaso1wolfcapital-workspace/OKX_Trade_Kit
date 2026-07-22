@@ -134,7 +134,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
             detail = "Order Block SMC (SHORT)"
         else:
             detail = "Order Block SMC (CHỜ TÍN HIỆU)"
-        print(f"       ❶ {coin:<4}: THUẬN XU HƯỚNG  {detail}")
+        print(f"       · {coin:<4}: THUẬN XU HƯỚNG  {detail}")
 
     # BẢNG COIN — Cột OB luôn width cố định 23 ký tự, dấu | thẳng hàng
     OB_W = 23  # width cố định cho mỗi cột OB ZONE

@@ -142,9 +142,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     # ⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT
     # ==============================================================================
     MODE_LABELS_H = {
-        "MAIN":    ("❶", "THUẬN XU HƯỚNG"),
-        "XOLE":    ("❷", "XO LE HEDGE"),
-        "PINGPONG":("❸", "PING-PONG NÉN"),
+        "MAIN":    ("·", "THUẬN XU HƯỚNG"),
+        "XOLE":    ("·", "XO LE HEDGE"),
+        "PINGPONG":("·", "PING-PONG NÉN"),
         "SIDEWAY": ("·", "SIDEWAY / CHỜ"),
     }
     _alt_mode = "🔄 ON (Neo BTC)" if getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True) else "🔒 LOCK (EMA riêng)"
@@ -175,7 +175,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             if tk.has_long: sides.append(f"Long {pos_tf}")
             if tk.has_short: sides.append(f"Short {pos_tf}")
             side_str = " / ".join(sides)
-            active_strategies["MAIN"].append(f"       ❶ {coin_n}: {strategy_tag}  {side_str} → DCA đến H4 ( Co giãn: {tk.current_vol_mult:.2f}x )")
+            active_strategies["MAIN"].append(f"       · {coin_n}: {strategy_tag}  {side_str} → DCA đến H4 ( Co giãn: {tk.current_vol_mult:.2f}x )")
             has_any = True
         elif tk.trend in ("UPTREND", "DOWNTREND", "HEDGE"):
             mkey = "MAIN"
@@ -440,14 +440,14 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     print("-" * 95)
 
     print("\n✜ TÌNH TRẠNG VỊ THẾ:")
-    # ⚡ Thu thập tất cả dòng output, sắp xếp theo chiến thuật (❶→❷→❸)
+    # ⚡ Thu thập tất cả dòng output, sắp xếp theo chiến thuật
     def _get_mode_icon(tk, side):
-        """Trả về icon chiến thuật: ❶=MAIN, ❷=XOLE, ❸=PING-PONG"""
+        """Trả về icon chiến thuật"""
         if getattr(tk, "is_ping_pong_pos", False) and getattr(tk, "ping_pong_pos_side", "") == side:
-            return "❸", 3
+            return "·", 3
         if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_pos_side", "") == side:
-            return "❷", 2
-        return "❶", 1
+            return "·", 2
+        return "·", 1
 
     pos_lines = []  # list of (mode_priority, coin_name, line_list)
     for cfg in COIN_PORTFOLIO:

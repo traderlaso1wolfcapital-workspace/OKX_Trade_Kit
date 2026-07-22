@@ -95,11 +95,11 @@ class AssetTracker:
         # ⚡ Xác định icon chiến thuật
         _mode_icon = ""
         if getattr(self, "is_ping_pong_pos", False) and getattr(self, "ping_pong_pos_side", "") == side:
-            _mode_icon = "❸"
+            _mode_icon = "·"
         elif getattr(self, "is_xole_pos", False) and getattr(self, "xole_pos_side", "") == side:
-            _mode_icon = "❷"
+            _mode_icon = "·"
         else:
-            _mode_icon = "❶"
+            _mode_icon = "·"
         self.closed_history.append({
             "side": side, "roi": float(roi), "reason": self.last_closed_reason,
             "dca_tfs": dca_label, "mode_icon": _mode_icon,
