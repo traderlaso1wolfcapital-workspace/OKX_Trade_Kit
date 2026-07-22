@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.191"
+APP_VERSION = "1.0.192"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2006,7 +2006,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_update_check_result(self, result):
         has_update, remote_version, remote_data = result
         if has_update is True:
-            self.btn_update.setText(f"🚀 Cập nhật App (v{remote_version})")
+            self.btn_update.setText(f"🚀 Cập nhật ngay (v{remote_version})")
             
             # Tạo hiệu ứng nhấp nháy nhẹ nhàng đổi màu để thu hút chú ý
             if not hasattr(self, 'update_btn_timer'):
@@ -2017,8 +2017,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.update_btn_color_state = not self.update_btn_color_state
                     if self.update_btn_color_state:
                         self.btn_update.setStyleSheet("""
-                            QPushButton { background-color: #10b981; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; border: 1px solid #059669; }
-                            QPushButton:hover { background-color: #059669; }
+                            QPushButton { background-color: #f59e0b; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; }
+                            QPushButton:hover { background-color: #d97706; }
                         """)
                     else:
                         self.btn_update.setStyleSheet("""
@@ -2027,7 +2027,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         """)
                         
                 self.update_btn_timer.timeout.connect(toggle_color)
-                self.update_btn_timer.start(500) # Đổi màu mỗi 500ms (nhịp đập nhanh hơn)
+                self.update_btn_timer.start(800) # Đổi màu mỗi 800ms
                 
                 # Gọi ngay lần đầu để set màu
                 toggle_color()
