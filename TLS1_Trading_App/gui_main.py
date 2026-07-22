@@ -25,6 +25,29 @@ def fix_qtwebengine_path():
 
 fix_qtwebengine_path()
 
+_GLOBAL_AUDIO_PLAYERS = []
+def play_ui_sound(sound_file, volume=0.5):
+    try:
+        from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+        from PyQt6.QtCore import QUrl
+        import os
+        global _GLOBAL_AUDIO_PLAYERS
+        from PyQt6.QtMultimedia import QMediaPlayer as QMP
+        _GLOBAL_AUDIO_PLAYERS = [p for p in _GLOBAL_AUDIO_PLAYERS if p.playbackState() == QMP.PlaybackState.PlayingState]
+        
+        player = QMediaPlayer()
+        audio_output = QAudioOutput(player)
+        player.setAudioOutput(audio_output)
+        audio_output.setVolume(volume)
+        
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", sound_file)
+        if os.path.exists(path):
+            player.setSource(QUrl.fromLocalFile(path))
+            player.play()
+            _GLOBAL_AUDIO_PLAYERS.append(player)
+    except Exception:
+        pass
+
 
 import time
 import ctypes
@@ -411,6 +434,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.account_dropdown.blockSignals(False)
 
     def create_new_account(self):
+        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
         text, ok = QtWidgets.QInputDialog.getText(self, "Tạo Tài Khoản Mới", "Nhập tên tài khoản (viết liền không dấu, ví dụ: account2):")
         if ok and text:
             text = text.strip()
@@ -437,6 +461,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg.exec()
 
     def delete_account(self):
+        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
         env_name = self.account_dropdown.currentData()
         if not env_name:
             return
@@ -822,6 +847,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_hwid_display.setToolTip("Click để copy Mã Máy")
         
         def on_copy_hwid():
+            play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             QtWidgets.QApplication.clipboard().setText(hwid_val)
             self.btn_hwid_display.setText("✅ Đã Copy!")
             QtCore.QTimer.singleShot(1500, lambda: self.btn_hwid_display.setText(hwid_val))
@@ -1374,7 +1400,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             pass
 
     def save_api_settings(self):
-        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
+        play_ui_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         
@@ -1400,7 +1426,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
                 timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
                 method = 'GET'
-                request_path = '/api/v5/account/balance'
+                request_path = '/api/v5/account/config'
                 message = timestamp + method + request_path
                 
                 mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod='sha256')
@@ -1426,6 +1452,22 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     if res.get("code") != "0":
                         raise Exception(res.get("msg", "Unknown OKX Error"))
                         
+                    # --- KIỂM TRA BẢO MẬT UID CHÍNH/PHỤ ---
+                    global CURRENT_UID
+                    if CURRENT_UID != "admtls12021":
+                        data_arr = res.get("data", [])
+                        if data_arr:
+                            main_uid = data_arr[0].get("mainUid", "")
+                            if main_uid and str(main_uid) != str(CURRENT_UID):
+                                display_err = f"API Key này KHÔNG thuộc về UID {CURRENT_UID}!\n\nVui lòng chỉ nhập API Key của tài khoản chính hoặc tài khoản phụ trực thuộc UID {CURRENT_UID}."
+                                msg = QtWidgets.QMessageBox(self)
+                                msg.setWindowTitle("Lỗi API Key (Sai Chủ)")
+                                msg.setText(display_err)
+                                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                                msg.exec()
+                                self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
+                                self.btn_save_api.setEnabled(True)
+                                return
             except urllib.error.HTTPError as e:
                 err_msg = str(e)
                 try:
@@ -1442,7 +1484,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
-                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1452,7 +1494,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"Không thể xác thực API Key:\n{str(e)}")
-                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1478,7 +1520,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg.exec()
 
     def save_strategy_settings(self):
-        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
+        play_ui_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         acc_name = self.get_acc_name()
@@ -1504,8 +1546,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "RISK_PER_TRADE_PCT": str(round(self.smc_input_risk_pct.value() / 100.0, 4)),
                 "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.smc_input_pos_vol.value(), 2)),
                 # Smart Money Concepts
-                "SMC_MODE": self.smc_combo_mode.currentText(),
-                "SMC_STYLE": self.smc_combo_style.currentText(),
                 # Internal Structure
                 "SMC_SHOW_INTERNAL": self.smc_chk_show_int.isChecked(),
                 "SMC_INT_BULL": self.smc_combo_int_bull.currentText(),
@@ -1602,10 +1642,53 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg.setText(f"Đã lưu Cấu Hình Chiến Thuật vào {env_file}!")
         msg.exec()
 
+    def _verify_env_security(self, env_path):
+        global CURRENT_UID
+        if CURRENT_UID == "admtls12021": return True
+        try:
+            import hmac, base64, urllib.request, json, datetime
+            api_key, secret_key, passphrase, is_demo = "", "", "", False
+            if not os.path.exists(env_path): return False
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("OKX_API_KEY="): api_key = line.strip().split("=")[1].strip('"')
+                    elif line.startswith("OKX_SECRET_KEY="): secret_key = line.strip().split("=")[1].strip('"')
+                    elif line.startswith("OKX_PASSPHRASE="): passphrase = line.strip().split("=")[1].strip('"')
+                    elif line.startswith("OKX_IS_DEMO="): is_demo = (line.strip().split("=")[1].strip('"').lower() == "true")
+            if not api_key or not secret_key: return False
+            timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
+            request_path = '/api/v5/account/config'
+            message = timestamp + 'GET' + request_path
+            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod='sha256')
+            sign = base64.b64encode(mac.digest()).decode('utf-8')
+            headers = {
+                'OK-ACCESS-KEY': api_key, 'OK-ACCESS-SIGN': sign, 'OK-ACCESS-TIMESTAMP': timestamp,
+                'OK-ACCESS-PASSPHRASE': passphrase, 'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            if is_demo: headers['x-simulated-trading'] = '1'
+            req = urllib.request.Request("https://www.okx.com" + request_path, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as response:
+                res = json.loads(response.read().decode('utf-8'))
+                if res.get("code") != "0": return False
+                data_arr = res.get("data", [])
+                if data_arr:
+                    main_uid = data_arr[0].get("mainUid", "")
+                    if main_uid and str(main_uid) != str(CURRENT_UID): return False
+            return True
+        except Exception:
+            return False
+
     def start_bot(self):
-        self.play_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
+        play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
         env_file = self.get_selected_env()
         if not env_file: return
+        
+        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+        if not self._verify_env_security(env_path):
+            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+            QtWidgets.QMessageBox.critical(self, "Khóa Bảo Mật", f"LỖI BẢO MẬT: API Key trong cấu hình {env_file} không hợp lệ hoặc KHÔNG thuộc quyền sở hữu của UID {CURRENT_UID}.\n\nHệ thống đã khóa lệnh chạy Bot để bảo vệ an toàn!")
+            return
         
         flag_path = os.path.join(USER_DATA_DIR, "json_data", f"stop_{self.strategy_id}.flag")
         if os.path.exists(flag_path):
@@ -1627,24 +1710,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.status_led.setStyleSheet("color: #00FF00; padding-left:10px;")
 
     def stop_bot(self):
-        self.play_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
+        play_ui_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
         if self.worker:
             self.btn_stop.setEnabled(False)
             self.worker.stop()
 
     def reset_wallet(self):
-        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
-        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
 
     def on_bot_finished(self):
+        play_ui_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
         self.log_display.appendPlainText("\n🛑 Bot đã dừng hoàn toàn.")
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
@@ -1819,7 +1903,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def trigger_humane_warning(self, reason):
-        self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.8)
+        play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.8)
         # Cảnh báo nhân đạo: Thay đổi dòng chào mừng, 24 tiếng sau mới tự đóng app (24 * 60 * 60 * 1000 = 86400000 ms)
         warning_msg = f'⚠ {reason} Vui lòng <b><a href="login" style="color:#ff3333;text-decoration:underline;">Click vào đây để mở bảng Liên hệ Admin TLS1</a></b> xử lý khiếu nại. App sẽ tự đóng sau 24h!'
         if hasattr(self, 'lbl_main_welcome'):
@@ -1925,6 +2009,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_main_logout.hide()
         
         def on_main_logout():
+            play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
             reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                 import sys, subprocess, os
@@ -2017,6 +2102,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bot_tabs.addTab(self.panel_sub2, "Bot SMC - OB")
 
     def check_for_updates(self):
+        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
         # Không tự động check liên tục nữa để tránh đơ máy
         pass
 
@@ -2445,6 +2531,7 @@ class LoginDialog(QtWidgets.QDialog):
         self.lbl_guide.setStyleSheet("color: #aaaaaa; font-size: 11px; font-weight: normal; margin-top: 5px;")
         
         def handle_ref_click(link):
+            play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             if link == "copy_ref":
                 QtWidgets.QApplication.clipboard().setText("HoanPhiTLS1")
                 QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), "✅ Đã Copy Mã Ref!", self.lbl_guide, QtCore.QRect(), 1500)
@@ -2516,6 +2603,7 @@ class LoginDialog(QtWidgets.QDialog):
         layout.addWidget(contact_frame)
         
     def check_login(self):
+        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
         global IS_LOGGED_IN, CURRENT_USER, CURRENT_UID
         uid = self.input_uid.text().strip()
         
@@ -2530,10 +2618,12 @@ class LoginDialog(QtWidgets.QDialog):
         # -------------------------------------
         
         if not uid:
+            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.warning(self, "Lỗi", "UID không được để trống!")
             return
             
         if not uid.isdigit():
+            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.warning(self, "Lỗi", "UID chỉ bao gồm các chữ số!")
             return
             
@@ -2573,6 +2663,7 @@ class LoginDialog(QtWidgets.QDialog):
             if user_info is not None:
                 status = user_info.get('status', 'ON')
                 if status == 'LOCK':
+                    play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                     QtWidgets.QMessageBox.critical(self, "Tài khoản bị khóa", "Tài khoản UID này đã bị Admin khóa.\n\nVui lòng nhắn tin Admin để yêu cầu kiểm tra lại UID.")
                     self.btn_login.setText("Đăng Nhập")
                     self.btn_login.setEnabled(True)
@@ -2608,6 +2699,7 @@ class LoginDialog(QtWidgets.QDialog):
                 self.logged_in_status = status
                 self.accept()
             else:
+                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 QtWidgets.QMessageBox.warning(
                     self, 
                     "Từ chối truy cập", 
@@ -2618,6 +2710,7 @@ class LoginDialog(QtWidgets.QDialog):
                 self.btn_login.setEnabled(True)
                 
         except Exception as e:
+            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.critical(self, "Lỗi kết nối", f"Không thể lấy dữ liệu từ hệ thống:\n{str(e)}\n\nVui lòng kiểm tra lại mạng!")
             self.btn_login.setText("Đăng Nhập")
             self.btn_login.setEnabled(True)

@@ -20,6 +20,7 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[23/07/2026]** - Lỗi văng App do thiếu thuộc tính play_sound trên MainWindow và sót biến smc_combo_mode khi lưu cấu hình. Đã fix: Refactor trình phát âm thanh thành hàm toàn cục play_ui_sound() và dọn dẹp các biến cấu hình SMC rác (Mã patch: z3322).
 - **[16/07/2026]** - Lỗi `bot_sub1` Altcoin Neo BTC entry bị đẩy cao hơn giá live khi BTC sát EMA200 hoặc bị overshoots sâu qua EMA. Đã fix: Bỏ `volatility_mult` khỏi base offset và áp dụng cơ chế **EMA Floor Clamp**: Giới hạn entry của Altcoin không vượt quá ngưỡng an toàn `EMA200_Altcoin * (1 +/- base_buffer)` của chính nó (Mã patch: `z3318`).
 - **[16/07/2026]** - Lỗi `bot_sub1` rải lưới DCA quá sát nhau ở các khung lớn do khoảng cách chặn (DCA_GAP) tính toán sai. Đã fix: Chuyển hệ số nhân từ `TF_VOLUME_MULTIPLIERS` sang `TF_MULTIPLIERS` và set lại Base Gap về chuẩn 0.5% (`0.0050`) để các lưới H1, H2, H4 giãn ra đúng cấp số nhân (Mã patch: `z3319`).
 - **[16/07/2026]** - Tối ưu Giao diện UI: Lệnh BTC và Altcoin hiển thị lộn xộn trong bảng trạng thái. Đã fix: Sửa logic sort trong `bot_ui.py` để ép hạng mục `BTC` luôn được ưu tiên in ra đầu tiên trong bảng `✜ TÌNH TRẠNG VỊ THẾ` dù đang pending hay đã khớp (Mã patch: `z3320`).
