@@ -178,7 +178,7 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
         # Quét sạch cả hai tiền tố lệnh cũ (scv25) và mới (scvlmt) để tránh sót lệnh trên sàn
-        ours_algo = [o for o in pending_algo if (o.get("clOrdId", "").startswith("scvlmt") or o.get("clOrdId", "").startswith("scv25")) and o.get("tdMode") == td_mode]
+        ours_algo = [o for o in pending_algo if (o.get("clOrdId", "").startswith("scvlmt") or o.get("clOrdId", "").startswith("scv25") or o.get("clOrdId", "").startswith(CL_ORD_PREFIX)) and o.get("tdMode") == td_mode]
         if pos_side: ours_algo = [o for o in ours_algo if o.get("posSide") == pos_side]
         if ours_algo: 
             body_cancel = [{"algoId": o["algoId"], "instId": o["instId"]} for o in ours_algo]
@@ -294,7 +294,7 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                         if w > current_weight:
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
-                            if dist <= Decimal("0.003"):
+                            if dist <= Decimal("0.006"):
                                 upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
                                 break
             except Exception:

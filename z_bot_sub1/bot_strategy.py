@@ -1131,7 +1131,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if w > current_weight:
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
-                            if dist <= Decimal("0.003"):
+                            if dist <= Decimal("0.006"):
                                 upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
                                 break
                                     
@@ -1290,7 +1290,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if w > current_weight:
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
-                            if dist <= Decimal("0.003"):
+                            if dist <= Decimal("0.006"):
                                 upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
                                 break
                                     
