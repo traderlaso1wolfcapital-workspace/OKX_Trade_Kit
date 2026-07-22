@@ -14,7 +14,7 @@ from z_bot_sub2.bot_config import (
     # Data & Timeframe
     TIMEFRAME_BASE, TIMEFRAME_HEDGE, LIMIT_CANDLES, M30_LIMIT_CANDLES,
     # Volume & Risk
-    POSITION_VOLUME_HIGH_CONFIDENCE, LEVERAGE,
+    POSITION_VOLUME_HIGH_CONFIDENCE, LEVERAGE, POSITION_MODE,
     SWING_VOLUME_USDT, SWING_RISK_PCT,
     INTERNAL_VOLUME_USDT, INTERNAL_RISK_PCT, INTERNAL_LEVERAGE,
     # SMC General
@@ -78,10 +78,9 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
     pos_side = "long" if setup.bias == BULLISH else "short"
     cl_id = f"{cl_prefix}{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
     try:
-        # Internal OB → isolated 50x, Swing OB → cross 100x
-        is_internal_ob = (setup.ob_source == "INTERNAL" or (hasattr(setup, 'ob_source') and setup.ob_source.startswith("INTERNAL")))
-        td_mode = "isolated" if is_internal_ob else "cross"
-        lever = str(INTERNAL_LEVERAGE) if td_mode == "isolated" else str(LEVERAGE)
+        # Đồng nhất sử dụng POSITION_MODE và LEVERAGE cho mọi OB (tránh lỗi mismatch OKX)
+        td_mode = POSITION_MODE
+        lever = str(LEVERAGE)
         # Set leverage trước khi đặt lệnh
         try:
             client.request("POST", "/api/v5/account/set-leverage", body={
@@ -221,4 +220,4 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     except Exception as e:
         print(f"⚠️ [SMC STARTUP CLEANUP LỖI]: {e}")
 
-
+# z7717 | Đồng nhất tdMode và lever (POSITION_MODE, LEVERAGE) cho mọi OB để tránh lỗi Margin mode mismatch trên OKX.
