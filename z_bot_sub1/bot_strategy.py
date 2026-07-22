@@ -661,11 +661,25 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
                     break
             
-            # Quét từ lớn xuống bé (H4 -> M5)
-            for tf_cand in ["H4", "H2", "H1", "M30", "M15", "M5"]:
-                expected_vol = _target_usdt * vol_mults.get(tf_cand, Decimal("1.0"))
-                if current_vol_usdt >= (expected_vol * _coin_vol_mult) * Decimal("0.85"):
-                    return tf_cand
+            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            if not old_has:
+                # Cumulative matching (khi restart bot, tính tổng volume dồn)
+                cumulative_vols = {}
+                cum_sum = Decimal("0")
+                for tf_cand in tfs_order:
+                    expected = _target_usdt * vol_mults.get(tf_cand, Decimal("1.0")) * _coin_vol_mult
+                    cum_sum += expected
+                    cumulative_vols[tf_cand] = cum_sum
+                
+                for tf_cand in reversed(tfs_order):
+                    if current_vol_usdt >= cumulative_vols[tf_cand] * Decimal("0.85"):
+                        return tf_cand
+            else:
+                # Individual matching (khi đang chạy live có fill mới)
+                for tf_cand in reversed(tfs_order):
+                    expected = _target_usdt * vol_mults.get(tf_cand, Decimal("1.0")) * _coin_vol_mult
+                    if current_vol_usdt >= expected * Decimal("0.85"):
+                        return tf_cand
         except: pass
             
         # Fallback 2: Kiểm tra lệnh Pending
@@ -1102,9 +1116,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 
             try:
                 tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}
                 current_weight = tf_weights.get(max_filled_tf, 0)
                 upgrade_tf = max_filled_tf
-                upgrade_weight = current_weight
                 
                 temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
                 base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
@@ -1118,9 +1132,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
                             if dist <= Decimal("0.003"):
-                                if w > upgrade_weight:
-                                    upgrade_tf = tf
-                                    upgrade_weight = w
+                                upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
+                                break
                                     
                 if upgrade_tf != max_filled_tf:
                     max_filled_tf = upgrade_tf
@@ -1262,9 +1275,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 
             try:
                 tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}
                 current_weight = tf_weights.get(max_filled_tf, 0)
                 upgrade_tf = max_filled_tf
-                upgrade_weight = current_weight
                 
                 temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
                 base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
@@ -1278,9 +1291,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
                             if dist <= Decimal("0.003"):
-                                if w > upgrade_weight:
-                                    upgrade_tf = tf
-                                    upgrade_weight = w
+                                upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
+                                break
                                     
                 if upgrade_tf != max_filled_tf:
                     max_filled_tf = upgrade_tf
@@ -2227,8 +2239,17 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 tf_mode = _get_td_mode(tf)
                 tf_orders = []
                 for o in actual_pending:
-                    if o.get("clOrdId", "").startswith(f"{CL_ORD_PREFIX}EL{tf}") and o.get("tdMode") == tf_mode and o.get("side") == "buy":
-                        tf_orders.append(o)
+                    if o.get("tdMode") == tf_mode and o.get("side") == "buy":
+                        cl_id = o.get("clOrdId", "")
+                        if cl_id.startswith(f"{CL_ORD_PREFIX}EL{tf}"):
+                            tf_orders.append(o)
+                        elif not cl_id.startswith(CL_ORD_PREFIX):
+                            # Nhận diện lệnh đặt thủ công dựa trên volume
+                            try:
+                                o_sz = Decimal(o.get("sz", "0"))
+                                if o_sz > 0 and abs(o_sz - Decimal(str(sz_for_tf))) / Decimal(str(sz_for_tf)) <= Decimal("0.05"):
+                                    tf_orders.append(o)
+                            except: pass
                 
                 matching_order = None
                 if len(tf_orders) > 1:
@@ -2411,8 +2432,17 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 tf_mode = _get_td_mode(tf)
                 tf_orders = []
                 for o in actual_pending:
-                    if o.get("clOrdId", "").startswith(f"{CL_ORD_PREFIX}ES{tf}") and o.get("tdMode") == tf_mode and o.get("side") == "sell":
-                        tf_orders.append(o)
+                    if o.get("tdMode") == tf_mode and o.get("side") == "sell":
+                        cl_id = o.get("clOrdId", "")
+                        if cl_id.startswith(f"{CL_ORD_PREFIX}ES{tf}"):
+                            tf_orders.append(o)
+                        elif not cl_id.startswith(CL_ORD_PREFIX):
+                            # Nhận diện lệnh đặt thủ công dựa trên volume
+                            try:
+                                o_sz = Decimal(o.get("sz", "0"))
+                                if o_sz > 0 and abs(o_sz - Decimal(str(sz_for_tf))) / Decimal(str(sz_for_tf)) <= Decimal("0.05"):
+                                    tf_orders.append(o)
+                            except: pass
                 
                 matching_order = None
                 if len(tf_orders) > 1:

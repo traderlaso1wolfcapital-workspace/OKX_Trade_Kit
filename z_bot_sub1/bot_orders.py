@@ -272,9 +272,9 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         if tracker:
             try:
                 tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}
                 current_weight = tf_weights.get(max_filled_tf, 0)
                 upgrade_tf = max_filled_tf
-                upgrade_weight = current_weight
                 
                 temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
                 base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
@@ -295,26 +295,23 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                             pending_px = Decimal(px_str)
                             dist = abs(base_sl - pending_px) / pending_px
                             if dist <= Decimal("0.003"):
-                                if w > upgrade_weight:
-                                    upgrade_tf = tf
-                                    upgrade_weight = w
-                                    
-                if upgrade_tf != max_filled_tf:
-                    max_filled_tf = upgrade_tf
+                                upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
+                                break
             except Exception:
                 pass
         # ------------------------
 
-        tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+        tp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+        sl_tf_mult = globals_ref.TF_MULTIPLIERS.get(upgrade_tf, Decimal("1.0")) if 'upgrade_tf' in locals() else tp_tf_mult
         
         is_xl_pos = getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_pos_side", "") == side if tracker else False
         if is_xl_pos:
-            target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tf_mult)
-            target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * tf_mult)
+            target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult)
+            target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult)
         else:
             # Khóa cứng TP/SL tuyệt đối không nhân với hệ số co giãn, chỉ nhân hệ số TF
-            target_tp_pct = globals_ref.SCALPING_TP_PCT * tf_mult
-            target_sl_pct = globals_ref.SCALPING_SL_PCT * tf_mult
+            target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult
+            target_sl_pct = globals_ref.SCALPING_SL_PCT * sl_tf_mult
         
         if side in ["long", "net"]:
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
