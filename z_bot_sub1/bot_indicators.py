@@ -15,7 +15,7 @@ if getattr(sys, 'frozen', False):
     user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
     log_path = os.path.join(user_data_dir, "bot_error.log")
 else:
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot_error.log")
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "TLS1_Trading_App", "bot_error.log")
 handler = RotatingFileHandler(log_path, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(funcName)s:%(lineno)d | %(message)s')
 handler.setFormatter(formatter)

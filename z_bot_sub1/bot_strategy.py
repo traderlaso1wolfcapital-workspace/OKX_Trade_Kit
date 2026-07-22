@@ -15,7 +15,7 @@ if getattr(sys, 'frozen', False):
     user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
     log_path = os.path.join(user_data_dir, "bot_error.log")
 else:
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bot_error.log")
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "TLS1_Trading_App", "bot_error.log")
 handler = RotatingFileHandler(log_path, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8')
 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(funcName)s:%(lineno)d | %(message)s')
 handler.setFormatter(formatter)
@@ -924,8 +924,12 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     filled_tf = best_tf_manual
                 tracker.active_pos_tf = filled_tf
                 # Step 2: Ghi TF đã khớp, reset pos_cycle_closed_tfs cho chu kỳ mới
-                if filled_tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(filled_tf)
+                if filled_tf:
+                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                    if filled_tf in _tfs_all:
+                        for _cand in _tfs_all[:_tfs_all.index(filled_tf)+1]:
+                            if _cand not in tracker.pos_cycle_filled_tfs:
+                                tracker.pos_cycle_filled_tfs.append(_cand)
                 tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 _is_xl = getattr(tracker, "is_xole_pos", False)
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
@@ -941,8 +945,12 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
                     tracker.active_pos_tf = _tf
                 # KHẮC PHỤC LỖI INFINITE LOOP: Ghi nhận TF đã khớp để không bao giờ DCA lặp lại ở TF này nữa
-                if _tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(_tf)
+                if _tf:
+                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                    if _tf in _tfs_all:
+                        for _cand in _tfs_all[:_tfs_all.index(_tf)+1]:
+                            if _cand not in tracker.pos_cycle_filled_tfs:
+                                tracker.pos_cycle_filled_tfs.append(_cand)
                 tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 tracker.open_reason_long = f"DCA Khung Lớn Tăng tại [{_tf}]: Cập nhật trung bình giá"
 
@@ -962,8 +970,12 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     filled_tf = best_tf_manual
                 tracker.active_pos_tf = filled_tf
                 # Step 2: Ghi TF đã khớp cho SHORT
-                if filled_tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(filled_tf)
+                if filled_tf:
+                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                    if filled_tf in _tfs_all:
+                        for _cand in _tfs_all[:_tfs_all.index(filled_tf)+1]:
+                            if _cand not in tracker.pos_cycle_filled_tfs:
+                                tracker.pos_cycle_filled_tfs.append(_cand)
                 tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 _is_xl = getattr(tracker, "is_xole_pos", False)
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
@@ -978,8 +990,12 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
                     tracker.active_pos_tf = _tf
                 # KHẮC PHỤC LỖI INFINITE LOOP: Ghi nhận TF đã khớp để không bao giờ DCA lặp lại ở TF này nữa
-                if _tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(_tf)
+                if _tf:
+                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                    if _tf in _tfs_all:
+                        for _cand in _tfs_all[:_tfs_all.index(_tf)+1]:
+                            if _cand not in tracker.pos_cycle_filled_tfs:
+                                tracker.pos_cycle_filled_tfs.append(_cand)
                 tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 tracker.open_reason_short = f"DCA Khung Lớn Giảm tại [{_tf}]: Cập nhật trung bình giá"
     except Exception:
@@ -2241,7 +2257,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 for o in actual_pending:
                     if o.get("tdMode") == tf_mode and o.get("side") == "buy":
                         cl_id = o.get("clOrdId", "")
-                        if cl_id.startswith(f"{CL_ORD_PREFIX}EL{tf}"):
+                        if cl_id.startswith(f"{CL_ORD_PREFIX}EL{tf}") or cl_id.startswith(f"scvlmtEL{tf}") or cl_id.startswith(f"scv25EL{tf}"):
                             tf_orders.append(o)
                         elif not cl_id.startswith(CL_ORD_PREFIX):
                             # Nhận diện lệnh đặt thủ công dựa trên volume
@@ -2434,7 +2450,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 for o in actual_pending:
                     if o.get("tdMode") == tf_mode and o.get("side") == "sell":
                         cl_id = o.get("clOrdId", "")
-                        if cl_id.startswith(f"{CL_ORD_PREFIX}ES{tf}"):
+                        if cl_id.startswith(f"{CL_ORD_PREFIX}ES{tf}") or cl_id.startswith(f"scvlmtES{tf}") or cl_id.startswith(f"scv25ES{tf}"):
                             tf_orders.append(o)
                         elif not cl_id.startswith(CL_ORD_PREFIX):
                             # Nhận diện lệnh đặt thủ công dựa trên volume
