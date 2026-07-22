@@ -56,6 +56,50 @@ for _ in range(4):
 if not USER_DATA_DIR:
     USER_DATA_DIR = PROJECT_DIR
 
+def auto_reset_state_on_update(data_dir, base_dir):
+    try:
+        import glob, json
+        app_version = "1.0.0"
+        version_json_path = os.path.join(base_dir, "version.json")
+        if os.path.exists(version_json_path):
+            with open(version_json_path, "r", encoding="utf-8") as f:
+                app_version = json.load(f).get("version", "1.0.0")
+
+        version_file = os.path.join(data_dir, "version.txt")
+        current_version = ""
+        if os.path.exists(version_file):
+            with open(version_file, "r", encoding="utf-8") as f:
+                current_version = f.read().strip()
+                
+        if current_version != app_version:
+            print(f"App updated: {current_version} -> {app_version}. Resetting states...")
+            json_dir = os.path.join(data_dir, "json_data")
+            if os.path.exists(json_dir):
+                for fpath in glob.glob(os.path.join(json_dir, "*mtf_states.json")):
+                    try:
+                        os.remove(fpath)
+                        print(f"Deleted old state: {fpath}")
+                    except Exception:
+                        pass
+                        
+            import shutil
+            for cache_name in ["__pycache__", "cache", "GPUCache", "QtWebEngine"]:
+                for base_p in [data_dir, base_dir]:
+                    c_path = os.path.join(base_p, cache_name)
+                    if os.path.exists(c_path) and os.path.isdir(c_path):
+                        try:
+                            shutil.rmtree(c_path)
+                            print(f"Deleted cache: {c_path}")
+                        except Exception:
+                            pass
+            
+            with open(version_file, "w", encoding="utf-8") as f:
+                f.write(app_version)
+    except Exception as e:
+        print(f"Error auto reset state: {e}")
+
+auto_reset_state_on_update(USER_DATA_DIR, _base)
+
 FIREBASE_URL = "https://botvip-e5772-default-rtdb.asia-southeast1.firebasedatabase.app"
 
 sys.path.insert(0, PROJECT_DIR)
@@ -79,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.172"
+APP_VERSION = "1.0.173"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
