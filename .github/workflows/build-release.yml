@@ -42,7 +42,10 @@ jobs:
             TLS1_Trading_App/version.json
 
   build-mac:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [macos-13, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -96,7 +99,12 @@ jobs:
       - name: Create DMG
         run: |
           cd TLS1_Trading_App/dist
-          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "TLS1_Trading_Mac_Universal.dmg"
+          if [ "${{ matrix.os }}" == "macos-13" ]; then
+            DMG_NAME="TLS1_Trading_Mac_Intel.dmg"
+          else
+            DMG_NAME="TLS1_Trading_Mac_AppleSilicon.dmg"
+          fi
+          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "$DMG_NAME"
 
       - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
