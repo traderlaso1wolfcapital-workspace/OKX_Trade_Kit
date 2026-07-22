@@ -648,7 +648,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         # Fallback 1: So sánh tổng volume của lệnh đang chạy trên sàn với volume các TF
         try:
             _amt = (new_pos_amt - old_pos_amt) if old_has else new_pos_amt
-            current_vol_usdt = Decimal(str(_amt)) * Decimal(str(contract_val)) * avg_px
+            current_vol_usdt = Decimal(str(_amt)) * Decimal(str(contract_val)) * Decimal(str(avg_px))
             _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("450"))
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.4"),
