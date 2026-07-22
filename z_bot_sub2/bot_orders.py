@@ -197,7 +197,7 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
         import time
         print("🧹 [SMC STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh rác trên OKX...")
         for item in portfolio:
-            inst_id = item["coin"]
+            inst_id = item["swap"]
             try:
                 pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id}).get("data", [])
                 if pending_regular:
