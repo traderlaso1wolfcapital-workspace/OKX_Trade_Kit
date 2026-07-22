@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.186"
+APP_VERSION = "1.0.187"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -141,6 +141,7 @@ sys.excepthook = exception_hook
 
 try:
     from PyQt6 import QtWidgets, QtCore, QtGui
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
 except ImportError:
     if getattr(sys, 'frozen', False):
         raise ImportError("Thiếu thư viện PyQt6 trong file đóng gói. Hãy liên hệ admin.")
@@ -148,6 +149,7 @@ except ImportError:
     import importlib
     importlib.invalidate_caches()
     from PyQt6 import QtWidgets, QtCore, QtGui
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 try:
     from lightweight_charts.widgets import QtChart
@@ -532,6 +534,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.tab_strategy = QtWidgets.QWidget()
             self.setup_tab_strategy()
             self.tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
+            
+            # TAB 4: COMMUNITY CHAT
+            self.tab_community = QtWidgets.QWidget()
+            self.setup_tab_community()
+            self.tabs.addTab(self.tab_community, "💬 Cộng Đồng")
 
     def setup_tab_dashboard(self):
         dash_layout = QtWidgets.QVBoxLayout(self.tab_dashboard)
@@ -827,6 +834,80 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addWidget(hwid_box)
         
         layout.addStretch(1)
+
+    def setup_tab_community(self):
+        from PyQt6.QtWebEngineCore import QWebEnginePage
+        
+        class WebPopupWindow(QtWidgets.QDialog):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.setWindowTitle("Cửa sổ bảo mật")
+                self.resize(600, 700)
+                layout = QtWidgets.QVBoxLayout(self)
+                layout.setContentsMargins(0, 0, 0, 0)
+                self.view = QWebEngineView(self)
+                layout.addWidget(self.view)
+                
+        class ExternalLinkWebPage(QWebEnginePage):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.popup = None
+                self.main_view = parent
+
+            def acceptNavigationRequest(self, url, _type, isMainFrame):
+                # Không chặn link nữa để Auth chạy bình thường
+                return super().acceptNavigationRequest(url, _type, isMainFrame)
+
+            def createWindow(self, _type):
+                # Tạo một cửa sổ thật sự bên trong App để chứa popup đăng nhập, giữ lại liên kết window.opener
+                self.popup = WebPopupWindow(self.main_view)
+                # Tự động đóng cửa sổ khi trang web yêu cầu đóng (ví dụ sau khi đăng nhập xong)
+                self.popup.view.page().windowCloseRequested.connect(self.popup.close)
+                self.popup.show()
+                return self.popup.view.page()
+
+        layout = QtWidgets.QVBoxLayout(self.tab_community)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.webview_chat = QWebEngineView()
+        
+        # Bật cấu hình JS Popup
+        from PyQt6.QtWebEngineCore import QWebEngineSettings
+        settings = self.webview_chat.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+        
+        custom_page = ExternalLinkWebPage(self.webview_chat)
+        self.webview_chat.setPage(custom_page)
+        
+        chat_url = "https://www.cbox.ws/box/?boxid=3542247&boxtag=z1G88F"
+        
+        # Load from version.json if available
+        try:
+            if getattr(sys, 'frozen', False):
+                base_dir = sys._MEIPASS
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            v_file = os.path.join(base_dir, "version.json")
+            if os.path.exists(v_file):
+                with open(v_file, "r", encoding="utf-8") as f:
+                    chat_url = json.load(f).get("COMMUNITY_CHAT_URL", chat_url)
+        except Exception:
+            pass
+            
+        from PyQt6.QtWebEngineCore import QWebEngineProfile
+        profile = QWebEngineProfile.defaultProfile()
+        profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies)
+        
+        if chat_url.strip().startswith("<"):
+            html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#151515;height:100vh;display:flex;">
+            {chat_url.replace('width="800"', 'width="100%"').replace('height="600"', 'height="100%"')}
+            </body></html>"""
+            # Phải dùng baseUrl trùng với Project Website trên Widgetbot dashboard để vượt rào
+            self.webview_chat.setHtml(html, QtCore.QUrl("https://github.com"))
+        else:
+            self.webview_chat.setUrl(QtCore.QUrl(chat_url))
+        layout.addWidget(self.webview_chat)
 
     def setup_tab_strategy(self):
         if self.strategy_id == "sub2":
