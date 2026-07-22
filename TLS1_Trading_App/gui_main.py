@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.193"
+APP_VERSION = "1.0.194"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1346,7 +1346,35 @@ class BotInstanceWidget(QtWidgets.QWidget):
         except Exception as e: 
             print('Error setting defaults:', e)
 
+    def play_sound(self, sound_file, volume=0.5):
+        try:
+            from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PyQt6.QtCore import QUrl
+            import os
+            
+            # Lưu trữ player để không bị dọn dẹp (garbage collected) khi đang phát
+            if not hasattr(self, '_audio_players'):
+                self._audio_players = []
+                
+            # Dọn dẹp các player đã phát xong
+            from PyQt6.QtMultimedia import QMediaPlayer as QMP
+            self._audio_players = [p for p in self._audio_players if p.playbackState() == QMP.PlaybackState.PlayingState]
+            
+            player = QMediaPlayer(self)
+            audio_output = QAudioOutput(player)
+            player.setAudioOutput(audio_output)
+            audio_output.setVolume(volume)
+            
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", sound_file)
+            if os.path.exists(path):
+                player.setSource(QUrl.fromLocalFile(path))
+                player.play()
+                self._audio_players.append(player)
+        except Exception as e:
+            pass
+
     def save_api_settings(self):
+        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         
@@ -1414,6 +1442,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
+                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1423,6 +1452,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"Không thể xác thực API Key:\n{str(e)}")
+                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1441,10 +1471,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
             f.write(f"OKX_PASSPHRASE=\"{passphrase}\"\n")
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
-        msg.setText("Đã xác thực và lưu API Key thành công!")
+        if not api_key and not secret_key:
+            msg.setText("Đã xóa trắng cấu hình API Key thành công!")
+        else:
+            msg.setText("Đã xác thực và lưu API Key thành công!")
         msg.exec()
 
     def save_strategy_settings(self):
+        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         acc_name = self.get_acc_name()
@@ -1569,6 +1603,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg.exec()
 
     def start_bot(self):
+        self.play_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
         env_file = self.get_selected_env()
         if not env_file: return
         
@@ -1592,16 +1627,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.status_led.setStyleSheet("color: #00FF00; padding-left:10px;")
 
     def stop_bot(self):
+        self.play_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
         if self.worker:
             self.btn_stop.setEnabled(False)
             self.worker.stop()
 
     def reset_wallet(self):
+        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
+        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
@@ -1781,6 +1819,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def trigger_humane_warning(self, reason):
+        self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.8)
         # Cảnh báo nhân đạo: Thay đổi dòng chào mừng, 24 tiếng sau mới tự đóng app (24 * 60 * 60 * 1000 = 86400000 ms)
         warning_msg = f'⚠ {reason} Vui lòng <b><a href="login" style="color:#ff3333;text-decoration:underline;">Click vào đây để mở bảng Liên hệ Admin TLS1</a></b> xử lý khiếu nại. App sẽ tự đóng sau 24h!'
         if hasattr(self, 'lbl_main_welcome'):
@@ -2606,6 +2645,28 @@ def main():
         pass
 
     app = QtWidgets.QApplication(sys.argv)
+    
+    # -------------------------------------------------------------
+    # NGĂN CHẶN MỞ NHIỀU APP CÙNG LÚC TRÊN 1 MÁY BẰNG MUTEX WINDOWS
+    # -------------------------------------------------------------
+    try:
+        import ctypes
+        mutex_name = "Global\\TLS1_Trading_App_Single_Instance_Mutex"
+        kernel32 = ctypes.windll.kernel32
+        mutex = kernel32.CreateMutexW(None, False, mutex_name)
+        last_error = kernel32.GetLastError()
+        
+        if last_error == 183: # ERROR_ALREADY_EXISTS
+            msg = QtWidgets.QMessageBox()
+            msg.setWindowTitle("Lỗi khởi động")
+            msg.setText("Ứng dụng TLS1 đang hoạt động trên máy tính này!\n\nMỗi máy tính chỉ được mở 1 bản App cùng lúc.")
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
+            msg.exec()
+            sys.exit(0)
+    except Exception as e:
+        pass
+    # -------------------------------------------------------------
+    
     app.setStyle("Fusion")
     
     if getattr(sys, 'frozen', False):
@@ -2640,9 +2701,37 @@ def main():
                 
             msgBox = QtWidgets.QMessageBox(window)
             msgBox.setWindowTitle("⚠️ Cảnh báo (Warning)")
-            msgBox.setText(f"Chào bạn <b>{name}</b>!<br><br><b>Lưu ý nhỏ:</b> Đây không phải lời khuyên đầu tư và App không cam kết lợi nhuận.<br><br>Bạn vui lòng tìm hiểu thật kỹ trước khi sử dụng App để hỗ trợ cho việc đầu tư/giao dịch của bản thân nhé!")
-            msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
-            btn_confirm = msgBox.addButton("Đã hiểu và Xác nhận", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            msgBox.setText(f"Chào sếp <b>{name}</b>!<br><br><b>Lưu ý nhỏ cho các sếp:</b> Đây không phải lời khuyên đầu tư và App cũng không cam kết lợi nhuận.<br><br>Vì liên quan đến Đầu tư tài chính, Sếp vui lòng tìm hiểu thật kỹ trước khi sử dụng App. Luôn rõ quan điểm mọi Ứng dụng chỉ hỗ trợ phần nào cho việc đầu tư của bản thân thôi nhé!")
+            
+            # Gỡ âm thanh Windows bằng cách dùng Icon Pixmap thay vì Icon chuẩn
+            info_icon = window.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation)
+            msgBox.setIconPixmap(info_icon.pixmap(48, 48))
+            
+            btn_confirm = msgBox.addButton("Đã hiểu và vui vẻ xác nhận", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            
+            # Phát âm thanh meme cảnh báo trước khi hiện bảng
+            try:
+                from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+                from PyQt6.QtCore import QUrl
+                import os
+                
+                window.alert_player = QMediaPlayer()
+                window.alert_audio = QAudioOutput()
+                window.alert_player.setAudioOutput(window.alert_audio)
+                window.alert_audio.setVolume(0.5)
+                
+                # Ưu tiên tìm file cảnh báo mới (dùng thay cho alert_meme.mp3 cũ nếu có)
+                alert_meme_mp3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "ncprime-rise-304744.mp3")
+                alert_meme_wav = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "alert_meme.wav")
+                
+                if os.path.exists(alert_meme_mp3):
+                    window.alert_player.setSource(QUrl.fromLocalFile(alert_meme_mp3))
+                    window.alert_player.play()
+                elif os.path.exists(alert_meme_wav):
+                    window.alert_player.setSource(QUrl.fromLocalFile(alert_meme_wav))
+                    window.alert_player.play()
+            except: pass
+            
             msgBox.exec()
             
             # Phát âm thanh chào mừng sau khi ấn xác nhận

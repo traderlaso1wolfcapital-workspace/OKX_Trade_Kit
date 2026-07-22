@@ -1,0 +1,6 @@
+=== CRASH LOG ===
+Traceback (most recent call last):
+  File "d:\4. Trade Coin - TLS1\4. Cursor - IDE\TLS1_Company\zProjects\OKX_Trade_Kit\TLS1_Trading_App\gui_main.py", line 1504, in save_strategy_settings
+    "RISK_PER_TRADE_PCT": str(round(self.smc_input_risk_pct.value() / 100.0, 4)),
+                ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'BotInstanceWidget' object has no attribute 'smc_combo_mode'. Did you mean: 'smc_combo_dir'?
