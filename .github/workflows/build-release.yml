@@ -22,15 +22,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller cython
+          pip install pyinstaller
 
       - name: Run Windows Build Script
         run: |
-          python build_cython.py
+
           cd TLS1_Trading_App
           python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
           set /p CHART_JS_DIR=<chart_dir.txt
-          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1_Trading_Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" --hidden-import "PyQt6.QtWebEngineCore" --hidden-import "PyQt6.QtWebEngineWidgets" --collect-all "PyQt6" --collect-all "lightweight_charts" --collect-all "pandas" gui_main.py
+          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1_Trading_Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub1.bot_api" --hidden-import "z_bot_sub1.bot_indicators" --hidden-import "z_bot_sub1.bot_orders" --hidden-import "z_bot_sub1.bot_ui" --hidden-import "z_bot_sub1.bot_sub1" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "z_bot_sub2.bot_api" --hidden-import "z_bot_sub2.bot_indicators" --hidden-import "z_bot_sub2.bot_orders" --hidden-import "z_bot_sub2.bot_ui" --hidden-import "z_bot_sub2.bot_sub2" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" --hidden-import "PyQt6.QtWebEngineCore" --hidden-import "PyQt6.QtWebEngineWidgets" --collect-all "z_bot_sub1" --collect-all "z_bot_sub2" --collect-all "PyQt6" --collect-all "lightweight_charts" --collect-all "pandas" gui_main.py
         shell: cmd
 
       - name: Upload Windows Artifacts
@@ -56,11 +56,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller cython
+          pip install pyinstaller
 
-      - name: Build Cython Extensions
-        run: |
-          python build_cython.py
 
       - name: Build Mac App with PyInstaller
         run: |
@@ -73,12 +70,24 @@ jobs:
             --add-data "$CHART_JS_DIR:lightweight_charts/js" \
             --hidden-import "z_bot_sub1.bot_config" \
             --hidden-import "z_bot_sub1.bot_strategy" \
+            --hidden-import "z_bot_sub1.bot_api" \
+            --hidden-import "z_bot_sub1.bot_indicators" \
+            --hidden-import "z_bot_sub1.bot_orders" \
+            --hidden-import "z_bot_sub1.bot_ui" \
+            --hidden-import "z_bot_sub1.bot_sub1" \
             --hidden-import "z_bot_sub2.bot_config" \
             --hidden-import "z_bot_sub2.bot_strategy" \
+            --hidden-import "z_bot_sub2.bot_api" \
+            --hidden-import "z_bot_sub2.bot_indicators" \
+            --hidden-import "z_bot_sub2.bot_orders" \
+            --hidden-import "z_bot_sub2.bot_ui" \
+            --hidden-import "z_bot_sub2.bot_sub2" \
             --hidden-import "sys_bot_sub1" \
             --hidden-import "sys_bot_sub2" \
             --hidden-import "PyQt6.QtWebEngineCore" \
             --hidden-import "PyQt6.QtWebEngineWidgets" \
+            --collect-all "z_bot_sub1" \
+            --collect-all "z_bot_sub2" \
             --collect-all "PyQt6" \
             --collect-all "lightweight_charts" \
             --collect-all "pandas" \

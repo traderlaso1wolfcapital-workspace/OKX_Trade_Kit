@@ -47,7 +47,8 @@ system_config = {
     "SHOULD_RESET_WALLET": False,
     "SHOULD_RESET_NEN": False,
     "LAST_EVOLUTION_TIMESTAMP": 0.0,
-    "SHOULD_STOP": False
+    "SHOULD_STOP": False,
+    "STARTUP_CLEANUP_DONE": False
 }
 
 # ==============================================================================
@@ -84,6 +85,7 @@ def main():
     system_config["SHOULD_RESET_WALLET"] = False
     system_config["SHOULD_RESET_NEN"] = False
     system_config["LAST_EVOLUTION_TIMESTAMP"] = 0.0
+    system_config["STARTUP_CLEANUP_DONE"] = False
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
@@ -243,6 +245,12 @@ def main():
 
     while True:
         try:
+            # --- STARTUP CLEANUP ---
+            if not system_config.get("STARTUP_CLEANUP_DONE", False):
+                bot_sub2.cleanup_all_orders_on_startup(client, bot_sub2.COIN_PORTFOLIO)
+                system_config["STARTUP_CLEANUP_DONE"] = True
+                time.sleep(2)
+                
             # 1. BỘ LẮNG NGHE LỆNH (IPC) TỪ GUI
             stop_flag = os.path.join(JSON_DATA_DIR, f"stop_{acc_name}.flag")
             if os.path.exists(stop_flag) or system_config["SHOULD_STOP"]:
@@ -327,8 +335,8 @@ def main():
                         print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới từ file JSON (Sub2 SMC)!")
                     except Exception as e: print(f"❌ Lỗi Hot-Reload JSON: {e}")
 
-            # 3. STATIC HEARTBEAT: RUN_STRATEGY_CYCLE (2 giây)
-            if now - last_realtime_scan >= 2.0:
+            # 3. STATIC HEARTBEAT: RUN_STRATEGY_CYCLE (10 giây)
+            if now - last_realtime_scan >= 10.0:
                 last_realtime_scan = now
                 is_limit_setup_cycle = False
                 if now - last_limit_setup >= 30.0:

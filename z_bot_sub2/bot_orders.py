@@ -189,3 +189,36 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
 # REPLAY HISTORY - Duyệt lại toàn bộ lịch sử để khởi tạo state
 # =============================================================================
 
+def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
+    """
+    Dọn dẹp toàn bộ lệnh Limit và TP/SL của tất cả các đồng coin trong danh mục khi khởi động.
+    """
+    try:
+        import time
+        print("🧹 [SMC STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh rác trên OKX...")
+        for item in portfolio:
+            inst_id = item["coin"]
+            try:
+                pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id}).get("data", [])
+                if pending_regular:
+                    body_cancel = [{"ordId": o["ordId"], "instId": inst_id} for o in pending_regular]
+                    for i in range(0, len(body_cancel), 20):
+                        client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel[i:i+20])
+                        time.sleep(0.1)
+            except Exception as e:
+                pass
+            
+            try:
+                pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"}).get("data", [])
+                if pending_algo:
+                    body_cancel_algo = [{"algoId": o["algoId"], "instId": inst_id} for o in pending_algo]
+                    for i in range(0, len(body_cancel_algo), 10):
+                        client.request("POST", "/api/v5/trade/cancel-algos", body=body_cancel_algo[i:i+10])
+                        time.sleep(0.1)
+            except Exception as e:
+                pass
+        print("✅ [SMC STARTUP CLEANUP]: Hoàn tất dọn dẹp lệnh. Sẵn sàng chạy chiến lược.")
+    except Exception as e:
+        print(f"⚠️ [SMC STARTUP CLEANUP LỖI]: {e}")
+
+

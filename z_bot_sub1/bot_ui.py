@@ -117,7 +117,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     BOT_VERSION = "v23.0"
 
     col1_w, col2_w, col3_w, col4_w = 23, 34, 14, 17
-    r1_c1 = f"☢  {bot_name} {BOT_VERSION}"
+    r1_c1 = f"☢  {bot_name}"
     r1_c2 = f"EQUITY: {format_with_commas(von_hien_tai, 2)} USDT ({growth_sign}{tang_truong:.2f}%)"
     _risk_pct = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
     r1_c3 = f"RISK: {_risk_pct*100:.1f}%" if _risk_pct > 0 else "RISK: STATIC"

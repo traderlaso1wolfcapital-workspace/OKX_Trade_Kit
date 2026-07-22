@@ -48,7 +48,8 @@ system_config = {
     "SHOULD_RESET_WALLET": False,
     "SHOULD_RESET_NEN": False,
     "LAST_EVOLUTION_TIMESTAMP": 0.0,
-    "SHOULD_STOP": False
+    "SHOULD_STOP": False,
+    "STARTUP_CLEANUP_DONE": False
 }
 
 def main():
@@ -79,6 +80,7 @@ def main():
     system_config["SHOULD_RESET_WALLET"] = False
     system_config["SHOULD_RESET_NEN"] = False
     system_config["LAST_EVOLUTION_TIMESTAMP"] = 0.0
+    system_config["STARTUP_CLEANUP_DONE"] = False
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
@@ -248,6 +250,13 @@ def main():
 
         try:
             current_now = time.time()
+            
+            # --- STARTUP CLEANUP ---
+            if not system_config.get("STARTUP_CLEANUP_DONE", False):
+                bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO)
+                system_config["STARTUP_CLEANUP_DONE"] = True
+                time.sleep(2)
+                
             # --- THE START OF GUI IPC FLAGS ---
             try:
                 stop_flag_path = os.path.join(JSON_DATA_DIR, f"stop_{acc_name}.flag")
@@ -350,8 +359,8 @@ def main():
                 bot_sub1.run_ai_self_evolution(env_paths, bot_sub1)
                 system_config["LAST_EVOLUTION_TIMESTAMP"] = current_now
 
-            # ⚡ QUÉT REALTIME MỖI 1 GIÂY
-            if current_now - last_realtime_scan >= 2.0:
+            # ⚡ QUÉT REALTIME MỖI 10 GIÂY
+            if current_now - last_realtime_scan >= 10.0:
                 is_limit_setup_cycle = False
                 if current_now - last_limit_setup >= 3.0: 
                     is_limit_setup_cycle = True

@@ -31,7 +31,7 @@ class OKXRestCore:
             headers["x-simulated-trading"] = "1"
         return headers
 
-    def request(self, method: str, path: str, params: dict | None = None, body: dict | None = None) -> dict[str, Any]:
+    def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None) -> dict[str, Any]:
         url = self.BASE_URL + path
         body_str = json.dumps(body) if body else ""
         if method.upper() == "GET" and params:
@@ -82,7 +82,7 @@ class AsyncOKXRestCore(OKXRestCore):
         if self.session and not self.session.closed:
             await self.session.close()
 
-    async def request(self, method: str, path: str, params: dict | None = None, body: dict | None = None) -> dict[str, Any]:
+    async def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None) -> dict[str, Any]:
         await self.init_session()
         url = self.BASE_URL + path
         body_str = json.dumps(body) if body else ""
