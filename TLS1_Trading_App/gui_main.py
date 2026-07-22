@@ -79,7 +79,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.159"
+APP_VERSION = "1.0.160"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
