@@ -1,0 +1,18 @@
+{
+    "BTC-USDT-SWAP": {
+        "max_roi_long": "0",
+        "max_roi_short": "0",
+        "mae_max_pct_long": "0",
+        "mae_max_pct_short": "0",
+        "last_entry_l": "0",
+        "last_entry_s": "0"
+    },
+    "ETH-USDT-SWAP": {
+        "max_roi_long": "0",
+        "max_roi_short": "0",
+        "mae_max_pct_long": "0",
+        "mae_max_pct_short": "0",
+        "last_entry_l": "0",
+        "last_entry_s": "0"
+    }
+}
