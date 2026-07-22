@@ -50,3 +50,5 @@ Thumbs.db
 .env*
 *.log
 json_data/
+.api*
+.api*

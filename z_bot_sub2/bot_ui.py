@@ -56,7 +56,7 @@ def format_with_commas(value, decimals=2):
 def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     """Hiển thị Dashboard UI cho Bot Sub2"""
 
-    print(f"\nbot_sub2.py {env_paths.get('ENV_FILE_NAME', '.env')}")
+    print(f"\nbot_sub2.py {env_paths.get('ENV_FILE_NAME', '.api')}")
 
     sync_time = datetime.now().strftime('%H:%M:%S')
     
@@ -277,3 +277,4 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     print("")
 # z7713 | Thiết kế lại bảng COIN: OB ZONE, LONG @, SHORT @, STATUS
 # z7716 | Dashboard mới: OB ZONE LONG / OB ZONE SHORT với hiển thị RR. Bỏ cột LONG @ / SHORT @.
+# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn

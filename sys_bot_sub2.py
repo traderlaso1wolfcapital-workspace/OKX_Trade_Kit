@@ -105,7 +105,7 @@ def main():
     else:
         CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    env_arg = sys.argv[1] if len(sys.argv) > 1 else ".env_sub2"
+    env_arg = sys.argv[1] if len(sys.argv) > 1 else ".api_sub2"
     env_basename = os.path.basename(env_arg)
     
     # Thử tìm file ở user_data_dir trước (nơi GUI lưu), rồi mới fallback về base_dir
@@ -115,10 +115,10 @@ def main():
     
     if not os.path.exists(env_file):
         print(f"❌ [LỖI] Không tìm thấy file cấu hình API: {env_file}")
-        print("Vui lòng tạo file .env_sub2 trong thư mục z_bot_sub2 hoặc chỉ định đúng file.")
+        print("Vui lòng tạo file .api_sub2 trong thư mục z_bot_sub2 hoặc chỉ định đúng file.")
         sys.exit(1)
         
-    acc_name = os.path.basename(env_file).replace(".env_sub2", "").replace(".env", "").replace("_", "")
+    acc_name = os.path.basename(env_file).replace(".api_sub2", "").replace(".api", "").replace("_", "")
     if acc_name == "": acc_name = "sub2"
 
     # Tải API keys
@@ -374,4 +374,4 @@ def main():
             time.sleep(1)
 
 if __name__ == "__main__":
-    main()
+    main()# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn

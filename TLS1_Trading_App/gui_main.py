@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.180"
+APP_VERSION = "1.0.181"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -218,15 +218,15 @@ class BotSubprocessWorker(QtCore.QThread):
 
     def __init__(self, env_file, strategy):
         super().__init__()
-        self.env_file = env_file
+        self.api_file = env_file
         self.strategy = strategy
         self.process = None
         self._is_running = True
 
     def run(self):
-        cmd = [sys.executable, '--run-bot', self.strategy, self.env_file]
+        cmd = [sys.executable, '--run-bot', self.strategy, self.api_file]
         if not getattr(sys, 'frozen', False):
-            cmd = [sys.executable, sys.argv[0], '--run-bot', self.strategy, self.env_file]
+            cmd = [sys.executable, sys.argv[0], '--run-bot', self.strategy, self.api_file]
 
         try:
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
@@ -366,7 +366,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         super().__init__()
         self.strategy_id = strategy_id
         self.strategy_name = strategy_name
-        self.env_files = env_files
+        self.api_files = env_files
         self.worker = None
         self.init_ui()
         self.load_current_settings()
@@ -375,35 +375,35 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pass
         
     def reload_accounts(self):
-        self.env_files = []
+        self.api_files = []
         if os.path.exists(PROJECT_DIR):
-            self.env_files.extend([f for f in os.listdir(PROJECT_DIR) if f.startswith('.env') and not f.endswith('.bak')])
+            self.api_files.extend([f for f in os.listdir(PROJECT_DIR) if f.startswith('.api') and not f.endswith('.bak')])
         bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
         os.makedirs(bot_dir, exist_ok=True)
         # Tự động tạo 5 tài khoản phụ rỗng mặc định nếu chưa có
         for i in range(1, 6):
-            default_env = os.path.join(bot_dir, f".env_sub{i}")
+            default_env = os.path.join(bot_dir, f".api_sub{i}")
             if not os.path.exists(default_env):
                 try:
                     with open(default_env, "w", encoding="utf-8") as f:
                         f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
                 except: pass
         if os.path.exists(bot_dir):
-            self.env_files.extend([f for f in os.listdir(bot_dir) if f.startswith('.env') and not f.endswith('.bak') and f not in self.env_files])
-        if '.env' not in self.env_files:
-            self.env_files.insert(0, '.env')
+            self.api_files.extend([f for f in os.listdir(bot_dir) if f.startswith('.api') and not f.endswith('.bak') and f not in self.api_files])
+        if '.api' not in self.api_files:
+            self.api_files.insert(0, '.api')
         
         self.account_dropdown.blockSignals(True)
         self.account_dropdown.clear()
         if self.strategy_id in ["trinhsat", "quansu"]:
-            self.account_dropdown.addItem("Mặc định (Không cần API)", ".env")
+            self.account_dropdown.addItem("Mặc định (Không cần API)", ".api")
             self.account_dropdown.setDisabled(True)
         else:
-            for env in self.env_files:
-                if env == ".env":
+            for env in self.api_files:
+                if env == ".api":
                     display = "Tài khoản chính (Main)"
                 else:
-                    sub_name = env.replace(".env_sub", "")
+                    sub_name = env.replace(".api_sub", "")
                     display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
                 self.account_dropdown.addItem(display, env)
         self.account_dropdown.blockSignals(False)
@@ -413,7 +413,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if ok and text:
             text = text.strip()
             if not text: return
-            env_name = f".env_{text}"
+            env_name = f".api_{text}"
             bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
             os.makedirs(bot_dir, exist_ok=True)
             env_path = os.path.join(bot_dir, env_name)
@@ -438,7 +438,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_name = self.account_dropdown.currentData()
         if not env_name:
             return
-        if env_name == ".env":
+        if env_name == ".api":
             msg = QtWidgets.QMessageBox(self)
             msg.setWindowTitle("Lỗi")
             msg.setText("Không thể xoá Tài khoản chính!")
@@ -485,18 +485,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.account_dropdown.setMinimumWidth(300)
         
         if self.strategy_id in ["trinhsat", "quansu"]:
-            self.account_dropdown.addItem("Mặc định (Không cần API)", ".env")
+            self.account_dropdown.addItem("Mặc định (Không cần API)", ".api")
             self.account_dropdown.setDisabled(True)
         else:
-            for env in self.env_files:
-                if env == ".env":
+            for env in self.api_files:
+                if env == ".api":
                     display = "Tài khoản chính (Main)"
                 else:
-                    sub_name = env.replace(".env_sub", "")
+                    sub_name = env.replace(".api_sub", "")
                     display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
                 self.account_dropdown.addItem(display, env)
 
-        target_env = ".env" if self.strategy_id == "main" else f".env_{self.strategy_id}"
+        target_env = ".api" if self.strategy_id == "main" else f".api_{self.strategy_id}"
         idx = self.account_dropdown.findData(target_env)
         if idx >= 0:
             self.account_dropdown.setCurrentIndex(idx)
@@ -1105,7 +1105,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def get_acc_name(self):
         env = self.get_selected_env()
         if not env: return "main"
-        acc_name = env.replace(".env", "").replace("_", "")
+        acc_name = env.replace(".api", "").replace("_", "")
         return "main" if acc_name == "" else acc_name
 
     def on_account_changed(self, index=None):
@@ -1609,7 +1609,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.setWindowIcon(QtGui.QIcon(logo_path))
         except Exception: pass
 
-        self.env_files = self.scan_env_files()
+        self.api_files = self.scan_env_files()
         self.init_ui()
         self.apply_dark_theme()
         
@@ -1749,7 +1749,7 @@ class MainWindow(QtWidgets.QMainWindow):
         bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
         os.makedirs(bot_dir, exist_ok=True)
         for i in range(1, 6):
-            default_env = os.path.join(bot_dir, f".env_sub{i}")
+            default_env = os.path.join(bot_dir, f".api_sub{i}")
             if not os.path.exists(default_env):
                 try:
                     with open(default_env, "w", encoding="utf-8") as f:
@@ -1763,16 +1763,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 if d.startswith("z_bot_") and os.path.isdir(os.path.join(root_dir, d)):
                     try:
                         for f in os.listdir(os.path.join(root_dir, d)):
-                            if f.startswith(".env") and not f.endswith(".example"):
+                            if f.startswith(".api") and not f.endswith(".example"):
                                 env_files.add(f)
                     except Exception:
                         pass
         result = sorted(list(env_files))
-        if '.env' not in result:
-            result.insert(0, '.env')
+        if '.api' not in result:
+            result.insert(0, '.api')
         else:
-            result.remove('.env')
-            result.insert(0, '.env')
+            result.remove('.api')
+            result.insert(0, '.api')
         return result
 
     def init_ui(self):
@@ -1884,10 +1884,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bot_tabs.setCornerWidget(self.lbl_main_welcome, QtCore.Qt.Corner.TopRightCorner)
         main_layout.addWidget(self.bot_tabs)
 
-        self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.env_files)
-        self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.env_files)
-        self.panel_sub2 = BotInstanceWidget("sub2", "Bot Mỏ Chim (Sub 2)", self.env_files)
-        # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.env_files)
+        self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.api_files)
+        self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.api_files)
+        self.panel_sub2 = BotInstanceWidget("sub2", "Bot Mỏ Chim (Sub 2)", self.api_files)
+        # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)
         
         self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")
         

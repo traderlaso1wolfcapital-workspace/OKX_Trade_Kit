@@ -111,7 +111,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     pnl_sign = "+" if loi_nhuan >= 0 else ""
     growth_sign = "+" if tang_truong >= 0 else ""
 
-    print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.env')}")
+    print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
     print("=" * 97)
     bot_name = "THỢ SĂN EMA200"
     BOT_VERSION = "v23.0"
@@ -644,3 +644,4 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
 # z1949 | Fix Partial Fills using Fills API, RAM structure order list(), Disk I/O Memory Cache, Time-based Caching for Rate Limit
 # z2500 | Bỏ hiển thị SL trong dòng "Đã khớp LONG/SHORT" trên Dashboard để giao diện gọn hơn
 # z3350 | Clean up: Xoá các imports (time) và các biến (von_goc, date_part, active_pos_count, sl_px_str, has_both, tf_tol) không sử dụng để tối ưu code.
+# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
