@@ -118,7 +118,7 @@ jobs:
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
-          repository: traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases
+          repository: TLS1-Releases/TLS1_Trading_App_Releases
           token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
