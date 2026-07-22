@@ -79,7 +79,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.169"
+APP_VERSION = "1.0.170"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2519,10 +2519,33 @@ if __name__ == "__main__":
         strategy = sys.argv[2]
         env_file = sys.argv[3]
         os.environ["PYTHONUNBUFFERED"] = "1"
+        class SafeStream:
+            def __init__(self, stream):
+                self.stream = stream
+            def write(self, data):
+                try:
+                    if self.stream: 
+                        self.stream.write(data)
+                        self.stream.flush()
+                except Exception:
+                    pass
+            def flush(self):
+                try:
+                    if self.stream: self.stream.flush()
+                except Exception:
+                    pass
+            def __getattr__(self, name):
+                return getattr(self.stream, name)
+                
         try:
-            sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
-            sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
+            if hasattr(sys.stderr, 'reconfigure'):
+                sys.stderr.reconfigure(encoding='utf-8', line_buffering=True)
         except: pass
+        
+        sys.stdout = SafeStream(sys.stdout)
+        sys.stderr = SafeStream(sys.stderr)
         
         try:
             import importlib.util

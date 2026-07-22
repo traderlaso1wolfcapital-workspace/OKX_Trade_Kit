@@ -78,7 +78,7 @@ _io_thread.start()
 def main():
     global system_config
     print('🚀 TLS1_COMPANY: BOT SUB2 ĐÃ ĐƯỢC CẬP NHẬT KIẾN TRÚC V2!')
-    if sys.platform == 'win32': os.system('chcp 65001 >nul')
+    if sys.platform == 'win32': pass
     
     # Khởi tạo lại trạng thái cờ dừng và reset khi chạy mới
     system_config["SHOULD_STOP"] = False

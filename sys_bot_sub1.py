@@ -54,7 +54,7 @@ system_config = {
 
 def main():
     global system_config
-    if sys.platform == 'win32': os.system('chcp 65001 >nul')
+    if sys.platform == 'win32': pass
     
     # --- Khởi tạo Hàng đợi & Luồng chạy ngầm cho I/O JSON ---
     if not hasattr(sys, '_bot_sub1_io_queue'):
