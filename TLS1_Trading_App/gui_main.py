@@ -2000,6 +2000,14 @@ del /f /q "%~f0"
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 subprocess.Popen([bat_path], startupinfo=startupinfo)
                 
+                for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
+                    panel = getattr(self, attr, None)
+                    if panel and hasattr(panel, 'worker') and getattr(panel.worker, 'process', None):
+                        try:
+                            panel.worker.process.kill()
+                            panel.worker.process.wait(timeout=2.0)
+                        except:
+                            pass
                 os._exit(0)
             except Exception as e:
                 if os.path.exists(new_exe_path):
@@ -2393,13 +2401,13 @@ class LoginDialog(QtWidgets.QDialog):
         QtWidgets.QApplication.processEvents()
         
         try:
-            import urllib.request
+            import requests
             import csv
             
             url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                content = response.read().decode('utf-8')
+            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+            response.raise_for_status()
+            content = response.text
             
             reader = csv.reader(content.splitlines())
             next(reader, None)  # Bỏ qua dòng tiêu đề
@@ -2478,6 +2486,20 @@ def main():
         import ctypes
         myappid = 'tls1.trading.app.v1'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except:
+        pass
+        
+    try:
+        import glob
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+            for f in glob.glob(os.path.join(base_dir, "TLS1_Update_Temp_*.exe")):
+                try: os.remove(f)
+                except: pass
+            update_bat = os.path.join(base_dir, "update_app.bat")
+            if os.path.exists(update_bat):
+                try: os.remove(update_bat)
+                except: pass
     except:
         pass
 
