@@ -1589,10 +1589,10 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 ema_next = get_ema200_for_tf(next_tf)
                 if ema_curr > 0 and ema_next > 0:
                     dist = abs(ema_next - ema_curr) / ema_curr
-                    # Ưu tiên TF lớn hơn: Dùng hệ số Volume (tăng dần nhẹ nhàng) thay vì hệ số TP/SL khổng lồ
-                    active_tf_vol_mult = globals_ref.TF_VOLUME_MULTIPLIERS.get(next_tf, Decimal("1.0"))
+                    # Ưu tiên TF lớn hơn: Ngưỡng khoảng cách sẽ được tính dựa trên hệ số của TF lớn hơn (next_tf)
+                    active_tf_mult = globals_ref.TF_MULTIPLIERS.get(next_tf, Decimal("1.0"))
                     gap_threshold = getattr(globals_ref, "DCA_GAP_THRESHOLD_PCT", Decimal("0.0050"))
-                    threshold = gap_threshold * active_tf_vol_mult
+                    threshold = gap_threshold * active_tf_mult
 
                     if dist < threshold:
                         # Quá sát nhau -> bỏ qua TF hiện tại để chuyển lên entry của TF tiếp theo
