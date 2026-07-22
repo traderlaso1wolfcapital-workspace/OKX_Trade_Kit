@@ -799,6 +799,13 @@ def run_strategy_cycle(
                     print(f"📊 [SMC] {cfg.get('coin', swap_id)}: Đặt limit {('LONG' if setup.bias == BULLISH else 'SHORT')} @ {float(setup.entry_price):.2f} | SL: {float(setup.stop_loss):.2f} | TP: {float(setup.take_profit):.2f}")
                 else:
                     print(f"🚫 [SMC] {cfg.get('coin', swap_id)}: OKX từ chối lệnh {('LONG' if setup.bias == BULLISH else 'SHORT')} @ {float(setup.entry_price):.2f} - {err_detail}")
+                    if "51008" in err_detail or "Insufficient" in err_detail:
+                        print("💡 [HƯỚNG DẪN] OKX báo lỗi 51008 (Insufficient USDT margin).")
+                        print("   Tài khoản Trading của Sếp đã hết số dư khả dụng (Available Margin) để gài lệnh.")
+                        print("   CÁCH XỬ LÝ:")
+                        print("   1. Giảm Volume hoặc Risk trong bot_config.py.")
+                        print("   2. Vào App OKX -> Open Orders hủy bớt các lệnh Limit rác đang giam vốn.")
+                        print("   3. Nạp thêm USDT vào ví Phái sinh.")
         except Exception as _e:
             pass
 

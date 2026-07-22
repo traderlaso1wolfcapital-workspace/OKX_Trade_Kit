@@ -223,6 +223,34 @@ def main():
     import z_bot_sub2.bot_terminal as bot_terminal
     bot_terminal.start_terminal_listener(system_config)
 
+    # Kiểm tra số dư 2 ví OKX
+    try:
+        trading_resp = client.request("GET", "/api/v5/account/balance")
+        trading_usdt = 0.0
+        if trading_resp and "data" in trading_resp and trading_resp["data"]:
+            for d in trading_resp["data"][0].get("details", []):
+                if d.get("ccy") == "USDT":
+                    trading_usdt = float(d.get("availEq", "0"))
+                    break
+        
+        funding_resp = client.request("GET", "/api/v5/asset/balances", params={"ccy": "USDT"})
+        funding_usdt = 0.0
+        if funding_resp and "data" in funding_resp and funding_resp["data"]:
+            for d in funding_resp["data"]:
+                if d.get("ccy") == "USDT":
+                    funding_usdt = float(d.get("availBal", "0"))
+                    break
+                    
+        print(f"\n💰 [SỐ DƯ TÀI KHOẢN] Ví Giao dịch (Trading): {trading_usdt:.2f} USDT | Ví Cấp vốn (Funding): {funding_usdt:.2f} USDT")
+        if trading_usdt < 10:
+            print("⚠️ [CẢNH BÁO] Số dư ví Trading quá thấp (Dưới 10 USDT)!")
+            if funding_usdt > 0:
+                print("💡 [HƯỚNG DẪN] Tiền của bạn đang nằm ở ví Funding! Hãy mở App OKX -> Chọn 'Chuyển tiền' (Transfer) sang ví Giao dịch (Trading) để Bot hoạt động.")
+            else:
+                print("💡 [HƯỚNG DẪN] Cả 2 ví đều cạn kiệt USDT. Vui lòng nạp thêm tiền vào ví Trading.")
+    except Exception as e:
+        print(f"⚠️ [LỖI API] Không thể kiểm tra số dư ví OKX: {e}")
+
     print(f"\n✅  SMC ORDER BLOCK BOT KHỞI ĐỘNG TRÊN [{env_file}]...")
 
     # Nạp cấu hình JSON ngay khi khởi động

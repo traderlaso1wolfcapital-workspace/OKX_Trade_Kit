@@ -243,6 +243,13 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
             raise Exception(resp.get('msg', 'Unknown'))
     except Exception as e:
         print(f"🚨 [LIMIT] Lỗi kết nối: {e} | {inst_id} {side}@{price}")
+        if "51008" in str(e):
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 51008 (Insufficient USDT margin).")
+            print("   Tài khoản Trading của Sếp đã hết số dư khả dụng (Available Margin) để gài lệnh.")
+            print("   CÁCH XỬ LÝ:")
+            print("   1. Giảm Volume hoặc Risk trong bot_config.py.")
+            print("   2. Vào App OKX -> Open Orders hủy bớt các lệnh Limit rác đang giam vốn.")
+            print("   3. Nạp thêm USDT vào ví Phái sinh.")
         raise
 
 def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross"):
