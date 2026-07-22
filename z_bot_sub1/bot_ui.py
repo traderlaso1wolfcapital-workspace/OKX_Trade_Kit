@@ -470,7 +470,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
             else:
                 filled_str = fmt_tf("M5")
-            line_main = f"    ✧ {icon} {coin_name} ╭─  Đã khớp LONG [{filled_str}]: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
+            line_main = f"    ✧ {coin_name} ╭─  Đã khớp LONG [{filled_str}]: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
             # Tìm vị trí của ╭─ để tính indent cho ╰─
             idx_branch = line_main.index("╭─")
             indent_branch = " " * idx_branch
@@ -497,7 +497,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
             else:
                 filled_str = fmt_tf("M5")
-            line_main = f"    ✧ {icon} {coin_name} ╭─  Đã khớp SHORT [{filled_str}]: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
+            line_main = f"    ✧ {coin_name} ╭─  Đã khớp SHORT [{filled_str}]: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
             idx_branch = line_main.index("╭─")
             indent_branch = " " * idx_branch
             lines = [line_main]
