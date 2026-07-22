@@ -279,10 +279,44 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") - target_sl_pct), tick_sz)
             tp_side, sl_side = "sell", "sell"
+            
+            if tracker:
+                try:
+                    filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
+                    placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
+                    max_pending_px = Decimal("-1")
+                    for tf, px_str in placed_dict.items():
+                        if tf not in filled_tfs and px_str not in ("---", "ERR"):
+                            px_dec = Decimal(px_str)
+                            if px_dec > max_pending_px:
+                                max_pending_px = px_dec
+                    if max_pending_px > 0:
+                        dist_to_dca = abs(calc_sl - max_pending_px) / max_pending_px
+                        if dist_to_dca <= Decimal("0.003"):
+                            calc_sl = round_to_tick(max_pending_px * (Decimal("1") - target_sl_pct), tick_sz)
+                except Exception:
+                    pass
         else:
             calc_tp = round_to_tick(avg_px * (Decimal("1") - target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") + target_sl_pct), tick_sz)
             tp_side, sl_side = "buy", "buy"
+            
+            if tracker:
+                try:
+                    filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
+                    placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
+                    min_pending_px = Decimal("inf")
+                    for tf, px_str in placed_dict.items():
+                        if tf not in filled_tfs and px_str not in ("---", "ERR"):
+                            px_dec = Decimal(px_str)
+                            if px_dec < min_pending_px:
+                                min_pending_px = px_dec
+                    if min_pending_px < Decimal("inf"):
+                        dist_to_dca = abs(calc_sl - min_pending_px) / min_pending_px
+                        if dist_to_dca <= Decimal("0.003"):
+                            calc_sl = round_to_tick(min_pending_px * (Decimal("1") + target_sl_pct), tick_sz)
+                except Exception:
+                    pass
             
         status = check_algo_tpsl_status(client, inst_id, side, td_mode, size_dec)
         

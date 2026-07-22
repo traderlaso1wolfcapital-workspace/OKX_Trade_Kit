@@ -1100,6 +1100,22 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             else:
                 tracker.active_sl_px_long = round_to_tick(avg_px_l * (Decimal("1") - coin_sl_pct), tick_sz)
 
+            try:
+                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
+                placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
+                max_pending_px = Decimal("-1")
+                for tf, px_str in placed_dict.items():
+                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
+                        px_dec = Decimal(px_str)
+                        if px_dec > max_pending_px:
+                            max_pending_px = px_dec
+                if max_pending_px > 0:
+                    dist_to_dca = abs(tracker.active_sl_px_long - max_pending_px) / max_pending_px
+                    if dist_to_dca <= Decimal("0.003"):
+                        tracker.active_sl_px_long = round_to_tick(max_pending_px * (Decimal("1") - coin_sl_pct), tick_sz)
+            except Exception:
+                pass
+
             if tracker.live_price <= tracker.active_sl_px_long:
                 clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
                 close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Trailing SL Hit LONG", "cross")
@@ -1221,6 +1237,22 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") - roi_fraction), tick_sz)
             else:
                 tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") + coin_sl_pct), tick_sz)
+
+            try:
+                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
+                placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
+                min_pending_px = Decimal("inf")
+                for tf, px_str in placed_dict.items():
+                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
+                        px_dec = Decimal(px_str)
+                        if px_dec < min_pending_px:
+                            min_pending_px = px_dec
+                if min_pending_px < Decimal("inf"):
+                    dist_to_dca = abs(tracker.active_sl_px_short - min_pending_px) / min_pending_px
+                    if dist_to_dca <= Decimal("0.003"):
+                        tracker.active_sl_px_short = round_to_tick(min_pending_px * (Decimal("1") + coin_sl_pct), tick_sz)
+            except Exception:
+                pass
 
             if tracker.live_price >= tracker.active_sl_px_short:
                 clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
