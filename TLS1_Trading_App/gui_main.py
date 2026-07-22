@@ -242,9 +242,8 @@ class BotSubprocessWorker(QtCore.QThread):
             )
             
             for line in self.process.stdout:
-                if not self._is_running:
-                    break
-                self.log_signal.emit(line.rstrip('\n'))
+                if self._is_running:
+                    self.log_signal.emit(line.rstrip('\n'))
                 
             self.process.wait()
         except Exception as e:
@@ -2020,6 +2019,7 @@ del /f /q "%~f0"
             if panel and hasattr(panel, 'worker') and getattr(panel.worker, 'process', None):
                 try:
                     panel.worker.process.kill()
+                    panel.worker.process.wait(timeout=2.0)
                 except:
                     pass
         event.accept()
