@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.192"
+APP_VERSION = "1.0.193"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2638,42 +2638,46 @@ def main():
             if hasattr(login, 'logged_in_status') and login.logged_in_status == 'PENDING 24H':
                 window.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")
                 
-                # Play meme sound
-                try:
-                    from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-                    from PyQt6.QtCore import QUrl
-                    import os
+            msgBox = QtWidgets.QMessageBox(window)
+            msgBox.setWindowTitle("⚠️ Cảnh báo (Warning)")
+            msgBox.setText(f"Chào bạn <b>{name}</b>!<br><br><b>Lưu ý nhỏ:</b> Đây không phải lời khuyên đầu tư và App không cam kết lợi nhuận.<br><br>Bạn vui lòng tìm hiểu thật kỹ trước khi sử dụng App để hỗ trợ cho việc đầu tư/giao dịch của bản thân nhé!")
+            msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
+            btn_confirm = msgBox.addButton("Đã hiểu và Xác nhận", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            msgBox.exec()
+            
+            # Phát âm thanh chào mừng sau khi ấn xác nhận
+            try:
+                from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+                from PyQt6.QtCore import QUrl
+                import os
+                
+                window.player = QMediaPlayer()
+                window.audio_output = QAudioOutput()
+                window.player.setAudioOutput(window.audio_output)
+                window.audio_output.setVolume(0.25)
+                
+                media_path_webm = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "wow.webm")
+                media_path_m4a = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "wow.m4a")
+                media_path_mp3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "wow.mp3")
+                
+                if os.path.exists(media_path_webm):
+                    window.player.setSource(QUrl.fromLocalFile(media_path_webm))
+                elif os.path.exists(media_path_m4a):
+                    window.player.setSource(QUrl.fromLocalFile(media_path_m4a))
+                elif os.path.exists(media_path_mp3):
+                    window.player.setSource(QUrl.fromLocalFile(media_path_mp3))
                     
-                    window.player = QMediaPlayer()
-                    window.audio_output = QAudioOutput()
-                    window.player.setAudioOutput(window.audio_output)
-                    window.audio_output.setVolume(0.25)
-                    
-                    media_path_m4a = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "wow.m4a")
-                    media_path_mp3 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "wow.mp3")
-                    
-                    if os.path.exists(media_path_m4a):
-                        window.player.setSource(QUrl.fromLocalFile(media_path_m4a))
-                    elif os.path.exists(media_path_mp3):
-                        window.player.setSource(QUrl.fromLocalFile(media_path_mp3))
-                        
-                    def on_status_changed(status):
-                        from PyQt6.QtMultimedia import QMediaPlayer
-                        if status == QMediaPlayer.MediaStatus.LoadedMedia or status == QMediaPlayer.MediaStatus.BufferedMedia:
-                            window.player.setPosition(500)
-                            window.player.play()
-                            try: window.player.mediaStatusChanged.disconnect(on_status_changed)
-                            except: pass
-                    
-                    window.player.mediaStatusChanged.connect(on_status_changed)
-                except Exception as e:
-                    pass
-                    
-                msgBox = QtWidgets.QMessageBox(window)
-                msgBox.setWindowTitle("Chào mừng")
-                msgBox.setText(f"    Chào mừng \"{name}\" đã đến với TLS1 Trading App v{APP_VERSION}    ")
-                msgBox.setIcon(QtWidgets.QMessageBox.Icon.NoIcon)
-                msgBox.exec()
+                def on_status_changed(status):
+                    from PyQt6.QtMultimedia import QMediaPlayer
+                    if status == QMediaPlayer.MediaStatus.LoadedMedia or status == QMediaPlayer.MediaStatus.BufferedMedia:
+                        window.player.setPosition(500)
+                        window.player.play()
+                        try: window.player.mediaStatusChanged.disconnect(on_status_changed)
+                        except: pass
+                
+                window.player.mediaStatusChanged.connect(on_status_changed)
+            except Exception as e:
+                pass
         else:
             sys.exit(0)
 
