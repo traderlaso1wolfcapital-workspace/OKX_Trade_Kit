@@ -1,0 +1,129 @@
+name: Build and Release TLS1 Trading App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller cython
+
+      - name: Run Windows Build Script
+        run: |
+          python build_cython.py
+          cd TLS1_Trading_App
+          python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
+          set /p CHART_JS_DIR=<chart_dir.txt
+          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1_Trading_Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" --hidden-import "PyQt6.QtWebEngineCore" --hidden-import "PyQt6.QtWebEngineWidgets" --collect-all "PyQt6" --collect-all "lightweight_charts" --collect-all "pandas" gui_main.py
+        shell: cmd
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Release
+          path: |
+            TLS1_Trading_App/dist/TLS1_Trading_Setup.exe
+            TLS1_Trading_App/version.json
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller cython
+
+      - name: Build Cython Extensions
+        run: |
+          python build_cython.py
+
+      - name: Build Mac App with PyInstaller
+        run: |
+          cd TLS1_Trading_App
+          CHART_JS_DIR=$(python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))")
+          pyinstaller --noconfirm --onedir --windowed --name "TLS1 Trading" \
+            --paths .. \
+            --add-data "version.json:." \
+            --add-data "media:media" \
+            --add-data "$CHART_JS_DIR:lightweight_charts/js" \
+            --hidden-import "z_bot_sub1.bot_config" \
+            --hidden-import "z_bot_sub1.bot_strategy" \
+            --hidden-import "z_bot_sub2.bot_config" \
+            --hidden-import "z_bot_sub2.bot_strategy" \
+            --hidden-import "sys_bot_sub1" \
+            --hidden-import "sys_bot_sub2" \
+            --hidden-import "PyQt6.QtWebEngineCore" \
+            --hidden-import "PyQt6.QtWebEngineWidgets" \
+            --collect-all "PyQt6" \
+            --collect-all "lightweight_charts" \
+            --collect-all "pandas" \
+            gui_main.py
+
+      - name: Create DMG
+        run: |
+          cd TLS1_Trading_App/dist
+          hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "TLS1_Trading_Mac_Universal.dmg"
+
+      - name: Upload Mac Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mac-Release
+          path: |
+            TLS1_Trading_App/dist/*.dmg
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Windows-Release
+          path: windows_artifacts
+
+      - name: Download Mac Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Mac-Release
+          path: mac_artifacts
+
+      - name: Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: traderlaso1wolfcapital-creator/TLS1_Trading_App_Releases
+          token: ${{ secrets.RELEASE_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          target_commitish: main
+          files: |
+            windows_artifacts/**/*.exe
+            mac_artifacts/**/*.dmg
+            windows_artifacts/**/version.json
