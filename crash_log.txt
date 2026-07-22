@@ -1,5 +1,0 @@
-=== CRASH LOG ===
-Traceback (most recent call last):
-  File "d:\4. Trade Coin - TLS1\4. Cursor - IDE\TLS1_Company\zProjects\OKX_Trade_Kit\TLS1_Trading_App\gui_main.py", line 862, in createWindow
-    # Tạo một cửa sổ thật sự bên trong App để chứa popup đăng nhập, giữ lại liên kết window.opener
-AttributeError: 'ExternalLinkWebPage' object has no attribute 'view'
