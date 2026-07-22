@@ -123,7 +123,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.189"
+APP_VERSION = "1.0.190"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2007,10 +2007,31 @@ class MainWindow(QtWidgets.QMainWindow):
         has_update, remote_version, remote_data = result
         if has_update is True:
             self.btn_update.setText(f"🚀 Cập nhật App (v{remote_version})")
-            self.btn_update.setStyleSheet("""
-                QPushButton { background-color: #3b82f6; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; }
-                QPushButton:hover { background-color: #2563eb; }
-            """)
+            
+            # Tạo hiệu ứng nhấp nháy nhẹ nhàng đổi màu để thu hút chú ý
+            if not hasattr(self, 'update_btn_timer'):
+                self.update_btn_timer = QtCore.QTimer(self)
+                self.update_btn_color_state = False
+                
+                def toggle_color():
+                    self.update_btn_color_state = not self.update_btn_color_state
+                    if self.update_btn_color_state:
+                        self.btn_update.setStyleSheet("""
+                            QPushButton { background-color: #10b981; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; border: 1px solid #059669; }
+                            QPushButton:hover { background-color: #059669; }
+                        """)
+                    else:
+                        self.btn_update.setStyleSheet("""
+                            QPushButton { background-color: #3b82f6; color: white; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px; }
+                            QPushButton:hover { background-color: #2563eb; }
+                        """)
+                        
+                self.update_btn_timer.timeout.connect(toggle_color)
+                self.update_btn_timer.start(500) # Đổi màu mỗi 500ms (nhịp đập nhanh hơn)
+                
+                # Gọi ngay lần đầu để set màu
+                toggle_color()
+                
             self.btn_update.setEnabled(True)
             self.remote_update_data = remote_data
         elif has_update is False:
