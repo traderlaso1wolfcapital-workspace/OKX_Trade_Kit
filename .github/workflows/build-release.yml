@@ -109,7 +109,7 @@ jobs:
       - name: Upload Mac Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Mac-Release
+          name: Mac-Release-${{ matrix.os }}
           path: |
             TLS1_Trading_App/dist/*.dmg
 
@@ -129,8 +129,9 @@ jobs:
       - name: Download Mac Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: Mac-Release
+          pattern: Mac-Release-*
           path: mac_artifacts
+          merge-multiple: true
 
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
