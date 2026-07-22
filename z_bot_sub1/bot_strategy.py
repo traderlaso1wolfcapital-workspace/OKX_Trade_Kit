@@ -1093,28 +1093,50 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             tracker.max_roi_long = current_roi_pct
 
         if globals_ref.ENABLE_TRAILING_SL:
+            # --- UPGRADE TF LOGIC CỤC BỘ ---
+            filled_tfs_l = getattr(tracker, "pos_cycle_filled_tfs", [])
+            if filled_tfs_l:
+                max_filled_tf = max(filled_tfs_l, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+            else:
+                max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
+                
+            try:
+                tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                current_weight = tf_weights.get(max_filled_tf, 0)
+                upgrade_tf = max_filled_tf
+                upgrade_weight = current_weight
+                
+                temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+                base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
+                base_sl = avg_px_l * (Decimal("1") - base_sl_pct)
+                placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
+                
+                for tf, px_str in placed_dict.items():
+                    if tf not in filled_tfs_l and px_str not in ("---", "ERR"):
+                        w = tf_weights.get(tf, 0)
+                        if w > current_weight:
+                            pending_px = Decimal(px_str)
+                            dist = abs(base_sl - pending_px) / pending_px
+                            if dist <= Decimal("0.003"):
+                                if w > upgrade_weight:
+                                    upgrade_tf = tf
+                                    upgrade_weight = w
+                                    
+                if upgrade_tf != max_filled_tf:
+                    max_filled_tf = upgrade_tf
+            except Exception:
+                pass
+                
+            active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+            active_coin_sl_pct = globals_ref.SCALPING_SL_PCT * active_tf_mult
+            # -------------------------------
+
             if tracker.max_roi_long >= dynamic_sl_roi_threshold:
                 locked_roi_profit = tracker.max_roi_long - dynamic_sl_roi_threshold
                 price_buffer_back = (locked_roi_profit / Decimal("100")) / Decimal(str(cfg["leverage"]))
                 tracker.active_sl_px_long = round_to_tick(avg_px_l * (Decimal("1") + price_buffer_back), tick_sz)
             else:
-                tracker.active_sl_px_long = round_to_tick(avg_px_l * (Decimal("1") - coin_sl_pct), tick_sz)
-
-            try:
-                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
-                placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
-                max_pending_px = Decimal("-1")
-                for tf, px_str in placed_dict.items():
-                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
-                        px_dec = Decimal(px_str)
-                        if px_dec > max_pending_px:
-                            max_pending_px = px_dec
-                if max_pending_px > 0:
-                    dist_to_dca = abs(tracker.active_sl_px_long - max_pending_px) / max_pending_px
-                    if dist_to_dca <= Decimal("0.003"):
-                        tracker.active_sl_px_long = round_to_tick(max_pending_px * (Decimal("1") - coin_sl_pct), tick_sz)
-            except Exception:
-                pass
+                tracker.active_sl_px_long = round_to_tick(avg_px_l * (Decimal("1") - active_coin_sl_pct), tick_sz)
 
             if tracker.live_price <= tracker.active_sl_px_long:
                 clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
@@ -1231,28 +1253,50 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             tracker.max_roi_short = current_roi_pct
 
         if globals_ref.ENABLE_TRAILING_SL:
+            # --- UPGRADE TF LOGIC CỤC BỘ ---
+            filled_tfs_s = getattr(tracker, "pos_cycle_filled_tfs", [])
+            if filled_tfs_s:
+                max_filled_tf = max(filled_tfs_s, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+            else:
+                max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
+                
+            try:
+                tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                current_weight = tf_weights.get(max_filled_tf, 0)
+                upgrade_tf = max_filled_tf
+                upgrade_weight = current_weight
+                
+                temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+                base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
+                base_sl = avg_px_s * (Decimal("1") + base_sl_pct)
+                placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
+                
+                for tf, px_str in placed_dict.items():
+                    if tf not in filled_tfs_s and px_str not in ("---", "ERR"):
+                        w = tf_weights.get(tf, 0)
+                        if w > current_weight:
+                            pending_px = Decimal(px_str)
+                            dist = abs(base_sl - pending_px) / pending_px
+                            if dist <= Decimal("0.003"):
+                                if w > upgrade_weight:
+                                    upgrade_tf = tf
+                                    upgrade_weight = w
+                                    
+                if upgrade_tf != max_filled_tf:
+                    max_filled_tf = upgrade_tf
+            except Exception:
+                pass
+                
+            active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+            active_coin_sl_pct = globals_ref.SCALPING_SL_PCT * active_tf_mult
+            # -------------------------------
+
             if tracker.max_roi_short >= dynamic_sl_roi_threshold:
                 locked_roi_profit = tracker.max_roi_short - dynamic_sl_roi_threshold
                 roi_fraction = (locked_roi_profit / Decimal("100")) / Decimal(str(cfg["leverage"]))
                 tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") - roi_fraction), tick_sz)
             else:
-                tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") + coin_sl_pct), tick_sz)
-
-            try:
-                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
-                placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
-                min_pending_px = Decimal("inf")
-                for tf, px_str in placed_dict.items():
-                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
-                        px_dec = Decimal(px_str)
-                        if px_dec < min_pending_px:
-                            min_pending_px = px_dec
-                if min_pending_px < Decimal("inf"):
-                    dist_to_dca = abs(tracker.active_sl_px_short - min_pending_px) / min_pending_px
-                    if dist_to_dca <= Decimal("0.003"):
-                        tracker.active_sl_px_short = round_to_tick(min_pending_px * (Decimal("1") + coin_sl_pct), tick_sz)
-            except Exception:
-                pass
+                tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") + active_coin_sl_pct), tick_sz)
 
             if tracker.live_price >= tracker.active_sl_px_short:
                 clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])

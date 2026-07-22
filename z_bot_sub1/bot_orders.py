@@ -182,7 +182,10 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
         if pos_side: ours_algo = [o for o in ours_algo if o.get("posSide") == pos_side]
         if ours_algo: 
             body_cancel = [{"algoId": o["algoId"], "instId": o["instId"]} for o in ours_algo]
-            client.request("POST", "/api/v5/trade/cancel-algos", body=body_cancel)
+            # OKX limits cancel-algos to 10 orders per request, must chunk them
+            for i in range(0, len(body_cancel), 10):
+                chunk = body_cancel[i:i+10]
+                client.request("POST", "/api/v5/trade/cancel-algos", body=chunk)
     except Exception as e:
         hft_logger.error(f"Lỗi clean_algo_orders: {e}", exc_info=True)
 
@@ -264,6 +267,44 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                 max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
         else:
             max_filled_tf = "M5"
+
+        # --- UPGRADE TF LOGIC ---
+        if tracker:
+            try:
+                tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
+                current_weight = tf_weights.get(max_filled_tf, 0)
+                upgrade_tf = max_filled_tf
+                upgrade_weight = current_weight
+                
+                temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+                base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
+                
+                if side in ["long", "net"]:
+                    base_sl = avg_px * (Decimal("1") - base_sl_pct)
+                    placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
+                else:
+                    base_sl = avg_px * (Decimal("1") + base_sl_pct)
+                    placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
+                
+                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
+                
+                for tf, px_str in placed_dict.items():
+                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
+                        w = tf_weights.get(tf, 0)
+                        if w > current_weight:
+                            pending_px = Decimal(px_str)
+                            dist = abs(base_sl - pending_px) / pending_px
+                            if dist <= Decimal("0.003"):
+                                if w > upgrade_weight:
+                                    upgrade_tf = tf
+                                    upgrade_weight = w
+                                    
+                if upgrade_tf != max_filled_tf:
+                    max_filled_tf = upgrade_tf
+            except Exception:
+                pass
+        # ------------------------
+
         tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
         
         is_xl_pos = getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_pos_side", "") == side if tracker else False
@@ -279,44 +320,10 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") - target_sl_pct), tick_sz)
             tp_side, sl_side = "sell", "sell"
-            
-            if tracker:
-                try:
-                    filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
-                    placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
-                    max_pending_px = Decimal("-1")
-                    for tf, px_str in placed_dict.items():
-                        if tf not in filled_tfs and px_str not in ("---", "ERR"):
-                            px_dec = Decimal(px_str)
-                            if px_dec > max_pending_px:
-                                max_pending_px = px_dec
-                    if max_pending_px > 0:
-                        dist_to_dca = abs(calc_sl - max_pending_px) / max_pending_px
-                        if dist_to_dca <= Decimal("0.003"):
-                            calc_sl = round_to_tick(max_pending_px * (Decimal("1") - target_sl_pct), tick_sz)
-                except Exception:
-                    pass
         else:
             calc_tp = round_to_tick(avg_px * (Decimal("1") - target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") + target_sl_pct), tick_sz)
             tp_side, sl_side = "buy", "buy"
-            
-            if tracker:
-                try:
-                    filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
-                    placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
-                    min_pending_px = Decimal("inf")
-                    for tf, px_str in placed_dict.items():
-                        if tf not in filled_tfs and px_str not in ("---", "ERR"):
-                            px_dec = Decimal(px_str)
-                            if px_dec < min_pending_px:
-                                min_pending_px = px_dec
-                    if min_pending_px < Decimal("inf"):
-                        dist_to_dca = abs(calc_sl - min_pending_px) / min_pending_px
-                        if dist_to_dca <= Decimal("0.003"):
-                            calc_sl = round_to_tick(min_pending_px * (Decimal("1") + target_sl_pct), tick_sz)
-                except Exception:
-                    pass
             
         status = check_algo_tpsl_status(client, inst_id, side, td_mode, size_dec)
         
