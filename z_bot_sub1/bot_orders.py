@@ -87,7 +87,8 @@ def clean_limit_orders(client, inst_id: str, td_mode: str = "cross", pos_side: s
         if ours_reg: 
             body_cancel = [{"ordId": o["ordId"], "instId": o["instId"]} for o in ours_reg]
             client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel)
-    except: pass
+    except Exception as e:
+        hft_logger.error(f"Lỗi clean_limit_orders ({inst_id}): {e}")
 
 def check_partial_lock_sl(client, inst_id: str, side: str, avg_px: Decimal,
                           tp_px: Decimal, live_price: Decimal,
@@ -217,7 +218,7 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
                         client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel[i:i+20])
                         time.sleep(0.1)
             except Exception as e:
-                pass
+                hft_logger.error(f"Lỗi cleanup startup Limit ({inst_id}): {e}")
             
             # 2. Quét và Hủy TP/SL
             try:
@@ -228,7 +229,7 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
                         client.request("POST", "/api/v5/trade/cancel-algos", body=body_cancel_algo[i:i+10])
                         time.sleep(0.1)
             except Exception as e:
-                pass
+                hft_logger.error(f"Lỗi cleanup startup Algo ({inst_id}): {e}")
         
         print("✅ [STARTUP CLEANUP]: Hoàn tất dọn dẹp lệnh. Sẵn sàng chạy chiến lược.")
     except Exception as e:

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 import requests
 from datetime import datetime, timezone
 
@@ -31,32 +32,51 @@ class OKXRestCore:
             headers["x-simulated-trading"] = "1"
         return headers
 
-    def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None) -> dict[str, Any]:
-        url = self.BASE_URL + path
-        body_str = json.dumps(body) if body else ""
-        if method.upper() == "GET" and params:
-            full_path = f"{path}?{'&'.join(f'{k}={v}' for k, v in params.items() if v is not None)}"
-            url = self.BASE_URL + full_path
-        else: full_path = path
-        resp = requests.request(
-            method, url, headers=self._make_headers(method, full_path, body_str), 
-            data=body_str if body and method.upper() != "GET" else None, timeout=5
-        )
-        resp.raise_for_status()
-        res_json = resp.json()
-        if res_json.get("code") != "0": 
-            err_msg = res_json.get("msg", "")
-            if "data" in res_json and res_json["data"]:
-                details = []
-                for item in res_json["data"]:
-                    s_code = item.get("sCode", "0")
-                    s_msg = item.get("sMsg", "")
-                    if s_code != "0" and s_code != "":
-                        details.append(f"({s_code}: {s_msg})")
-                if details:
-                    err_msg += " Details: " + "; ".join(details)
-            raise RuntimeError(f"OKX Error [{res_json.get('code')}]: {err_msg}")
-        return res_json
+    def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None, max_retries: int = 3) -> dict[str, Any]:
+        last_err = None
+        for attempt in range(max_retries):
+            try:
+                url = self.BASE_URL + path
+                body_str = json.dumps(body) if body else ""
+                if method.upper() == "GET" and params:
+                    full_path = f"{path}?{'&'.join(f'{k}={v}' for k, v in params.items() if v is not None)}"
+                    url = self.BASE_URL + full_path
+                else: full_path = path
+                resp = requests.request(
+                    method, url, headers=self._make_headers(method, full_path, body_str), 
+                    data=body_str if body and method.upper() != "GET" else None, timeout=5
+                )
+                if resp.status_code == 429:
+                    last_err = RuntimeError(f"HTTP 429 Rate Limit — retry {attempt+1}/{max_retries}")
+                    time.sleep(1)
+                    continue
+                resp.raise_for_status()
+                res_json = resp.json()
+                if res_json.get("code") != "0":
+                    err_code = res_json.get("code", "")
+                    err_msg = res_json.get("msg", "")
+                    if "data" in res_json and res_json["data"]:
+                        details = []
+                        for item in res_json["data"]:
+                            s_code = item.get("sCode", "0")
+                            s_msg = item.get("sMsg", "")
+                            if s_code != "0" and s_code != "":
+                                details.append(f"({s_code}: {s_msg})")
+                        if details:
+                            err_msg += " Details: " + "; ".join(details)
+                    if err_code in ("50011", "50026"):
+                        last_err = RuntimeError(f"OKX Rate Limit [{err_code}]: {err_msg} — retry {attempt+1}/{max_retries}")
+                        time.sleep(1)
+                        continue
+                    raise RuntimeError(f"OKX Error [{err_code}]: {err_msg}")
+                return res_json
+            except (requests.exceptions.RequestException, json.JSONDecodeError, ValueError) as e:
+                last_err = e
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                raise
+        raise last_err if last_err else RuntimeError("OKX request failed after max retries")
 
     def fetch_positions(self, inst_id: str) -> list[dict]:
         return self.request("GET", "/api/v5/account/positions", params={"instType": "SWAP", "instId": inst_id})["data"]
@@ -82,34 +102,53 @@ class AsyncOKXRestCore(OKXRestCore):
         if self.session and not self.session.closed:
             await self.session.close()
 
-    async def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None) -> dict[str, Any]:
-        await self.init_session()
-        url = self.BASE_URL + path
-        body_str = json.dumps(body) if body else ""
-        if method.upper() == "GET" and params:
-            full_path = f"{path}?{'&'.join(f'{k}={v}' for k, v in params.items() if v is not None)}"
-            url = self.BASE_URL + full_path
-        else: full_path = path
-        
-        async with self.session.request(
-            method, url, headers=self._make_headers(method, full_path, body_str), 
-            data=body_str if body and method.upper() != "GET" else None
-        ) as resp:
-            resp.raise_for_status()
-            res_json = await resp.json()
-            if res_json.get("code") != "0": 
-                err_msg = res_json.get("msg", "")
-                if "data" in res_json and res_json["data"]:
-                    details = []
-                    for item in res_json["data"]:
-                        s_code = item.get("sCode", "0")
-                        s_msg = item.get("sMsg", "")
-                        if s_code != "0" and s_code != "":
-                            details.append(f"({s_code}: {s_msg})")
-                    if details:
-                        err_msg += " Details: " + "; ".join(details)
-                raise RuntimeError(f"OKX Error [{res_json.get('code')}]: {err_msg}")
-            return res_json
+    async def request(self, method: str, path: str, params: dict | None = None, body: list | dict | None = None, max_retries: int = 3) -> dict[str, Any]:
+        last_err = None
+        for attempt in range(max_retries):
+            try:
+                await self.init_session()
+                url = self.BASE_URL + path
+                body_str = json.dumps(body) if body else ""
+                if method.upper() == "GET" and params:
+                    full_path = f"{path}?{'&'.join(f'{k}={v}' for k, v in params.items() if v is not None)}"
+                    url = self.BASE_URL + full_path
+                else: full_path = path
+                
+                async with self.session.request(
+                    method, url, headers=self._make_headers(method, full_path, body_str), 
+                    data=body_str if body and method.upper() != "GET" else None
+                ) as resp:
+                    if resp.status == 429:
+                        last_err = RuntimeError(f"HTTP 429 Rate Limit — retry {attempt+1}/{max_retries}")
+                        await asyncio.sleep(1)
+                        continue
+                    resp.raise_for_status()
+                    res_json = await resp.json()
+                    if res_json.get("code") != "0":
+                        err_code = res_json.get("code", "")
+                        err_msg = res_json.get("msg", "")
+                        if "data" in res_json and res_json["data"]:
+                            details = []
+                            for item in res_json["data"]:
+                                s_code = item.get("sCode", "0")
+                                s_msg = item.get("sMsg", "")
+                                if s_code != "0" and s_code != "":
+                                    details.append(f"({s_code}: {s_msg})")
+                            if details:
+                                err_msg += " Details: " + "; ".join(details)
+                        if err_code in ("50011", "50026"):
+                            last_err = RuntimeError(f"OKX Rate Limit [{err_code}]: {err_msg} — retry {attempt+1}/{max_retries}")
+                            await asyncio.sleep(1)
+                            continue
+                        raise RuntimeError(f"OKX Error [{err_code}]: {err_msg}")
+                    return res_json
+            except (asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ValueError) as e:
+                last_err = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                raise
+        raise last_err if last_err else RuntimeError("OKX async request failed after max retries")
 
     async def fetch_positions(self, inst_id: str) -> list[dict]:
         res = await self.request("GET", "/api/v5/account/positions", params={"instType": "SWAP", "instId": inst_id})

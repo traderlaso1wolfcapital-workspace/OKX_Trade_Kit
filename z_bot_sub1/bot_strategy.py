@@ -740,7 +740,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         if not candles_h1 or len(candles_h1) < 280: return
         if not candles_h2 or len(candles_h2) < 280: return
         if not candles_h4 or len(candles_h4) < 280: return
-    except: return
+    except Exception as e:
+        hft_logger.error(f"Lỗi fetch candles {coin_name} ({swap_id}): {e}")
+        return
 
     # --------------------------------------------------------------------------
     # 🌐 TÍNH TOÁN XU HƯỚNG M15 (MACRO MTF FILTER)
@@ -2019,8 +2021,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 if _emergency_needed:
                     is_limit_setup_cycle = True
                     print(f"⚡ [EMERGENCY RE-PLACE] {coin_name}: Phát hiện lệnh Limit bị hủy trên sàn → Đặt lại ngay!")
-            except:
-                pass
+            except Exception as e:
+                hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
 
             def _get_td_mode(tf):
                 return "cross"
@@ -2206,7 +2208,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             if long_orders_tf:
                                 client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                                body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
-                        except: pass
+                        except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                         tracker.placed_entry_px_long_by_tf[tf] = "---"
 
                 for tf in TFS_ALL:
@@ -2218,7 +2220,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if iso_orders:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in iso_orders])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     # Reset isolated entries
                     if tracker.placed_entry_px_long_by_tf.get(tf, "---") != "---":
                         if tf not in exchange_longs_cross:
@@ -2247,7 +2249,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         bad_orders = [o for o in actual_pending if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")]
                         if bad_orders:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders", body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in bad_orders])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     continue
                     
                 px_str = f"{px_tf:.{dec_places}f}"
@@ -2266,7 +2268,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                                 o_sz = Decimal(o.get("sz", "0"))
                                 if o_sz > 0 and abs(o_sz - Decimal(str(sz_for_tf))) / Decimal(str(sz_for_tf)) <= Decimal("0.05"):
                                     tf_orders.append(o)
-                            except: pass
+                            except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 matching_order = None
                 if len(tf_orders) > 1:
@@ -2279,7 +2281,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         for dup in duplicates:
                             if dup in actual_pending:
                                 actual_pending.remove(dup)
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 elif len(tf_orders) == 1:
                     matching_order = tf_orders[0]
                 
@@ -2299,8 +2301,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             if last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
                                 tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
                                 continue
-                    except:
-                        pass
+                    except Exception as e:
+                        hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ để tránh khoảng trống lệnh trên sàn
                 amend_ok = False
@@ -2314,7 +2316,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             tracker.placed_entry_px_long_by_tf[tf] = px_str
                             amend_ok = True
                             tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 if not amend_ok:
                     # Fallback: Hủy lệnh cũ rồi đặt lệnh mới
@@ -2325,7 +2327,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if long_orders_tf:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     try:
                         try:
                             _lever = str(_get_leverage(tf))
@@ -2399,7 +2401,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             if short_orders_tf:
                                 client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                                body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
-                        except: pass
+                        except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                         tracker.placed_entry_px_short_by_tf[tf] = "---"
 
                 for tf in TFS_ALL:
@@ -2411,7 +2413,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if iso_orders:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in iso_orders])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     # Reset isolated entries
                     if tracker.placed_entry_px_short_by_tf.get(tf, "---") != "---":
                         if tf not in exchange_shorts_cross:
@@ -2440,7 +2442,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         bad_orders = [o for o in actual_pending if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")]
                         if bad_orders:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders", body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in bad_orders])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     continue
                     
                 px_str = f"{px_tf:.{dec_places}f}"
@@ -2459,7 +2461,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                                 o_sz = Decimal(o.get("sz", "0"))
                                 if o_sz > 0 and abs(o_sz - Decimal(str(sz_for_tf))) / Decimal(str(sz_for_tf)) <= Decimal("0.05"):
                                     tf_orders.append(o)
-                            except: pass
+                            except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 matching_order = None
                 if len(tf_orders) > 1:
@@ -2472,7 +2474,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         for dup in duplicates:
                             if dup in actual_pending:
                                 actual_pending.remove(dup)
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 elif len(tf_orders) == 1:
                     matching_order = tf_orders[0]
                 
@@ -2492,8 +2494,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             if last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
                                 tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
                                 continue
-                    except:
-                        pass
+                    except Exception as e:
+                        hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ để tránh khoảng trống lệnh trên sàn
                 amend_ok = False
@@ -2507,7 +2509,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             tracker.placed_entry_px_short_by_tf[tf] = px_str
                             amend_ok = True
                             tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
                 if not amend_ok:
                     # Fallback: Hủy lệnh cũ rồi đặt lệnh mới
@@ -2518,7 +2520,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         if short_orders_tf:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
-                    except: pass
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     try:
                         try:
                             _lever = str(_get_leverage(tf))
@@ -2588,7 +2590,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 if old_orders:
                     client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                    body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in old_orders])
-            except: pass
+            except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
 
 # =========================================================================================
 # 🗺️ BẢN ĐỒ GIẢI PHẪU THUẬT TOÁN — CRITICAL STRATEGY MAP (PURE LIMIT CROSS PP0)

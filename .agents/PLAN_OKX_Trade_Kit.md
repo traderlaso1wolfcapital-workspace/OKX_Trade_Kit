@@ -799,3 +799,21 @@ Trong đó `(+5.30%)` = offset entry thực tế (alt_dist + btc_dist × vol_mul
 
 - Sửa lỗi NameError globals_ref: Định nghĩa biến globals_ref trỏ đến module hiện tại bằng `sys.modules[__name__]` ở đầu `bot_main.py` để sửa lỗi thiếu reference truy xuất config.
 
+
+## X. CHUẨN MỰC KIẾN TRÚC MẠNG & XỬ LÝ LỖI (Cập nhật 23/07/2026 - z3400)
+**QUY TẮC BẤT DI BẤT DỊCH DÀNH CHO MỌI AI CODER (CLINE/DEEPSEEK/GEMINI):**
+
+1. **TUYỆT ĐỐI CẤM SỬ DỤNG except: pass TRONG CORE TRADING:**
+   - Tại các file như ot_orders.py, ot_strategy.py, và ot_api.py, tuyệt đối không dùng except: pass để "nuốt lỗi" khi giao tiếp với sàn OKX (Vào lệnh, Hủy lệnh, Fetch nến, Lấy số dư).
+   - Nếu có lỗi, BẮT BUỘC phải bắt và ghi log rõ ràng: except Exception as e: hft_logger.error(f"Lỗi API: {e}"). Điều này giúp hệ thống không bị mù trạng thái khi mất mạng.
+
+2. **CƠ CHẾ RETRY BẮT BUỘC (API RATE LIMIT):**
+   - Lớp giao tiếp ot_api.py (cả Sync và Async) phải luôn giữ cơ chế lặp or attempt in range(max_retries) (Mặc định 3 lần).
+   - Các Exception BẮT BUỘC PHẢI BẮT trong vòng lặp Sync: (requests.exceptions.RequestException, json.JSONDecodeError, ValueError).
+   - Các Exception BẮT BUỘC PHẢI BẮT trong vòng lặp Async: (asyncio.TimeoutError, aiohttp.ClientError, json.JSONDecodeError, ValueError).
+   - Sàn OKX thường xuyên ném ra mã HTTP 429, 50011, 50026, hoặc đôi khi là trang lỗi HTML (502 Bad Gateway) gây lỗi JSON. Bot phải lùi lại 1 giây (sleep(1)) và retry thay vì crash văng App.
+
+3. **QUẢN LÝ TIẾN TRÌNH & QTHREAD (GRACEFUL SHUTDOWN):**
+   - BotSubprocessWorker trong gui_main.py chạy độc lập với giao diện chính.
+   - Khi closeEvent (Tắt App) được gọi, không được block GUI Thread. Phải gọi .stop() cho tất cả các Bot chạy song song, sau đó mới tiến hành .wait(3000) và .terminate().
+   - Trình phát âm thanh toàn cục (_GLOBAL_AUDIO_PLAYERS) phải được .stop() và .clear() khi tắt App để tránh lỗi QThread: Destroyed while thread is still running.

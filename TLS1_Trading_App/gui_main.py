@@ -25,29 +25,6 @@ def fix_qtwebengine_path():
 
 fix_qtwebengine_path()
 
-_GLOBAL_AUDIO_PLAYERS = []
-def play_ui_sound(sound_file, volume=0.5):
-    try:
-        from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-        from PyQt6.QtCore import QUrl
-        import os
-        global _GLOBAL_AUDIO_PLAYERS
-        from PyQt6.QtMultimedia import QMediaPlayer as QMP
-        _GLOBAL_AUDIO_PLAYERS = [p for p in _GLOBAL_AUDIO_PLAYERS if p.playbackState() == QMP.PlaybackState.PlayingState]
-        
-        player = QMediaPlayer()
-        audio_output = QAudioOutput(player)
-        player.setAudioOutput(audio_output)
-        audio_output.setVolume(volume)
-        
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", sound_file)
-        if os.path.exists(path):
-            player.setSource(QUrl.fromLocalFile(path))
-            player.play()
-            _GLOBAL_AUDIO_PLAYERS.append(player)
-    except Exception:
-        pass
-
 
 import time
 import ctypes
@@ -78,6 +55,30 @@ for _ in range(4):
 
 if not USER_DATA_DIR:
     USER_DATA_DIR = PROJECT_DIR
+
+_GLOBAL_AUDIO_PLAYERS = []
+
+def play_ui_sound(sound_file, volume=0.5):
+    try:
+        from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+        from PyQt6.QtCore import QUrl
+        import os
+        global _GLOBAL_AUDIO_PLAYERS
+        from PyQt6.QtMultimedia import QMediaPlayer as QMP
+        _GLOBAL_AUDIO_PLAYERS = [p for p in _GLOBAL_AUDIO_PLAYERS if p.playbackState() == QMP.PlaybackState.PlayingState]
+        
+        player = QMediaPlayer()
+        audio_output = QAudioOutput(player)
+        player.setAudioOutput(audio_output)
+        audio_output.setVolume(volume)
+        
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", sound_file)
+        if os.path.exists(path):
+            player.setSource(QUrl.fromLocalFile(path))
+            player.play()
+            _GLOBAL_AUDIO_PLAYERS.append(player)
+    except Exception:
+        pass
 
 def auto_reset_state_on_update(data_dir, base_dir):
     try:
@@ -146,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.194"
+APP_VERSION = "1.0.195"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1400,7 +1401,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             pass
 
     def save_api_settings(self):
-        play_ui_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
+        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         
@@ -1463,7 +1464,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                 msg = QtWidgets.QMessageBox(self)
                                 msg.setWindowTitle("Lỗi API Key (Sai Chủ)")
                                 msg.setText(display_err)
-                                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                                 msg.exec()
                                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                                 self.btn_save_api.setEnabled(True)
@@ -1484,7 +1485,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
-                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1494,7 +1495,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
                 msg.setText(f"Không thể xác thực API Key:\n{str(e)}")
-                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
                 msg.exec()
                 self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
                 self.btn_save_api.setEnabled(True)
@@ -1520,7 +1521,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg.exec()
 
     def save_strategy_settings(self):
-        play_ui_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
+        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file: return
         acc_name = self.get_acc_name()
@@ -1546,6 +1547,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "RISK_PER_TRADE_PCT": str(round(self.smc_input_risk_pct.value() / 100.0, 4)),
                 "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.smc_input_pos_vol.value(), 2)),
                 # Smart Money Concepts
+                "SMC_MODE": self.smc_combo_mode.currentText(),
+                "SMC_STYLE": self.smc_combo_style.currentText(),
                 # Internal Structure
                 "SMC_SHOW_INTERNAL": self.smc_chk_show_int.isChecked(),
                 "SMC_INT_BULL": self.smc_combo_int_bull.currentText(),
@@ -1680,13 +1683,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             return False
 
     def start_bot(self):
-        play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
+        self.play_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
         env_file = self.get_selected_env()
         if not env_file: return
         
         env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
         if not self._verify_env_security(env_path):
-            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+            self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.critical(self, "Khóa Bảo Mật", f"LỖI BẢO MẬT: API Key trong cấu hình {env_file} không hợp lệ hoặc KHÔNG thuộc quyền sở hữu của UID {CURRENT_UID}.\n\nHệ thống đã khóa lệnh chạy Bot để bảo vệ an toàn!")
             return
         
@@ -1710,25 +1713,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.status_led.setStyleSheet("color: #00FF00; padding-left:10px;")
 
     def stop_bot(self):
-        play_ui_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
+        self.play_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
         if self.worker:
             self.btn_stop.setEnabled(False)
             self.worker.stop()
 
     def reset_wallet(self):
-        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
-        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+        self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
 
     def on_bot_finished(self):
-        play_ui_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
+        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         self.log_display.appendPlainText("\n🛑 Bot đã dừng hoàn toàn.")
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
@@ -1903,7 +1906,7 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     def trigger_humane_warning(self, reason):
-        play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.8)
+        self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.8)
         # Cảnh báo nhân đạo: Thay đổi dòng chào mừng, 24 tiếng sau mới tự đóng app (24 * 60 * 60 * 1000 = 86400000 ms)
         warning_msg = f'⚠ {reason} Vui lòng <b><a href="login" style="color:#ff3333;text-decoration:underline;">Click vào đây để mở bảng Liên hệ Admin TLS1</a></b> xử lý khiếu nại. App sẽ tự đóng sau 24h!'
         if hasattr(self, 'lbl_main_welcome'):
@@ -2009,7 +2012,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_main_logout.hide()
         
         def on_main_logout():
-            play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+            play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                 import sys, subprocess, os
@@ -2102,7 +2105,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bot_tabs.addTab(self.panel_sub2, "Bot SMC - OB")
 
     def check_for_updates(self):
-        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
         # Không tự động check liên tục nữa để tránh đơ máy
         pass
 
@@ -2249,6 +2251,16 @@ del /f /q "%~f0"
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def closeEvent(self, event):
+        # Bước 1: Gửi tín hiệu stop cho tất cả các worker trước để chúng đóng song song
+        for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
+            panel = getattr(self, attr, None)
+            if panel and hasattr(panel, 'worker'):
+                try:
+                    panel.worker.stop()
+                except:
+                    pass
+                    
+        # Bước 2: Chờ và ép buộc đóng (terminate) nếu quá hạn
         for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
             panel = getattr(self, attr, None)
             if panel and hasattr(panel, 'worker') and getattr(panel.worker, 'process', None):
@@ -2257,6 +2269,25 @@ del /f /q "%~f0"
                     panel.worker.process.wait(timeout=2.0)
                 except:
                     pass
+            if panel and hasattr(panel, 'worker'):
+                try:
+                    panel.worker.quit()
+                    if not panel.worker.wait(3000):
+                        panel.worker.terminate()
+                        panel.worker.wait(2000)
+                except:
+                    pass
+        try:
+            global _GLOBAL_AUDIO_PLAYERS
+            from PyQt6.QtMultimedia import QMediaPlayer
+            for p in _GLOBAL_AUDIO_PLAYERS[:]:
+                try:
+                    p.stop()
+                except:
+                    pass
+            _GLOBAL_AUDIO_PLAYERS.clear()
+        except:
+            pass
         event.accept()
 
     def apply_dark_theme(self):
@@ -2397,6 +2428,7 @@ class HWIDAuthDialog(QtWidgets.QDialog):
         btn_hwid_val.setToolTip("Click để tự động copy")
         
         def copy_auth_hwid():
+            play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             QtWidgets.QApplication.clipboard().setText(hwid)
             btn_hwid_val.setText("✅ Đã Copy!")
             QtCore.QTimer.singleShot(1500, lambda: btn_hwid_val.setText(hwid))
@@ -2710,7 +2742,6 @@ class LoginDialog(QtWidgets.QDialog):
                 self.btn_login.setEnabled(True)
                 
         except Exception as e:
-            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.critical(self, "Lỗi kết nối", f"Không thể lấy dữ liệu từ hệ thống:\n{str(e)}\n\nVui lòng kiểm tra lại mạng!")
             self.btn_login.setText("Đăng Nhập")
             self.btn_login.setEnabled(True)

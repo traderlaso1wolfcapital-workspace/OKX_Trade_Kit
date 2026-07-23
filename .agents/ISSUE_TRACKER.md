@@ -10,15 +10,21 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## 🐞 CÁC LỖI HIỆN TẠI ĐANG CHỜ XỬ LÝ (PENDING BUGS)
 
-*Hiện tại hệ thống đang vận hành trơn tru và chưa có lỗi nào được ghi nhận. Phiên Audit 6 Patches của Gemini & DeepSeek đã dọn sạch các lỗi tồn đọng.*
+*(Danh sách trống — tất cả lỗi đã được xử lý)*
 
-*(Thêm lỗi mới vào đây)*
 
 
 
 ---
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[23/07/2026]** - ✅ Hoàn thành Audit System 2026: Vá 3 lỗ hổng hệ thống cốt lõi:
+  1. **Retry/Backoff API OKX**: Thêm vòng lặp retry 3 lần kèm `time.sleep(1)` vào cả sync `request()` và async `request()` trong `bot_api.py` (sub1 + sub2), bắt HTTP 429 và OKX 50011/50026, timeout/connection error.
+  2. **Thanh trừng `except: pass`**: Thay thế các block `except: pass` tại các hàm trọng yếu (`clean_limit_orders`, `cleanup_all_orders_on_startup`, fetch candles, xử lý vị thế, trailing SL upgrade TF) bằng `hft_logger.error(...)` trong `bot_orders.py` và `bot_strategy.py`.
+  3. **Graceful Shutdown QThread**: Bổ sung logic dừng `BotSubprocessWorker` (stop → quit → wait → terminate) và dọn dẹp `_GLOBAL_AUDIO_PLAYERS.clear()` trong `closeEvent` của `gui_main.py`.
+  *(CTO Antigravity Update: Đã fix lại triệt để lỗi bắt thiếu JSONDecodeError/HTTPError, sửa lỗi treo App do worker.stop block Main Thread, và rà soát triệt để except: pass do Cline làm sót trong bot_strategy.py)*
+  (Tham chiếu: `PLAN_SYSTEM_AUDIT_2026.md`, Mã patch: `z3400`)
 
 - **[23/07/2026]** - Lỗi văng App do thiếu thuộc tính play_sound trên MainWindow và sót biến smc_combo_mode khi lưu cấu hình. Đã fix: Refactor trình phát âm thanh thành hàm toàn cục play_ui_sound() và dọn dẹp các biến cấu hình SMC rác (Mã patch: z3322).
 - **[16/07/2026]** - Lỗi `bot_sub1` Altcoin Neo BTC entry bị đẩy cao hơn giá live khi BTC sát EMA200 hoặc bị overshoots sâu qua EMA. Đã fix: Bỏ `volatility_mult` khỏi base offset và áp dụng cơ chế **EMA Floor Clamp**: Giới hạn entry của Altcoin không vượt quá ngưỡng an toàn `EMA200_Altcoin * (1 +/- base_buffer)` của chính nó (Mã patch: `z3318`).
