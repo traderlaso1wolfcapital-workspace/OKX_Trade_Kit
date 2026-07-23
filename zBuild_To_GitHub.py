@@ -41,9 +41,9 @@ print(f"[1] Đã tự động tăng Version từ {old_v} len {new_v}")
 # 3. Git Commands
 git = r"C:\Program Files\Git\cmd\git.exe"
 
-print("[2] Đang lưu thay đổi (Commit)...")
+print("[2] Đang lưu thay đổi (Commit) dưới danh nghĩa Ẩn danh (TLS1 Admin)...")
 subprocess.run([git, "add", "."], check=False, cwd=base_dir)
-subprocess.run([git, "commit", "-m", f"Release v{new_v} (Auto)"], check=False, cwd=base_dir)
+subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Release v{new_v} (Auto)"], check=False, cwd=base_dir)
 
 print(f"[3] Đang gắn nhãn phiên bản (Tag v{new_v})...")
 subprocess.run([git, "tag", f"v{new_v}"], check=False, cwd=base_dir)
