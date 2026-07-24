@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.199"
+APP_VERSION = "1.0.200"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -184,6 +184,130 @@ except ImportError:
     import importlib
     importlib.invalidate_caches()
     from lightweight_charts.widgets import QtChart
+
+
+# ============================================================================
+# PRESENCE MANAGER - Theo dõi số người đang online qua Firebase Realtime DB
+# ============================================================================
+class PresenceManager(QtCore.QThread):
+    """Quản lý trạng thái online/offline của user trên Firebase Realtime Database.
+    Chạy trên thread riêng để không block Main UI.
+    """
+    online_count_changed = QtCore.pyqtSignal(int)  # Signal báo số người online thay đổi
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._uid = None
+        self._nickname = None
+        self._running = False
+        self._registered = False
+
+    def register(self, uid, nickname):
+        """Đăng ký presence lên Firebase khi login thành công."""
+        self._uid = uid
+        self._nickname = nickname
+        self._registered = False
+        try:
+            import urllib.request
+            import json as _json
+            import time
+            data = _json.dumps({
+                "nickname": nickname,
+                "last_seen": int(time.time()),
+                "version": APP_VERSION,
+                "platform": sys.platform
+            }).encode('utf-8')
+            url = f"{FIREBASE_URL}/presence/{uid}.json"
+            req = urllib.request.Request(url, data=data, method='PUT')
+            req.add_header('Content-Type', 'application/json')
+            urllib.request.urlopen(req, timeout=8)
+            self._registered = True
+        except Exception as e:
+            print(f"[Presence] Register failed: {e}")
+
+    def unregister(self):
+        """Xóa presence khỏi Firebase khi đóng app hoặc đăng xuất."""
+        if not self._uid or not self._registered:
+            return
+        try:
+            import urllib.request
+            url = f"{FIREBASE_URL}/presence/{self._uid}.json"
+            req = urllib.request.Request(url, method='DELETE')
+            urllib.request.urlopen(req, timeout=5)
+            self._registered = False
+        except Exception as e:
+            print(f"[Presence] Unregister failed: {e}")
+
+    def _heartbeat(self):
+        """Cập nhật last_seen mỗi chu kỳ để Firebase biết user vẫn online."""
+        if not self._uid or not self._registered:
+            return
+        try:
+            import urllib.request
+            import json as _json
+            import time
+            data = _json.dumps({"last_seen": int(time.time())}).encode('utf-8')
+            url = f"{FIREBASE_URL}/presence/{self._uid}.json"
+            req = urllib.request.Request(url, data=data, method='PATCH')
+            req.add_header('Content-Type', 'application/json')
+            urllib.request.urlopen(req, timeout=8)
+        except Exception as e:
+            print(f"[Presence] Heartbeat failed: {e}")
+
+    def _fetch_online_count(self):
+        """Đọc toàn bộ /presence từ Firebase, đếm user active trong 3 phút."""
+        try:
+            import urllib.request
+            import json as _json
+            import time
+            url = f"{FIREBASE_URL}/presence.json"
+            req = urllib.request.Request(url, method='GET')
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = _json.loads(resp.read().decode('utf-8'))
+            if not data or not isinstance(data, dict):
+                self.online_count_changed.emit(0)
+                return
+            now = int(time.time())
+            threshold = 180  # 3 phút = 180 giây
+            count = 0
+            stale_uids = []
+            for uid, info in data.items():
+                if isinstance(info, dict):
+                    last_seen = info.get('last_seen', 0)
+                    if now - last_seen <= threshold:
+                        count += 1
+                    elif now - last_seen > 600:  # Quá 10 phút → dọn dẹp node zombie
+                        stale_uids.append(uid)
+            # Dọn dẹp các node zombie (user crash không kịp unregister)
+            for stale_uid in stale_uids[:5]:  # Giới hạn dọn 5 node/lần tránh quá tải
+                try:
+                    del_url = f"{FIREBASE_URL}/presence/{stale_uid}.json"
+                    del_req = urllib.request.Request(del_url, method='DELETE')
+                    urllib.request.urlopen(del_req, timeout=3)
+                except Exception:
+                    pass
+            self.online_count_changed.emit(count)
+        except Exception as e:
+            print(f"[Presence] Fetch count failed: {e}")
+
+    def run(self):
+        """Vòng lặp chính: heartbeat + fetch count mỗi 60 giây."""
+        import time
+        self._running = True
+        # Fetch lần đầu ngay lập tức
+        self._fetch_online_count()
+        tick = 0
+        while self._running:
+            time.sleep(1)
+            tick += 1
+            if tick >= 60:  # Mỗi 60 giây
+                tick = 0
+                self._heartbeat()
+                self._fetch_online_count()
+
+    def stop(self):
+        """Dừng thread."""
+        self._running = False
 
 
 class ToggleSwitch(QtWidgets.QCheckBox):
@@ -1042,13 +1166,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_main = ToggleSwitch()
         self.chk_xole = ToggleSwitch()
-        self.chk_pingpong = ToggleSwitch()
-        self.chk_dynamic_pingpong_tp = ToggleSwitch()
         
         add_checkbox(l_toggles, 0, 0, "Bật MAIN", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 (Main).")
         add_checkbox(l_toggles, 0, 1, "Bật XOLE", self.chk_xole, "Bật/Tắt chiến thuật Bắt Bẻ Xole (Giao dịch ngược xu hướng nhỏ).")
-        add_checkbox(l_toggles, 0, 2, "Bật PING-PONG", self.chk_pingpong, "Bật/Tắt chiến thuật Ping-Pong (Đánh nhồi trong vùng Squeeze).")
-        add_checkbox(l_toggles, 1, 0, "Bật TP Động (Option A)", self.chk_dynamic_pingpong_tp, "Bật cơ chế Chốt lời động bám theo EMA200 của khung thời gian nhỏ hơn liền kề.", colspan=3)
         layout.addWidget(grp_toggles)
 
         # 2. LỚP BẢO VỆ CỤC BỘ
@@ -1077,19 +1197,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         grp_risk = QtWidgets.QGroupBox("Quản Lý Vốn & Rủi Ro")
 
         l_risk = QtWidgets.QGridLayout(grp_risk)
-        self.chk_dynamic_risk = ToggleSwitch()
-        add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh. Nếu tắt, sẽ dùng Vốn Limit Cố Định.", 2)
-        
-        self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %")
-        add_field(l_risk, 1, "Vào lệnh theo % vốn (%):", self.input_risk_pct, "Phần trăm tổng tài khoản sẽ bị mất nếu lệnh chạm mốc Dừng Lỗ (SL). Ví dụ 2.0%.")
         
         self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
-        add_field(l_risk, 2, "Vào lệnh theo volume đòn bẩy:", self.input_pos_vol, "Vốn cố định sử dụng nếu Quản lý vốn động bị tắt. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        add_field(l_risk, 0, "Vốn Limit cố định (USDT):", self.input_pos_vol, "Vốn cố định sử dụng cho mỗi lệnh Limit. (POSITION_VOLUME_HIGH_CONFIDENCE)")
         
         self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %")
         self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %")
-        add_field(l_risk, 3, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 2.1%.")
-        add_field(l_risk, 4, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 2.1%.")
+        add_field(l_risk, 1, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 2.1%.")
+        add_field(l_risk, 2, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 2.1%.")
         layout.addWidget(grp_risk)
 
         # 4. BỘ LỌC & DUNG SAI KỸ THUẬT
@@ -1104,40 +1219,28 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_confluence_pct = QtWidgets.QDoubleSpinBox(); self.input_confluence_pct.setSuffix(" %"); self.input_confluence_pct.setDecimals(3)
         add_field(l_filter, 2, "Hợp lưu EMA200 đa khung:", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
         
-        self.input_squeeze_tol = QtWidgets.QDoubleSpinBox(); self.input_squeeze_tol.setSuffix(" %"); self.input_squeeze_tol.setDecimals(3)
-        add_field(l_filter, 3, "Dung sai nén Squeeze:", self.input_squeeze_tol, "Dung sai khoảng cách nén tam giác hẹp giữa EMA34 và EMA89 (VD: 0.25%).")
-        
         self.input_drift_pct = QtWidgets.QDoubleSpinBox(); self.input_drift_pct.setSuffix(" %"); self.input_drift_pct.setDecimals(3)
-        add_field(l_filter, 4, "Ngưỡng trượt EMA200:", self.input_drift_pct, "Ngưỡng trượt tối đa EMA200 trong 20 nến (0.3% cho phép độ dốc nhẹ <= 4 độ). Nếu cao hơn sẽ bị coi là trend mạnh.")
-        
-        self.input_alt_diff = QtWidgets.QDoubleSpinBox(); self.input_alt_diff.setSuffix(" %"); self.input_alt_diff.setDecimals(3)
-        add_field(l_filter, 5, "Lệch pha Alt/BTC:", self.input_alt_diff, "Ngưỡng lệch pha Altcoin so với BTC (VD: 0.5%) để bật chế độ lùi Limit sâu.")
+        add_field(l_filter, 3, "Ngưỡng trượt EMA200:", self.input_drift_pct, "Ngưỡng trượt tối đa EMA200 trong 20 nến (0.3% cho phép độ dốc nhẹ <= 4 độ). Nếu cao hơn sẽ bị coi là trend mạnh.")
         
         self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4)
-        add_field(l_filter, 6, "Đệm đón lõm Entry:", self.input_entry_offset, "Đệm (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
+        add_field(l_filter, 4, "Đệm đón lõm Entry:", self.input_entry_offset, "Đệm (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
         self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
-        add_field(l_filter, 7, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
+        add_field(l_filter, 5, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
         layout.addWidget(grp_filter)
 
-        # 5. CẤU HÌNH PING-PONG & CHU KỲ
-        grp_misc = QtWidgets.QGroupBox("Cấu Hình Ping-Pong & Lượng Tử")
+        # 5. LƯỢNG TỬ & TIẾN HÓA
+        grp_misc = QtWidgets.QGroupBox("Lượng Tử & Tiến Hóa")
         l_misc = QtWidgets.QGridLayout(grp_misc)
         
-        self.input_pp_div = QtWidgets.QDoubleSpinBox()
-        add_field(l_misc, 0, "Tỷ lệ chia Volume Ping-Pong:", self.input_pp_div, "Tỷ lệ chia nhỏ Volume khi đánh nhồi Ping-Pong trong vùng Squeeze (VD: 3.0).")
-        
-        self.input_pp_lev = QtWidgets.QSpinBox(); self.input_pp_lev.setMaximum(200)
-        add_field(l_misc, 1, "Đòn bẩy Ping-Pong:", self.input_pp_lev, "Đòn bẩy cô lập (Isolated) riêng cho Ping-Pong (VD: 50x).")
-        
         self.input_q_buffer = QtWidgets.QSpinBox(); self.input_q_buffer.setMaximum(999)
-        add_field(l_misc, 2, "Nến đệm lượng tử:", self.input_q_buffer, "Số nến quá khứ (Buffer) làm vùng đệm cho thuật toán ma trận lượng tử.")
+        add_field(l_misc, 0, "Nến đệm lượng tử:", self.input_q_buffer, "Số nến quá khứ (Buffer) làm vùng đệm cho thuật toán ma trận lượng tử.")
         
         self.input_q_forth = QtWidgets.QSpinBox(); self.input_q_forth.setMaximum(999)
-        add_field(l_misc, 3, "Nến dự báo lượng tử:", self.input_q_forth, "Số nến tương lai mô phỏng được thuật toán phóng chiếu.")
+        add_field(l_misc, 1, "Nến dự báo lượng tử:", self.input_q_forth, "Số nến tương lai mô phỏng được thuật toán phóng chiếu.")
         
         self.input_evo_cycle = QtWidgets.QSpinBox(); self.input_evo_cycle.setMaximum(999999)
-        add_field(l_misc, 4, "Chu kỳ tiến hóa (giây):", self.input_evo_cycle, "Thời gian tối thiểu giữa 2 lần AI chạy tự tiến hóa lại hệ số thông minh.")
+        add_field(l_misc, 2, "Chu kỳ tiến hóa (giây):", self.input_evo_cycle, "Thời gian tối thiểu giữa 2 lần AI chạy tự tiến hóa lại hệ số thông minh.")
         layout.addWidget(grp_misc)
 
         # 6. ĐÒN BẨY & VOL
@@ -1386,8 +1489,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
             self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
-            self.chk_pingpong.setChecked(bool(cfg.get("ENABLE_STRATEGY_PING_PONG", getattr(bot_config, "ENABLE_STRATEGY_PING_PONG", False))))
-            self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
             
             self.chk_sideway_safe.setChecked(bool(cfg.get("ENABLE_SIDEWAY_SAFE_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_SAFE_EXIT", False))))
             self.chk_squeeze_escape.setChecked(bool(cfg.get("ENABLE_SQUEEZE_ESCAPE_EXIT", getattr(bot_config, "ENABLE_SQUEEZE_ESCAPE_EXIT", False))))
@@ -1397,22 +1498,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chk_sideway_vap.setChecked(bool(cfg.get("ENABLE_SIDEWAY_VAP_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_VAP_EXIT", False))))
             self.chk_h4_flip.setChecked(bool(cfg.get("ENABLE_H4_FLIP_CLOSE", getattr(bot_config, "ENABLE_H4_FLIP_CLOSE", False))))
             
-            self.chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", False))))
-            self.input_risk_pct.setValue(float(cfg.get("RISK_PER_TRADE_PCT", float(getattr(bot_config, "RISK_PER_TRADE_PCT", 0.01)))) * 100)
             self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.01)))) * 100)
             self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.01)))) * 100)
             self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", float(getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 150.0)))))
             
             self.input_dca_gap_pct.setValue(float(cfg.get("DCA_GAP_THRESHOLD_PCT", float(getattr(bot_config, "DCA_GAP_THRESHOLD_PCT", 0.01)))) * 100)
             self.input_confluence_pct.setValue(float(cfg.get("EMA_CONFLUENCE_TOLERANCE_PCT", float(getattr(bot_config, "EMA_CONFLUENCE_TOLERANCE_PCT", 0.01)))) * 100)
-            self.input_squeeze_tol.setValue(float(cfg.get("EMA_SQUEEZE_TOLERANCE_PCT", float(getattr(bot_config, "EMA_SQUEEZE_TOLERANCE_PCT", 0.01)))) * 100)
             self.input_drift_pct.setValue(float(cfg.get("EMA200_DRIFT_THRESHOLD_PCT", float(getattr(bot_config, "EMA200_DRIFT_THRESHOLD_PCT", 0.01)))) * 100)
-            self.input_alt_diff.setValue(float(cfg.get("ALTCOIN_DIFF_THRESHOLD_PCT", float(getattr(bot_config, "ALTCOIN_DIFF_THRESHOLD_PCT", 0.01)))) * 100)
             self.input_entry_offset.setValue(float(cfg.get("BASE_ENTRY_OFFSET_PCT", float(getattr(bot_config, "BASE_ENTRY_OFFSET_PCT", 0.01)))) * 100)
             self.input_accum_candles.setValue(int(cfg.get("REQUIRED_ACCUMULATION_CANDLES", getattr(bot_config, "REQUIRED_ACCUMULATION_CANDLES", 3))))
             
-            self.input_pp_div.setValue(float(cfg.get("PING_PONG_VOL_DIVIDER", float(getattr(bot_config, "PING_PONG_VOL_DIVIDER", 3.0)))))
-            self.input_pp_lev.setValue(int(cfg.get("PING_PONG_LEVERAGE", getattr(bot_config, "PING_PONG_LEVERAGE", 50))))
             self.input_q_buffer.setValue(int(cfg.get("QUANTUM_BUFFER_CANDLES", getattr(bot_config, "QUANTUM_BUFFER_CANDLES", 10))))
             self.input_q_forth.setValue(int(cfg.get("QUANTUM_FORTH_CANDLES", getattr(bot_config, "QUANTUM_FORTH_CANDLES", 5))))
             self.input_evo_cycle.setValue(int(cfg.get("EVOLUTION_CYCLE_SECONDS", getattr(bot_config, "EVOLUTION_CYCLE_SECONDS", 86400))))
@@ -1651,8 +1746,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             cfg.update({
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
-            "ENABLE_STRATEGY_PING_PONG": self.chk_pingpong.isChecked(),
-            "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),
             "ENABLE_SIDEWAY_SAFE_EXIT": self.chk_sideway_safe.isChecked(),
             "ENABLE_SQUEEZE_ESCAPE_EXIT": self.chk_squeeze_escape.isChecked(),
             "ENABLE_SAFEGUARD_ENTRY_EXIT": self.chk_safeguard_entry.isChecked(),
@@ -1661,22 +1754,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLE_SIDEWAY_VAP_EXIT": self.chk_sideway_vap.isChecked(),
             "ENABLE_H4_FLIP_CLOSE": self.chk_h4_flip.isChecked(),
 
-            "USE_DYNAMIC_RISK": self.chk_dynamic_risk.isChecked(),
-            "RISK_PER_TRADE_PCT": str(round(self.input_risk_pct.value() / 100.0, 4)),
             "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
             "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
 
             "DCA_GAP_THRESHOLD_PCT": str(round(self.input_dca_gap_pct.value() / 100.0, 6)),
             "EMA_CONFLUENCE_TOLERANCE_PCT": str(round(self.input_confluence_pct.value() / 100.0, 6)),
-            "EMA_SQUEEZE_TOLERANCE_PCT": str(round(self.input_squeeze_tol.value() / 100.0, 6)),
             "EMA200_DRIFT_THRESHOLD_PCT": str(round(self.input_drift_pct.value() / 100.0, 6)),
-            "ALTCOIN_DIFF_THRESHOLD_PCT": str(round(self.input_alt_diff.value() / 100.0, 6)),
             "BASE_ENTRY_OFFSET_PCT": str(round(self.input_entry_offset.value() / 100.0, 6)),
             "REQUIRED_ACCUMULATION_CANDLES": self.input_accum_candles.value(),
 
-            "PING_PONG_VOL_DIVIDER": str(round(self.input_pp_div.value(), 2)),
-            "PING_PONG_LEVERAGE": self.input_pp_lev.value(),
             "QUANTUM_BUFFER_CANDLES": self.input_q_buffer.value(),
             "QUANTUM_FORTH_CANDLES": self.input_q_forth.value(),
             "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
@@ -2084,6 +2171,11 @@ class MainWindow(QtWidgets.QMainWindow):
             play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+                # Dọn dẹp presence trước khi đăng xuất
+                if hasattr(self, 'presence_manager'):
+                    self.presence_manager.unregister()
+                    self.presence_manager.stop()
+                    self.presence_manager.wait(2000)
                 import sys, subprocess, os
                 self.close()
                 env = os.environ.copy()
@@ -2143,6 +2235,21 @@ class MainWindow(QtWidgets.QMainWindow):
         social_layout.addWidget(btn_telegram)
         social_layout.setContentsMargins(15, 0, 0, 0)
         header_layout.insertLayout(1, social_layout)
+        # Label hiển thị số người đang online
+        self.lbl_online_count = QtWidgets.QLabel("")
+        self.lbl_online_count.setStyleSheet("""
+            color: #4caf50; 
+            font-size: 12px; 
+            font-weight: bold; 
+            background-color: #1a2e1a; 
+            border: 1px solid #2d5a2d; 
+            border-radius: 10px; 
+            padding: 3px 10px;
+            margin-right: 5px;
+        """)
+        self.lbl_online_count.hide()
+        
+        header_layout.addWidget(self.lbl_online_count)
         header_layout.addWidget(self.btn_update)
         header_layout.addWidget(self.btn_main_logout)
 
@@ -2319,7 +2426,44 @@ del /f /q "%~f0"
             # Fallback mở trình duyệt nếu chạy code hoặc trên Mac
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
+    def start_presence(self, uid, nickname):
+        """Khởi động PresenceManager sau khi login thành công."""
+        self.presence_manager = PresenceManager(self)
+        self.presence_manager.online_count_changed.connect(self._update_online_label)
+        self.presence_manager.register(uid, nickname)
+        self.presence_manager.start()
+        # Hiện label online
+        self.lbl_online_count.show()
+
+    def _update_online_label(self, count):
+        """Cập nhật label hiển thị số người online theo format XX/100."""
+        max_slots = 100
+        self.lbl_online_count.setText(f"🟢 {count}/{max_slots}")
+        # Đổi màu theo mức độ đông: xanh → vàng → đỏ
+        if count >= 80:
+            color, bg, border = "#ff5555", "#2e1a1a", "#5a2d2d"
+        elif count >= 50:
+            color, bg, border = "#ffaa00", "#2e2a1a", "#5a4d2d"
+        else:
+            color, bg, border = "#4caf50", "#1a2e1a", "#2d5a2d"
+        self.lbl_online_count.setStyleSheet(f"""
+            color: {color}; 
+            font-size: 12px; 
+            font-weight: bold; 
+            background-color: {bg}; 
+            border: 1px solid {border}; 
+            border-radius: 10px; 
+            padding: 3px 10px;
+            margin-right: 5px;
+        """)
+        self.lbl_online_count.show()
+
     def closeEvent(self, event):
+        # Bước 0: Dọn dẹp presence trước khi thoát
+        if hasattr(self, 'presence_manager'):
+            self.presence_manager.unregister()
+            self.presence_manager.stop()
+            self.presence_manager.wait(2000)
         # Bước 1: Gửi tín hiệu stop cho tất cả các worker trước để chúng đóng song song
         for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
             panel = getattr(self, attr, None)
@@ -2889,6 +3033,8 @@ def main():
             if hasattr(login, 'logged_in_name'):
                 name = login.logged_in_name
                 window.set_welcome_name(name)
+                # Kích hoạt hệ thống Presence (theo dõi online)
+                window.start_presence(CURRENT_UID or "unknown", name)
                 
             if hasattr(login, 'logged_in_status') and login.logged_in_status == 'PENDING 24H':
                 window.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")
@@ -3041,6 +3187,8 @@ if __name__ == "__main__":
     else:
         main()
 
+# z3 | Dọn dẹp UI: Xóa 8 cấu hình đã bị loại bỏ khỏi code bot (Ping-Pong, Dynamic Risk, Squeeze Tol, Alt Diff). Đổi tên nhóm "Cấu Hình Ping-Pong & Lượng Tử" → "Lượng Tử & Tiến Hóa".
+# z2 | Thêm hệ thống Presence Online: PresenceManager (QThread) ghi heartbeat 60s lên Firebase RTDB, hiển thị 🟢 XX/100 trên header (đổi màu xanh/vàng/đỏ theo mức tải), tự dọn zombie > 10p, cleanup khi đóng app/đăng xuất.
 # z1 | Đẩy các nút social sang góc phải và thay icon logo 256 nét hơn cho app/taskbar
 
 

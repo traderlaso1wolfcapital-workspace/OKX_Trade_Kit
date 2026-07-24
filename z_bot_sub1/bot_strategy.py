@@ -2294,13 +2294,13 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         new_sz = Decimal(str(sz_for_tf))
                         
                         # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
+                        # Áp dụng VÔ ĐIỀU KIỆN (bất kể size thay đổi) — lệnh TF nào chỉ reload khi nến TF đó đóng
                         last_closed_ts_for_tf = get_current_candle_start_ms(tf)
                         
-                        if old_sz == new_sz:
-                            # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
-                            if last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
-                                tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
-                                continue
+                        # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
+                        if last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
+                            tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
+                            continue
                     except Exception as e:
                         hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
@@ -2487,13 +2487,13 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         new_sz = Decimal(str(sz_for_tf))
                         
                         # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
+                        # Áp dụng VÔ ĐIỀU KIỆN (bất kể size thay đổi) — lệnh TF nào chỉ reload khi nến TF đó đóng
                         last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
                         
-                        if old_sz == new_sz:
-                            # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
-                            if last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
-                                tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
-                                continue
+                        # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
+                        if last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
+                            tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
+                            continue
                     except Exception as e:
                         hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
@@ -2628,3 +2628,4 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # z3306 | Refactor: Xóa stub functions, gộp _is_alt_synced, xóa get_ema200_for_tf_target trùng lặp, sắp xếp lại thứ tự code
 # z3350 | Clean up: Xoá các imports (traceback, time) và các biến (tolerance_pct, live_high, live_low, lot_sz, tf_tol, von_goc, v.v.) không sử dụng để tối ưu code.
 # z7713 | Thuật toán reload limit EMA200: Nhúng hàm get_current_candle_start_ms lấy giờ UTC chuẩn, bắt chính xác sát giây nến đóng để tính lại Limit.
+# z7714 | Fix Candle Cooldown vô điều kiện: Bỏ ràng buộc `if old_sz == new_sz` khỏi PER-TF CANDLE COOLDOWN (cả LONG & SHORT). Giờ lệnh limit TF nào chỉ được amend/reload khi nến TF đó đóng mới, bất kể size có thay đổi. Tránh amend liên tục mỗi 3s.
