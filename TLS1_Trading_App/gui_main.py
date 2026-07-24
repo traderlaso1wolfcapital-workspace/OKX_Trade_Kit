@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.196"
+APP_VERSION = "1.0.197"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -237,6 +237,15 @@ class HelpButton(QtWidgets.QPushButton):
             pos = self.mapToGlobal(QtCore.QPoint(self.width() // 2, -15))
             QtWidgets.QToolTip.showText(pos, self._help_text, self)
         super().mousePressEvent(event)
+
+class HoverSoundButton(QtWidgets.QPushButton):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+
+    def enterEvent(self, event):
+        play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.5)
+        super().enterEvent(event)
 
 class BotSubprocessWorker(QtCore.QThread):
     log_signal = QtCore.pyqtSignal(str)
@@ -398,7 +407,23 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.load_current_settings()
 
     def set_welcome_name(self, name):
-        pass
+        if hasattr(self, 'webview_chat_fallback'):
+            fallback_html = f"""<!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <style>
+            body, html {{ margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #ffffff; }}
+            #tlkio {{ width: 100%; height: 100%; }}
+            </style>
+            </head>
+            <body>
+            <div id="tlkio" data-channel="tls1_community" data-nickname="{name}" data-theme="theme--day" style="width:100%;height:100%;"></div>
+            <script async src="https://tlk.io/embed.js" type="text/javascript"></script>
+            </body>
+            </html>"""
+            self.webview_chat_fallback.setHtml(fallback_html, QtCore.QUrl("https://tlk.io/"))
+
         
     def reload_accounts(self):
         self.api_files = []
@@ -746,7 +771,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_layout.addWidget(self.tab_live_view, 1)
 
     def setup_tab_api(self):
-        layout = QtWidgets.QVBoxLayout(self.tab_api)
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        
+        container = QtWidgets.QWidget()
+        container.setStyleSheet("background-color: transparent;")
+        scroll.setStyleSheet("background-color: transparent;")
+        layout = QtWidgets.QVBoxLayout(container)
         
         # Chọn tài khoản
         acc_layout = QtWidgets.QHBoxLayout()
@@ -808,11 +840,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout_api.addLayout(h_container)
         layout.addWidget(form_group)
         
-        self.btn_save_api = QtWidgets.QPushButton("💾 LƯU CẤU HÌNH API KEY")
-        self.btn_save_api.setStyleSheet("background-color: #ff9900; color: black; min-height: 40px;")
-        self.btn_save_api.clicked.connect(self.save_api_settings)
-        layout.addWidget(self.btn_save_api)
-        
         layout.addSpacing(15)
         
         # Nhóm Lệnh Can Thiệp Nhanh
@@ -821,11 +848,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         actions_layout.setContentsMargins(15, 20, 15, 15)
         actions_layout.setSpacing(10)
 
-        self.btn_reset_wallet = QtWidgets.QPushButton("♻️ Reset Vốn Gốc (Audit)")
+        self.btn_reset_wallet = HoverSoundButton("♻️ Reset Vốn Gốc (Audit)")
         self.btn_reset_wallet.setStyleSheet("min-height: 40px; min-width: 150px;")
         self.btn_reset_wallet.clicked.connect(self.reset_wallet)
 
-        self.btn_reset_nen = QtWidgets.QPushButton("♻️ Reset Đếm Nến")
+        self.btn_reset_nen = HoverSoundButton("♻️ Reset Đếm Nến")
         self.btn_reset_nen.setStyleSheet("min-height: 40px; min-width: 150px;")
         self.btn_reset_nen.clicked.connect(self.reset_nen)
 
@@ -862,6 +889,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         layout.addStretch(1)
 
+        scroll.setWidget(container)
+        main_layout = QtWidgets.QVBoxLayout(self.tab_api)
+        main_layout.setContentsMargins(0,0,0,0)
+        main_layout.addWidget(scroll)
+        
+        self.btn_save_api = HoverSoundButton("💾 LƯU CẤU HÌNH API KEY")
+        self.btn_save_api.setStyleSheet("background-color: #ff9900; color: black; min-height: 40px; font-weight: bold; font-size: 14px;")
+        self.btn_save_api.clicked.connect(self.save_api_settings)
+        main_layout.addWidget(self.btn_save_api)
+
     def setup_tab_community(self):
         from PyQt6.QtWebEngineCore import QWebEnginePage
         
@@ -893,12 +930,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.popup.show()
                 return self.popup.view.page()
 
-        layout = QtWidgets.QVBoxLayout(self.tab_community)
+        layout = QtWidgets.QHBoxLayout(self.tab_community)
         layout.setContentsMargins(0, 0, 0, 0)
         
+        # --- Khối Chat 1: Discord (Chính) ---
         self.webview_chat = QWebEngineView()
         
-        # Bật cấu hình JS Popup
         from PyQt6.QtWebEngineCore import QWebEngineSettings
         settings = self.webview_chat.settings()
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
@@ -931,10 +968,27 @@ class BotInstanceWidget(QtWidgets.QWidget):
             {chat_url.replace('width="800"', 'width="100%"').replace('height="600"', 'height="100%"')}
             </body></html>"""
             # Phải dùng baseUrl trùng với Project Website trên Widgetbot dashboard để vượt rào
-            self.webview_chat.setHtml(html, QtCore.QUrl("https://github.com"))
+            self.webview_chat.setHtml(html, QtCore.QUrl("https://www.traderlaso1.io.vn/"))
         else:
             self.webview_chat.setUrl(QtCore.QUrl(chat_url))
-        layout.addWidget(self.webview_chat)
+            
+        # --- Khối Chat 2: Cbox (Dự phòng cho phép nhắn tin) ---
+        self.webview_chat_fallback = QWebEngineView()
+        fb_settings = self.webview_chat_fallback.settings()
+        fb_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
+        fb_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+        
+        fb_custom_page = ExternalLinkWebPage(self.webview_chat_fallback)
+        self.webview_chat_fallback.setPage(fb_custom_page)
+        self.webview_chat_fallback.setUrl(QtCore.QUrl("https://tlk.io/tls1_community"))
+
+        # Sử dụng QSplitter để chia đôi màn hình và cho phép kéo thả kích thước
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
+        splitter.addWidget(self.webview_chat)
+        splitter.addWidget(self.webview_chat_fallback)
+        splitter.setSizes([500, 500]) # Khởi tạo chia đôi 50/50
+
+        layout.addWidget(splitter)
 
     def setup_tab_strategy(self):
         if self.strategy_id == "sub2":
@@ -1029,13 +1083,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %")
         add_field(l_risk, 1, "Vào lệnh theo % vốn (%):", self.input_risk_pct, "Phần trăm tổng tài khoản sẽ bị mất nếu lệnh chạm mốc Dừng Lỗ (SL). Ví dụ 2.0%.")
         
+        self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
+        add_field(l_risk, 2, "Vào lệnh theo volume đòn bẩy:", self.input_pos_vol, "Vốn cố định sử dụng nếu Quản lý vốn động bị tắt. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        
         self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %")
         self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %")
-        add_field(l_risk, 2, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 2.1%.")
-        add_field(l_risk, 3, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 2.1%.")
-        
-        self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
-        add_field(l_risk, 4, "Vào lệnh theo volume đòn bẩy:", self.input_pos_vol, "Vốn cố định sử dụng nếu Quản lý vốn động bị tắt. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        add_field(l_risk, 3, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 2.1%.")
+        add_field(l_risk, 4, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 2.1%.")
         layout.addWidget(grp_risk)
 
         # 4. BỘ LỌC & DUNG SAI KỸ THUẬT
@@ -1099,15 +1153,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_field(l_port, 3, "ETH Vol Multiplier:", self.input_eth_vol_mult, "Hệ số nhân Volume cho ETH. Giúp tùy chỉnh tỷ trọng tài sản.")
         layout.addWidget(grp_port)
 
-        self.btn_save_strategy = QtWidgets.QPushButton("💾 LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)")
+        self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
-        layout.addWidget(self.btn_save_strategy)
         
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
+        main_layout.addWidget(self.btn_save_strategy)
 
 
     def setup_tab_strategy_smc(self):
@@ -1197,15 +1251,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         layout.addWidget(grp_smc)
 
-        self.btn_save_strategy = QtWidgets.QPushButton("💾 LƯU CẤU HÌNH SMC (AUTO-RELOAD)")
+        self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH SMC (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
-        layout.addWidget(self.btn_save_strategy)
         
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
+        main_layout.addWidget(self.btn_save_strategy)
 
     def get_selected_env(self):
         return self.account_dropdown.currentData()
@@ -1682,6 +1736,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
         except Exception:
             return False
 
+    def on_main_logout(self):
+        play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
+        
+        reply = QtWidgets.QMessageBox.question(self, 'Xác nhận Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản không?', QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+        if reply == QtWidgets.QMessageBox.Yes:
+            global CURRENT_UID
+            CURRENT_UID = None
+            try:
+                os.remove(os.path.join(USER_DATA_DIR, "auth.txt"))
+            except: pass
+            self.close()
+            os.execl(sys.executable, sys.executable, *sys.argv)
+
     def start_bot(self):
         self.play_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
         env_file = self.get_selected_env()
@@ -1723,12 +1790,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
+        QtWidgets.QMessageBox.information(self, "Thông báo", "Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
+        QtWidgets.QMessageBox.information(self, "Thông báo", "Đã kích hoạt lệnh Reset Đếm Nến thành công!")
 
     def on_bot_finished(self):
         play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
@@ -2773,22 +2842,23 @@ def main():
     # -------------------------------------------------------------
     # NGĂN CHẶN MỞ NHIỀU APP CÙNG LÚC TRÊN 1 MÁY BẰNG MUTEX WINDOWS
     # -------------------------------------------------------------
-    try:
-        import ctypes
-        mutex_name = "Global\\TLS1_Trading_App_Single_Instance_Mutex"
-        kernel32 = ctypes.windll.kernel32
-        mutex = kernel32.CreateMutexW(None, False, mutex_name)
-        last_error = kernel32.GetLastError()
-        
-        if last_error == 183: # ERROR_ALREADY_EXISTS
-            msg = QtWidgets.QMessageBox()
-            msg.setWindowTitle("Lỗi khởi động")
-            msg.setText("Ứng dụng TLS1 đang hoạt động trên máy tính này!\n\nMỗi máy tính chỉ được mở 1 bản App cùng lúc.")
-            msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
-            msg.exec()
-            sys.exit(0)
-    except Exception as e:
-        pass
+    if getattr(sys, 'frozen', False):
+        try:
+            import ctypes
+            mutex_name = "Global\\TLS1_Trading_App_Single_Instance_Mutex"
+            kernel32 = ctypes.windll.kernel32
+            mutex = kernel32.CreateMutexW(None, False, mutex_name)
+            last_error = kernel32.GetLastError()
+            
+            if last_error == 183: # ERROR_ALREADY_EXISTS
+                msg = QtWidgets.QMessageBox()
+                msg.setWindowTitle("Lỗi khởi động")
+                msg.setText("Ứng dụng TLS1 đang hoạt động trên máy tính này!\n\nMỗi máy tính chỉ được mở 1 bản App cùng lúc.")
+                msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
+                msg.exec()
+                sys.exit(0)
+        except Exception as e:
+            pass
     # -------------------------------------------------------------
     
     app.setStyle("Fusion")

@@ -1,6 +1,0 @@
-=== CRASH LOG ===
-Traceback (most recent call last):
-  File "d:\4. Trade Coin - TLS1\4. Cursor - IDE\TLS1_Company\zProjects\OKX_Trade_Kit\TLS1_Trading_App\gui_main.py", line 2014, in on_main_logout
-    self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-    ^^^^^^^^^^^^^^^
-AttributeError: 'MainWindow' object has no attribute 'play_sound'
