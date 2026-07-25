@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.201"
+APP_VERSION = "1.0.202"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1166,9 +1166,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_main = ToggleSwitch()
         self.chk_xole = ToggleSwitch()
+        self.chk_dynamic_pingpong_tp = ToggleSwitch()
         
         add_checkbox(l_toggles, 0, 0, "Bật MAIN", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 (Main).")
         add_checkbox(l_toggles, 0, 1, "Bật XOLE", self.chk_xole, "Bật/Tắt chiến thuật Bắt Bẻ Xole (Giao dịch ngược xu hướng nhỏ).")
+        add_checkbox(l_toggles, 1, 0, "Bật TP động theo EMA200", self.chk_dynamic_pingpong_tp, "Bật cơ chế Chốt lời động bám theo EMA200 của khung thời gian nhỏ hơn liền kề.", colspan=2)
         layout.addWidget(grp_toggles)
 
         # 2. LỚP BẢO VỆ CỤC BỘ
@@ -1198,13 +1200,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
         l_risk = QtWidgets.QGridLayout(grp_risk)
         
-        self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
-        add_field(l_risk, 0, "Vốn Limit cố định (USDT):", self.input_pos_vol, "Vốn cố định sử dụng cho mỗi lệnh Limit. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        self.chk_dynamic_risk = ToggleSwitch()
+        add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh. Nếu tắt, sẽ dùng Vốn Limit Cố Định.", 2)
         
-        self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %")
-        self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %")
-        add_field(l_risk, 1, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 2.1%.")
-        add_field(l_risk, 2, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 2.1%.")
+        self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %"); self.input_risk_pct.setValue(0.50)
+        add_field(l_risk, 1, "Vào lệnh theo % vốn (%):", self.input_risk_pct, "Phần trăm tổng tài khoản sẽ vào lệnh. Ví dụ 0.50%.")
+
+        self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
+        add_field(l_risk, 2, "Vốn Limit cố định (USDT):", self.input_pos_vol, "Vốn cố định sử dụng cho mỗi lệnh Limit. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        
+        self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %"); self.input_tp_pct.setValue(0.80)
+        self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %"); self.input_sl_pct.setValue(0.80)
+        add_field(l_risk, 3, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 0.8%.")
+        add_field(l_risk, 4, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 0.8%.")
         layout.addWidget(grp_risk)
 
         # 4. BỘ LỌC & DUNG SAI KỸ THUẬT
@@ -1489,6 +1497,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
             self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
+            self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
             
             self.chk_sideway_safe.setChecked(bool(cfg.get("ENABLE_SIDEWAY_SAFE_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_SAFE_EXIT", False))))
             self.chk_squeeze_escape.setChecked(bool(cfg.get("ENABLE_SQUEEZE_ESCAPE_EXIT", getattr(bot_config, "ENABLE_SQUEEZE_ESCAPE_EXIT", False))))
@@ -1498,8 +1507,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chk_sideway_vap.setChecked(bool(cfg.get("ENABLE_SIDEWAY_VAP_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_VAP_EXIT", False))))
             self.chk_h4_flip.setChecked(bool(cfg.get("ENABLE_H4_FLIP_CLOSE", getattr(bot_config, "ENABLE_H4_FLIP_CLOSE", False))))
             
-            self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.01)))) * 100)
-            self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.01)))) * 100)
+            self.chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", False))))
+            self.input_risk_pct.setValue(float(cfg.get("DYNAMIC_RISK_PCT", float(getattr(bot_config, "DYNAMIC_RISK_PCT", 0.005)))) * 100)
+            
+            self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.008)))) * 100)
+            self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.008)))) * 100)
             self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", float(getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 150.0)))))
             
             self.input_dca_gap_pct.setValue(float(cfg.get("DCA_GAP_THRESHOLD_PCT", float(getattr(bot_config, "DCA_GAP_THRESHOLD_PCT", 0.01)))) * 100)
@@ -1746,6 +1758,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             cfg.update({
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
+                "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),
             "ENABLE_SIDEWAY_SAFE_EXIT": self.chk_sideway_safe.isChecked(),
             "ENABLE_SQUEEZE_ESCAPE_EXIT": self.chk_squeeze_escape.isChecked(),
             "ENABLE_SAFEGUARD_ENTRY_EXIT": self.chk_safeguard_entry.isChecked(),
@@ -1754,6 +1767,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLE_SIDEWAY_VAP_EXIT": self.chk_sideway_vap.isChecked(),
             "ENABLE_H4_FLIP_CLOSE": self.chk_h4_flip.isChecked(),
 
+            "USE_DYNAMIC_RISK": self.chk_dynamic_risk.isChecked(),
+            "DYNAMIC_RISK_PCT": str(round(self.input_risk_pct.value() / 100.0, 5)),
             "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
             "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
@@ -2241,9 +2256,8 @@ class MainWindow(QtWidgets.QMainWindow):
             color: #4caf50; 
             font-size: 12px; 
             font-weight: bold; 
-            background-color: #1a2e1a; 
-            border: 1px solid #2d5a2d; 
-            border-radius: 10px; 
+            background: transparent;
+            border: none;
             padding: 3px 10px;
             margin-right: 5px;
         """)
@@ -2441,18 +2455,17 @@ del /f /q "%~f0"
         self.lbl_online_count.setText(f"🟢 {count}/{max_slots}")
         # Đổi màu theo mức độ đông: xanh → vàng → đỏ
         if count >= 80:
-            color, bg, border = "#ff5555", "#2e1a1a", "#5a2d2d"
+            color = "#ff5555"
         elif count >= 50:
-            color, bg, border = "#ffaa00", "#2e2a1a", "#5a4d2d"
+            color = "#ffaa00"
         else:
-            color, bg, border = "#4caf50", "#1a2e1a", "#2d5a2d"
+            color = "#4caf50"
         self.lbl_online_count.setStyleSheet(f"""
             color: {color}; 
             font-size: 12px; 
             font-weight: bold; 
-            background-color: {bg}; 
-            border: 1px solid {border}; 
-            border-radius: 10px; 
+            background: transparent;
+            border: none;
             padding: 3px 10px;
             margin-right: 5px;
         """)
@@ -2862,6 +2875,32 @@ class LoginDialog(QtWidgets.QDialog):
             return
         # -------------------------------------
         
+        # --- Kiểm tra giới hạn 100 người online ---
+        self.btn_login.setText("Đang kiểm tra slots...")
+        self.btn_login.setEnabled(False)
+        QtWidgets.QApplication.processEvents()
+        try:
+            import urllib.request
+            import json as _json
+            import time
+            url = f"{FIREBASE_URL}/presence.json"
+            req = urllib.request.Request(url, method='GET')
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = _json.loads(resp.read().decode('utf-8'))
+            
+            if data and isinstance(data, dict):
+                now = int(time.time())
+                count = sum(1 for info in data.values() if isinstance(info, dict) and (now - info.get('last_seen', 0)) <= 180)
+                if count >= 100:
+                    play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                    QtWidgets.QMessageBox.warning(self, "Hệ Thống Quá Tải", "Đã đạt giới hạn 100 người dùng online.\\nVui lòng quay lại sau!")
+                    self.btn_login.setText("Đăng Nhập")
+                    self.btn_login.setEnabled(True)
+                    return
+        except Exception:
+            pass # Bỏ qua nếu lỗi mạng để người dùng tiếp tục
+        # ------------------------------------------
+        
         if not uid:
             play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.warning(self, "Lỗi", "UID không được để trống!")
@@ -2982,6 +3021,19 @@ def main():
         pass
 
     app = QtWidgets.QApplication(sys.argv)
+    app.setStyleSheet("""
+        QComboBox QAbstractItemView {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            selection-background-color: #4caf50;
+        }
+        QToolTip {
+            background-color: #2e2e2e;
+            color: #ffffff;
+            border: 1px solid #4caf50;
+            padding: 2px;
+        }
+    """)
     
     # -------------------------------------------------------------
     # NGĂN CHẶN MỞ NHIỀU APP CÙNG LÚC TRÊN 1 MÁY BẰNG MUTEX WINDOWS
