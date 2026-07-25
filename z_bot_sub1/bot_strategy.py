@@ -2280,16 +2280,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 _sz_tf_raw = round_to_tick(tf_target_usdt / (px_tf * contract_val), spec["lotSz"])
                 sz_for_tf = max(_sz_tf_raw, spec["minSz"])
                 
-                # ⚡ BẢO VỆ CHỐNG KHỚP LỆNH MARKET (Tránh lỗi DCA vô tội vạ khi restart)
-                if px_tf >= tracker.live_price:
-                    tracker.placed_entry_px_long_by_tf[tf] = "---"
-                    try:
-                        # Hủy nếu đang có lệnh treo
-                        bad_orders = [o for o in actual_pending if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")]
-                        if bad_orders:
-                            client.request("POST", "/api/v5/trade/cancel-batch-orders", body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in bad_orders])
-                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
-                    continue
+                # ⚡ Yêu cầu của User: Cho phép khớp luôn thành Market nếu giá Limit đẹp hơn giá Live hiện tại
+                # (Đã bỏ block: BẢO VỆ CHỐNG KHỚP LỆNH MARKET)
                     
                 px_str = f"{px_tf:.{dec_places}f}"
                 
@@ -2372,7 +2364,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             _lever = str(_get_leverage(tf))
                             _resp = client.request("POST", "/api/v5/account/set-leverage", body={
                                 "instId": swap_id, "lever": _lever,
-                                "mgnMode": tf_mode, "posSide": "long"
+                                "mgnMode": tf_mode, "posSide": "net" if pMode == "net_mode" else "long"
                             })
                             if _resp and _resp.get("code") != "0":
                                 print(f"🚨 [Hệ thống] set-leverage long failed: {_resp}")
@@ -2413,7 +2405,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             tracker.missing_count_long[tf] = 0
                             
 
-                        place_pure_limit(client, swap_id, "buy", "long", str(sz_for_tf), px_str,
+                        place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
                                          f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
@@ -2473,16 +2465,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 _sz_tf_raw = round_to_tick(tf_target_usdt / (px_tf * contract_val), spec["lotSz"])
                 sz_for_tf = max(_sz_tf_raw, spec["minSz"])
                 
-                # ⚡ BẢO VỆ CHỐNG KHỚP LỆNH MARKET (Tránh lỗi DCA vô tội vạ khi restart)
-                if px_tf <= tracker.live_price:
-                    tracker.placed_entry_px_short_by_tf[tf] = "---"
-                    try:
-                        # Hủy nếu đang có lệnh treo
-                        bad_orders = [o for o in actual_pending if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")]
-                        if bad_orders:
-                            client.request("POST", "/api/v5/trade/cancel-batch-orders", body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in bad_orders])
-                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
-                    continue
+                # ⚡ Yêu cầu của User: Cho phép khớp luôn thành Market nếu giá Limit đẹp hơn giá Live hiện tại
+                # (Đã bỏ block: BẢO VỆ CHỐNG KHỚP LỆNH MARKET)
                     
                 px_str = f"{px_tf:.{dec_places}f}"
                 
@@ -2565,7 +2549,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             _lever = str(_get_leverage(tf))
                             _resp = client.request("POST", "/api/v5/account/set-leverage", body={
                                 "instId": swap_id, "lever": _lever,
-                                "mgnMode": tf_mode, "posSide": "short"
+                                "mgnMode": tf_mode, "posSide": "net" if pMode == "net_mode" else "short"
                             })
                             if _resp and _resp.get("code") != "0":
                                 print(f"🚨 [Hệ thống] set-leverage short failed: {_resp}")
@@ -2602,7 +2586,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         else:
                             tracker.missing_count_short[tf] = 0
                             
-                        place_pure_limit(client, swap_id, "sell", "short", str(sz_for_tf), px_str,
+                        place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
                                          f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
