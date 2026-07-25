@@ -228,6 +228,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
         state_dict["side"] = "none"
         state_dict["accum"], state_dict["fail"], state_dict["back"], state_dict["forth"] = 0, 0, 0, 0
         state_dict["win_streak"] = 0
+        state_dict["streak_locked"] = False
         
     state_dict["ts"] = latest_closed_ts
     last_open = tf_opens_asc[-1]
@@ -370,6 +371,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
                     state_dict["recovery_count"] = 0
                     state_dict["cycle_fail_triggered"] = True
                     state_dict["win_streak"] = 0
+                    state_dict["streak_locked"] = False
                 
                 # Đảo chiều hoàn toàn khi back vượt req_accum (60 nến ngược chiều)
                 if state_dict["back"] >= req_accum:
@@ -380,6 +382,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
                     state_dict["recovery_count"] = state_dict["accum"]
                     state_dict["locked"] = False
                     state_dict["win_streak"] = 0
+                    state_dict["streak_locked"] = False
 
 # ==============================================================================
 # 🔁 TÁI DỰNG LỊCH SỬ NẾN KHI RESET (REPLAY ENGINE)
@@ -1555,7 +1558,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         st = tracker.mtf_states[tf]
         # Trend còn hiệu lực khi: đủ nến tích lũy + side rõ ràng + không bị lock
         # ⚡ KHÔNG dùng fail count ở đây — EMA34/89 vs EMA200 là tiêu chí cuối cùng
-        return (not st["locked"] and
+        return (not st["locked"] and not st.get("streak_locked", False) and
                 st["accum"] >= globals_ref.REQUIRED_ACCUMULATION_CANDLES and
                 st["side"] in ("above", "under"))
 
@@ -1620,7 +1623,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                                 st = tracker.mtf_states[tf]
                                 is_sqz = getattr(tracker, f"is_{tf.lower()}_squeeze", False)
                                 is_valid = (st["fail"] < globals_ref.MAX_CYCLE_FAILURES and
-                                            not st["locked"] and
+                                            not st["locked"] and not st.get("streak_locked", False) and
                                             st["accum"] >= globals_ref.REQUIRED_ACCUMULATION_CANDLES and
                                             st["side"] == target_side and
                                             not is_sqz)
@@ -1639,7 +1642,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     st = tracker.mtf_states[tf]
                     is_sqz = getattr(tracker, f"is_{tf.lower()}_squeeze", False)
                     is_valid = (st["fail"] < globals_ref.MAX_CYCLE_FAILURES and
-                                not st["locked"] and
+                                not st["locked"] and not st.get("streak_locked", False) and
                                 st["accum"] >= globals_ref.REQUIRED_ACCUMULATION_CANDLES and
                                 st["side"] == target_side and
                                 not is_sqz)
