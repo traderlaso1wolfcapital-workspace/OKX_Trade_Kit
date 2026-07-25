@@ -243,102 +243,72 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
         nominal_side = "touch"
     
     if state_dict["side"] == "none" or state_dict.get("accum", 0) == 0:
-        # Tìm side thực sự bằng cách lùi về quá khứ tìm nến gần nhất không touch
-        init_side = "none"
-        for i in range(len(tf_closes_asc)-1, max(-1, len(tf_closes_asc)-201), -1):
+        # 🔄 Tái dựng lịch sử bằng cơ chế Forward Replay (Quét thuận chiều)
+        temp_state = {"side": "none", "accum": 0, "fail": 0, "back": 0, "forth": 0, "recovery_count": 0}
+        
+        for i in range(len(tf_closes_asc)):
             s_open = tf_opens_asc[i]
             s_close = tf_closes_asc[i]
             s_low = min(s_open, s_close)
             s_high = max(s_open, s_close)
             
             sub_closes = tf_closes_asc[:i+1]
-            if len(sub_closes) < 200: break
+            if len(sub_closes) < 200: continue
             sub_ema200 = calculate_ema(sub_closes, 200)
-            if sub_ema200 <= 0: break
+            if sub_ema200 <= 0: continue
             
             if s_low > sub_ema200:
-                init_side = "above"
-                break
+                s_nominal = "above"
             elif s_high < sub_ema200:
-                init_side = "under"
-                break
-                
-        if init_side != "none":
-            state_dict["side"] = init_side
-        else:
-            return
-            
-        total_accum = 0
-        pos = 0
-        max_pos = min(len(tf_closes_asc) - 200, len(tf_closes_asc) - 1)
-        
-        while pos < max_pos:
-            batch_same = 0
-            batch_opp = 0
-            
-            # 1. Đếm batch cùng hướng (hoặc touch)
-            while pos < max_pos:
-                idx = len(tf_closes_asc) - 1 - pos
-                if idx < 200: break
-                sub_closes = tf_closes_asc[:idx+1]
-                sub_open = tf_opens_asc[:idx+1][-1]
-                sub_close = tf_closes_asc[:idx+1][-1]
-                sub_ema200 = calculate_ema(sub_closes, 200)
-                if sub_ema200 <= 0: break
-                
-                s_body_low = min(sub_open, sub_close)
-                s_body_high = max(sub_open, sub_close)
-                if s_body_low > sub_ema200:
-                    sub_side = "above"
-                elif s_body_high < sub_ema200:
-                    sub_side = "under"
-                else:
-                    sub_side = "touch"
-                
-                if sub_side == state_dict["side"] or sub_side == "touch":
-                    batch_same += 1
-                    pos += 1
-                else:
-                    break
-                    
-            if pos >= max_pos:
-                total_accum += batch_same
-                break
-                
-            # 2. Đếm batch ngược hướng
-            while pos < max_pos:
-                idx = len(tf_closes_asc) - 1 - pos
-                if idx < 200: break
-                sub_closes = tf_closes_asc[:idx+1]
-                sub_open = tf_opens_asc[:idx+1][-1]
-                sub_close = tf_closes_asc[:idx+1][-1]
-                sub_ema200 = calculate_ema(sub_closes, 200)
-                if sub_ema200 <= 0: break
-                
-                s_body_low = min(sub_open, sub_close)
-                s_body_high = max(sub_open, sub_close)
-                if s_body_low > sub_ema200:
-                    sub_side = "above"
-                elif s_body_high < sub_ema200:
-                    sub_side = "under"
-                else:
-                    sub_side = "touch"
-                
-                if sub_side != state_dict["side"] and sub_side != "touch":
-                    batch_opp += 1
-                    pos += 1
-                else:
-                    break
-                    
-            # 3. Quyết định
-            if batch_opp >= quantum_buf:
-                total_accum += batch_same
-                break
+                s_nominal = "under"
             else:
-                total_accum += batch_same + batch_opp
+                s_nominal = "touch"
+                
+            if temp_state["side"] == "none":
+                if s_nominal != "touch":
+                    temp_state["side"] = s_nominal
+                    temp_state["accum"] = 1
+                continue
+                
+            if s_nominal != "touch":
+                if s_nominal == temp_state["side"]:
+                    if temp_state["back"] > 0:
+                        temp_state["forth"] += 1
+                        if temp_state["forth"] >= quantum_forth:
+                            temp_state["accum"] += temp_state["forth"]
+                            temp_state["recovery_count"] = temp_state.get("recovery_count", 0) + temp_state["forth"]
+                            temp_state["back"], temp_state["forth"] = 0, 0
+                            temp_state.pop("cycle_fail_triggered", None)
+                    else:
+                        temp_state["accum"] += 1
+                        temp_state["recovery_count"] = temp_state.get("recovery_count", 0) + 1
+                        if temp_state["fail"] > 0 and temp_state["recovery_count"] >= req_accum:
+                            temp_state["fail"] = 0
+                else:
+                    if temp_state["forth"] > 0: temp_state["forth"] = 0 
+                    temp_state["back"] += 1
+                    
+                    cycle_trig = temp_state.get("cycle_fail_triggered", False)
+                    if temp_state["back"] >= quantum_buf and not cycle_trig:
+                        temp_state["fail"] += 1 
+                        temp_state["recovery_count"] = 0
+                        temp_state["cycle_fail_triggered"] = True
+                    
+                    if temp_state["back"] >= req_accum:
+                        temp_state["side"] = s_nominal
+                        temp_state["accum"] = temp_state["back"]
+                        temp_state["back"], temp_state["forth"], temp_state["fail"] = 0, 0, 0
+                        temp_state.pop("cycle_fail_triggered", None)
+                        temp_state["recovery_count"] = temp_state["accum"]
+                        
+        state_dict["side"] = temp_state["side"]
+        state_dict["accum"] = temp_state["accum"] if temp_state["accum"] > 0 else 1
+        state_dict["fail"] = temp_state["fail"]
+        state_dict["back"] = temp_state["back"]
+        state_dict["forth"] = temp_state["forth"]
+        if temp_state.get("cycle_fail_triggered"):
+            state_dict["cycle_fail_triggered"] = True
         
-        state_dict["accum"] = total_accum if total_accum > 0 else 1
-        state_dict["fail"], state_dict["back"], state_dict["forth"] = 0, 0, 0
         if state_dict["accum"] >= req_accum: 
             state_dict["locked"] = False
     elif nominal_side != "touch":
