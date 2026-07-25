@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.203"
+APP_VERSION = "1.0.204"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1166,11 +1166,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_main = ToggleSwitch()
         self.chk_xole = ToggleSwitch()
+        self.chk_dynamic_ema200_tp = ToggleSwitch()
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
+        self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
         add_checkbox(l_toggles, 0, 0, "Bật MAIN", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 (Main).")
         add_checkbox(l_toggles, 0, 1, "Bật XOLE", self.chk_xole, "Bật/Tắt chiến thuật Bắt Bẻ Xole (Giao dịch ngược xu hướng nhỏ).")
-        add_checkbox(l_toggles, 1, 0, "Bật TP động theo EMA200", self.chk_dynamic_pingpong_tp, "Bật cơ chế Chốt lời động bám theo EMA200 của khung thời gian nhỏ hơn liền kề.", colspan=2)
+        add_checkbox(l_toggles, 1, 0, "Bật TP động theo EMA200", self.chk_dynamic_ema200_tp, "Bật cơ chế Chốt lời động bám theo EMA200 của khung thời gian nhỏ hơn liền kề.")
+        add_checkbox(l_toggles, 1, 1, "Bật TP theo Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng Ping-Pong.")
+        add_checkbox(l_toggles, 2, 0, "Altcoin neo theo EMA200 BTC", self.chk_altcoin_follow_btc_ema, "ON: Altcoin tính Limit bằng cản EMA200 của BTC | OFF: Altcoin dùng EMA200 của chính nó", colspan=2)
         layout.addWidget(grp_toggles)
 
         # 2. LỚP BẢO VỆ CỤC BỘ
@@ -1227,14 +1231,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_confluence_pct = QtWidgets.QDoubleSpinBox(); self.input_confluence_pct.setSuffix(" %"); self.input_confluence_pct.setDecimals(3)
         add_field(l_filter, 2, "Hợp lưu EMA200 đa khung:", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
         
-        self.input_drift_pct = QtWidgets.QDoubleSpinBox(); self.input_drift_pct.setSuffix(" %"); self.input_drift_pct.setDecimals(3)
-        add_field(l_filter, 3, "Ngưỡng trượt EMA200:", self.input_drift_pct, "Ngưỡng trượt tối đa EMA200 trong 20 nến (0.3% cho phép độ dốc nhẹ <= 4 độ). Nếu cao hơn sẽ bị coi là trend mạnh.")
-        
         self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4)
-        add_field(l_filter, 4, "Đệm đón lõm Entry:", self.input_entry_offset, "Đệm (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
+        add_field(l_filter, 3, "Đệm đón lõm Entry:", self.input_entry_offset, "Đệm (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
         self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
-        add_field(l_filter, 5, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
+        add_field(l_filter, 4, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
         layout.addWidget(grp_filter)
 
         # 5. LƯỢNG TỬ & TIẾN HÓA
@@ -1438,6 +1439,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f: cfg = json.load(f)
+                if not cfg.get("RESET_CONFIG_V23", False):
+                    cfg = {}
+                    try: os.remove(config_path)
+                    except: pass
             except: pass
 
         try:
@@ -1497,7 +1502,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
             self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
+            self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
             self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
+            self.chk_altcoin_follow_btc_ema.setChecked(bool(cfg.get("ALTCOIN_FOLLOW_BTC_EMA", getattr(bot_config, "ALTCOIN_FOLLOW_BTC_EMA", True))))
             
             self.chk_sideway_safe.setChecked(bool(cfg.get("ENABLE_SIDEWAY_SAFE_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_SAFE_EXIT", False))))
             self.chk_squeeze_escape.setChecked(bool(cfg.get("ENABLE_SQUEEZE_ESCAPE_EXIT", getattr(bot_config, "ENABLE_SQUEEZE_ESCAPE_EXIT", False))))
@@ -1516,7 +1523,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             self.input_dca_gap_pct.setValue(float(cfg.get("DCA_GAP_THRESHOLD_PCT", float(getattr(bot_config, "DCA_GAP_THRESHOLD_PCT", 0.01)))) * 100)
             self.input_confluence_pct.setValue(float(cfg.get("EMA_CONFLUENCE_TOLERANCE_PCT", float(getattr(bot_config, "EMA_CONFLUENCE_TOLERANCE_PCT", 0.01)))) * 100)
-            self.input_drift_pct.setValue(float(cfg.get("EMA200_DRIFT_THRESHOLD_PCT", float(getattr(bot_config, "EMA200_DRIFT_THRESHOLD_PCT", 0.01)))) * 100)
             self.input_entry_offset.setValue(float(cfg.get("BASE_ENTRY_OFFSET_PCT", float(getattr(bot_config, "BASE_ENTRY_OFFSET_PCT", 0.01)))) * 100)
             self.input_accum_candles.setValue(int(cfg.get("REQUIRED_ACCUMULATION_CANDLES", getattr(bot_config, "REQUIRED_ACCUMULATION_CANDLES", 3))))
             
@@ -1756,9 +1762,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             })
         else:
             cfg.update({
+                "RESET_CONFIG_V23": True,
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
+                "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
                 "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),
+                "ALTCOIN_FOLLOW_BTC_EMA": self.chk_altcoin_follow_btc_ema.isChecked(),
             "ENABLE_SIDEWAY_SAFE_EXIT": self.chk_sideway_safe.isChecked(),
             "ENABLE_SQUEEZE_ESCAPE_EXIT": self.chk_squeeze_escape.isChecked(),
             "ENABLE_SAFEGUARD_ENTRY_EXIT": self.chk_safeguard_entry.isChecked(),
@@ -1775,7 +1784,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             "DCA_GAP_THRESHOLD_PCT": str(round(self.input_dca_gap_pct.value() / 100.0, 6)),
             "EMA_CONFLUENCE_TOLERANCE_PCT": str(round(self.input_confluence_pct.value() / 100.0, 6)),
-            "EMA200_DRIFT_THRESHOLD_PCT": str(round(self.input_drift_pct.value() / 100.0, 6)),
             "BASE_ENTRY_OFFSET_PCT": str(round(self.input_entry_offset.value() / 100.0, 6)),
             "REQUIRED_ACCUMULATION_CANDLES": self.input_accum_candles.value(),
 
@@ -1938,12 +1946,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
                     
                     if not getattr(self, '_chart_initialized', False):
-                        self.chart_widget.set(df)
+                        self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
                         self._chart_initialized = True
                         self.chart_widget.spinner(False)
                     else:
-                        self.chart_widget.update(df.iloc[-1])
+                        self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
             except Exception as e:
                 import traceback

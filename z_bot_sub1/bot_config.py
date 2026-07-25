@@ -14,6 +14,9 @@ from typing import Any
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
 ENABLE_STRATEGY_XOLE = True       # ❷ CHIẾN THUẬT BẮT BẺ (XOLE)
 
+ENABLE_DYNAMIC_EMA200_TP = False   # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO)
+ENABLE_DYNAMIC_PINGPONG_TP = False # CHỐT LỜI ĐỘNG TẠM THỜI (PING-PONG)
+
 ALTCOIN_FOLLOW_BTC_EMA = True     # 🔄 ON: Altcoin neo limit theo BTC | LOCK: Altcoin dùng EMA200 của chính nó
 # ------------------------------------------------------------------------------
 
@@ -26,7 +29,9 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("500")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("180")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
+USE_DYNAMIC_RISK = False                           # Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
+DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệnh (0.005 = 0.5%)
 
 
 # ==============================================================================

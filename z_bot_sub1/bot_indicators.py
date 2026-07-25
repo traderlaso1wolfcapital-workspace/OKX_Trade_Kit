@@ -60,14 +60,7 @@ def check_ema_squeeze(prices: list[Decimal], ema34: Decimal, ema89: Decimal, ema
                 structure_ok = False; break
         if not structure_ok: return False
     
-    # 3. Flat Resistance Check (EMA200)
-    if len(prices) > 200 + 30:
-        ema200_past = calculate_ema(prices[:-30], 200)
-        dist_200_slope = abs(ema200 - ema200_past) / live_price
-        drift_threshold = getattr(globals_ref, "EMA200_DRIFT_THRESHOLD_PCT", Decimal("0.0030"))
-        if dist_200_slope > drift_threshold:
-            return False
-            
+
     # 4. Accumulation Check
     if is_bullish:
         if not (min(ema89, ema34) * Decimal("0.999") <= live_price <= ema200 * Decimal("1.001")): return False

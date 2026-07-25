@@ -131,6 +131,8 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "POSITION_VOLUME_HIGH_CONFIDENCE": int(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
             "ENABLE_STRATEGY_XOLE": bool(globals_ref.ENABLE_STRATEGY_XOLE),
+            "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
+            "ENABLE_DYNAMIC_PINGPONG_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_PINGPONG_TP", False)),
             "ALTCOIN_FOLLOW_BTC_EMA": bool(globals_ref.ALTCOIN_FOLLOW_BTC_EMA),
             "ENABLE_SIDEWAY_SAFE_EXIT": bool(globals_ref.ENABLE_SIDEWAY_SAFE_EXIT),
             "ENABLE_SQUEEZE_ESCAPE_EXIT": bool(globals_ref.ENABLE_SQUEEZE_ESCAPE_EXIT),
@@ -175,6 +177,8 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: globals_ref.ENABLE_STRATEGY_MAIN = bool(cfg["ENABLE_STRATEGY_MAIN"])
                 if "ENABLE_STRATEGY_XOLE" in cfg: globals_ref.ENABLE_STRATEGY_XOLE = bool(cfg["ENABLE_STRATEGY_XOLE"])
+                if "ENABLE_DYNAMIC_EMA200_TP" in cfg: globals_ref.ENABLE_DYNAMIC_EMA200_TP = bool(cfg["ENABLE_DYNAMIC_EMA200_TP"])
+                if "ENABLE_DYNAMIC_PINGPONG_TP" in cfg: globals_ref.ENABLE_DYNAMIC_PINGPONG_TP = bool(cfg["ENABLE_DYNAMIC_PINGPONG_TP"])
                 if "ALTCOIN_FOLLOW_BTC_EMA" in cfg: globals_ref.ALTCOIN_FOLLOW_BTC_EMA = bool(cfg["ALTCOIN_FOLLOW_BTC_EMA"])
 
                 # Lớp bảo vệ cục bộ
@@ -390,6 +394,21 @@ def get_current_candle_start_ms(tf_str: str) -> int:
     elif tf_str == "H4": period = 14400
     else: period = 300
     return (ts_sec // period) * period * 1000
+
+def get_nearest_opposite_ema200(tracker, side, pos_tf):
+    tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+    try: start_idx = tfs.index(pos_tf) + 1
+    except ValueError: return Decimal("0")
+    for tf in tfs[start_idx:]:
+        e34 = getattr(tracker, f"{tf.lower()}_ema34", getattr(tracker, "ema34", Decimal("0")) if tf == "M5" else Decimal("0"))
+        e89 = getattr(tracker, f"{tf.lower()}_ema89", getattr(tracker, "ema89", Decimal("0")) if tf == "M5" else Decimal("0"))
+        e200 = getattr(tracker, f"{tf.lower()}_ema200", getattr(tracker, "ema200", Decimal("0")) if tf == "M5" else Decimal("0"))
+        if e200 <= 0: continue
+        if side == "LONG":
+            if e34 < e200 and e89 < e200: return e200
+        else:
+            if e34 > e200 and e89 > e200: return e200
+    return Decimal("0")
 
 def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
@@ -1108,6 +1127,28 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.record_exit("LONG", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
                     return
 
+        # 1.7 Dynamic Ping-Pong TP
+        if globals_ref.ENABLE_DYNAMIC_PINGPONG_TP and is_squeeze:
+            if is_in_profit:
+                target_ema200 = getattr(tracker, f"{pos_tf.lower()}_ema200", tracker.ema200 if pos_tf == "M5" else Decimal("0"))
+                if target_ema200 > 0 and tracker.live_price >= target_ema200:
+                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
+                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Ping-Pong TP LONG: ROI {current_roi_pct:.1f}%", "cross")
+                    tracker.closure_reason_long = "PingPong_TP_Exit"
+                    tracker.record_exit("LONG", current_roi_pct, "PingPong_TP_Exit", f"Chốt lời non (Ping-Pong) tại {pos_tf} EMA200.")
+                    return
+
+        # 1.8 Dynamic EMA200 TP (Higher TF)
+        if globals_ref.ENABLE_DYNAMIC_EMA200_TP:
+            higher_tf_ema200 = get_nearest_opposite_ema200(tracker, "LONG", pos_tf)
+            if higher_tf_ema200 > 0 and is_in_profit:
+                if tracker.live_price >= higher_tf_ema200:
+                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
+                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Dynamic EMA200 TP LONG: ROI {current_roi_pct:.1f}%", "cross")
+                    tracker.closure_reason_long = "Dynamic_EMA200_TP_Exit"
+                    tracker.record_exit("LONG", current_roi_pct, "Dynamic_EMA200_TP_Exit", f"Chốt lời động chạm cản EMA200 TF lớn hơn.")
+                    return
+
         # 1.5. Safeguard Entry Recover Close (Âm >70% SL, hồi về Entry thoát hòa)
         sl_pct_cap = coin_sl_pct * Decimal("100")
         if globals_ref.ENABLE_SAFEGUARD_ENTRY_EXIT and tracker.mae_max_pct_long >= (sl_pct_cap * Decimal("0.70")) and tracker.live_price >= avg_px_l:
@@ -1264,6 +1305,28 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Squeeze Defense SHORT: ROI {current_roi_pct:.1f}%", "cross")
                     tracker.closure_reason_short = "Squeeze_Defense_Exit"
                     tracker.record_exit("SHORT", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
+                    return
+
+        # 1.7 Dynamic Ping-Pong TP
+        if globals_ref.ENABLE_DYNAMIC_PINGPONG_TP and is_squeeze:
+            if is_in_profit:
+                target_ema200 = getattr(tracker, f"{pos_tf.lower()}_ema200", tracker.ema200 if pos_tf == "M5" else Decimal("0"))
+                if target_ema200 > 0 and tracker.live_price <= target_ema200:
+                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
+                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Ping-Pong TP SHORT: ROI {current_roi_pct:.1f}%", "cross")
+                    tracker.closure_reason_short = "PingPong_TP_Exit"
+                    tracker.record_exit("SHORT", current_roi_pct, "PingPong_TP_Exit", f"Chốt lời non (Ping-Pong) tại {pos_tf} EMA200.")
+                    return
+
+        # 1.8 Dynamic EMA200 TP (Higher TF)
+        if globals_ref.ENABLE_DYNAMIC_EMA200_TP:
+            higher_tf_ema200 = get_nearest_opposite_ema200(tracker, "SHORT", pos_tf)
+            if higher_tf_ema200 > 0 and is_in_profit:
+                if tracker.live_price <= higher_tf_ema200:
+                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
+                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Dynamic EMA200 TP SHORT: ROI {current_roi_pct:.1f}%", "cross")
+                    tracker.closure_reason_short = "Dynamic_EMA200_TP_Exit"
+                    tracker.record_exit("SHORT", current_roi_pct, "Dynamic_EMA200_TP_Exit", f"Chốt lời động chạm cản EMA200 TF lớn hơn.")
                     return
 
         # 1.5. Safeguard Entry Recover Close (Âm >70% SL, hồi về Entry thoát hòa)
