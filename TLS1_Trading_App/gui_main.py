@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.210"
+APP_VERSION = "1.0.211"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1998,6 +1998,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.init_ui()
         self.apply_dark_theme()
         
+        # FIX cho Windows: Ép tất cả QComboBox dùng QStyledItemDelegate để hiển thị đúng CSS nền đen
+        for combo in self.findChildren(QtWidgets.QComboBox):
+            combo.setItemDelegate(QtWidgets.QStyledItemDelegate(combo))
+            
+
         # --- Clean up garbage update files ---
         try:
             current_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
@@ -2580,16 +2585,16 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
                 padding: 4px;
             }
             QComboBox QAbstractItemView, QComboBox QListView {
-                background-color: #1a1a1a;
-                color: #ffffff;
+                background-color: #ffffff;
+                color: #000000;
                 selection-background-color: #333333;
                 selection-color: #ff9900;
                 border: 1px solid #444444;
                 outline: none;
             }
             QListView {
-                background-color: #1a1a1a;
-                color: #ffffff;
+                background-color: #ffffff;
+                color: #000000;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button {
                 background-color: #333333;
@@ -3035,13 +3040,13 @@ def main():
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet("""
         QComboBox QAbstractItemView, QComboBox QListView {
-            background-color: #1e1e1e;
-            color: #ffffff;
+            background-color: #ffffff;
+            color: #000000;
             selection-background-color: #4caf50;
         }
         QListView {
-            background-color: #1e1e1e;
-            color: #ffffff;
+            background-color: #ffffff;
+            color: #000000;
         }
         QToolTip {
             background-color: #2e2e2e;
