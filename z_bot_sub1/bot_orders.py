@@ -347,14 +347,25 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         tp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
         sl_tf_mult = globals_ref.TF_MULTIPLIERS.get(upgrade_tf, Decimal("1.0")) if 'upgrade_tf' in locals() else tp_tf_mult
         
+        # ⚡ Tính hệ số giảm (Shrink) TP/SL dựa trên chuỗi thắng (win_streak)
+        streak_mult = Decimal("1.0")
+        if tracker and max_filled_tf in tracker.mtf_states:
+            win_streak = tracker.mtf_states[max_filled_tf].get("win_streak", 0)
+            streak = min(win_streak, 4)
+            if streak == 0: streak_mult = Decimal("1.0")
+            elif streak == 1: streak_mult = Decimal("0.8")
+            elif streak == 2: streak_mult = Decimal("0.6")
+            elif streak == 3: streak_mult = Decimal("0.4")
+            else: streak_mult = Decimal("0.3")
+        
         is_xl_pos = getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_pos_side", "") == side if tracker else False
         if is_xl_pos:
-            target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult)
-            target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult)
+            target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult) * streak_mult
+            target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult) * streak_mult
         else:
-            # Khóa cứng TP/SL tuyệt đối không nhân với hệ số co giãn, chỉ nhân hệ số TF
-            target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult
-            target_sl_pct = globals_ref.SCALPING_SL_PCT * sl_tf_mult
+            # Nhân hệ số TF và hệ số bóp TP/SL (streak_mult)
+            target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult * streak_mult
+            target_sl_pct = globals_ref.SCALPING_SL_PCT * sl_tf_mult * streak_mult
         
         if side in ["long", "net"]:
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)

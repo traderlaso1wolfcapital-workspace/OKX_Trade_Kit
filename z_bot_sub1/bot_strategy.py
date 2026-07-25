@@ -227,6 +227,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
     if state_dict["ts"] > 0 and gap_ms > max(tf_ms * 1.5, 3600000):
         state_dict["side"] = "none"
         state_dict["accum"], state_dict["fail"], state_dict["back"], state_dict["forth"] = 0, 0, 0, 0
+        state_dict["win_streak"] = 0
         
     state_dict["ts"] = latest_closed_ts
     last_open = tf_opens_asc[-1]
@@ -368,6 +369,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
                     state_dict["fail"] += 1 
                     state_dict["recovery_count"] = 0
                     state_dict["cycle_fail_triggered"] = True
+                    state_dict["win_streak"] = 0
                 
                 # Đảo chiều hoàn toàn khi back vượt req_accum (60 nến ngược chiều)
                 if state_dict["back"] >= req_accum:
@@ -377,6 +379,7 @@ def update_tf_state(tf_opens_asc: list[Decimal], tf_closes_asc: list[Decimal], t
                     state_dict.pop("cycle_fail_triggered", None)
                     state_dict["recovery_count"] = state_dict["accum"]
                     state_dict["locked"] = False
+                    state_dict["win_streak"] = 0
 
 # ==============================================================================
 # 🔁 TÁI DỰNG LỊCH SỬ NẾN KHI RESET (REPLAY ENGINE)

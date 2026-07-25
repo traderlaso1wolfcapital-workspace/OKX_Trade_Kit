@@ -23,10 +23,12 @@ class AssetTracker:
         self.last_pos_state = "none"
 
         self.mtf_states = {
-            "M5": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-            "M15": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-            "M30": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-            "H1": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False}
+            "M5": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0},
+            "M15": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0},
+            "M30": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0},
+            "H1": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0},
+            "H2": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0},
+            "H4": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0}
         }
         self.placed_target_tf = "M5"
         self.active_pos_tf = "M5"
@@ -89,6 +91,18 @@ class AssetTracker:
             self.last_closed_reason = f"[{reason_code}] {reason_desc}"
         else:
             self.last_closed_reason = f"[{reason_code}]"  # Chỉ hiện code khi desc rỗng
+            
+        # ⚡ Tăng/Reset win_streak theo khung thời gian (Shrinking TP logic)
+        tf = getattr(self, "active_pos_tf", "M5")
+        if tf not in self.mtf_states:
+            self.mtf_states[tf] = {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0}
+            
+        if roi > Decimal("0"):
+            self.mtf_states[tf]["win_streak"] = self.mtf_states[tf].get("win_streak", 0) + 1
+        else:
+            self.mtf_states[tf]["win_streak"] = 0
+            
+
         def fmt_tf(t): return t.lower() if t.upper().startswith("M") else t.upper()
         tfs = sorted(self.pos_cycle_closed_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(), 0))
         dca_label = " ".join([fmt_tf(t) for t in tfs]) if tfs else ""
