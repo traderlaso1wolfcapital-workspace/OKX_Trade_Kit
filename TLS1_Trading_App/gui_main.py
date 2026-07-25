@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.209"
+APP_VERSION = "1.0.210"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2579,13 +2579,17 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
                 border-radius: 4px;
                 padding: 4px;
             }
-            QComboBox QAbstractItemView {
+            QComboBox QAbstractItemView, QComboBox QListView {
                 background-color: #1a1a1a;
                 color: #ffffff;
                 selection-background-color: #333333;
                 selection-color: #ff9900;
                 border: 1px solid #444444;
                 outline: none;
+            }
+            QListView {
+                background-color: #1a1a1a;
+                color: #ffffff;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button {
                 background-color: #333333;
@@ -3030,10 +3034,14 @@ def main():
 
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet("""
-        QComboBox QAbstractItemView {
+        QComboBox QAbstractItemView, QComboBox QListView {
             background-color: #1e1e1e;
             color: #ffffff;
             selection-background-color: #4caf50;
+        }
+        QListView {
+            background-color: #1e1e1e;
+            color: #ffffff;
         }
         QToolTip {
             background-color: #2e2e2e;
