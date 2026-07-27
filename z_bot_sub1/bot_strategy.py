@@ -2095,9 +2095,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 # Reset filled_tfs khi không còn vị thế nào (chu kỳ mới)
                 tracker.pos_cycle_filled_tfs = []
                 tracker.pos_cycle_closed_tfs = []
-                # Nếu chưa có vị thế, hướng đi được quyết định bởi BTC hoặc tín hiệu của bản thân
+                # Nếu chưa có vị thế, hướng đi được quyết định bởi BTC (nếu là Altcoin sync) hoặc tín hiệu của bản thân (BTC, forex như XAU)
                 h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
-                if coin_name == "BTC":
+                if coin_name == "BTC" or not _is_alt_synced:
                     allowed_long = (tracker.trend in ("UPTREND", "HEDGE")) and h4_side != "under"
                     allowed_short = (tracker.trend in ("DOWNTREND", "HEDGE")) and h4_side != "above"
                 else:
