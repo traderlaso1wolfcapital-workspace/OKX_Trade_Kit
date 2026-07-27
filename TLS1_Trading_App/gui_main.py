@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.222"
+APP_VERSION = "1.0.223"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1263,7 +1263,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_dynamic_risk = ToggleSwitch()
         add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh. Nếu tắt, sẽ dùng Vốn Limit Cố Định.", 2)
         
-        self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %"); self.input_risk_pct.setValue(0.50)
+        self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %"); self.input_risk_pct.setValue(0.50); self.input_risk_pct.setSingleStep(0.5)
         add_field(l_risk, 1, "Vào lệnh theo % vốn (%):", self.input_risk_pct, "Phần trăm tổng tài khoản sẽ vào lệnh. Ví dụ 0.50%.")
 
         self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
@@ -1386,7 +1386,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_risk = QtWidgets.QGridLayout(grp_risk)
         self.smc_chk_dynamic_risk = ToggleSwitch()
         add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.smc_chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh.", 2)
-        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox(); self.smc_input_risk_pct.setSuffix(" %")
+        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox(); self.smc_input_risk_pct.setSuffix(" %"); self.smc_input_risk_pct.setSingleStep(0.5)
         add_field(l_risk, 1, "Vào lệnh theo % vốn:", self.smc_input_risk_pct, "Phần trăm tài khoản sẽ vào lệnh (Risk per trade).")
         self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000)
         add_field(l_risk, 2, "Vốn Limit cố định:", self.smc_input_pos_vol, "Sử dụng nếu quản lý vốn động bị tắt.")

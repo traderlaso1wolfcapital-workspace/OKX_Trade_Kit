@@ -174,6 +174,8 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg:
                     globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = int(float(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
                     
+                if "USE_DYNAMIC_RISK" in cfg: globals_ref.USE_DYNAMIC_RISK = bool(cfg["USE_DYNAMIC_RISK"])
+                if "DYNAMIC_RISK_PCT" in cfg: globals_ref.DYNAMIC_RISK_PCT = Decimal(str(cfg["DYNAMIC_RISK_PCT"]))
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: globals_ref.ENABLE_STRATEGY_MAIN = bool(cfg["ENABLE_STRATEGY_MAIN"])
                 if "ENABLE_STRATEGY_XOLE" in cfg: globals_ref.ENABLE_STRATEGY_XOLE = bool(cfg["ENABLE_STRATEGY_XOLE"])
@@ -1972,8 +1974,13 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
 
             # Volume sizing: 100% mặc định - vol/3 sẽ áp dụng per-TF trong grid loop bên dưới
-            # Khóa cứng volume tuyệt đối theo POSITION_VOLUME_HIGH_CONFIDENCE cho toàn bộ Altcoin & BTC
-            target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+            if getattr(globals_ref, "USE_DYNAMIC_RISK", False):
+                _dyn_risk = getattr(globals_ref, "DYNAMIC_RISK_PCT", Decimal("0.005"))
+                _lever = Decimal(str(cfg.get("leverage", 100)))
+                _von = Decimal(str(getattr(globals_ref, "von_hien_tai", 10000)))
+                target_usdt = _von * _dyn_risk * _lever
+            else:
+                target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
             # ====================================================================
             # 🎯 ĐẶT LỆNH LIMIT ĐA KHUNG ĐỒNG PHA (MULTI-TIMEFRAME GRID)
             # ====================================================================
