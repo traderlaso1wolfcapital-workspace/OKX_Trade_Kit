@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.219"
+APP_VERSION = "1.0.220"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2546,8 +2546,8 @@ del /f /q "%~f0"
     def _update_online_label(self, count):
         """Cập nhật label hiển thị số người online theo format XX/100."""
         import random
-        # Fake số lượng online từ 42 đến 53 cho khách phổ thông thấy app đông vui
-        fake_count = random.randint(42, 53)
+        # Tạm thời fake số lượng online từ 56 đến 58 để không nhảy quá nhiều (thực tế cắm dài hạn)
+        fake_count = random.choice([56, 57, 58])
         max_slots = 100
         self.lbl_online_count.setText(f"🟢 {fake_count}/{max_slots}")
         # Đổi màu theo mức độ đông: xanh → vàng → đỏ
