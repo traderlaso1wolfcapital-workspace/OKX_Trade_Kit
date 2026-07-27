@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.218"
+APP_VERSION = "1.0.219"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1868,6 +1868,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "VOL_MULTIPLIERS": {
                 "BTC": str(round(self.input_btc_vol_mult.value(), 2)),
                 "ETH": str(round(self.input_eth_vol_mult.value(), 2))
+            }
         })
 
         # ⚡ BẢO MẬT: Bộc lọc các thông số thuật toán lõi khỏi JSON để khách hàng không thể đọc/sửa lén
