@@ -104,10 +104,13 @@ CL_ORD_PREFIX = "scvlmt"
 EVOLUTION_CYCLE_SECONDS = 86400         
 AI_CONFIDENCE_SCORE = Decimal("0")
 # --- DANH MỤC COIN ---
+# --- DANH MỤC TÀI SẢN (COIN PORTFOLIO) ---
+# asset_class: "crypto" = tiền mã hóa (neo theo BTC nếu ALTCOIN_FOLLOW_BTC_EMA=ON)
+#              "forex"  = kim loại, cổ phiếu, cặp tiền tệ (giao dịch độc lập, không neo BTC)
 COIN_PORTFOLIO = [
-    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.0")},
-    {"coin": "BTC", "swap": "BTC-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0")},
-    {"coin": "ETH", "swap": "ETH-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.3")},
+    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.0"), "asset_class": "forex"},
+    {"coin": "BTC", "swap": "BTC-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0"), "asset_class": "crypto"},
+    {"coin": "ETH", "swap": "ETH-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.3"), "asset_class": "crypto"},
 ]
 ENABLED_COINS = ["XAU", "BTC", "ETH"]
 
