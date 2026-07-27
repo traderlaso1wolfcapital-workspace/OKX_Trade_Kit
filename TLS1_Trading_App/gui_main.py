@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.221"
+APP_VERSION = "1.0.222"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -764,8 +764,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_coins_layout.setSpacing(15)
         
         import os
-        svg_b64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNENBRjUwIiBzdHJva2Utd2lkdGg9IjQiIGQ9Ik00IDEybDUgNUwyMCA2Ii8+PC9zdmc+"
-        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url(data:image/svg+xml;base64,{svg_b64}); }}"
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="#4CAF50" stroke-width="4" d="M4 12l5 5L20 6"/></svg>'
+        svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
+        if not os.path.exists(svg_path):
+            with open(svg_path, "w", encoding="utf-8") as f:
+                f.write(svg_content)
+        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
         
         self.dash_chk_xau = QtWidgets.QCheckBox("XAU")
         self.dash_chk_xau.setStyleSheet(cb_style)
@@ -1193,8 +1197,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
         
         import os
-        svg_b64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNENBRjUwIiBzdHJva2Utd2lkdGg9IjQiIGQ9Ik00IDEybDUgNUwyMCA2Ii8+PC9zdmc+"
-        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url(data:image/svg+xml;base64,{svg_b64}); }}"
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="#4CAF50" stroke-width="4" d="M4 12l5 5L20 6"/></svg>'
+        svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
+        if not os.path.exists(svg_path):
+            with open(svg_path, "w", encoding="utf-8") as f:
+                f.write(svg_content)
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
         
         self.chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
         self.chk_cfg_xau.setStyleSheet(cb_style)
