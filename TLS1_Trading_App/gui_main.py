@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.217"
+APP_VERSION = "1.0.218"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1859,12 +1859,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
             "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
-
-            # ⚡ BẢO MẬT: Bộc lọc các thông số thuật toán lõi khỏi JSON để khách hàng không thể đọc/sửa lén
-            # Các thông số này sẽ tự động được lấy từ bot_config.py (đã được biên dịch ngầm vào .exe)
-            for key in ["DCA_GAP_THRESHOLD_PCT", "EMA_CONFLUENCE_TOLERANCE_PCT", "BASE_ENTRY_OFFSET_PCT", 
-                        "REQUIRED_ACCUMULATION_CANDLES", "QUANTUM_BUFFER_CANDLES", "QUANTUM_FORTH_CANDLES"]:
-                cfg.pop(key, None)
             "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
 
             "LEVERAGES": {
@@ -1874,8 +1868,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "VOL_MULTIPLIERS": {
                 "BTC": str(round(self.input_btc_vol_mult.value(), 2)),
                 "ETH": str(round(self.input_eth_vol_mult.value(), 2))
-            }
         })
+
+        # ⚡ BẢO MẬT: Bộc lọc các thông số thuật toán lõi khỏi JSON để khách hàng không thể đọc/sửa lén
+        # Các thông số này sẽ tự động được lấy từ bot_config.py (đã được biên dịch ngầm vào .exe)
+        for key in ["DCA_GAP_THRESHOLD_PCT", "EMA_CONFLUENCE_TOLERANCE_PCT", "BASE_ENTRY_OFFSET_PCT", 
+                    "REQUIRED_ACCUMULATION_CANDLES", "QUANTUM_BUFFER_CANDLES", "QUANTUM_FORTH_CANDLES"]:
+            cfg.pop(key, None)
 
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
