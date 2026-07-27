@@ -863,6 +863,11 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
     # LẤY TÌNH TRẠNG VỊ THẾ TỪ SÀN
     old_has_l, old_has_s = tracker.has_long, tracker.has_short
+    old_avg_px_l = getattr(tracker, "active_avg_px_long", Decimal("0"))
+    old_avg_px_s = getattr(tracker, "active_avg_px_short", Decimal("0"))
+    old_long_vol = getattr(tracker, "long_pos_vol", Decimal("0"))
+    old_short_vol = getattr(tracker, "short_pos_vol", Decimal("0"))
+    
     tracker.has_long, tracker.has_short = False, False
     tracker.active_avg_px_long, tracker.active_avg_px_short = Decimal("0"), Decimal("0")
     active_long_pos, active_short_pos = [], []
@@ -888,15 +893,19 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             if norm_side == "long":
                 if td_mode == "cross":
                     active_long_pos.append(p); tracker.has_long = True
-                    avg_px = Decimal(p["avgPx"])
-                    cross_long_amt += pos_amt
-                    cross_long_vol += pos_amt * contract_val * avg_px
+                    avg_px = Decimal(p.get("avgPx", "0"))
+                    if avg_px <= 0: avg_px = Decimal(p.get("markPx", tracker.live_price))
+                    if avg_px <= 0: avg_px = getattr(tracker, "live_price", Decimal("1"))
+                    cross_long_amt += abs(pos_amt)
+                    cross_long_vol += abs(pos_amt) * contract_val * avg_px
             else:
                 if td_mode == "cross":
                     active_short_pos.append(p); tracker.has_short = True
-                    avg_px = Decimal(p["avgPx"])
-                    cross_short_amt += pos_amt
-                    cross_short_vol += pos_amt * contract_val * avg_px
+                    avg_px = Decimal(p.get("avgPx", "0"))
+                    if avg_px <= 0: avg_px = Decimal(p.get("markPx", tracker.live_price))
+                    if avg_px <= 0: avg_px = getattr(tracker, "live_price", Decimal("1"))
+                    cross_short_amt += abs(pos_amt)
+                    cross_short_vol += abs(pos_amt) * contract_val * avg_px
 
         if cross_long_amt > 0:
             tracker.active_avg_px_long = cross_long_vol / (cross_long_amt * contract_val)
@@ -912,6 +921,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
     except Exception as e:
         hft_logger.error(f"Lỗi lấy position {coin_name}: {e}", exc_info=True)
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
+        tracker.active_avg_px_long, tracker.active_avg_px_short = old_avg_px_l, old_avg_px_s
+        tracker.long_pos_vol, tracker.short_pos_vol = old_long_vol, old_short_vol
 
     try:
         if tracker.has_long:
@@ -2331,6 +2342,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 elif len(tf_orders) == 1:
                     matching_order = tf_orders[0]
                 
+                last_closed_ts_for_tf = get_current_candle_start_ms(tf)
+                
                 if matching_order:
                     try:
                         old_px = Decimal(matching_order["px"])
@@ -2341,8 +2354,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         
                         # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
                         # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
-                        last_closed_ts_for_tf = get_current_candle_start_ms(tf)
-                        
                         if old_sz == new_sz and last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
                             tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
                             continue
@@ -2515,6 +2526,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 elif len(tf_orders) == 1:
                     matching_order = tf_orders[0]
                 
+                last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
+                
                 if matching_order:
                     try:
                         old_px = Decimal(matching_order["px"])
@@ -2525,8 +2538,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         
                         # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
                         # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
-                        last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
-                        
                         if old_sz == new_sz and last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
                             tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
                             continue

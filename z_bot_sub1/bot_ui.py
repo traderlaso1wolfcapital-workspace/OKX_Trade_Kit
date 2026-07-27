@@ -122,7 +122,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     col1_w, col2_w, col3_w, col4_w = 18, 21, 27, 19
     line_w = 94
 
-    r1_c1 = f"☢  {bot_name}"
+    r1_c1 = f"⚡ {bot_name}"
     r1_c2 = f"{'Vốn gốc':>9}: {format_with_commas(von_goc, 2)} USDT"
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
@@ -150,7 +150,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         "SIDEWAY": ("·", "SIDEWAY / CHỜ"),
     }
     _alt_mode = "🔄 ON (Neo BTC)" if getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True) else "🔒 LOCK (EMA riêng)"
-    print(f"\n⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT:  [Altcoin: {_alt_mode}]")
+    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT:  [Altcoin: {_alt_mode}]")
     active_strategies = {"MAIN": [], "XOLE": [], "PINGPONG": [], "SIDEWAY": []}
     
     for cfg in COIN_PORTFOLIO:
@@ -357,7 +357,11 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 entry_offset = (btc_dist_unsigned + dist_to_h4) * alt_vol_mult - buffer_h4_pct
             else:
                 entry_offset = dist_to_h4 + btc_dist_unsigned * alt_vol_mult
-            dist_ema_display = f"[H4] {dist_to_h4:+.2f}% ({entry_offset:+.2f}%)"
+            
+            if cfg["coin"] == "XAU":
+                dist_ema_display = f"[H4] {dist_to_h4:+.2f}%"
+            else:
+                dist_ema_display = f"[H4] {dist_to_h4:+.2f}% ({entry_offset:+.2f}%)"
 
         # Dùng cho WAIT section (vẫn cần target_tf và dist_ema)
         target_tf = getattr(tk, "active_target_tf", "M5")

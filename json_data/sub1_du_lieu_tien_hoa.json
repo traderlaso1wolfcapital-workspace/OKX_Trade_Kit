@@ -1,9 +1,9 @@
 {
   "wallet_stats": {
     "von_goc": 20.5581058506918,
-    "von_hien_tai": 55.963449993818465,
-    "loi_nhuan": 35.40534414312666,
-    "tang_truong": 172.22084758326721
+    "von_hien_tai": 55.00593176981842,
+    "loi_nhuan": 34.44782591912662,
+    "tang_truong": 167.56322868124263
   },
   "ETH": {
     "tong_lenh_dong": 18,
@@ -889,6 +889,17 @@
           "vol_30m": 31684.26
         }
       }
+    ]
+  },
+  "XAU": {
+    "tong_lenh_dong": 1,
+    "lenh_thang": 1,
+    "lenh_thua": 0,
+    "lich_su_mae": [
+      0.0
+    ],
+    "lich_su_mfe": [
+      3.716747297741924
     ]
   }
 }

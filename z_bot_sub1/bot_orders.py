@@ -191,10 +191,13 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
         hft_logger.error(f"Lỗi clean_algo_orders: {e}", exc_info=True)
 
 def close_position_market(client, inst_id: str, pos_side: str, size: str, log_reason: str, td_mode: str = "cross"):
-    side = "sell" if pos_side == "long" else "buy"
+    size_dec = Decimal(size)
+    norm_side = "long" if pos_side == "long" or (pos_side == "net" and size_dec > 0) else "short"
+    side = "sell" if norm_side == "long" else "buy"
+    abs_size = str(abs(size_dec))
     try:
         client.request("POST", "/api/v5/trade/order", body={
-            "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": size
+            "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": abs_size
         })
         print(f"🚨 [LIMIT ENGINE]: Market {inst_id} ({pos_side.upper()} - {td_mode.upper()}) closed: {log_reason}")
     except Exception as e:
@@ -290,9 +293,7 @@ def fetch_spec(client, inst_id: str) -> dict[str, Decimal]:
 
 def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, globals_ref: Any):
     try:
-        side, size, avg_px = pos["posSide"], pos["pos"], Decimal(pos.get("avgPx", "0"))
-        if avg_px <= 0 or Decimal(str(size)) <= 0:
-            return
+        side, size, avg_px = pos["posSide"], pos["pos"], Decimal(pos["avgPx"])
         td_mode = pos.get("mgnMode", "cross")
         size_dec = Decimal(str(size))
         
@@ -374,7 +375,8 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             target_tp_pct = Decimal("0.05")
             target_sl_pct = Decimal("0.05")
         
-        if side in ["long", "net"]:
+        norm_side = "long" if side == "long" or (side == "net" and Decimal(str(pos["pos"])) > 0) else "short"
+        if norm_side == "long":
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") - target_sl_pct), tick_sz)
             tp_side, sl_side = "sell", "sell"
@@ -383,7 +385,8 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             calc_sl = round_to_tick(avg_px * (Decimal("1") + target_sl_pct), tick_sz)
             tp_side, sl_side = "buy", "buy"
             
-        status = check_algo_tpsl_status(client, inst_id, side, td_mode, size_dec)
+        abs_size_dec = abs(size_dec)
+        status = check_algo_tpsl_status(client, inst_id, side, td_mode, abs_size_dec)
         
         # Nếu đã có lệnh nhưng lệch giá mục tiêu quá 0.5% (do đổi TF), xem như kích thước/vị thế không khớp để đặt lại
         if status["size_matched"]:
@@ -402,7 +405,7 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             status["has_sl"] = False
 
         if tracker:
-            if side in ["long", "net"]:
+            if norm_side == "long":
                 tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
                 tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
             else:
@@ -410,12 +413,13 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                 tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
 
         if not status["has_tp"] or not status["has_sl"]:
+            abs_size_str = str(abs_size_dec)
             if not status["has_tp"]:
                 tp_px_str = f"{calc_tp:.{dec_places}f}"
-                place_algo_tpsl(client, inst_id, tp_side, side, size, tp_px_str, True, f"{CL_ORD_PREFIX}TP{int(time.time() * 1000000)}"[:32], td_mode)
+                place_algo_tpsl(client, inst_id, tp_side, side, abs_size_str, tp_px_str, True, f"{CL_ORD_PREFIX}TP{int(time.time() * 1000000)}"[:32], td_mode)
             if not status["has_sl"]:
                 sl_px_str = f"{calc_sl:.{dec_places}f}"
-                place_algo_tpsl(client, inst_id, sl_side, side, size, sl_px_str, False, f"{CL_ORD_PREFIX}SL{int(time.time() * 1000000)}"[:32], td_mode)
+                place_algo_tpsl(client, inst_id, sl_side, side, abs_size_str, sl_px_str, False, f"{CL_ORD_PREFIX}SL{int(time.time() * 1000000)}"[:32], td_mode)
     except Exception as e:
         hft_logger.error(f"Lỗi apply_emergency_tpsl ({inst_id} {pos.get('posSide', '')}): {e}", exc_info=True)
 
