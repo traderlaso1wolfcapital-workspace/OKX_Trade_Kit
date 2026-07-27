@@ -29,7 +29,7 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("180")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("100")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
 USE_DYNAMIC_RISK = False                           # Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệnh (0.005 = 0.5%)
 
@@ -71,8 +71,8 @@ TF_MULTIPLIERS = {
 }
 TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v for k, v in TF_MULTIPLIERS.items()}
 TF_VOLUME_MULTIPLIERS = {
-    "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.4"),
-    "H1": Decimal("1.6"), "H2": Decimal("1.8"), "H4": Decimal("2.0")
+    "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
+    "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
 }
 
 # --- XO LE: Hệ số TP/SL, Offsets, Volume (Đảo ngược) ---
@@ -82,8 +82,8 @@ XOLE_TF_MULTIPLIERS = {
 }
 XOLE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v for k, v in XOLE_TF_MULTIPLIERS.items()}
 XOLE_TF_VOLUME_MULTIPLIERS = {
-    "M5": Decimal("2.0"), "M15": Decimal("1.8"), "M30": Decimal("1.6"),
-    "H1": Decimal("1.4"), "H2": Decimal("1.2"), "H4": Decimal("1.0")
+    "M5": Decimal("5.0"), "M15": Decimal("3.0"), "M30": Decimal("2.0"),
+    "H1": Decimal("1.5"), "H2": Decimal("1.2"), "H4": Decimal("1.0")
 }
 
 # ==============================================================================
@@ -105,9 +105,11 @@ EVOLUTION_CYCLE_SECONDS = 86400
 AI_CONFIDENCE_SCORE = Decimal("0")
 # --- DANH MỤC COIN ---
 COIN_PORTFOLIO = [
+    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.0")},
     {"coin": "BTC", "swap": "BTC-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0")},
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.3")},
 ]
+ENABLED_COINS = ["XAU", "BTC", "ETH"]
 
 import sys
 globals_ref = sys.modules[__name__]

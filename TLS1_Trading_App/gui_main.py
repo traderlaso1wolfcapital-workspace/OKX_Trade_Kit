@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.213"
+APP_VERSION = "1.0.214"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -758,6 +758,33 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.addWidget(self.btn_stop)
         top_panel.addWidget(control_box)
         
+        self.dash_active_coins_box = QtWidgets.QWidget()
+        dash_coins_layout = QtWidgets.QHBoxLayout(self.dash_active_coins_box)
+        dash_coins_layout.setContentsMargins(15, 10, 15, 10)
+        dash_coins_layout.setSpacing(15)
+        
+        import os
+        svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_green.svg").replace("\\", "/")
+        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        
+        self.dash_chk_xau = QtWidgets.QCheckBox("XAU")
+        self.dash_chk_xau.setStyleSheet(cb_style)
+        self.dash_chk_xau.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.dash_chk_xau.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.dash_chk_btc = QtWidgets.QCheckBox("BTC")
+        self.dash_chk_btc.setStyleSheet(cb_style)
+        self.dash_chk_btc.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.dash_chk_btc.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.dash_chk_eth = QtWidgets.QCheckBox("ETH")
+        self.dash_chk_eth.setStyleSheet(cb_style)
+        self.dash_chk_eth.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.dash_chk_eth.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        
+        dash_coins_layout.addWidget(self.dash_chk_xau)
+        dash_coins_layout.addWidget(self.dash_chk_btc)
+        dash_coins_layout.addWidget(self.dash_chk_eth)
+        top_panel.addWidget(self.dash_active_coins_box)
+        
         top_panel.addStretch(1)
         dash_layout.addLayout(top_panel, 0)
 
@@ -810,7 +837,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.setContentsMargins(10, 10, 10, 0)
         
         self.combo_coin = QtWidgets.QComboBox()
-        self.combo_coin.addItems(["BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"])
+        self.combo_coin.addItems(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"])
         self.combo_tf = QtWidgets.QComboBox()
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("5m")
@@ -1160,6 +1187,27 @@ class BotInstanceWidget(QtWidgets.QWidget):
             layout_obj.addLayout(h_lbl, row, col, 1, colspan)
 
 
+        # 0. DANH MỤC GIAO DỊCH
+        grp_active_coins = QtWidgets.QGroupBox("Danh Mục Giao Dịch")
+        grp_active_coins.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
+        
+        import os
+        svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_green.svg").replace("\\", "/")
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        
+        self.chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
+        self.chk_cfg_xau.setStyleSheet(cb_style)
+        self.chk_cfg_btc = QtWidgets.QCheckBox("BTC-USDT-SWAP")
+        self.chk_cfg_btc.setStyleSheet(cb_style)
+        self.chk_cfg_eth = QtWidgets.QCheckBox("ETH-USDT-SWAP")
+        self.chk_cfg_eth.setStyleSheet(cb_style)
+        
+        l_active_coins.addWidget(self.chk_cfg_xau)
+        l_active_coins.addWidget(self.chk_cfg_btc)
+        l_active_coins.addWidget(self.chk_cfg_eth)
+        layout.addWidget(grp_active_coins)
+
         # 1. CÔNG TẮC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Công Tắc Chiến Thuật")
         l_toggles = QtWidgets.QGridLayout(grp_toggles)
@@ -1236,7 +1284,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
         add_field(l_filter, 4, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
+        # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_filter)
+        grp_filter.hide()
 
         # 5. LƯỢNG TỬ & TIẾN HÓA
         grp_misc = QtWidgets.QGroupBox("Lượng Tử & Tiến Hóa")
@@ -1250,7 +1300,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.input_evo_cycle = QtWidgets.QSpinBox(); self.input_evo_cycle.setMaximum(999999)
         add_field(l_misc, 2, "Chu kỳ tiến hóa (giây):", self.input_evo_cycle, "Thời gian tối thiểu giữa 2 lần AI chạy tự tiến hóa lại hệ số thông minh.")
+        # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_misc)
+        grp_misc.hide()
+
 
         # 6. ĐÒN BẨY & VOL
         grp_port = QtWidgets.QGroupBox("Đòn Bẩy Cắt Ngang (Cross)")
@@ -1263,7 +1316,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_field(l_port, 2, "ETH Leverage:", self.input_eth_lever, "Đòn bẩy Cross mặc định cho các lệnh ETH (VD: 100x).")
         self.input_eth_vol_mult = QtWidgets.QDoubleSpinBox()
         add_field(l_port, 3, "ETH Vol Multiplier:", self.input_eth_vol_mult, "Hệ số nhân Volume cho ETH. Giúp tùy chỉnh tỷ trọng tài sản.")
+        # Tạm ẩn Đòn Bẩy Cắt Ngang theo yêu cầu
         layout.addWidget(grp_port)
+        grp_port.hide()
+        
+        layout.addStretch(1)
 
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
@@ -1537,6 +1594,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.input_eth_lever.setValue(int(cfg.get("LEVERAGES", {}).get("ETH", eth_cfg.get("leverage", 100))))
             self.input_btc_vol_mult.setValue(float(cfg.get("VOL_MULTIPLIERS", {}).get("BTC", float(btc_cfg.get("vol_mult", 1.0)))))
             self.input_eth_vol_mult.setValue(float(cfg.get("VOL_MULTIPLIERS", {}).get("ETH", float(eth_cfg.get("vol_mult", 1.3)))))
+            
+            if hasattr(self, 'chk_cfg_btc'):
+                enabled_coins = cfg.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
+                self.chk_cfg_btc.setChecked("BTC" in enabled_coins)
+                self.chk_cfg_eth.setChecked("ETH" in enabled_coins)
+                self.chk_cfg_xau.setChecked("XAU" in enabled_coins)
+                if hasattr(self, 'dash_chk_btc'):
+                    self.dash_chk_btc.setChecked("BTC" in enabled_coins)
+                    self.dash_chk_eth.setChecked("ETH" in enabled_coins)
+                    self.dash_chk_xau.setChecked("XAU" in enabled_coins)
         except Exception as e: 
             print('Error setting defaults:', e)
 
@@ -1690,7 +1757,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def save_strategy_settings(self):
         self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
-        if not env_file: return
+        if not env_file:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.setWindowTitle("Lỗi")
+            msg.setText("Vui lòng chọn Tài khoản (API Key) ở góc trái màn hình trước khi Lưu cấu hình!")
+            msg.exec()
+            return
         acc_name = self.get_acc_name()
         json_data_dir = os.path.join(USER_DATA_DIR, "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
@@ -1761,7 +1834,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "OB_MAX_COUNT": self.smc_input_ob_max.value(),
             })
         else:
+            enabled = []
+            if getattr(self, 'chk_cfg_xau', None) and self.chk_cfg_xau.isChecked(): enabled.append("XAU")
+            if getattr(self, 'chk_cfg_btc', None) and self.chk_cfg_btc.isChecked(): enabled.append("BTC")
+            if getattr(self, 'chk_cfg_eth', None) and self.chk_cfg_eth.isChecked(): enabled.append("ETH")
             cfg.update({
+                "ENABLED_COINS": enabled,
                 "RESET_CONFIG_V23": True,
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
@@ -1803,6 +1881,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
+            
+        if hasattr(self, 'dash_chk_btc') and self.strategy_id != "sub2":
+            self.dash_chk_btc.setChecked(self.chk_cfg_btc.isChecked())
+            self.dash_chk_eth.setChecked(self.chk_cfg_eth.isChecked())
+            self.dash_chk_xau.setChecked(self.chk_cfg_xau.isChecked())
             
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
@@ -2464,8 +2547,11 @@ del /f /q "%~f0"
 
     def _update_online_label(self, count):
         """Cập nhật label hiển thị số người online theo format XX/100."""
+        import random
+        # Fake số lượng online từ 42 đến 53 cho khách phổ thông thấy app đông vui
+        fake_count = random.randint(42, 53)
         max_slots = 100
-        self.lbl_online_count.setText(f"🟢 {count}/{max_slots}")
+        self.lbl_online_count.setText(f"🟢 {fake_count}/{max_slots}")
         # Đổi màu theo mức độ đông: xanh → vàng → đỏ
         if count >= 80:
             color = "#ff5555"

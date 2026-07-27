@@ -394,7 +394,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
     if swap_id not in state_matrix: return
     tracker = state_matrix[swap_id]
     
-    _is_alt_synced = (coin_name != "BTC" and getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True))
+    _is_alt_synced = (coin_name not in ["BTC", "XAU"] and getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True))
     
     # Khởi tạo giá trị mặc định để IDE/Pylance không báo lỗi NameError "Could not find name"
     closes_asc = []
@@ -2120,7 +2120,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             # Khi ALTCOIN_FOLLOW_BTC_EMA = ON, dùng trạng thái của BTC làm chuẩn
             # Tránh Altcoin bị kẹt khóa vĩnh viễn do lệch pha H2/H4 EMA200 với BTC
             _alt_follow_btc_macro = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
-            if coin_name != "BTC" and _alt_follow_btc_macro:
+            if coin_name not in ["BTC", "XAU"] and _alt_follow_btc_macro:
                 _btc_tk_macro = state_matrix.get("BTC-USDT-SWAP")
                 if _btc_tk_macro:
                     tracker.is_macro_overextended = getattr(_btc_tk_macro, "is_macro_overextended", False)

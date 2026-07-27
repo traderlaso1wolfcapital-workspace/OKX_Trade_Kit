@@ -589,8 +589,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                         lines.append(f"{indent_branch}{prefix}  Đang limit: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
                     pos_lines.append((0, coin_name, lines))
 
-    # ⚡ Sắp xếp: BTC ưu tiên số 1, sau đó đến mode priority (❶=1, ❷=2, ❸=3), pending=0 xếp cuối
-    pos_lines.sort(key=lambda x: (0 if x[1] == "BTC" else 1, x[0] if x[0] > 0 else 99))
+    # ⚡ Sắp xếp: XAU ưu tiên 0, BTC ưu tiên 1, ETH ưu tiên 2, sau đó đến mode priority (❶=1, ❷=2, ❸=3), pending=0 xếp cuối
+    def _coin_order(c_name): return {"XAU": 0, "BTC": 1, "ETH": 2}.get(c_name, 99)
+    pos_lines.sort(key=lambda x: (_coin_order(x[1]), x[0] if x[0] > 0 else 99))
 
     is_first = True
     for mode, coin_name, lines in pos_lines:

@@ -407,9 +407,18 @@ def main():
                 if not hasattr(sys, '_bot_sub1_executor'):
                     sys._bot_sub1_executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(32, len(bot_sub1.COIN_PORTFOLIO) * 2))
                 
+                try:
+                    import json
+                    with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
+                        _gcfg = json.load(f)
+                        enabled_coins = _gcfg.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
+                except:
+                    enabled_coins = ["BTC", "ETH", "XAU"]
+                
                 futures = []
                 for cfg in bot_sub1.COIN_PORTFOLIO: 
-                    futures.append(sys._bot_sub1_executor.submit(process_coin, cfg))
+                    if cfg["coin"] in enabled_coins:
+                        futures.append(sys._bot_sub1_executor.submit(process_coin, cfg))
                 concurrent.futures.wait(futures)
                 # ----------------------------------------------------------------
                 
