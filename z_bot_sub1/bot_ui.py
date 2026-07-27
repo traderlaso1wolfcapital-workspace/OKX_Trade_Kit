@@ -119,26 +119,38 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     growth_sign = "+" if tang_truong >= 0 else ""
 
     bot_name = "THỢ SĂN EMA200"
-    col1_w, col2_w, col3_w, col4_w = 18, 21, 27, 19
+    col1_w, col2_w, col3_w = 20, 20, 26
     line_w = 94
 
-    r1_c1 = f"⚡ {bot_name}"
-    r1_c2 = f"{'Vốn gốc':>9}: {format_with_commas(von_goc, 2)} USDT"
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
-    r1_c3 = f"{'PNL':>3}: {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD ({growth_sign}{tang_truong:.0f}%)"
-    r1_c4 = f"{'WINRATE':>8} : {ai_winrate:.1f}% / {total_pos}"
 
-    r2_c1 = f" {sync_time:^{col1_w - 1}}"
-    r2_c2 = f"{'Tổng vốn':>9}: {format_with_commas(von_hien_tai, 2)} USDT"
-    r2_c3 = f"{'VOL':>3}: {format_with_commas(target_vol, 1)} U"
-    r2_c4 = f"{'MFE/MAE':>8} : {mfe_str} / {mae_str}"
+    r0_c1 = f"⚡ {bot_name}"
+    r0_c2 = "🏦 TÀI KHOẢN"
+    r0_c3 = "📊 LỢI NHUẬN"
+    r0_c4 = "🎯 HIỆU SUẤT"
+    
+    r1_c1 = f"🕒 {sync_time}"
+    r1_c2 = f"Gốc : {format_with_commas(von_goc, 2)} U"
+    r1_c3 = f"PNL : {pnl_sign}{format_with_commas(loi_nhuan, 2)} U ({growth_sign}{tang_truong:.0f}%)"
+    r1_c4 = f"Win : {ai_winrate:.1f}% / {total_pos}"
+    c1, c2, c3, c4 = 20, 20, 26, 16
+    SEP = "|"
 
-    print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
-    print("=" * line_w)
-    print(f"{r1_c1:<{col1_w}} | {r1_c2:<{col2_w}} | {r1_c3:<{col3_w}} | {r1_c4:<{col4_w}}")
-    print(f"{r2_c1:<{col1_w}} | {r2_c2:<{col2_w}} | {r2_c3:<{col3_w}} | {r2_c4:<{col4_w}}")
-    print("=" * line_w)
+    r0 = f"  {'⚡ THỢ SĂN EMA200':^{c1-1}} | {'🏦 TÀI KHOẢN':^{c2-1}} | {'📊 LỢI NHUẬN':^{c3-1}} | 🎯 HIỆU SUẤT"
+    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
+    r2 = f"   {'':<{c1-1}} | {'Tong: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
+
+    bar  = "-" * line_w
+    dbar = "=" * line_w
+
+    print(f"\n  bot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
+    print(dbar)
+    print(r0)
+    print(bar)
+    print(r1)
+    print(r2)
+    print(dbar)
 
     # ==============================================================================
     # ⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT
@@ -490,10 +502,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             else:
                 filled_str = fmt_tf("M5")
             long_vol_str = f" = {tk.long_pos_vol:.0f} U " if getattr(tk, "long_pos_vol", 0) > 0 else " "
-            line_main = f"    ✧ {coin_name} ╭─  Đã khớp LONG [{filled_str}]{long_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
-            # Tìm vị trí của ╭─ để tính indent cho ╰─
-            idx_branch = line_main.index("╭─")
-            indent_branch = " " * idx_branch
+            line_main = f"    {coin_name} ╭─  Đã khớp LONG [{filled_str}]{long_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
+            # "    {coin} ╭─" → 4 spaces + coin (3) + " " (1) = 8 chars trước ╭─
+            indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
             placed_long_dict = getattr(tk, "placed_entry_px_long_by_tf", {})
@@ -518,9 +529,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             else:
                 filled_str = fmt_tf("M5")
             short_vol_str = f" = {tk.short_pos_vol:.0f} U " if getattr(tk, "short_pos_vol", 0) > 0 else " "
-            line_main = f"    ✧ {coin_name} ╭─  Đã khớp SHORT [{filled_str}]{short_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
-            idx_branch = line_main.index("╭─")
-            indent_branch = " " * idx_branch
+            line_main = f"    {coin_name} ╭─  Đã khớp SHORT [{filled_str}]{short_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
+            indent_branch = "        "  # 8 spaces khớp với XAU / BTC / ETH
             lines = [line_main]
             
             placed_short_dict = getattr(tk, "placed_entry_px_short_by_tf", {})
@@ -553,7 +563,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             
             if has_pending:
                 has_any = True
-                line_main = f"    ✧ {coin_name} ╭─  Chưa có vị thế"
+                line_main = f"    {coin_name} ╭─  Chưa có vị thế"
                 idx_branch = line_main.index("╭─")
                 indent_branch = " " * idx_branch
                 lines = [line_main]
@@ -576,7 +586,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                         lines.append(f"{indent_branch}{prefix}  Đang limit SHORT: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
                 pos_lines.append((0, coin_name, lines))
             else:
-                pos_lines.append((0, coin_name, [f"    ✧ {coin_name} ╭─  Chưa có vị thế"]))
+                pos_lines.append((0, coin_name, [f"    {coin_name} ╭─  Chưa có vị thế"]))
         else:
             # Có vị thế 1 bên, in pending bên kia nếu có
             if not tk.has_long:
@@ -584,7 +594,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 active_dca_tfs_l = [tf for tf, px in placed_long_dict.items() if px not in ("---", "ERR")]
                 if active_dca_tfs_l:
                     active_dca_tfs_l_sorted = sorted(active_dca_tfs_l, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
-                    line_main = f"    ✧ {coin_name} ╭─  Chưa có vị thế LONG"
+                    line_main = f"    {coin_name} ╭─  Chưa có vị thế LONG"
                     idx_branch = line_main.index("╭─")
                     indent_branch = " " * idx_branch
                     lines = [line_main]
@@ -598,7 +608,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 active_dca_tfs_s = [tf for tf, px in placed_short_dict.items() if px not in ("---", "ERR")]
                 if active_dca_tfs_s:
                     active_dca_tfs_sorted_s = sorted(active_dca_tfs_s, key=lambda tf: Decimal(placed_short_dict[tf]))
-                    line_main = f"    ✧ {coin_name} ╭─  Chưa có vị thế SHORT"
+                    line_main = f"    {coin_name} ╭─  Chưa có vị thế SHORT"
                     idx_branch = line_main.index("╭─")
                     indent_branch = " " * idx_branch
                     lines = [line_main]

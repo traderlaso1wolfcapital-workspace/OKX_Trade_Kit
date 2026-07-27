@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.231"
+APP_VERSION = "1.0.232"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -822,8 +822,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         self.log_display.setFont(QtGui.QFont("Courier New", 10))
         self.log_display.setStyleSheet(
-            "background-color: #0c0c0c; color: #FFFFFF; font-family: 'Courier New', 'Consolas', monospace; font-size: 13px;"
-            "border: 1px solid #333333; border-radius: 4px;"
+            "background-color: #f5f5f5; color: #000000; font-family: 'Courier New', 'Consolas', monospace; font-size: 13px;"
+            "border: 1px solid #cccccc; border-radius: 4px;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
