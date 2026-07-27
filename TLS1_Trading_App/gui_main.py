@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.223"
+APP_VERSION = "1.0.224"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1260,19 +1260,23 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
         l_risk = QtWidgets.QGridLayout(grp_risk)
         
-        self.chk_dynamic_risk = ToggleSwitch()
-        add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh. Nếu tắt, sẽ dùng Vốn Limit Cố Định.", 2)
-        
-        self.input_risk_pct = QtWidgets.QDoubleSpinBox(); self.input_risk_pct.setSuffix(" %"); self.input_risk_pct.setValue(0.50); self.input_risk_pct.setSingleStep(0.5)
-        add_field(l_risk, 1, "Vào lệnh theo % vốn (%):", self.input_risk_pct, "Phần trăm tổng tài khoản sẽ vào lệnh. Ví dụ 0.50%.")
-
         self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
-        add_field(l_risk, 2, "Vốn Limit cố định (USDT):", self.input_pos_vol, "Vốn cố định sử dụng cho mỗi lệnh Limit. (POSITION_VOLUME_HIGH_CONFIDENCE)")
+        tooltip_text = (
+            "Vốn cố định sử dụng cho mỗi lệnh Limit ở mốc M5.\n"
+            "Các mốc lớn hơn sẽ nhân theo hệ số:\n"
+            "M5: x1.0\n"
+            "M15: x1.2\n"
+            "M30: x1.5\n"
+            "H1: x2.0\n"
+            "H2: x3.0\n"
+            "H4: x5.0"
+        )
+        add_field(l_risk, 0, "Volume limit lệnh (USDT):", self.input_pos_vol, tooltip_text)
         
         self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %"); self.input_tp_pct.setValue(0.80)
         self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %"); self.input_sl_pct.setValue(0.80)
-        add_field(l_risk, 3, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 0.8%.")
-        add_field(l_risk, 4, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 0.8%.")
+        add_field(l_risk, 1, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 0.8%.")
+        add_field(l_risk, 2, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 0.8%.")
         layout.addWidget(grp_risk)
 
         # 4. BỘ LỌC & DUNG SAI KỸ THUẬT
@@ -1386,7 +1390,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_risk = QtWidgets.QGridLayout(grp_risk)
         self.smc_chk_dynamic_risk = ToggleSwitch()
         add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.smc_chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh.", 2)
-        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox(); self.smc_input_risk_pct.setSuffix(" %"); self.smc_input_risk_pct.setSingleStep(0.5)
+        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox(); self.smc_input_risk_pct.setSuffix(" %")
         add_field(l_risk, 1, "Vào lệnh theo % vốn:", self.smc_input_risk_pct, "Phần trăm tài khoản sẽ vào lệnh (Risk per trade).")
         self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000)
         add_field(l_risk, 2, "Vốn Limit cố định:", self.smc_input_pos_vol, "Sử dụng nếu quản lý vốn động bị tắt.")
@@ -1578,9 +1582,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chk_max_roi.setChecked(bool(cfg.get("ENABLE_MAX_ROI_EXIT", getattr(bot_config, "ENABLE_MAX_ROI_EXIT", False))))
             self.chk_sideway_vap.setChecked(bool(cfg.get("ENABLE_SIDEWAY_VAP_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_VAP_EXIT", False))))
             self.chk_h4_flip.setChecked(bool(cfg.get("ENABLE_H4_FLIP_CLOSE", getattr(bot_config, "ENABLE_H4_FLIP_CLOSE", False))))
-            
-            self.chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", False))))
-            self.input_risk_pct.setValue(float(cfg.get("DYNAMIC_RISK_PCT", float(getattr(bot_config, "DYNAMIC_RISK_PCT", 0.005)))) * 100)
             
             self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.008)))) * 100)
             self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.008)))) * 100)
@@ -1861,9 +1862,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLE_MAX_ROI_EXIT": self.chk_max_roi.isChecked(),
             "ENABLE_SIDEWAY_VAP_EXIT": self.chk_sideway_vap.isChecked(),
             "ENABLE_H4_FLIP_CLOSE": self.chk_h4_flip.isChecked(),
-
-            "USE_DYNAMIC_RISK": self.chk_dynamic_risk.isChecked(),
-            "DYNAMIC_RISK_PCT": str(round(self.input_risk_pct.value() / 100.0, 5)),
             "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
             "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
@@ -1884,6 +1882,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         for key in ["DCA_GAP_THRESHOLD_PCT", "EMA_CONFLUENCE_TOLERANCE_PCT", "BASE_ENTRY_OFFSET_PCT", 
                     "REQUIRED_ACCUMULATION_CANDLES", "QUANTUM_BUFFER_CANDLES", "QUANTUM_FORTH_CANDLES"]:
             cfg.pop(key, None)
+
+        if os.path.exists(config_path):
+            try:
+                os.remove(config_path)
+            except: pass
 
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)

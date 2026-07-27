@@ -124,11 +124,19 @@ def update_post_trade_monitoring(*args, **kwargs):
 def sync_config_to_json(env_paths: dict, globals_ref: Any):
     """Đồng bộ cấu hình từ bot_config.py → JSON (Two-Way Sync Chiều 1: Code → JSON)"""
     try:
+        config_path = env_paths["FILE_GLOBAL_CONFIG"]
+        # Đọc JSON hiện tại để giữ các giá trị do User đặt (ví dụ: POSITION_VOLUME_HIGH_CONFIDENCE)
+        existing_cfg = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as _f:
+                    existing_cfg = json.load(_f)
+            except: pass
         cfg = {
             "AI_CONFIDENCE_SCORE": str(globals_ref.AI_CONFIDENCE_SCORE),
             "TP_TARGET_OPTIMAL": str(globals_ref.SCALPING_TP_PCT),
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
-            "POSITION_VOLUME_HIGH_CONFIDENCE": int(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE),
+            "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "200"))),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
             "ENABLE_STRATEGY_XOLE": bool(globals_ref.ENABLE_STRATEGY_XOLE),
             "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
@@ -151,7 +159,6 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "VOL_MULTIPLIERS": {c["coin"]: str(c["vol_mult"]) for c in globals_ref.COIN_PORTFOLIO},
             "LEVERAGES": {c["coin"]: c["leverage"] for c in globals_ref.COIN_PORTFOLIO},
         }
-        config_path = env_paths["FILE_GLOBAL_CONFIG"]
         temp_file = config_path + ".tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -172,10 +179,8 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
 
 
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg:
-                    globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = int(float(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                    globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
                     
-                if "USE_DYNAMIC_RISK" in cfg: globals_ref.USE_DYNAMIC_RISK = bool(cfg["USE_DYNAMIC_RISK"])
-                if "DYNAMIC_RISK_PCT" in cfg: globals_ref.DYNAMIC_RISK_PCT = Decimal(str(cfg["DYNAMIC_RISK_PCT"]))
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: globals_ref.ENABLE_STRATEGY_MAIN = bool(cfg["ENABLE_STRATEGY_MAIN"])
                 if "ENABLE_STRATEGY_XOLE" in cfg: globals_ref.ENABLE_STRATEGY_XOLE = bool(cfg["ENABLE_STRATEGY_XOLE"])
@@ -1673,8 +1678,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         tracker.trend = "SIDEWAY"
         best_tf = "M5"
 
-    # Ép Altcoin chạy theo Trục neo H4 của BTC
-    if coin_name != "BTC":
+    # Ép Altcoin chạy theo Trục neo H4 của BTC (chỉ áp dụng cho Altcoin thực sự, không áp dụng forex như XAU)
+    if coin_name != "BTC" and _is_alt_synced:
         btc_tk = state_matrix.get("BTC-USDT-SWAP")
         if btc_tk and "H4" in btc_tk.mtf_states:
             btc_h4_side = btc_tk.mtf_states["H4"]["side"]
@@ -1973,14 +1978,15 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             tracker.confluence_found_status = True  # Luôn true vì bỏ check dung sai
 
 
-            # Volume sizing: 100% mặc định - vol/3 sẽ áp dụng per-TF trong grid loop bên dưới
-            if getattr(globals_ref, "USE_DYNAMIC_RISK", False):
-                _dyn_risk = getattr(globals_ref, "DYNAMIC_RISK_PCT", Decimal("0.005"))
-                _lever = Decimal(str(cfg.get("leverage", 100)))
-                _von = Decimal(str(getattr(globals_ref, "von_hien_tai", 10000)))
-                target_usdt = _von * _dyn_risk * _lever
-            else:
-                target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+            try:
+                cfg_file = env_paths.get("FILE_GLOBAL_CONFIG", "")
+                if cfg_file and os.path.exists(cfg_file):
+                    with open(cfg_file, "r", encoding="utf-8") as _f:
+                        _cfg = json.load(_f)
+                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+            except: pass
+            target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
             # ====================================================================
             # 🎯 ĐẶT LỆNH LIMIT ĐA KHUNG ĐỒNG PHA (MULTI-TIMEFRAME GRID)
             # ====================================================================
@@ -2331,12 +2337,11 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
-                        # Áp dụng VÔ ĐIỀU KIỆN (bất kể size thay đổi) — lệnh TF nào chỉ reload khi nến TF đó đóng
+                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
+                        # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
                         last_closed_ts_for_tf = get_current_candle_start_ms(tf)
                         
-                        # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
-                        if last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
+                        if old_sz == new_sz and last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
                             tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
                             continue
                     except Exception as e:
@@ -2516,12 +2521,11 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến TF đó đã đóng mới (tính bằng đồng hồ UTC chuẩn)
-                        # Áp dụng VÔ ĐIỀU KIỆN (bất kể size thay đổi) — lệnh TF nào chỉ reload khi nến TF đó đóng
+                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
+                        # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
                         last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
                         
-                        # Nếu nến chưa đóng mới → giữ nguyên lệnh, skip amend
-                        if last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
+                        if old_sz == new_sz and last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
                             tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
                             continue
                     except Exception as e:

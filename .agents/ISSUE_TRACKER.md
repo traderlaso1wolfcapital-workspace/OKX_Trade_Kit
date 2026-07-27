@@ -19,6 +19,8 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/07/2026]** - XAU (forex) giao dịch sai trend do bị ép neo theo BTC H4. Block "Ép Altcoin neo H4 BTC" chỉ check `coin_name != "BTC"` bỏ qua `_is_alt_synced`. Đã fix: thêm `and _is_alt_synced` vào điều kiện dòng 1682 `bot_strategy.py` sub1 (Mã patch: `z7715`).
+
 - **[23/07/2026]** - ✅ Hoàn thành Audit System 2026: Vá 3 lỗ hổng hệ thống cốt lõi:
   1. **Retry/Backoff API OKX**: Thêm vòng lặp retry 3 lần kèm `time.sleep(1)` vào cả sync `request()` và async `request()` trong `bot_api.py` (sub1 + sub2), bắt HTTP 429 và OKX 50011/50026, timeout/connection error.
   2. **Thanh trừng `except: pass`**: Thay thế các block `except: pass` tại các hàm trọng yếu (`clean_limit_orders`, `cleanup_all_orders_on_startup`, fetch candles, xử lý vị thế, trailing SL upgrade TF) bằng `hft_logger.error(...)` trong `bot_orders.py` và `bot_strategy.py`.

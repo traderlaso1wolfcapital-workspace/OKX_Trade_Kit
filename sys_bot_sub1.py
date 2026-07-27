@@ -188,7 +188,6 @@ def main():
         "FILE_TRADE_HISTORY": os.path.join(JSON_DATA_DIR, f"{acc_name}_lich_su_tien_hoa_chi_tiet.json"),
         "FILE_RSI_BEHAVIOR": os.path.join(JSON_DATA_DIR, f"{acc_name}_hanh_vi_rsi_macro.json"),
         "FILE_WAIT_LOG": os.path.join(JSON_DATA_DIR, f"{acc_name}_nhat_ky_phien_cho_doi.json"),
-        "FILE_GEOMETRY_EMA": os.path.join(JSON_DATA_DIR, f"{acc_name}_du_lieu_hoc_geometry_ema.json"),
         "FILE_MTF_STATES": os.path.join(JSON_DATA_DIR, f"{acc_name}_mtf_states.json"),
         "ENV_NAME": env_file,
         "ENV_FILE_NAME": env_file
@@ -380,10 +379,7 @@ def main():
                 if cfg_mtime > last_config_mtime:
                     bot_sub1.run_ai_self_evolution(env_paths, bot_sub1)
                     last_config_mtime = cfg_mtime
-                    for coin, state in state_matrix.items():
-                        if "tracker" in state and hasattr(state["tracker"], "last_limit_update_ts"):
-                            state["tracker"].last_limit_update_ts = {}
-                    print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới từ file JSON và reset Limit Cooldown!")
+                    print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới từ file JSON!")
 
             # ⚙️ AI EVOLUTION CHU KỲ
             if current_now - system_config["LAST_EVOLUTION_TIMESTAMP"] >= bot_sub1.EVOLUTION_CYCLE_SECONDS:

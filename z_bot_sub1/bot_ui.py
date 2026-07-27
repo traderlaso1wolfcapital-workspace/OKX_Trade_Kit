@@ -76,7 +76,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 data = json.load(f)
                 if "wallet_stats" in data:
                     w = data["wallet_stats"]
-                    _, von_hien_tai = w.get("von_goc", 2000.00), w.get("von_hien_tai", 2000.00)
+                    von_goc, von_hien_tai = w.get("von_goc", 2000.00), w.get("von_hien_tai", 2000.00)
                     loi_nhuan, tang_truong = w.get("loi_nhuan", 0.00), w.get("tang_truong", 0.00)
                 total_pos, total_win, all_mae, all_mfe = 0, 0, [] ,[]
                 for coin in data:
@@ -99,6 +99,13 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             print(line)
 
     target_vol = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+    try:
+        if os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
+            with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as _f:
+                _cfg = json.load(_f)
+                if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                    target_vol = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+    except: pass
     if getattr(globals_ref, "USE_DYNAMIC_RISK", False):
         try:
             sl_pct = globals_ref.SCALPING_SL_PCT
@@ -111,32 +118,27 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     pnl_sign = "+" if loi_nhuan >= 0 else ""
     growth_sign = "+" if tang_truong >= 0 else ""
 
-    print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
-    print("=" * 97)
     bot_name = "THỢ SĂN EMA200"
-    BOT_VERSION = "v23.0"
+    col1_w, col2_w, col3_w, col4_w = 18, 21, 27, 19
+    line_w = 94
 
-    col1_w, col2_w, col3_w, col4_w = 23, 34, 14, 17
     r1_c1 = f"☢  {bot_name}"
-    r1_c2 = f"EQUITY: {format_with_commas(von_hien_tai, 2)} USDT ({growth_sign}{tang_truong:.2f}%)"
-    _risk_pct = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
-    r1_c3 = f"RISK: {_risk_pct*100:.1f}%" if _risk_pct > 0 else "RISK: STATIC"
-    
-    rr_ratio = 0.0
-    if ai_avg_mae > 0: rr_ratio = ai_avg_mfe / ai_avg_mae
-    
-    rr_str = f"{int(rr_ratio)}" if rr_ratio == int(rr_ratio) else f"{rr_ratio:.1f}"
-    
-    r1_c4 = f"WINRATE: {ai_winrate:.1f}% / {total_pos}"
-    
-    r2_c1 = f"    {sync_time}    "
-    r2_c2 = f"PNL   : {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD"
-    r2_c3 = f"VOL: {format_with_commas(target_vol, 1)} U"
-    r2_c4 = f"R/R    : 1 / {rr_str}"
+    r1_c2 = f" Vốn gốc: {format_with_commas(von_goc, 2)} USDT"
+    mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
+    mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
+    r1_c3 = f"PNL: {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD ({growth_sign}{tang_truong:.0f}%)"
+    r1_c4 = f"WINRATE : {ai_winrate:.1f}% / {total_pos}"
 
+    r2_c1 = f" {sync_time:^{col1_w - 1}}"
+    r2_c2 = f"Tổng vốn: {format_with_commas(von_hien_tai, 2)} USDT"
+    r2_c3 = f"VOL: {format_with_commas(target_vol, 1)} U"
+    r2_c4 = f"MFE/MAE : {mfe_str} / {mae_str}"
+
+    print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
+    print("=" * line_w)
     print(f"{r1_c1:<{col1_w}} | {r1_c2:<{col2_w}} | {r1_c3:<{col3_w}} | {r1_c4:<{col4_w}}")
     print(f"{r2_c1:<{col1_w}} | {r2_c2:<{col2_w}} | {r2_c3:<{col3_w}} | {r2_c4:<{col4_w}}")
-    print("=" * 97)
+    print("=" * line_w)
 
     # ==============================================================================
     # ⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT
@@ -279,7 +281,20 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         return f"{arrow} {st['accum']:3}-{st['fail']}"
         
     def _get_vol_str(tk_obj, tf_name):
-        target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("450"))
+        target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+        try:
+            cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
+            if cfg_path and os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as _f:
+                    _cfg = json.load(_f)
+                    if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                        target_usdt = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+            elif os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "global_config.json")):
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "global_config.json"), "r", encoding="utf-8") as _f:
+                    _cfg = json.load(_f)
+                    if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                        target_usdt = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+        except: pass
         _is_xl = getattr(tk_obj, "xole_tf", None)
         if _is_xl:
             v_mult = getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))
