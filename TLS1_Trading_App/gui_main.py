@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.220"
+APP_VERSION = "1.0.221"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -764,8 +764,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_coins_layout.setSpacing(15)
         
         import os
-        svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_green.svg").replace("\\", "/")
-        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        svg_b64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNENBRjUwIiBzdHJva2Utd2lkdGg9IjQiIGQ9Ik00IDEybDUgNUwyMCA2Ii8+PC9zdmc+"
+        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url(data:image/svg+xml;base64,{svg_b64}); }}"
         
         self.dash_chk_xau = QtWidgets.QCheckBox("XAU")
         self.dash_chk_xau.setStyleSheet(cb_style)
@@ -1193,8 +1193,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
         
         import os
-        svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "check_green.svg").replace("\\", "/")
-        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        svg_b64 = "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNENBRjUwIiBzdHJva2Utd2lkdGg9IjQiIGQ9Ik00IDEybDUgNUwyMCA2Ii8+PC9zdmc+"
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url(data:image/svg+xml;base64,{svg_b64}); }}"
         
         self.chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
         self.chk_cfg_xau.setStyleSheet(cb_style)
