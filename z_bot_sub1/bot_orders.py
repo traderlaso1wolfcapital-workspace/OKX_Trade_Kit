@@ -290,7 +290,9 @@ def fetch_spec(client, inst_id: str) -> dict[str, Decimal]:
 
 def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, globals_ref: Any):
     try:
-        side, size, avg_px = pos["posSide"], pos["pos"], Decimal(pos["avgPx"])
+        side, size, avg_px = pos["posSide"], pos["pos"], Decimal(pos.get("avgPx", "0"))
+        if avg_px <= 0 or Decimal(str(size)) <= 0:
+            return
         td_mode = pos.get("mgnMode", "cross")
         size_dec = Decimal(str(size))
         
