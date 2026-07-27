@@ -123,16 +123,16 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     line_w = 94
 
     r1_c1 = f"☢  {bot_name}"
-    r1_c2 = f" Vốn gốc: {format_with_commas(von_goc, 2)} USDT"
+    r1_c2 = f"{'Vốn gốc':>9}: {format_with_commas(von_goc, 2)} USDT"
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
-    r1_c3 = f"PNL: {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD ({growth_sign}{tang_truong:.0f}%)"
-    r1_c4 = f"WINRATE : {ai_winrate:.1f}% / {total_pos}"
+    r1_c3 = f"{'PNL':>3}: {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD ({growth_sign}{tang_truong:.0f}%)"
+    r1_c4 = f"{'WINRATE':>8} : {ai_winrate:.1f}% / {total_pos}"
 
     r2_c1 = f" {sync_time:^{col1_w - 1}}"
-    r2_c2 = f"Tổng vốn: {format_with_commas(von_hien_tai, 2)} USDT"
-    r2_c3 = f"VOL: {format_with_commas(target_vol, 1)} U"
-    r2_c4 = f"MFE/MAE : {mfe_str} / {mae_str}"
+    r2_c2 = f"{'Tổng vốn':>9}: {format_with_commas(von_hien_tai, 2)} USDT"
+    r2_c3 = f"{'VOL':>3}: {format_with_commas(target_vol, 1)} U"
+    r2_c4 = f"{'MFE/MAE':>8} : {mfe_str} / {mae_str}"
 
     print(f"\nbot_sub1.py {env_paths.get('ENV_FILE_NAME', '.api')}")
     print("=" * line_w)

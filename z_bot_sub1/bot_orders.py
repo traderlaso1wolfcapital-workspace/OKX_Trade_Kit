@@ -367,6 +367,11 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult * streak_mult
             target_sl_pct = globals_ref.SCALPING_SL_PCT * sl_tf_mult * streak_mult
         
+        # ⚡ SAFETY CLAMP: Giới hạn TP/SL tối đa 5% cho forex (XAU, kim loại) — OKX từ chối nếu vượt ngưỡng
+        if max_filled_tf in ("H2", "H4") and target_tp_pct > Decimal("0.05"):
+            target_tp_pct = Decimal("0.05")
+            target_sl_pct = Decimal("0.05")
+        
         if side in ["long", "net"]:
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") - target_sl_pct), tick_sz)
@@ -380,11 +385,11 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         
         # Nếu đã có lệnh nhưng lệch giá mục tiêu quá 0.5% (do đổi TF), xem như kích thước/vị thế không khớp để đặt lại
         if status["size_matched"]:
-            if status["has_tp"] and status["tp_px"] > 0:
+            if status["has_tp"] and status["tp_px"] > 0 and calc_tp > 0:
                 diff_tp = abs(status["tp_px"] - calc_tp) / calc_tp
                 if diff_tp > Decimal("0.005"):
                     status["size_matched"] = False
-            if status["has_sl"] and status["sl_px"] > 0:
+            if status["has_sl"] and status["sl_px"] > 0 and calc_sl > 0:
                 diff_sl = abs(status["sl_px"] - calc_sl) / calc_sl
                 if diff_sl > Decimal("0.005"):
                     status["size_matched"] = False
