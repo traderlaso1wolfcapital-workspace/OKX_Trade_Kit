@@ -1631,11 +1631,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 if ema_curr > 0 and ema_next > 0:
                     dist = abs(ema_next - ema_curr) / ema_curr
                     # Ưu tiên TF lớn hơn: Ngưỡng khoảng cách sẽ được tính dựa trên hệ số của TF lớn hơn (next_tf)
-                    _is_xl = getattr(tracker, "xole_tf", None)
-                    if _is_xl:
-                        active_tf_mult = globals_ref.XOLE_TF_VOLUME_MULTIPLIERS.get(next_tf, Decimal("1.0"))
-                    else:
-                        active_tf_mult = globals_ref.TF_VOLUME_MULTIPLIERS.get(next_tf, Decimal("1.0"))
+                    active_tf_mult = globals_ref.TF_MULTIPLIERS.get(next_tf, Decimal("1.0"))
                     gap_threshold = getattr(globals_ref, "DCA_GAP_THRESHOLD_PCT", Decimal("0.0050"))
                     threshold = gap_threshold * active_tf_mult
 

@@ -39,7 +39,7 @@ DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệ
 # ==============================================================================
 # --- Các dung sai & Ngưỡng lệch ---
 EMA_CONFLUENCE_TOLERANCE_PCT = Decimal("0.0023")   # Dung sai hợp lưu EMA đa khung (0.0020 = 0.2%)
-BASE_ENTRY_OFFSET_PCT = Decimal("0.0009")          # Đệm 0.09% đón lõm Entry và trừ lùi TP để dễ khớp trước vạch cản
+BASE_ENTRY_OFFSET_PCT = Decimal("0.0005")          # Đệm 0.09% đón lõm Entry và trừ lùi TP để dễ khớp trước vạch cản
 DCA_GAP_THRESHOLD_PCT = Decimal("0.0030")          # Ngưỡng khoảng cách tối thiểu (Base Gap = 0.5%) để rải limit. Sẽ nhân với TF_MULTIPLIERS cho các khung lớn.
 
 # --- Lợi nhuận (TP) & Cắt lỗ (SL) cơ sở ---

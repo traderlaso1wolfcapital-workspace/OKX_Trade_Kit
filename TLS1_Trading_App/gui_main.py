@@ -147,7 +147,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.215"
+APP_VERSION = "1.0.216"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -1860,13 +1860,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
 
-            "DCA_GAP_THRESHOLD_PCT": str(round(self.input_dca_gap_pct.value() / 100.0, 6)),
-            "EMA_CONFLUENCE_TOLERANCE_PCT": str(round(self.input_confluence_pct.value() / 100.0, 6)),
-            "BASE_ENTRY_OFFSET_PCT": str(round(self.input_entry_offset.value() / 100.0, 6)),
-            "REQUIRED_ACCUMULATION_CANDLES": self.input_accum_candles.value(),
-
-            "QUANTUM_BUFFER_CANDLES": self.input_q_buffer.value(),
-            "QUANTUM_FORTH_CANDLES": self.input_q_forth.value(),
+            # ⚡ BẢO MẬT: Bộc lọc các thông số thuật toán lõi khỏi JSON để khách hàng không thể đọc/sửa lén
+            # Các thông số này sẽ tự động được lấy từ bot_config.py (đã được biên dịch ngầm vào .exe)
+            for key in ["DCA_GAP_THRESHOLD_PCT", "EMA_CONFLUENCE_TOLERANCE_PCT", "BASE_ENTRY_OFFSET_PCT", 
+                        "REQUIRED_ACCUMULATION_CANDLES", "QUANTUM_BUFFER_CANDLES", "QUANTUM_FORTH_CANDLES"]:
+                cfg.pop(key, None)
             "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
 
             "LEVERAGES": {
