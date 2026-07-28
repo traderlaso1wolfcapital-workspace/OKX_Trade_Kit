@@ -266,8 +266,13 @@ def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, t
         if resp and resp.get("code") != "0":
             print(f"🚨 [ALGO {tp_or_sl}] OKX từ chối: {resp.get('msg', 'Unknown')} | instId={inst_id} px={trigger_px}")
     except Exception as e:
-        hft_logger.error(f"Lỗi place_algo_tpsl: {e}", exc_info=True)
-        print(f"🚨 [ALGO {tp_or_sl}] Lỗi kết nối OKX: {e} | instId={inst_id} px={trigger_px}")
+        err_str = str(e)
+        hft_logger.error(f"Lỗi place_algo_tpsl: {err_str}", exc_info=True)
+        print(f"🚨 [ALGO {tp_or_sl}] Lỗi kết nối OKX: {err_str} | instId={inst_id} px={trigger_px}")
+        
+        if any(code in err_str for code in ["51280", "51281", "51282", "51283"]):
+            print(f"⚠️ [EMERGENCY] Giá đã vượt qua {tp_or_sl} {trigger_px} trước khi gài lệnh. Đóng {pos_side.upper()} Market ngay lập tức!")
+            close_position_market(client, inst_id, pos_side, size, f"{tp_or_sl} bị đâm thủng", td_mode)
 
 def check_algo_tpsl_status(client, inst_id: str, pos_side: str, td_mode: str, size: Decimal) -> dict[str, Any]:
     status = {"has_tp": False, "has_sl": False, "tp_px": Decimal("0"), "sl_px": Decimal("0"), "size_matched": True}

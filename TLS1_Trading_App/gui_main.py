@@ -15,13 +15,19 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
 def fix_qtwebengine_path():
-    if sys.platform == 'darwin' and getattr(sys, 'frozen', False):
-        bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
-        for root, dirs, files in os.walk(bundle_dir):
-            if 'QtWebEngineProcess' in files:
-                qt_proc = os.path.join(root, 'QtWebEngineProcess')
-                os.environ['QTWEBENGINEPROCESS_PATH'] = qt_proc
-                break
+    if getattr(sys, 'frozen', False):
+        if sys.platform == 'darwin':
+            bundle_dir = os.path.dirname(os.path.dirname(sys.executable))
+            for root, dirs, files in os.walk(bundle_dir):
+                if 'QtWebEngineProcess' in files:
+                    os.environ['QTWEBENGINEPROCESS_PATH'] = os.path.join(root, 'QtWebEngineProcess')
+                    break
+        elif sys.platform == 'win32':
+            bundle_dir = os.path.dirname(sys.executable)
+            for root, dirs, files in os.walk(bundle_dir):
+                if 'QtWebEngineProcess.exe' in files:
+                    os.environ['QTWEBENGINEPROCESS_PATH'] = os.path.join(root, 'QtWebEngineProcess.exe')
+                    break
 
 fix_qtwebengine_path()
 
@@ -454,6 +460,21 @@ class LiveChartWorker(QtCore.QThread):
                                 "type": "chart_data",
                                 "candles": [c[:6] for c in candles]
                             }
+                            
+                            # Đọc markers
+                            import os
+                            import json
+                            local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+                            marker_file = os.path.join(local_app_data, 'TLS1_Trading', 'json_data', 'trade_markers.json')
+                            if os.path.exists(marker_file):
+                                try:
+                                    with open(marker_file, 'r', encoding='utf-8') as f:
+                                        markers = json.load(f)
+                                        if self.inst_id in markers:
+                                            chart_data["markers"] = markers[self.inst_id]
+                                except Exception:
+                                    pass
+
                             self.chart_data_signal.emit(chart_data)
             except Exception:
                 pass
@@ -864,7 +885,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                     border_up_color='#26a69a', border_down_color='#ef5350',
                                     wick_up_color='#26a69a', wick_down_color='#ef5350')
             self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
-            self.chart_widget.watermark('BTC-USDT-SWAP (Live)', color='rgba(255, 153, 0, 0.1)')
+            self.chart_widget.watermark(f'{self.combo_coin.currentText()} (Live)', color='rgba(255, 153, 0, 0.1)')
             self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='#2a2a2a')
             self.chart_widget.time_scale(right_offset=30)
             self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
@@ -872,7 +893,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
-            self.live_chart_worker = LiveChartWorker(inst_id="BTC-USDT-SWAP", bar="5m", parent=self)
+            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentText(), bar="5m", parent=self)
             self.live_chart_worker.chart_data_signal.connect(self.update_live_chart)
             
             self.combo_coin.currentTextChanged.connect(self.on_chart_config_changed)
@@ -2045,6 +2066,36 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     else:
                         self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
+                        
+                    # Vẽ markers
+                    if "markers" in data and self._chart_initialized:
+                        markers = data["markers"]
+                        # Tính hash để xem có cần vẽ lại không
+                        import hashlib
+                        m_str = json.dumps(markers, sort_keys=True)
+                        m_hash = hashlib.md5(m_str.encode()).hexdigest()
+                        
+                        if getattr(self, '_last_markers_hash', None) != m_hash:
+                            self.chart_widget.clear_markers()
+                            import datetime
+                            for m in markers:
+                                # Màu sắc
+                                if m.get("status") == "active":
+                                    color = '#00FF00' if m["side"] == "LONG" else '#FF0000'
+                                else:
+                                    color = '#005500' if m["side"] == "LONG" else '#8B0000'
+                                    
+                                shape = 'arrow_up' if m["side"] == "LONG" else 'arrow_down'
+                                pos = 'below' if m["side"] == "LONG" else 'above'
+                                text = 'B' if m["side"] == "LONG" else 'S'
+                                
+                                # Lightweight chart cần datetime
+                                try:
+                                    dt = datetime.datetime.fromtimestamp(m["time"] / 1000)
+                                    self.chart_widget.marker(time=dt, position=pos, shape=shape, color=color, text=text)
+                                except:
+                                    pass
+                            self._last_markers_hash = m_hash
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -3360,3 +3411,4 @@ if __name__ == "__main__":
 # z1 | Đẩy các nút social sang góc phải và thay icon logo 256 nét hơn cho app/taskbar
 
 
+# z4 | Chart Fix & Marker: Sửa lỗi QtWebEngineProcess trên Windows PyInstaller, đồng bộ combo_coin với LiveChartWorker và tích hợp tính năng vẽ tag B/S.

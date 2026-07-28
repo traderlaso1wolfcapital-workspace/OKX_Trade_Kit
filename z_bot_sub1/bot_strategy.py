@@ -956,7 +956,16 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.open_reason_long = f"Xo Le Hedge (LONG {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
                 else:
                     tracker.open_reason_long = f"Xu hướng Tăng tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
+                
+                # MARKER
+                import bot_models
+                bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
+                
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
+                # DCA MARKER
+                import bot_models
+                bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
+                
                 filled_tf = determine_filled_tf("long", True, old_pos_amt_l, tracker.last_long_pos_amt, tracker.active_avg_px_long)
                 _tf = filled_tf if filled_tf else getattr(tracker, "placed_target_tf", "M5")
                 if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
@@ -1001,7 +1010,16 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.open_reason_short = f"Xo Le Hedge (SHORT {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
                 else:
                     tracker.open_reason_short = f"Xu hướng Giảm tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
+                
+                # MARKER
+                import bot_models
+                bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
+                
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
+                # DCA MARKER
+                import bot_models
+                bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
+                
                 filled_tf = determine_filled_tf("short", True, old_pos_amt_s, tracker.last_short_pos_amt, tracker.active_avg_px_short)
                 _tf = filled_tf if filled_tf else getattr(tracker, "placed_target_tf", "M5")
                 if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
@@ -1240,6 +1258,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             return
 
     if not tracker.has_long and tracker.last_pos_state in ["had_long", "had_both"]:
+        import bot_models
+        bot_models.record_trade_marker(coin_name, "LONG", 0, "closed")
+        
         closure_reason_l = getattr(tracker, "closure_reason_long", "")
         if not closure_reason_l:
             exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
@@ -1421,6 +1442,9 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             return
 
     if not tracker.has_short and tracker.last_pos_state in ["had_short", "had_both"]:
+        import bot_models
+        bot_models.record_trade_marker(coin_name, "SHORT", 0, "closed")
+        
         closure_reason_s = getattr(tracker, "closure_reason_short", "")
         if not closure_reason_s:
             exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
@@ -2676,3 +2700,4 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # z3350 | Clean up: Xoá các imports (traceback, time) và các biến (tolerance_pct, live_high, live_low, lot_sz, tf_tol, von_goc, v.v.) không sử dụng để tối ưu code.
 # z7713 | Thuật toán reload limit EMA200: Nhúng hàm get_current_candle_start_ms lấy giờ UTC chuẩn, bắt chính xác sát giây nến đóng để tính lại Limit.
 # z7714 | Fix Candle Cooldown vô điều kiện: Bỏ ràng buộc `if old_sz == new_sz` khỏi PER-TF CANDLE COOLDOWN (cả LONG & SHORT). Giờ lệnh limit TF nào chỉ được amend/reload khi nến TF đó đóng mới, bất kể size có thay đổi. Tránh amend liên tục mỗi 3s.
+# z7717 | Marker Feature: Tích hợp ghi log trade_markers (B/S tag) tại thời điểm entry/exit để GUI vẽ lên Chart.

@@ -19,6 +19,7 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/07/2026]** - Lỗi v1.0.231 không hiển thị chart trên bản release Windows và yêu cầu tính năng vẽ marker B/S. Đã fix: Sửa `fix_qtwebengine_path` hỗ trợ Windows tìm `QtWebEngineProcess.exe`, đồng bộ mặc định `combo_coin` với `LiveChartWorker` để tránh blank chart khởi tạo. Tích hợp tính năng ghi log trade markers tại `bot_models.py` khi vào lệnh/thoát lệnh và vẽ (update) liên tục trên `LiveChartWorker` của `gui_main.py` (Marker sáng màu khi Active, và chuyển màu tối/chìm khi Closed). (Mã patch: `z4`, `z7717`)
 - **[27/07/2026]** - XAU (forex) giao dịch sai trend do bị ép neo theo BTC H4. Phát hiện 4 vị trí hardcode `["BTC", "XAU"]` hoặc chỉ check `coin_name != "BTC"` bỏ qua `_is_alt_synced`. Đã fix triệt để: thêm field `asset_class` ("crypto"/"forex") vào `COIN_PORTFOLIO` trong `bot_config.py`, sửa `_is_alt_synced` trong `bot_strategy.py` dùng `cfg.get("asset_class")`, sửa 3 block khác (ép trend H4, allowed_long/short, Macro Extension Breaker) để dùng `_is_alt_synced` thay vì hardcode. (Mã patch: `z7715`, `z7716`)
 
 - **[23/07/2026]** - ✅ Hoàn thành Audit System 2026: Vá 3 lỗ hổng hệ thống cốt lõi:

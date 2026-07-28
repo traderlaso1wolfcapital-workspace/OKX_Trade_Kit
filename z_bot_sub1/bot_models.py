@@ -2,6 +2,45 @@
 from decimal import Decimal
 import time
 
+
+def record_trade_marker(coin: str, side: str, price: float, status: str = "active"):
+    try:
+        import os, json, time
+        local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+        marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'json_data')
+        os.makedirs(marker_dir, exist_ok=True)
+        marker_file = os.path.join(marker_dir, "trade_markers.json")
+        markers = {}
+        if os.path.exists(marker_file):
+            try:
+                with open(marker_file, "r", encoding="utf-8") as f:
+                    markers = json.load(f)
+            except Exception: pass
+            
+        if coin not in markers:
+            markers[coin] = []
+            
+        if status == "closed":
+            # Mark all active ones for this side as closed
+            for m in markers[coin]:
+                if m["side"] == side and m["status"] == "active":
+                    m["status"] = "closed"
+        else:
+            markers[coin].append({
+                "time": int(time.time() * 1000),
+                "side": side,
+                "price": float(price),
+                "status": "active"
+            })
+            
+        markers[coin] = markers[coin][-50:] # Giữ 50 marker gần nhất
+        with open(marker_file, "w", encoding="utf-8") as f:
+            json.dump(markers, f)
+    except Exception as e:
+        print(f"Error recording marker: {e}")
+
+# 🧠 CLASS LƯU TRỮ VÀ QUẢN LÝ TÀI SẢN
+
 # 🧠 CLASS LƯU TRỮ VÀ QUẢN LÝ TÀI SẢN (RAM STATE ENGINE)
 # BẮT BUỘC PHẢI Ở ĐÂY ĐỂ KHÔNG BỊ XÓA BỘ NHỚ KHI RELOAD FILE LOGIC
 # ==============================================================================
