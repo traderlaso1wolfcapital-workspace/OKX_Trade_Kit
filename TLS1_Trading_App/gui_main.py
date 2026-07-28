@@ -153,7 +153,7 @@ def get_app_version():
     except:
         return "1.0.59"
 
-APP_VERSION = "1.0.237"
+APP_VERSION = "1.0.238"
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -2625,6 +2625,46 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_update.setEnabled(False)
 
     def run_update_app(self):
+        # ⚡ Hộp thoại cảnh báo & xác định tình trạng vị thế trước khi cập nhật
+        msg_box = QtWidgets.QMessageBox(self)
+        msg_box.setWindowTitle("⚠️ CẢNH BÁO QUAN TRỌNG TRƯỚC KHI CẬP NHẬT")
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
+        msg_box.setText("<b>VUI LÒNG KIỂM TRA VỊ THẾ TRÊN SÀN!</b>")
+        msg_box.setInformativeText(
+            "Để hạn chế tối đa rủi ro cho tài khoản, các Sếp vui lòng kiểm tra và đảm bảo <b>KHÔNG còn lệnh/vị thế nào đang chạy</b> trên sàn OKX trước khi thực hiện cập nhật ứng dụng.\n\n"
+            "• <b>Xác nhận cập nhật</b>: Tiến hành tải và cập nhật phiên bản mới ngay lập tức.\n"
+            "• <b>Quay lại kiểm tra</b>: Hủy cập nhật để Sếp kiểm tra lại vị thế trên tài khoản."
+        )
+        btn_confirm = msg_box.addButton("Xác nhận cập nhật", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        btn_cancel = msg_box.addButton("Quay lại kiểm tra", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        msg_box.setDefaultButton(btn_cancel)
+        
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #ffffff;
+            }
+            QLabel {
+                color: #000000;
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: #f3f4f6;
+                color: #000000;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                padding: 6px 16px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #e5e7eb;
+            }
+        """)
+        
+        msg_box.exec()
+        if msg_box.clickedButton() != btn_confirm:
+            return  # Khách chọn quay lại kiểm tra -> Hủy cập nhật
+
         url = "https://github.com/TLS1-Releases/TLS1_Trading_App_Releases/releases/latest"
         remote_version = None
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
