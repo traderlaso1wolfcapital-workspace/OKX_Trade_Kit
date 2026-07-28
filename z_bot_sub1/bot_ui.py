@@ -611,13 +611,26 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                     dca_str = ""
                 mode_icon = entry.get("mode_icon", "")
                 icon_str = f" {mode_icon}" if mode_icon else ""
-                smart_print(f"  ✧{icon_str} [{coin_name}]: Đã đóng {entry['side']} ({roi_str}){dca_str} → Lý do: {entry['reason']}")
+                
+                clean_reason = str(entry.get('reason', ''))
+                if "[Exchange_TP_Hit]" in clean_reason or "[Exchange_SL_Hit]" in clean_reason:
+                    clean_reason = clean_reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
+                    reason_disp = f"→ {clean_reason}" if clean_reason else ""
+                else:
+                    reason_disp = f"→ Lý do: {clean_reason}"
+                
+                smart_print(f"  ✧{icon_str} [{coin_name}]: Đã đóng {entry['side']} ({roi_str}){dca_str} {reason_disp}")
         elif getattr(tk, "last_closed_side", ""):
             has_closed_history = True
             pnl_color = "+" if tk.last_closed_roi > 0 else ""
             roi_str = f"{pnl_color}{tk.last_closed_roi:.1f}%"
             reason = getattr(tk, "last_closed_reason", "Không rõ")
-            smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) → Lý do: {reason}")
+            if "[Exchange_TP_Hit]" in reason or "[Exchange_SL_Hit]" in reason:
+                clean_reason = reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
+                reason_disp = f"→ {clean_reason}" if clean_reason else ""
+            else:
+                reason_disp = f"→ Lý do: {reason}"
+            smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) {reason_disp}")
     if not has_closed_history:
         smart_print("  · Chưa có lệnh nào được đóng trong phiên này.")
     print("=" * 95 + "\n" * 3)

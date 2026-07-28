@@ -1274,24 +1274,42 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         
         closure_reason_l = getattr(tracker, "closure_reason_long", "")
         if not closure_reason_l:
-            exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
+            exit_roi = Decimal("0")
+            pnl_usd = Decimal("0")
+            okx_fetched = False
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
-                _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
-                if _risk > 0:
-                    _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
-                _total = sum([_base * getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(t, Decimal("1.0")) for t in getattr(tracker, "pos_cycle_filled_tfs", [])])
-                if _total == 0: _total = _base
-                pnl_usd = _total * (exit_roi / Decimal("100")) / Decimal(str(cfg["leverage"]))
-                pnl_str = f"{abs(float(pnl_usd)):.1f}$"
+                pos_hist = client.request("GET", "/api/v5/account/positions-history", 
+                                          params={"instType": "SWAP", "instId": swap_id, "limit": "1"}).get("data", [])
+                if pos_hist:
+                    last_p = pos_hist[0]
+                    pnl_usd = Decimal(str(last_p.get("pnl", "0")))
+                    pnl_ratio = Decimal(str(last_p.get("pnlRatio", "0"))) * Decimal("100")
+                    if pnl_ratio != 0 or pnl_usd != 0:
+                        exit_roi = pnl_ratio
+                        okx_fetched = True
             except Exception:
-                pnl_str = "x.x$"
+                pass
+
+            if not okx_fetched:
+                exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
+                try:
+                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
+                    _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
+                    if _risk > 0:
+                        _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
+                    _total = sum([_base * getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(t, Decimal("1.0")) for t in getattr(tracker, "pos_cycle_filled_tfs", [])])
+                    if _total == 0: _total = _base
+                    pnl_usd = _total * (exit_roi / Decimal("100")) / Decimal(str(cfg["leverage"]))
+                except Exception:
+                    pnl_usd = Decimal("0")
                 
-            if tracker.live_price >= tracker.entry_price_long:
-                tracker.record_exit("LONG", exit_roi, "Exchange_TP_Hit", f"Lãi {pnl_str}")
+            pnl_label = "Lãi" if pnl_usd >= 0 else "Lỗ"
+            pnl_str = f"{pnl_label} {abs(float(pnl_usd)):.2f}$"
+            if pnl_usd >= 0:
+                tracker.record_exit("LONG", exit_roi, "Exchange_TP_Hit", pnl_str)
                 is_sl_hit = False
             else:
-                tracker.record_exit("LONG", exit_roi, "Exchange_SL_Hit", f"Lỗ {pnl_str}")
+                tracker.record_exit("LONG", exit_roi, "Exchange_SL_Hit", pnl_str)
                 is_sl_hit = True
         else:
             is_sl_hit = (closure_reason_l and ("SL" in closure_reason_l or "Cắt" in closure_reason_l))
@@ -1457,24 +1475,42 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         
         closure_reason_s = getattr(tracker, "closure_reason_short", "")
         if not closure_reason_s:
-            exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
+            exit_roi = Decimal("0")
+            pnl_usd = Decimal("0")
+            okx_fetched = False
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
-                _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
-                if _risk > 0:
-                    _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
-                _total = sum([_base * getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(t, Decimal("1.0")) for t in getattr(tracker, "pos_cycle_filled_tfs", [])])
-                if _total == 0: _total = _base
-                pnl_usd = _total * (exit_roi / Decimal("100")) / Decimal(str(cfg["leverage"]))
-                pnl_str = f"{abs(float(pnl_usd)):.1f}$"
+                pos_hist = client.request("GET", "/api/v5/account/positions-history", 
+                                          params={"instType": "SWAP", "instId": swap_id, "limit": "1"}).get("data", [])
+                if pos_hist:
+                    last_p = pos_hist[0]
+                    pnl_usd = Decimal(str(last_p.get("pnl", "0")))
+                    pnl_ratio = Decimal(str(last_p.get("pnlRatio", "0"))) * Decimal("100")
+                    if pnl_ratio != 0 or pnl_usd != 0:
+                        exit_roi = pnl_ratio
+                        okx_fetched = True
             except Exception:
-                pnl_str = "x.x$"
+                pass
+
+            if not okx_fetched:
+                exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
+                try:
+                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
+                    _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
+                    if _risk > 0:
+                        _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
+                    _total = sum([_base * getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(t, Decimal("1.0")) for t in getattr(tracker, "pos_cycle_filled_tfs", [])])
+                    if _total == 0: _total = _base
+                    pnl_usd = _total * (exit_roi / Decimal("100")) / Decimal(str(cfg["leverage"]))
+                except Exception:
+                    pnl_usd = Decimal("0")
                 
-            if tracker.live_price <= tracker.entry_price_short:
-                tracker.record_exit("SHORT", exit_roi, "Exchange_TP_Hit", f"Lãi {pnl_str}")
+            pnl_label = "Lãi" if pnl_usd >= 0 else "Lỗ"
+            pnl_str = f"{pnl_label} {abs(float(pnl_usd)):.2f}$"
+            if pnl_usd >= 0:
+                tracker.record_exit("SHORT", exit_roi, "Exchange_TP_Hit", pnl_str)
                 is_sl_hit = False
             else:
-                tracker.record_exit("SHORT", exit_roi, "Exchange_SL_Hit", f"Lỗ {pnl_str}")
+                tracker.record_exit("SHORT", exit_roi, "Exchange_SL_Hit", pnl_str)
                 is_sl_hit = True
         else:
             is_sl_hit = (closure_reason_s and ("SL" in closure_reason_s or "Cắt" in closure_reason_s))
