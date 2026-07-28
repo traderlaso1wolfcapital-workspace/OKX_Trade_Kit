@@ -541,6 +541,41 @@ class ButtonHoverSoundFilter(QtCore.QObject):
                     pass
         return super().eventFilter(obj, event)
 
+class FirebaseChatWorker(QtCore.QThread):
+    new_message_signal = QtCore.pyqtSignal(dict)
+    
+    def __init__(self, db_url):
+        super().__init__()
+        self.db_url = db_url
+        self.is_running = True
+        
+    def run(self):
+        if not self.db_url:
+            return
+        url = self.db_url.rstrip('/') + '/chat.json'
+        headers = {'Accept': 'text/event-stream'}
+        try:
+            response = requests.get(url, headers=headers, stream=True, timeout=None)
+            for line in response.iter_lines(decode_unicode=True):
+                if not self.is_running:
+                    break
+                if line and line.startswith('data: '):
+                    try:
+                        data_str = line[6:]
+                        if data_str.strip() == "null":
+                            continue
+                        data = json.loads(data_str)
+                        self.new_message_signal.emit(data)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print("Firebase chat connection error:", e)
+            
+    def stop(self):
+        self.is_running = False
+        self.quit()
+        self.wait()
+
 class BotInstanceWidget(QtWidgets.QWidget):
     def __init__(self, strategy_id, strategy_name, env_files):
         super().__init__()
@@ -681,6 +716,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.account_dropdown = QtWidgets.QComboBox()
         self.account_dropdown.setView(QtWidgets.QListView())
         self.account_dropdown.setMinimumWidth(300)
+        self.account_dropdown.setStyleSheet("""
+            QComboBox { background-color: #2d2d2d; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 5px 10px; font-size: 13px; }
+            QComboBox:hover { border-color: #ffb74d; }
+            QComboBox::drop-down { border: none; }
+            QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #aaa; margin-right: 8px; }
+            QComboBox QAbstractItemView { background-color: #1e1e1e; color: #e0e0e0; selection-background-color: #0e639c; selection-color: white; border: 1px solid #555; padding: 4px; outline: none; }
+            QComboBox QAbstractItemView::item { padding: 6px 10px; min-height: 24px; }
+            QComboBox QAbstractItemView::item:hover { background-color: #333; }
+        """)
         
         if self.strategy_id in ["trinhsat", "quansu"]:
             self.account_dropdown.addItem("Mặc định (Không cần API)", ".api")
@@ -794,16 +838,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.dash_chk_xau = QtWidgets.QCheckBox("XAU")
         self.dash_chk_xau.setStyleSheet(cb_style)
-        self.dash_chk_xau.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.dash_chk_xau.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.dash_chk_xau.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.dash_chk_xau.stateChanged.connect(lambda s: self._on_dash_coin_toggled("xau", s))
         self.dash_chk_btc = QtWidgets.QCheckBox("BTC")
         self.dash_chk_btc.setStyleSheet(cb_style)
-        self.dash_chk_btc.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.dash_chk_btc.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.dash_chk_btc.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.dash_chk_btc.stateChanged.connect(lambda s: self._on_dash_coin_toggled("btc", s))
         self.dash_chk_eth = QtWidgets.QCheckBox("ETH")
         self.dash_chk_eth.setStyleSheet(cb_style)
-        self.dash_chk_eth.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.dash_chk_eth.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self.dash_chk_eth.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.dash_chk_eth.stateChanged.connect(lambda s: self._on_dash_coin_toggled("eth", s))
         
         dash_coins_layout.addWidget(self.dash_chk_xau)
         dash_coins_layout.addWidget(self.dash_chk_btc)
@@ -1076,54 +1120,45 @@ class BotInstanceWidget(QtWidgets.QWidget):
         main_layout.addWidget(self.btn_save_api)
 
     def setup_tab_community(self):
-        from PyQt6.QtWebEngineCore import QWebEnginePage
+        layout = QtWidgets.QVBoxLayout(self.tab_community)
+        layout.setContentsMargins(10, 10, 10, 10)
         
-        class WebPopupWindow(QtWidgets.QDialog):
-            def __init__(self, parent=None):
-                super().__init__(parent)
-                self.setWindowTitle("Cửa sổ bảo mật")
-                self.resize(600, 700)
-                layout = QtWidgets.QVBoxLayout(self)
-                layout.setContentsMargins(0, 0, 0, 0)
-                self.view = QWebEngineView(self)
-                layout.addWidget(self.view)
-                
-        class ExternalLinkWebPage(QWebEnginePage):
-            def __init__(self, parent=None):
-                super().__init__(parent)
-                self.popup = None
-                self.main_view = parent
-
-            def acceptNavigationRequest(self, url, _type, isMainFrame):
-                # Không chặn link nữa để Auth chạy bình thường
-                return super().acceptNavigationRequest(url, _type, isMainFrame)
-
-            def createWindow(self, _type):
-                # Tạo một cửa sổ thật sự bên trong App để chứa popup đăng nhập, giữ lại liên kết window.opener
-                self.popup = WebPopupWindow(self.main_view)
-                # Tự động đóng cửa sổ khi trang web yêu cầu đóng (ví dụ sau khi đăng nhập xong)
-                self.popup.view.page().windowCloseRequested.connect(self.popup.close)
-                self.popup.show()
-                return self.popup.view.page()
-
-        layout = QtWidgets.QHBoxLayout(self.tab_community)
-        layout.setContentsMargins(0, 0, 0, 0)
+        title = QtWidgets.QLabel("💬 Cộng đồng TRADER LÀ SỐ 1 - Realtime Chat")
+        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffb74d;")
+        layout.addWidget(title)
         
-        # --- Khối Chat 1: Discord (Chính) ---
-        self.webview_chat = QWebEngineView()
+        self.chat_display = QtWidgets.QTextBrowser()
+        self.chat_display.setOpenExternalLinks(True)
+        self.chat_display.setStyleSheet("background-color: #1e1e1e; color: #d4d4d4; font-size: 14px; padding: 10px; border-radius: 5px; border: 1px solid #333;")
+        layout.addWidget(self.chat_display)
         
-        from PyQt6.QtWebEngineCore import QWebEngineSettings
-        settings = self.webview_chat.settings()
-        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+        input_layout = QtWidgets.QHBoxLayout()
         
-        custom_page = ExternalLinkWebPage(self.webview_chat)
-        self.webview_chat.setPage(custom_page)
+        self.chat_input = QtWidgets.QLineEdit()
+        self.chat_input.setPlaceholderText("Nhập tin nhắn... (Nhấn Enter để gửi)")
+        self.chat_input.setStyleSheet("background-color: #252526; color: white; padding: 10px; border-radius: 5px; font-size: 14px; border: 1px solid #444;")
+        input_layout.addWidget(self.chat_input)
         
-        chat_url = "https://www.cbox.ws/box/?boxid=3542247&boxtag=z1G88F"
+        self.btn_send_chat = QtWidgets.QPushButton("Gửi")
+        self.btn_send_chat.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.btn_send_chat.setStyleSheet("""
+            QPushButton {
+                background-color: #0e639c; color: white; font-weight: bold; border-radius: 5px; padding: 10px 20px; font-size: 14px;
+            }
+            QPushButton:hover { background-color: #1177bb; }
+        """)
+        input_layout.addWidget(self.btn_send_chat)
+        layout.addLayout(input_layout)
         
-        # Load from version.json if available
+        self.chat_input.returnPressed.connect(self.send_chat_message)
+        self.btn_send_chat.clicked.connect(self.send_chat_message)
+        
+        import time
+        self.chat_nickname = "User_" + str(int(time.time()))[-5:]
+        self.firebase_chat_url = "https://botvip-e5772-default-rtdb.asia-southeast1.firebasedatabase.app"
+        
         try:
+            import sys, os, json
             if getattr(sys, 'frozen', False):
                 base_dir = sys._MEIPASS
             else:
@@ -1131,40 +1166,83 @@ class BotInstanceWidget(QtWidgets.QWidget):
             v_file = os.path.join(base_dir, "version.json")
             if os.path.exists(v_file):
                 with open(v_file, "r", encoding="utf-8") as f:
-                    chat_url = json.load(f).get("COMMUNITY_CHAT_URL", chat_url)
+                    v_data = json.load(f)
+                    self.firebase_chat_url = v_data.get("FIREBASE_CHAT_URL", self.firebase_chat_url)
         except Exception:
             pass
             
-        from PyQt6.QtWebEngineCore import QWebEngineProfile
-        profile = QWebEngineProfile.defaultProfile()
-        profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies)
-        
-        if chat_url.strip().startswith("<"):
-            html = f"""<!DOCTYPE html><html><body style="margin:0;padding:0;background:#151515;height:100vh;display:flex;">
-            {chat_url.replace('width="800"', 'width="100%"').replace('height="600"', 'height="100%"')}
-            </body></html>"""
-            # Phải dùng baseUrl trùng với Project Website trên Widgetbot dashboard để vượt rào
-            self.webview_chat.setHtml(html, QtCore.QUrl("https://www.traderlaso1.io.vn/"))
-        else:
-            self.webview_chat.setUrl(QtCore.QUrl(chat_url))
+        self.chat_worker = FirebaseChatWorker(self.firebase_chat_url)
+        self.chat_worker.new_message_signal.connect(self.handle_new_chat_message)
+        self.chat_worker.start()
+
+    def handle_new_chat_message(self, data):
+        if not data or not isinstance(data, dict):
+            return
+        path = data.get("path")
+        msg_data = data.get("data")
+        if not msg_data:
+            return
             
-        # --- Khối Chat 2: Cbox (Dự phòng cho phép nhắn tin) ---
-        self.webview_chat_fallback = QWebEngineView()
-        fb_settings = self.webview_chat_fallback.settings()
-        fb_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, True)
-        fb_settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanAccessClipboard, True)
+        if path == "/":
+            self.chat_display.clear()
+            if isinstance(msg_data, dict):
+                try:
+                    sorted_msgs = sorted(msg_data.values(), key=lambda x: x.get("timestamp", 0))
+                    for msg in sorted_msgs:
+                        self.append_chat_message(msg)
+                except Exception:
+                    pass
+        else:
+            if isinstance(msg_data, dict) and "text" in msg_data:
+                self.append_chat_message(msg_data)
+
+    def append_chat_message(self, msg):
+        sender = msg.get("sender", "Khách")
+        text = msg.get("text", "")
+        time_str = msg.get("time", "")
         
-        fb_custom_page = ExternalLinkWebPage(self.webview_chat_fallback)
-        self.webview_chat_fallback.setPage(fb_custom_page)
-        self.webview_chat_fallback.setUrl(QtCore.QUrl("https://tlk.io/tls1_community"))
+        color = "#ffb74d" if sender == self.chat_nickname else "#4db8ff"
+        html = f"<b><span style='color: #888;'>[{time_str}]</span> <span style='color: {color};'>{sender}:</span></b> {text}"
+        self.chat_display.append(html)
+        
+        scrollbar = self.chat_display.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
-        # Sử dụng QSplitter để chia đôi màn hình và cho phép kéo thả kích thước
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        splitter.addWidget(self.webview_chat)
-        splitter.addWidget(self.webview_chat_fallback)
-        splitter.setSizes([500, 500]) # Khởi tạo chia đôi 50/50
-
-        layout.addWidget(splitter)
+    def send_chat_message(self):
+        text = self.chat_input.text().strip()
+        if not text:
+            return
+            
+        self.chat_input.clear()
+        
+        if self.chat_nickname.startswith("User_"):
+            name, ok = QtWidgets.QInputDialog.getText(
+                self, "Tạo Tên Hiển Thị", 
+                "Nhập tên bạn muốn hiển thị trong Cộng Đồng:",
+                QtWidgets.QLineEdit.EchoMode.Normal, ""
+            )
+            if ok and name.strip():
+                self.chat_nickname = name.strip()
+                
+        import time
+        now_str = time.strftime("%H:%M:%S", time.localtime())
+        payload = {
+            "sender": self.chat_nickname,
+            "text": text,
+            "time": now_str,
+            "timestamp": int(time.time() * 1000)
+        }
+        
+        def post_msg():
+            import requests
+            try:
+                url = self.firebase_chat_url.rstrip('/') + '/chat.json'
+                requests.post(url, json=payload, timeout=5)
+            except Exception as e:
+                print("Lỗi gửi tin nhắn:", e)
+                
+        import threading
+        threading.Thread(target=post_msg, daemon=True).start()
 
     def setup_tab_strategy(self):
         if self.strategy_id == "sub2":
@@ -1636,6 +1714,36 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     self.dash_chk_xau.setChecked("XAU" in enabled_coins)
         except Exception as e: 
             print('Error setting defaults:', e)
+
+    def _on_dash_coin_toggled(self, coin, state):
+        """Đồng bộ checkbox trên Dashboard xuống Cấu Hình và lưu tự động."""
+        checked = bool(state)
+        cfg_map = {"xau": "chk_cfg_xau", "btc": "chk_cfg_btc", "eth": "chk_cfg_eth"}
+        cfg_attr = cfg_map.get(coin)
+        if cfg_attr and hasattr(self, cfg_attr):
+            getattr(self, cfg_attr).setChecked(checked)
+        
+        # Auto-save ENABLED_COINS vào file config
+        try:
+            env_name = self.account_dropdown.currentData() or ".api"
+            if getattr(sys, 'frozen', False):
+                base_dir = sys._MEIPASS
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+            config_path = os.path.join(base_dir, f"strategy_config_{env_name.replace('.', '')}.json")
+            cfg = {}
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            enabled = []
+            if self.dash_chk_xau.isChecked(): enabled.append("XAU")
+            if self.dash_chk_btc.isChecked(): enabled.append("BTC")
+            if self.dash_chk_eth.isChecked(): enabled.append("ETH")
+            cfg["ENABLED_COINS"] = enabled
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=4)
+        except Exception as e:
+            print("Lỗi auto-save ENABLED_COINS:", e)
 
     def play_sound(self, sound_file, volume=0.5):
         try:
@@ -3412,3 +3520,4 @@ if __name__ == "__main__":
 
 
 # z4 | Chart Fix & Marker: Sửa lỗi QtWebEngineProcess trên Windows PyInstaller, đồng bộ combo_coin với LiveChartWorker và tích hợp tính năng vẽ tag B/S.
+# z5 | Firebase Chat + UI Fix: Chuyển tab Cộng Đồng sang Native PyQt Chat kết nối Firebase RTDB (botvip-e5772), xóa QWebEngineView cũ (Cbox/tlk.io). Fix checkbox XAU/BTC/ETH trên Dashboard thành interactive + auto-save. Fix dropdown chọn tài khoản bị trùng màu (chữ đen trên nền đen).

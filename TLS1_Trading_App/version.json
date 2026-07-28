@@ -4,5 +4,6 @@
     "update_url_win": "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest",
     "update_url_mac": "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest",
     "changelog": "\u0110\u00e3 h\u1ed7 tr\u1ee3 ho\u00e0n ch\u1ec9nh h\u1ec7 \u0111i\u1ec1u h\u00e0nh macOS!",
-    "COMMUNITY_CHAT_URL": "<widgetbot server=\"1377607263732367472\" channel=\"1424073008217067695\" width=\"100%\" height=\"100%\"></widgetbot><script src=\"https://cdn.jsdelivr.net/npm/@widgetbot/html-embed\"></script>"
+    "COMMUNITY_CHAT_URL": "<widgetbot server=\"1377607263732367472\" channel=\"1424073008217067695\" width=\"100%\" height=\"100%\"></widgetbot><script src=\"https://cdn.jsdelivr.net/npm/@widgetbot/html-embed\"></script>",
+    "FIREBASE_CHAT_URL": "https://botvip-e5772-default-rtdb.asia-southeast1.firebasedatabase.app"
 }
