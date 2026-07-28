@@ -238,16 +238,36 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     except Exception as e:
         hft_logger.error(f"Lỗi cleanup_all_orders_on_startup: {e}", exc_info=True)
 
+def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross"):
+    try:
+        resp = client.request("POST", "/api/v5/trade/order", body={
+            "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": size
+        })
+        print(f"🚀 [MARKET FALLBACK 51006] Đã khớp Market {inst_id} ({side.upper()} {pos_side.upper()}) size={size}: {resp}")
+        return resp
+    except Exception as e:
+        hft_logger.error(f"Lỗi place_market_entry: {e}", exc_info=True)
+        print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {e}")
+
 def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross"):
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     try:
         resp = client.request("POST", "/api/v5/trade/order", body=body)
         if resp and resp.get("code") != "0":
-            print(f"🚨 [LIMIT] OKX từ chối: {resp.get('msg', 'Unknown')} | {inst_id} {side}@{price}")
-            raise Exception(resp.get('msg', 'Unknown'))
+            err_msg = str(resp.get('msg', 'Unknown'))
+            err_code = str(resp.get('code', ''))
+            print(f"🚨 [LIMIT] OKX từ chối: {err_msg} | {inst_id} {side}@{price}")
+            if err_code == "51006" or "51006" in err_msg or "Order price is not within the price limit" in err_msg:
+                print(f"💡 [FALLBACK 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá hiện tại ngon hơn giá Limit! Tự động vào Market!")
+                return place_market_entry(client, inst_id, side, pos_side, size, td_mode)
+            raise Exception(err_msg)
     except Exception as e:
-        print(f"🚨 [LIMIT] Lỗi kết nối: {e} | {inst_id} {side}@{price}")
-        if "51008" in str(e):
+        err_str = str(e)
+        if "51006" in err_str or "Order price is not within the price limit" in err_str:
+            print(f"💡 [FALLBACK 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá hiện tại ngon hơn giá Limit! Tự động vào Market!")
+            return place_market_entry(client, inst_id, side, pos_side, size, td_mode)
+        print(f"🚨 [LIMIT] Lỗi kết nối: {err_str} | {inst_id} {side}@{price}")
+        if "51008" in err_str:
             print("💡 [HƯỚNG DẪN] OKX báo lỗi 51008 (Insufficient USDT margin).")
             print("   Tài khoản Trading của Sếp đã hết số dư khả dụng (Available Margin) để gài lệnh.")
             print("   CÁCH XỬ LÝ:")

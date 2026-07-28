@@ -23,6 +23,10 @@ hft_logger.addHandler(handler)
 
 from z_bot_sub1.bot_indicators import *
 from z_bot_sub1.bot_orders import *
+try:
+    from z_bot_sub1 import bot_models
+except ImportError:
+    import bot_models
 
 def _sync_save_data_point_to_json(coin: str, is_win: bool, mae_val: float, mfe_val: float, nen_entry: int, vap_entry: int, pb_entry: int, entry_px: float, exit_px: float, side: str, ema_dist: float, mtf_vols: dict, env_paths: dict, state_matrix: dict, globals_ref: Any):
     try:
@@ -653,7 +657,19 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         try:
             _amt = (new_pos_amt - old_pos_amt) if old_has else new_pos_amt
             current_vol_usdt = Decimal(str(_amt)) * Decimal(str(contract_val)) * Decimal(str(avg_px))
-            _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("450"))
+            _target_usdt = Decimal("200")
+            try:
+                gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
+                if gcfg_path and os.path.exists(gcfg_path):
+                    with open(gcfg_path, "r", encoding="utf-8") as f:
+                        _gcfg = json.load(f)
+                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _gcfg:
+                            _target_usdt = Decimal(str(_gcfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
+                    _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
+            except Exception:
+                _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.4"),
                 "H1": Decimal("1.6"), "H2": Decimal("1.8"), "H4": Decimal("2.0")
@@ -958,12 +974,10 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.open_reason_long = f"Xu hướng Tăng tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                import bot_models
                 bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
                 
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
-                import bot_models
                 bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
                 
                 filled_tf = determine_filled_tf("long", True, old_pos_amt_l, tracker.last_long_pos_amt, tracker.active_avg_px_long)
@@ -1012,12 +1026,10 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.open_reason_short = f"Xu hướng Giảm tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                import bot_models
                 bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
                 
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
-                import bot_models
                 bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
                 
                 filled_tf = determine_filled_tf("short", True, old_pos_amt_s, tracker.last_short_pos_amt, tracker.active_avg_px_short)
@@ -1258,7 +1270,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             return
 
     if not tracker.has_long and tracker.last_pos_state in ["had_long", "had_both"]:
-        import bot_models
         bot_models.record_trade_marker(coin_name, "LONG", 0, "closed")
         
         closure_reason_l = getattr(tracker, "closure_reason_long", "")
@@ -1442,7 +1453,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             return
 
     if not tracker.has_short and tracker.last_pos_state in ["had_short", "had_both"]:
-        import bot_models
         bot_models.record_trade_marker(coin_name, "SHORT", 0, "closed")
         
         closure_reason_s = getattr(tracker, "closure_reason_short", "")

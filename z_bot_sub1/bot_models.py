@@ -136,9 +136,9 @@ class AssetTracker:
         if tf not in self.mtf_states:
             self.mtf_states[tf] = {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False}
             
-        if roi > Decimal("0"):
+        if roi > Decimal("0") or roi == Decimal("0"):  # Mọi lần đóng lệnh (tp bot, tp tay, hòa) đều +1 streak
             self.mtf_states[tf]["win_streak"] = self.mtf_states[tf].get("win_streak", 0) + 1
-            if self.mtf_states[tf]["win_streak"] >= 4:
+            if self.mtf_states[tf]["win_streak"] >= 3:
                 self.mtf_states[tf]["streak_locked"] = True
         else:
             self.mtf_states[tf]["win_streak"] = 0

@@ -134,12 +134,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     r1_c2 = f"Gốc : {format_with_commas(von_goc, 2)} U"
     r1_c3 = f"PNL : {pnl_sign}{format_with_commas(loi_nhuan, 2)} U ({growth_sign}{tang_truong:.0f}%)"
     r1_c4 = f"Win : {ai_winrate:.1f}% / {total_pos}"
-    c1, c2, c3, c4 = 20, 20, 26, 16
+    c1, c2, c3, c4 = 20, 26, 20, 16
     SEP = "|"
 
-    r0 = f"  {'⚡ THỢ SĂN EMA200':^{c1-1}} | {'🏦 TÀI KHOẢN':^{c2-1}} | {'📊 LỢI NHUẬN':^{c3-1}} | 🎯 HIỆU SUẤT"
-    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
-    r2 = f"   {'':<{c1-1}} | {'Tong: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
+    r0 = f"  {'⚡ THỢ SĂN EMA200':^{c1-1}} | {'🏦 TÀI KHOẢN':^{c2-1}} | {'💼 TỔNG VỐN':^{c3-1}} | 🎯 HIỆU SUẤT"
+    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
+    r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
 
     bar  = "-" * line_w
     dbar = "=" * line_w
@@ -161,94 +161,55 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         "PINGPONG":("·", "PING-PONG NÉN"),
         "SIDEWAY": ("·", "SIDEWAY / CHỜ"),
     }
-    _alt_mode = "🔄 ON (Neo BTC)" if getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True) else "🔒 LOCK (EMA riêng)"
-    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT:  [Altcoin: {_alt_mode}]")
+    print(f"\n\u2622 CHIẾN THUẬT ĐANG KÍCH HOẠT:")
     active_strategies = {"MAIN": [], "XOLE": [], "PINGPONG": [], "SIDEWAY": []}
     
+    strat_items = []
     for cfg in COIN_PORTFOLIO:
         sid = cfg["swap"]
         if sid not in state_matrix: continue
         tk = state_matrix[sid]
         coin_n = cfg["coin"]
-        
-        has_any = False
 
-        # Hien thi chien thuat kem trang thai vi the thuc te neu dang gong
+        # Xác định label chiến thuật
         if tk.has_long or tk.has_short:
             pos_tf = getattr(tk, "active_pos_tf", "M5")
-            open_reason_l = getattr(tk, "open_reason_long", "")
-            open_reason_s = getattr(tk, "open_reason_short", "")
-            open_reason = open_reason_l if tk.has_long else open_reason_s
+            open_reason = getattr(tk, "open_reason_long", "") if tk.has_long else getattr(tk, "open_reason_short", "")
             if "Xo Le" in open_reason:
-                strategy_tag = "XO LE HEDGE"
+                label = "NGƯỢC XU HƯỚNG (Xo Le)"
             elif "Ping-Pong" in open_reason:
-                strategy_tag = "PING-PONG NÉN"
+                label = "NGƯỢC XU HƯỚNG (Ping-Pong)"
             else:
-                strategy_tag = "THUẬN XU HƯỚNG"
-            sides = []
-            if tk.has_long: sides.append(f"Long {pos_tf}")
-            if tk.has_short: sides.append(f"Short {pos_tf}")
-            side_str = " / ".join(sides)
-            active_strategies["MAIN"].append(f"       · {coin_n}: {strategy_tag}  {side_str} → DCA đến H4 ( Co giãn: {tk.current_vol_mult:.2f}x )")
-            has_any = True
-        elif tk.trend in ("UPTREND", "DOWNTREND", "HEDGE"):
-            mkey = "MAIN"
+                label = "THUẬN XU HƯỚNG"
+            _ref_tf = pos_tf
+        elif tk.trend == "HEDGE":
+            label = "HEDGE"
             sl_tf = getattr(tk, "signal_long_tf", None)
             ss_tf = getattr(tk, "signal_short_tf", None)
-            if tk.trend == "HEDGE":
-                detail = f"HEDGE: Long {sl_tf} / Short {ss_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            elif tk.trend == "UPTREND":
-                detail = f"Tăng từ H4 đến {sl_tf} — Entry EMA200-{sl_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            else:
-                detail = f"Giảm từ H4 đến {ss_tf} — Entry EMA200-{ss_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            icon, label = MODE_LABELS_H[mkey]
-            active_strategies["MAIN"].append(f"       {icon} {coin_n}: {label}  {detail}")
-            # ⚡ Ghi chú Ping-Pong H4
-            if getattr(tk, "is_h4_squeeze", False):
-                active_strategies["MAIN"].append("            ╰─  ⚠️ H4 đang PING-PONG: đã huỷ limit thuận chiều, chờ xu hướng rõ")
-            has_any = True
+            _ref_tf = sl_tf if sl_tf else ss_tf
+        elif tk.trend in ("UPTREND", "DOWNTREND"):
+            label = "THUẬN XU HƯỚNG"
+            sl_tf = getattr(tk, "signal_long_tf", None)
+            ss_tf = getattr(tk, "signal_short_tf", None)
+            _ref_tf = sl_tf if sl_tf else ss_tf
         elif coin_n != "BTC" and state_matrix.get("BTC-USDT-SWAP") and state_matrix["BTC-USDT-SWAP"].trend in ("UPTREND", "DOWNTREND", "HEDGE"):
-            btc_tk = state_matrix["BTC-USDT-SWAP"]
-            mkey = "MAIN"
-            b_sl_tf = getattr(btc_tk, "signal_long_tf", None)
-            b_ss_tf = getattr(btc_tk, "signal_short_tf", None)
-            if btc_tk.trend == "HEDGE":
-                detail = f"HEDGE: Long {b_sl_tf} / Short {b_ss_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            elif btc_tk.trend == "UPTREND":
-                detail = f"Tăng từ H4 đến {b_sl_tf} — Entry EMA200-{b_sl_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            else:
-                detail = f"Giảm từ H4 đến {b_ss_tf} — Entry EMA200-{b_ss_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            icon, label = MODE_LABELS_H[mkey]
-            active_strategies["MAIN"].append(f"       {icon} {coin_n}: {label}  {detail}")
-            has_any = True
+            label = "THUẬN XU HƯỚNG"
+            _ref_tf = None
+        else:
+            label = "SIDEWAY / CHỜ"
+            _ref_tf = None
 
-        if getattr(tk, "is_xole_pos", False):
-            mkey = "XOLE"
-            xl_tf  = getattr(tk, "xole_tf", getattr(tk, "active_target_tf", "?"))
-            xl_big = getattr(tk, "xole_big_tf", "?")
-            detail = f"Thuận {xl_tf}, nghịch {xl_big} → EMA200-{xl_tf} | TP=EMA200-{xl_big} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            icon, label = MODE_LABELS_H[mkey]
-            active_strategies["XOLE"].append(f"       {icon} {coin_n}: {label}  {detail}")
-            has_any = True
+        _ws = tk.mtf_states.get(_ref_tf, {}).get("win_streak", 0) if _ref_tf else 0
+        _lock = tk.mtf_states.get(_ref_tf, {}).get("streak_locked", False) if _ref_tf else False
+        _lock_tag = " 🔒LOCK" if _lock else ""
+        left_str = f"· {coin_n}: {label}"
+        strat_items.append((left_str, f"( streak={_ws}{_lock_tag} )"))
 
-        if getattr(tk, "is_ping_pong_pos", False):
-            mkey = "PINGPONG"
-            pp_tf  = getattr(tk, "ping_pong_tf", getattr(tk, "active_target_tf", "?"))
-            pp_big = getattr(tk, "ping_pong_big_tf", "?")
-            detail = f"Nén {pp_big} → Bắt bẻ tại EMA200 {pp_tf} ( Co giãn: {tk.current_vol_mult:.2f}x )"
-            icon, label = MODE_LABELS_H[mkey]
-            active_strategies["PINGPONG"].append(f"       {icon} {coin_n}: {label}  {detail}")
-            has_any = True
+    max_w = max([len(x[0]) for x in strat_items], default=30)
+    for left_str, right_str in strat_items:
+        print(f"       {left_str:<{max_w}}   {right_str}")
 
-        if not has_any:
-            mkey = "SIDEWAY"
-            detail = "Chưa đủ điều kiện — đứng ngoài quan sát"
-            icon, label = MODE_LABELS_H[mkey]
-            active_strategies["SIDEWAY"].append(f"       {icon} {coin_n}: {label}  {detail}")
 
-    for mkey in ["MAIN", "XOLE", "PINGPONG", "SIDEWAY"]:
-        for line in active_strategies[mkey]:
-            smart_print(line)
 
     active_limit_tfs = set()
     for cfg in COIN_PORTFOLIO:
@@ -338,13 +299,13 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             buffer_h4_pct = buffer_h4_pct * volatility_mult
 
             if tk.trend == "UPTREND":
-                entry_dist_h4 = dist_to_h4 - buffer_h4_pct  # LONG: Entry dưới giá hiện tại
-                dist_ema_display = f"[H4] {entry_dist_h4:+.2f}%"
+                entry_dist_h4 = dist_to_h4 - buffer_h4_pct
+                dist_ema_display = f"{entry_dist_h4:+.2f}%"
             elif tk.trend == "DOWNTREND":
-                entry_dist_h4 = dist_to_h4 + buffer_h4_pct  # SHORT: Entry trên giá hiện tại
-                dist_ema_display = f"[H4] {entry_dist_h4:+.2f}%"
+                entry_dist_h4 = dist_to_h4 + buffer_h4_pct
+                dist_ema_display = f"{entry_dist_h4:+.2f}%"
             else:
-                dist_ema_display = f"[H4] {dist_to_h4:+.2f}%"
+                dist_ema_display = f"{dist_to_h4:+.2f}%"
         else:
             # Altcoin: hiển thị Entry thực (có đệm lõm + hệ số vol_mult động)
             btc_h4_ema200 = getattr(btc_tk, "h4_ema200", btc_tk.ema200) if btc_tk else Decimal("0")
@@ -371,10 +332,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 entry_offset = dist_to_h4 + btc_dist_unsigned * alt_vol_mult
             
             if cfg["coin"] == "XAU":
-                dist_ema_display = f"[H4] {dist_to_h4:+.2f}%"
+                dist_ema_display = f"{dist_to_h4:+.2f}%"
             else:
-                dist_ema_display = f"[H4] {dist_to_h4:+.2f}% ({entry_offset:+.2f}%)"
-
+                dist_ema_display = f"{dist_to_h4:+.2f}% ({entry_offset:+.2f}%)"
         # Dùng cho WAIT section (vẫn cần target_tf và dist_ema)
         target_tf = getattr(tk, "active_target_tf", "M5")
         dist_ema = float(abs(dist_to_h4))
