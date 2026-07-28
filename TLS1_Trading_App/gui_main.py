@@ -1725,12 +1725,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         # Auto-save ENABLED_COINS vào file config
         try:
-            env_name = self.account_dropdown.currentData() or ".api"
-            if getattr(sys, 'frozen', False):
-                base_dir = sys._MEIPASS
-            else:
-                base_dir = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(base_dir, f"strategy_config_{env_name.replace('.', '')}.json")
+            acc_name = self.get_acc_name()
+            json_data_dir = os.path.join(USER_DATA_DIR, "json_data")
+            config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
             cfg = {}
             if os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
@@ -1740,6 +1737,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if self.dash_chk_btc.isChecked(): enabled.append("BTC")
             if self.dash_chk_eth.isChecked(): enabled.append("ETH")
             cfg["ENABLED_COINS"] = enabled
+            os.makedirs(json_data_dir, exist_ok=True)
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=4)
         except Exception as e:
@@ -3561,3 +3559,5 @@ if __name__ == "__main__":
 
 # z4 | Chart Fix & Marker: Sửa lỗi QtWebEngineProcess trên Windows PyInstaller, đồng bộ combo_coin với LiveChartWorker và tích hợp tính năng vẽ tag B/S.
 # z5 | Firebase Chat + UI Fix: Chuyển tab Cộng Đồng sang Native PyQt Chat kết nối Firebase RTDB (botvip-e5772), xóa QWebEngineView cũ (Cbox/tlk.io). Fix checkbox XAU/BTC/ETH trên Dashboard thành interactive + auto-save. Fix dropdown chọn tài khoản bị trùng màu (chữ đen trên nền đen).
+
+# z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json

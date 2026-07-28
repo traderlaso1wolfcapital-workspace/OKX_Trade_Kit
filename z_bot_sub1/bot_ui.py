@@ -126,8 +126,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
 
     r0_c1 = f"⚡ {bot_name}"
-    r0_c2 = "🏦 TÀI KHOẢN"
-    r0_c3 = "📊 LỢI NHUẬN"
+    r0_c2 = "💰 LỢI NHUẬN"
+    r0_c3 = "🏦 TÀI KHOẢN"
     r0_c4 = "🎯 HIỆU SUẤT"
     
     r1_c1 = f"🕒 {sync_time}"
@@ -137,7 +137,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     c1, c2, c3, c4 = 20, 26, 20, 16
     SEP = "|"
 
-    r0 = f"  {'⚡ THỢ SĂN EMA200':^{c1-1}} | {'🏦 TÀI KHOẢN':^{c2-1}} | {'💼 TỔNG VỐN':^{c3-1}} | 🎯 HIỆU SUẤT"
+    r0 = f"  {'⚡ THỢ SĂN EMA200':^{c1-1}} | {'💰 LỢI NHUẬN':^{c2-1}} | {'🏦 TÀI KHOẢN':^{c3-1}} | 🎯 HIỆU SUẤT"
     r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
     r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
 
@@ -458,10 +458,11 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
+                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
             else:
-                filled_str = fmt_tf("M5")
-            long_vol_str = f" = {tk.long_pos_vol:.0f} U " if getattr(tk, "long_pos_vol", 0) > 0 else " "
+                filled_str = fmt_tf("M5").ljust(18)
+            long_vol = f"{tk.long_pos_vol:.0f} U" if getattr(tk, "long_pos_vol", 0) > 0 else ""
+            long_vol_str = f" = {long_vol.ljust(6)} " if long_vol else " "
             line_main = f"    {coin_name} ╭─  Đã khớp LONG [{filled_str}]{long_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
             # "    {coin} ╭─" → 4 spaces + coin (3) + " " (1) = 8 chars trước ╭─
             indent_branch = "        "  # 8 spaces
@@ -485,10 +486,11 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
+                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
             else:
-                filled_str = fmt_tf("M5")
-            short_vol_str = f" = {tk.short_pos_vol:.0f} U " if getattr(tk, "short_pos_vol", 0) > 0 else " "
+                filled_str = fmt_tf("M5").ljust(18)
+            short_vol = f"{tk.short_pos_vol:.0f} U" if getattr(tk, "short_pos_vol", 0) > 0 else ""
+            short_vol_str = f" = {short_vol.ljust(6)} " if short_vol else " "
             line_main = f"    {coin_name} ╭─  Đã khớp SHORT [{filled_str}]{short_vol_str}: Entry {entry_px_str.strip()}  → ROI (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces khớp với XAU / BTC / ETH
             lines = [line_main]
@@ -648,3 +650,5 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
 # z2500 | Bỏ hiển thị SL trong dòng "Đã khớp LONG/SHORT" trên Dashboard để giao diện gọn hơn
 # z3350 | Clean up: Xoá các imports (time) và các biến (von_goc, date_part, active_pos_count, sl_px_str, has_both, tf_tol) không sử dụng để tối ưu code.
 # z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
+
+# z1951 | Padding cứng 18 ký tự cho chuỗi TF DCA để thẳng hàng dấu hai chấm (:) trên UI bot_ui.py. Đổi nhãn TỔNG VỐN thành TÀI KHOẢN, TÀI KHOẢN thành LỢI NHUẬN

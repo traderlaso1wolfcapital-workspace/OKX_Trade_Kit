@@ -1070,7 +1070,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.active_pos_tf = btc_pos_tf
                     btc_sync_tf_changed = True
                     btc_sync_tf_changed = True
-                    print(f"🔄 [SYNC] {coin_name} LONG active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
+                    # print(f"🔄 [SYNC] {coin_name} LONG active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
             # SHORT: nếu cả BTC và Altcoin đều có short, sync TF
             if tracker.has_short and btc_tk_sync.has_short:
                 if tf_weight(btc_pos_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
@@ -1078,7 +1078,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     tracker.active_pos_tf = btc_pos_tf
                     btc_sync_tf_changed = True
                     btc_sync_tf_changed = True
-                    print(f"🔄 [SYNC] {coin_name} SHORT active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
+                    # print(f"🔄 [SYNC] {coin_name} SHORT active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
 
     # ==============================================================================
     # ⚔️ QUẢN TRỊ VỊ THẾ & PHANH BẢO VỆ LIMIT CROSS
@@ -2754,3 +2754,5 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # z7713 | Thuật toán reload limit EMA200: Nhúng hàm get_current_candle_start_ms lấy giờ UTC chuẩn, bắt chính xác sát giây nến đóng để tính lại Limit.
 # z7714 | Fix Candle Cooldown vô điều kiện: Bỏ ràng buộc `if old_sz == new_sz` khỏi PER-TF CANDLE COOLDOWN (cả LONG & SHORT). Giờ lệnh limit TF nào chỉ được amend/reload khi nến TF đó đóng mới, bất kể size có thay đổi. Tránh amend liên tục mỗi 3s.
 # z7717 | Marker Feature: Tích hợp ghi log trade_markers (B/S tag) tại thời điểm entry/exit để GUI vẽ lên Chart.
+
+# z7718 | Tắt tính năng log print ra console đối với các lệnh '[SYNC]' để app GUI không bị rác màn hình.
