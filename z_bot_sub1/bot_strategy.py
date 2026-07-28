@@ -638,19 +638,26 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
     def determine_filled_tf(side, old_has, old_pos_amt, new_pos_amt, avg_px):
         try:
-            # Lấy 5 lệnh khớp gần nhất
+            # Lấy 100 lệnh khớp gần nhất
             fills = client.request("GET", "/api/v5/trade/fills", 
-                                   params={"instType": "SWAP", "instId": swap_id, "limit": "5"})["data"]
+                                   params={"instType": "SWAP", "instId": swap_id, "limit": "100"}).get("data", [])
             prefix = f"{CL_ORD_PREFIX}EL" if side == "long" else f"{CL_ORD_PREFIX}ES"
             current_ms = int(time.time() * 1000)
+            matched_tfs = []
             for f in fills:
                 fill_time = int(f.get("ts", "0"))
-                if current_ms - fill_time > 60000: continue # Lọc rác: quá 60 giây -> bỏ qua
+                # Khi đang chạy live (old_has=True): chỉ lấy fill trong 60s
+                # Khi khởi động lại bot (old_has=False): lấy toàn bộ fill gần nhất không giới hạn 60s
+                if old_has and (current_ms - fill_time > 60000): continue
                 cl_id = f.get("clOrdId", "")
                 if cl_id.startswith(prefix):
-                    for tf_cand in ["M5", "M15", "M30", "H1", "H2", "H4"]:
+                    for tf_cand in ["H4", "H2", "H1", "M30", "M15", "M5"]:
                         if cl_id[len(prefix):].startswith(tf_cand):
-                            return tf_cand
+                            matched_tfs.append(tf_cand)
+                            break
+            if matched_tfs:
+                # Trả về TF cao nhất có trong lịch sử khớp lệnh
+                return max(matched_tfs, key=tf_weight)
         except: pass
 
         # Fallback 1: So sánh tổng volume của lệnh đang chạy trên sàn với volume các TF
@@ -671,8 +678,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
 
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
-                "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.4"),
-                "H1": Decimal("1.6"), "H2": Decimal("1.8"), "H4": Decimal("2.0")
+                "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
+                "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
             })
             
             _coin_vol_mult = Decimal("1.0")
@@ -692,13 +699,13 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     cumulative_vols[tf_cand] = cum_sum
                 
                 for tf_cand in reversed(tfs_order):
-                    if current_vol_usdt >= cumulative_vols[tf_cand] * Decimal("0.85"):
+                    if current_vol_usdt >= cumulative_vols[tf_cand] * Decimal("0.70"):
                         return tf_cand
             else:
                 # Individual matching (khi đang chạy live có fill mới)
                 for tf_cand in reversed(tfs_order):
                     expected = _target_usdt * vol_mults.get(tf_cand, Decimal("1.0")) * _coin_vol_mult
-                    if current_vol_usdt >= expected * Decimal("0.85"):
+                    if current_vol_usdt >= expected * Decimal("0.70"):
                         return tf_cand
         except: pass
             
@@ -923,17 +930,82 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     cross_short_amt += abs(pos_amt)
                     cross_short_vol += abs(pos_amt) * contract_val * avg_px
 
+        def reconstruct_filled_tfs_from_volume(side_str: str, pos_vol_usdt: Decimal) -> list[str]:
+            """
+            BẮT BUỘC KHỞI ĐẦU: Quét tổng volume thực tế trên sàn, so sánh với Setting Base Volume trong JSON
+            để quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã được DCA trong khối volume đó.
+            """
+            _target_usdt = Decimal("200")
+            try:
+                gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
+                if gcfg_path and os.path.exists(gcfg_path):
+                    with open(gcfg_path, "r", encoding="utf-8") as f:
+                        _gcfg = json.load(f)
+                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _gcfg:
+                            _target_usdt = Decimal(str(_gcfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
+                    _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
+            except Exception:
+                _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+
+            _coin_vol_mult = Decimal("1.0")
+            for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
+                if item["coin"] == coin_name:
+                    _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
+                    break
+
+            base_vol = _target_usdt * _coin_vol_mult
+            vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
+                "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
+                "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
+            })
+
+            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            cum_vols = {}
+            cum = Decimal("0")
+            for tf in tfs_order:
+                cum += base_vol * vol_mults.get(tf, Decimal("1.0"))
+                cum_vols[tf] = cum
+
+            filled_tfs = []
+            for tf in tfs_order:
+                if pos_vol_usdt >= cum_vols[tf] * Decimal("0.70"):
+                    filled_tfs.append(tf)
+                else:
+                    break
+
+            if not filled_tfs:
+                filled_tfs = ["M5"]
+
+            return filled_tfs
+
         if cross_long_amt > 0:
             tracker.active_avg_px_long = cross_long_vol / (cross_long_amt * contract_val)
             tracker.entry_price_long = tracker.active_avg_px_long
             tracker.long_pos_vol = cross_long_vol
             tracker.last_long_pos_amt = cross_long_amt
 
+            # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
+            detected_long_tfs = reconstruct_filled_tfs_from_volume("long", cross_long_vol)
+            for _tf in detected_long_tfs:
+                if _tf not in tracker.pos_cycle_filled_tfs:
+                    tracker.pos_cycle_filled_tfs.append(_tf)
+            tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+            tracker.active_pos_tf = detected_long_tfs[-1]
+
         if cross_short_amt > 0:
             tracker.active_avg_px_short = cross_short_vol / (cross_short_amt * contract_val)
             tracker.entry_price_short = tracker.active_avg_px_short
             tracker.short_pos_vol = cross_short_vol
             tracker.last_short_pos_amt = cross_short_amt
+
+            # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
+            detected_short_tfs = reconstruct_filled_tfs_from_volume("short", cross_short_vol)
+            for _tf in detected_short_tfs:
+                if _tf not in tracker.pos_cycle_filled_tfs:
+                    tracker.pos_cycle_filled_tfs.append(_tf)
+            tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+            tracker.active_pos_tf = detected_short_tfs[-1]
     except Exception as e:
         hft_logger.error(f"Lỗi lấy position {coin_name}: {e}", exc_info=True)
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
@@ -944,29 +1016,8 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         if tracker.has_long:
             if not old_has_l:
                 tracker.mtf_volumes_at_entry = {"vol_5m": float(candles[0][5]), "vol_30m": float(candles_m15[0][5])}
-                filled_tf = determine_filled_tf("long", False, Decimal("0"), tracker.last_long_pos_amt, tracker.active_avg_px_long)
-                # Fallback cho lệnh thủ công (không có clOrdId của bot): dò TF có EMA200 gần entry nhất
-                if not filled_tf:
-                    best_tf_manual, best_dist = "M5", Decimal("inf")
-                    for tf_candidate in ["M5", "M15", "M30", "H1", "H2", "H4"]:
-                        ema_tf = get_ema200_for_tf(tf_candidate)
-                        if ema_tf > 0:
-                            d = abs(tracker.active_avg_px_long - ema_tf) / ema_tf
-                            if d < best_dist:
-                                best_dist, best_tf_manual = d, tf_candidate
-                    filled_tf = best_tf_manual
-                tracker.active_pos_tf = filled_tf
-                # Step 2: Ghi TF đã khớp, reset pos_cycle_closed_tfs cho chu kỳ mới
-                if filled_tf:
-                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
-                    if filled_tf in _tfs_all:
-                        for _cand in _tfs_all[:_tfs_all.index(filled_tf)+1]:
-                            if _cand not in tracker.pos_cycle_filled_tfs:
-                                tracker.pos_cycle_filled_tfs.append(_cand)
-                tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 _is_xl = getattr(tracker, "is_xole_pos", False)
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
-                _trend = getattr(tracker, "trend", "UPTREND")
                 if _is_xl:
                     _big = getattr(tracker, "xole_big_tf", "")
                     tracker.open_reason_long = f"Xo Le Hedge (LONG {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
@@ -979,44 +1030,12 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
                 bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
-                
-                filled_tf = determine_filled_tf("long", True, old_pos_amt_l, tracker.last_long_pos_amt, tracker.active_avg_px_long)
-                _tf = filled_tf if filled_tf else getattr(tracker, "placed_target_tf", "M5")
-                if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
-                    tracker.active_pos_tf = _tf
-                # KHẮC PHỤC LỖI INFINITE LOOP: Ghi nhận TF đã khớp để không bao giờ DCA lặp lại ở TF này nữa
-                if _tf:
-                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
-                    if _tf in _tfs_all:
-                        for _cand in _tfs_all[:_tfs_all.index(_tf)+1]:
-                            if _cand not in tracker.pos_cycle_filled_tfs:
-                                tracker.pos_cycle_filled_tfs.append(_cand)
-                tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                _tf = getattr(tracker, "active_pos_tf", "M5")
                 tracker.open_reason_long = f"DCA Khung Lớn Tăng tại [{_tf}]: Cập nhật trung bình giá"
 
         if tracker.has_short:
             if not old_has_s:
                 tracker.mtf_volumes_at_entry = {"vol_5m": float(candles[0][5]), "vol_30m": float(candles_m15[0][5])}
-                filled_tf = determine_filled_tf("short", False, Decimal("0"), tracker.last_short_pos_amt, tracker.active_avg_px_short)
-                # Fallback cho lệnh thủ công (không có clOrdId của bot): dò TF có EMA200 gần entry nhất
-                if not filled_tf:
-                    best_tf_manual, best_dist = "M5", Decimal("inf")
-                    for tf_candidate in ["M5", "M15", "M30", "H1", "H2", "H4"]:
-                        ema_tf = get_ema200_for_tf(tf_candidate)
-                        if ema_tf > 0:
-                            d = abs(tracker.active_avg_px_short - ema_tf) / ema_tf
-                            if d < best_dist:
-                                best_dist, best_tf_manual = d, tf_candidate
-                    filled_tf = best_tf_manual
-                tracker.active_pos_tf = filled_tf
-                # Step 2: Ghi TF đã khớp cho SHORT
-                if filled_tf:
-                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
-                    if filled_tf in _tfs_all:
-                        for _cand in _tfs_all[:_tfs_all.index(filled_tf)+1]:
-                            if _cand not in tracker.pos_cycle_filled_tfs:
-                                tracker.pos_cycle_filled_tfs.append(_cand)
-                tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                 _is_xl = getattr(tracker, "is_xole_pos", False)
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
                 if _is_xl:
@@ -1031,19 +1050,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
                 bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
-                
-                filled_tf = determine_filled_tf("short", True, old_pos_amt_s, tracker.last_short_pos_amt, tracker.active_avg_px_short)
-                _tf = filled_tf if filled_tf else getattr(tracker, "placed_target_tf", "M5")
-                if tf_weight(_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
-                    tracker.active_pos_tf = _tf
-                # KHẮC PHỤC LỖI INFINITE LOOP: Ghi nhận TF đã khớp để không bao giờ DCA lặp lại ở TF này nữa
-                if _tf:
-                    _tfs_all = ["M5", "M15", "M30", "H1", "H2", "H4"]
-                    if _tf in _tfs_all:
-                        for _cand in _tfs_all[:_tfs_all.index(_tf)+1]:
-                            if _cand not in tracker.pos_cycle_filled_tfs:
-                                tracker.pos_cycle_filled_tfs.append(_cand)
-                tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                _tf = getattr(tracker, "active_pos_tf", "M5")
                 tracker.open_reason_short = f"DCA Khung Lớn Giảm tại [{_tf}]: Cập nhật trung bình giá"
     except Exception:
         pass
