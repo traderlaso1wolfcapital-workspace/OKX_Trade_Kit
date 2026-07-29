@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.245")
+            return json.load(f).get("version", "1.0.246")
     except:
-        return "1.0.245"
+        return "1.0.246"
 
 APP_VERSION = get_app_version()
 
