@@ -424,9 +424,9 @@ def register_trade_setups_for_ob(ob: OrderBlock, current_bar: int, swing_trend: 
     if risk <= Decimal("0") or risk < max(real_high, real_low) * min_risk_pct:
         return []
 
-    # TP: H1 thuận trend → 5R (RR 1:5), H2 ngược trend → 1R (RR 1:1)
-    # is_hedge=False nghĩa là H1, is_hedge=True nghĩa là H2
-    tp_mult = Decimal("1.0") if is_hedge else Decimal("5.0")
+    # TP: Base timeframe (is_hedge=False) dùng OB_RR_RATIO_TREND, Hedge timeframe (is_hedge=True) dùng OB_RR_RATIO_COUNTER
+    from z_bot_sub2 import bot_config
+    tp_mult = getattr(bot_config, "OB_RR_RATIO_COUNTER", Decimal("1.0")) if is_hedge else getattr(bot_config, "OB_RR_RATIO_TREND", Decimal("5.0"))
 
     if ob.bias == BULLISH:
         tp = entry + risk * tp_mult

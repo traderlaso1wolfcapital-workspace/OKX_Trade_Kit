@@ -116,11 +116,13 @@ SMC_ZONES = False                   # Premium/Discount Zones
 SMC_TRADE = True                    # Show OB Trade Setup
 OB_SOURCE = "SWING"                 # "ALL" | "INTERNAL" | "SWING" ← CHỈ DÙNG SWING OB
 OB_DIRECTION = "BOTH"               # "BOTH" | "LONG_ONLY" | "SHORT_ONLY"
-OB_TP_MODE = "RR"                   # "RR" | "NEAREST_OB" | "FALLBACK_RR"
-OB_RR_RATIO_TREND = Decimal("1.0")   # RR cho Swing OB (1:1)
-OB_RR_RATIO_INTERNAL = Decimal("1.0") # RR cho Internal OB (1:1)
-OB_RR_RATIO = Decimal("1.0")          # RR mặc định (1:1)
-OB_MAX_ACTIVE_SETUPS = 40           # Max setups giữ lại cùng lúc
+OB_TP_MODE = "RR"                   # "RR" | "NEAREST_OB"
+OB_RR_RATIO_TREND = Decimal("5.0")   # RR thuận trend mặc định
+OB_RR_RATIO_COUNTER = Decimal("1.0") # RR ngược trend mặc định
+OB_RR_RATIO = Decimal("5.0")          # RR mặc định
+OB_MAX_ACTIVE_SETUPS = 10           # Số lượng setup chờ tối đa mỗi coin
+OB_MAX_COUNT = 20                   # Giới hạn mảng OB
+OB_CLEANUP_CROSSED = True           # Tự động dọn dẹp OB đã bị mitigate
 
 # ==============================================================================
 # 12. HỆ THỐNG & KẾT NỐI

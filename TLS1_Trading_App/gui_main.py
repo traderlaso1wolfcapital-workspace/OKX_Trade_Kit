@@ -1561,6 +1561,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_toggles = QtWidgets.QGridLayout(grp_toggles)
         self.smc_chk_main = ToggleSwitch()
         add_checkbox(l_toggles, 0, 0, "Bật Chiến thuật SMC Order Block", self.smc_chk_main, "Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")
+        
+        self.smc_combo_tf_base = QtWidgets.QComboBox()
+        self.smc_combo_tf_base.addItems(["5m", "15m", "30m", "1H", "2H", "4H"])
+        add_field(l_toggles, 1, "Timeframe base:", self.smc_combo_tf_base, "Khung thời gian chính để giao dịch thuận xu hướng.")
         layout.addWidget(grp_toggles)
 
         # 2. QUẢN LÝ VỐN & RỦI RO
@@ -1573,8 +1577,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000)
         add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.smc_input_pos_vol, "Khối lượng vốn cố định (USDT) cho mỗi lệnh Limit SMC.")
         
-        self.smc_input_rr = QtWidgets.QDoubleSpinBox(); self.smc_input_rr.setDecimals(1)
-        add_field(l_risk, 1, "Tỷ lệ Risk:Reward (RR):", self.smc_input_rr, "Tỷ lệ lợi nhuận/rủi ro cho mỗi setup SMC (VD: 2.0 = 1:2).")
+        self.smc_input_rr_trend = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_trend.setDecimals(1)
+        add_field(l_risk, 1, "Tỷ lệ Risk:Reward thuận trend:", self.smc_input_rr_trend, "Tỷ lệ lợi nhuận/rủi ro thuận xu hướng (VD: 5.0 = 1:5).")
+
+        self.smc_input_rr_counter = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_counter.setDecimals(1)
+        add_field(l_risk, 2, "Tỷ lệ Risk:Reward ngược trend:", self.smc_input_rr_counter, "Tỷ lệ lợi nhuận/rủi ro ngược xu hướng (VD: 1.0 = 1:1).")
         layout.addWidget(grp_risk)
 
         # 3. CẤU TRÚC SMC & PIVOT
@@ -1743,7 +1750,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     tp_map = {"RR": "Risk:Reward", "NEAREST_OB": "Nearest opposite OB", "FALLBACK_RR": "Opposite OB, fallback RR"}
                     tpm = cfg.get("OB_TP_MODE", getattr(bot_config, "OB_TP_MODE", "RR"))
                     self.smc_combo_tp.setCurrentText(tp_map.get(tpm, "Risk:Reward"))
-                    self.smc_input_rr.setValue(float(cfg.get("OB_RR_RATIO", getattr(bot_config, "OB_RR_RATIO", 1.0))))
+                    self.smc_combo_tf_base.setCurrentText(cfg.get("TIMEFRAME_BASE", getattr(bot_config, "TIMEFRAME_BASE", "15m")))
+                    self.smc_input_rr_trend.setValue(float(cfg.get("OB_RR_RATIO_TREND", getattr(bot_config, "OB_RR_RATIO_TREND", 5.0))))
+                    self.smc_input_rr_counter.setValue(float(cfg.get("OB_RR_RATIO_COUNTER", getattr(bot_config, "OB_RR_RATIO_COUNTER", 1.0))))
                     self.smc_input_max_setup.setValue(int(cfg.get("OB_MAX_ACTIVE_SETUPS", getattr(bot_config, "OB_MAX_ACTIVE_SETUPS", 10))))
                     self.smc_input_ob_max.setValue(int(cfg.get("OB_MAX_COUNT", getattr(bot_config, "OB_MAX_COUNT", 20))))
                 except AttributeError:
@@ -2051,7 +2060,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "OB_SOURCE": src_map.get(self.smc_combo_source.currentText(), "ALL"),
                 "OB_DIRECTION": dir_map.get(self.smc_combo_dir.currentText(), "BOTH"),
                 "OB_TP_MODE": tp_map.get(self.smc_combo_tp.currentText(), "RR"),
-                "OB_RR_RATIO": str(round(self.smc_input_rr.value(), 2)),
+                "TIMEFRAME_BASE": self.smc_combo_tf_base.currentText(),
+                "OB_RR_RATIO_TREND": str(round(self.smc_input_rr_trend.value(), 2)),
+                "OB_RR_RATIO_COUNTER": str(round(self.smc_input_rr_counter.value(), 2)),
                 "OB_MAX_ACTIVE_SETUPS": self.smc_input_max_setup.value(),
                 "OB_MAX_COUNT": self.smc_input_ob_max.value(),
             })
@@ -2344,8 +2355,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                     if (!obs || !overlay) return;
                                     overlay.innerHTML = '';
                                     const w = overlay.clientWidth || (container ? container.clientWidth : 800);
-                                    const canvas = (chartObj && chartObj.div) ? chartObj.div.querySelector('canvas') : null;
-                                    const paneW = canvas ? canvas.clientWidth : (w - 65);
+                                    
+                                    // Giá trị offset an toàn cho cột giá (price scale) bên phải
+                                    const PRICE_SCALE_WIDTH = 70;
+                                    const maxRightX = w - PRICE_SCALE_WIDTH;
 
                                     obs.forEach(ob => {{
                                         const y1 = series.priceToCoordinate(ob.high);
@@ -2362,11 +2375,20 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             try {{
                                                 const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
                                                 const xCoord = chart.timeScale().timeToCoordinate(secTime);
-                                                if (xCoord !== null && xCoord > 0) {{
-                                                    startX = Math.max(10, Math.floor(xCoord));
+                                                if (xCoord !== null) {{
+                                                    startX = Math.floor(xCoord);
                                                 }}
                                             }} catch(e) {{}}
                                         }}
+
+                                        // Nếu OB ở quá xa về bên phải so với cột giá thì không vẽ
+                                        if (startX >= maxRightX) return;
+                                        
+                                        // Ẩn nếu OB nằm ngoài màn hình bên trái quá xa
+                                        if (startX < -1000) return;
+
+                                        const boxWidth = maxRightX - startX;
+                                        if (boxWidth <= 0) return;
 
                                         const bg = isBull ? 'rgba(21, 101, 192, 0.38)' : 'rgba(198, 40, 40, 0.38)';
 
@@ -2374,14 +2396,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         box.style.position = 'absolute';
                                         box.style.top = topY + 'px';
                                         box.style.left = startX + 'px';
-                                        box.style.width = Math.max(20, (paneW - startX)) + 'px';
+                                        box.style.width = boxWidth + 'px';
                                         box.style.height = h + 'px';
                                         box.style.backgroundColor = bg;
-                                        box.style.border = '1px solid transparent';
+                                        box.style.border = 'none';
                                         box.style.boxSizing = 'border-box';
-                                        box.style.borderRadius = '2px';
-                                        box.style.display = 'flex';
-                                        box.style.alignItems = 'center';
+                                        box.style.pointerEvents = 'none';
 
                                         overlay.appendChild(box);
                                     }});

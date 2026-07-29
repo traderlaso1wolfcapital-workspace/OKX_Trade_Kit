@@ -875,6 +875,19 @@ def load_global_config_from_json(env_paths: dict, globals_ref: Any):
                 if "INTERNAL_RISK_PCT" in cfg: globals_ref.INTERNAL_RISK_PCT = Decimal(str(cfg["INTERNAL_RISK_PCT"]))
                 if "INTERNAL_LEVERAGE" in cfg: globals_ref.INTERNAL_LEVERAGE = int(cfg["INTERNAL_LEVERAGE"])
                 
+                if "TIMEFRAME_BASE" in cfg:
+                    globals_ref.TIMEFRAME_BASE = cfg["TIMEFRAME_BASE"]
+                    tf_list = ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1M"]
+                    try:
+                        base_idx = tf_list.index(globals_ref.TIMEFRAME_BASE)
+                        if base_idx + 1 < len(tf_list):
+                            globals_ref.TIMEFRAME_HEDGE = tf_list[base_idx + 1]
+                    except ValueError:
+                        pass
+                
+                if "OB_RR_RATIO_TREND" in cfg: globals_ref.OB_RR_RATIO_TREND = Decimal(str(cfg["OB_RR_RATIO_TREND"]))
+                if "OB_RR_RATIO_COUNTER" in cfg: globals_ref.OB_RR_RATIO_COUNTER = Decimal(str(cfg["OB_RR_RATIO_COUNTER"]))
+
                 if "SMC_TRADE" in cfg: globals_ref.SMC_TRADE = bool(cfg["SMC_TRADE"])
                 if "OB_SOURCE" in cfg: globals_ref.OB_SOURCE = cfg["OB_SOURCE"]
                 if "OB_DIRECTION" in cfg: globals_ref.OB_DIRECTION = cfg["OB_DIRECTION"]
