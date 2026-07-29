@@ -138,9 +138,7 @@ def replay_history(
                     highs=sub_h, lows=sub_l
                 )
                 if ob:
-                    tracker.swing_obs.insert(0, ob)
-                    if len(tracker.swing_obs) > 100:
-                        tracker.swing_obs.pop()
+                    add_ob_and_merge(tracker.swing_obs, ob)
         tracker.swing_trend = st
 
         # ---------------------------------------------------------------
@@ -176,9 +174,7 @@ def replay_history(
                     highs=sub_h, lows=sub_l
                 )
                 if ob:
-                    tracker.internal_obs.insert(0, ob)
-                    if len(tracker.internal_obs) > 100:
-                        tracker.internal_obs.pop()
+                    add_ob_and_merge(tracker.internal_obs, ob)
         tracker.internal_trend = it
 
         # ---------------------------------------------------------------
@@ -265,9 +261,7 @@ def replay_history_m30(
                     highs=sub_h, lows=sub_l
                 )
                 if ob:
-                    tracker.m30_swing_obs.insert(0, ob)
-                    if len(tracker.m30_swing_obs) > 100:
-                        tracker.m30_swing_obs.pop()
+                    add_ob_and_merge(tracker.m30_swing_obs, ob)
         m30_trend = st
 
         # Mitigate M30 OB
@@ -613,11 +607,9 @@ def run_strategy_cycle(
                     ob = find_order_block(sub_ph, sub_pl, sub_t, pivot_used.bar_index, i, sbias, "SWING",
                                           highs=sub_h, lows=sub_l)
                     if ob:
-                        tracker.swing_obs.insert(0, ob)
-                        if len(tracker.swing_obs) > 100:
-                            tracker.swing_obs.pop()
+                        is_merged = add_ob_and_merge(tracker.swing_obs, ob)
                         # 1 OB -> 1 Setup theo bias, RR linh hoạt theo swing_trend
-                        if SMC_TRADE:
+                        if SMC_TRADE and not is_merged:
                             new_setups = register_trade_setups_for_ob(ob, i, tracker.swing_trend)
                             for setup in new_setups:
                                 tracker.trade_setups.append(setup)
@@ -651,11 +643,9 @@ def run_strategy_cycle(
                     ob = find_order_block(sub_ph, sub_pl, sub_t, pivot_used.bar_index, i, ibias, "INTERNAL",
                                           highs=sub_h, lows=sub_l)
                     if ob:
-                        tracker.internal_obs.insert(0, ob)
-                        if len(tracker.internal_obs) > 100:
-                            tracker.internal_obs.pop()
+                        is_merged = add_ob_and_merge(tracker.internal_obs, ob)
                         # ⚡ Cho phép Internal OB tạo setup nếu ngược trend
-                        if SMC_TRADE:
+                        if SMC_TRADE and not is_merged:
                             new_setups = register_trade_setups_for_ob(ob, i, tracker.swing_trend)
                             for setup in new_setups:
                                 tracker.trade_setups.append(setup)
@@ -914,3 +904,4 @@ def _sync_save_mtf_states_sub2(swap_id: str, data: dict, mtf_file: str):
         os.replace(temp, mtf_file)
     except: pass
 
+# z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge) để tránh bị rối trên chart

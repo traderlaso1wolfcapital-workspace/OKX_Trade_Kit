@@ -11,8 +11,8 @@ ENABLE_STRATEGY_SMC = True          # ❶ CHIẾN THUẬT SMC ORDER BLOCK (MAIN)
 # ==============================================================================
 # 1. CẤU HÌNH DỮ LIỆU & KHUNG THỜI GIAN
 # ==============================================================================
-TIMEFRAME_BASE = "15m"              # Khung nến chính MAIN (M15)
-TIMEFRAME_HEDGE = "30m"             # Khung nến phụ HEDGE (M30)
+TIMEFRAME_BASE = "1H"               # Khung nến chính MAIN (H1)
+TIMEFRAME_HEDGE = "2H"              # Khung nến phụ HEDGE (H2)
 LIMIT_CANDLES = 900                 # Số nến fetch từ OKX (900 nến 15m ≈ 225h / 9.4 ngày)
 M30_LIMIT_CANDLES = 600             # Số nến M30 fetch (600 nến 30m ≈ 300h / 12.5 ngày)
 
@@ -137,3 +137,4 @@ COIN_PORTFOLIO = [
 ENABLED_COINS = ["XAU", "BTC", "ETH"]
 # z7713 | Chuyển M15, RR 1:1, OB_SOURCE="SWING"
 # z7716 | Tách RR thành OB_RR_RATIO_TREND (1:5) và OB_RR_RATIO_COUNTER (1:1)
+# z1949 | Chuyển TIMEFRAME_BASE = "1H", TIMEFRAME_HEDGE = "2H"

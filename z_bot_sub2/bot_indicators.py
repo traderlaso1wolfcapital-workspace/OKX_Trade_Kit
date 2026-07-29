@@ -424,9 +424,9 @@ def register_trade_setups_for_ob(ob: OrderBlock, current_bar: int, swing_trend: 
     if risk <= Decimal("0") or risk < max(real_high, real_low) * min_risk_pct:
         return []
 
-    # TP: Swing OB → 3R (RR 1:3), Internal OB → 1R (RR 1:1)
-    is_swing = (ob.source == "SWING")
-    tp_mult = Decimal("3.0") if is_swing else Decimal("1.0")
+    # TP: H1 thuận trend → 5R (RR 1:5), H2 ngược trend → 1R (RR 1:1)
+    # is_hedge=False nghĩa là H1, is_hedge=True nghĩa là H2
+    tp_mult = Decimal("1.0") if is_hedge else Decimal("5.0")
 
     if ob.bias == BULLISH:
         tp = entry + risk * tp_mult
@@ -598,3 +598,38 @@ def round_to_tick(price: Decimal, tick: Decimal) -> Decimal:
     return (price / tick).quantize(Decimal("1")) * tick
 
 
+
+def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
+    """
+    Thêm OB mới vào danh sách. Nếu có OB nào cùng bias bị giao cắt vùng giá,
+    sẽ gộp 2 OB lại thành 1 vùng lớn hơn.
+    Trả về True nếu bị gộp, False nếu thêm mới.
+    """
+    merged = False
+    top2 = max(new_ob.bar_high, new_ob.bar_low)
+    bot2 = min(new_ob.bar_high, new_ob.bar_low)
+    
+    for ob in ob_list:
+        if ob.bias == new_ob.bias and not ob.crossed:
+            top1 = max(ob.bar_high, ob.bar_low)
+            bot1 = min(ob.bar_high, ob.bar_low)
+            # Check overlap
+            if top1 >= bot2 and bot1 <= top2:
+                # Gộp
+                ob.bar_high = max(top1, top2)
+                ob.bar_low = min(bot1, bot2)
+                if new_ob.raw_high > Decimal("0"):
+                    ob.raw_high = max(ob.raw_high, new_ob.raw_high) if ob.raw_high > Decimal("0") else new_ob.raw_high
+                if new_ob.raw_low > Decimal("0"):
+                    ob.raw_low = min(ob.raw_low, new_ob.raw_low) if ob.raw_low > Decimal("0") else new_ob.raw_low
+                ob.bar_time = max(ob.bar_time, new_ob.bar_time)
+                merged = True
+                return True
+                
+    if not merged:
+        ob_list.insert(0, new_ob)
+        if len(ob_list) > 100:
+            ob_list.pop()
+        return False
+
+# z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge), sửa TP H1 RR 1:5, H2 RR 1:1

@@ -500,6 +500,24 @@ class LiveChartWorker(QtCore.QThread):
                                             "source": str(ob.source)
                                         })
                                 chart_data["ob_boxes"] = ob_boxes
+                                
+                                # Add trade setups as markers
+                                if "markers" not in chart_data:
+                                    chart_data["markers"] = []
+                                
+                                BULLISH = 1
+                                for setup in tk.trade_setups:
+                                    t_ms = 0
+                                    if setup.created_bar < len(times):
+                                        t_ms = times[setup.created_bar]
+                                    if t_ms > 0:
+                                        chart_data["markers"].append({
+                                            "time": int(t_ms) * 1000 if t_ms < 100000000000 else int(t_ms),
+                                            "side": "LONG" if setup.bias == BULLISH else "SHORT",
+                                            "price": float(setup.entry_price),
+                                            "status": "inactive" if setup.triggered else "active",
+                                            "type": "SETUP"
+                                        })
                             except Exception:
                                 pass
 
@@ -2355,10 +2373,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         box.style.width = Math.max(20, (w - startX - 55)) + 'px';
                                         box.style.height = h + 'px';
                                         box.style.backgroundColor = bg;
-                                        box.style.borderTop = '1px solid ' + border;
-                                        box.style.borderBottom = '1px solid ' + border;
+                                        box.style.border = '1px solid ' + border;
                                         box.style.boxSizing = 'border-box';
-                                        box.style.borderRadius = '1px';
+                                        box.style.borderRadius = '2px';
+                                        box.style.display = 'flex';
+                                        box.style.alignItems = 'center';
+
+                                        const lblText = isBull ? `Bullish OB [${ob.low.toFixed(2)}]` : `Bearish OB [${ob.high.toFixed(2)}]`;
+                                        const textColor = isBull ? '#64b5f6' : '#e57373';
+                                        box.innerHTML = `<span style="color:${textColor}; font-size:11px; font-weight:bold; margin-left:5px; pointer-events:none; white-space:nowrap; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${lblText}</span>`;
 
                                         overlay.appendChild(box);
                                     }});
@@ -2388,6 +2411,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def append_log(self, text):
         try:
             if text.strip().startswith('{"type": "chart_data"'):
+                return
+            if "[SYNC]" in text:
                 return
         except Exception:
             pass
@@ -3739,3 +3764,4 @@ if __name__ == "__main__":
 # z5 | Firebase Chat + UI Fix: Chuyển tab Cộng Đồng sang Native PyQt Chat kết nối Firebase RTDB (botvip-e5772), xóa QWebEngineView cũ (Cbox/tlk.io). Fix checkbox XAU/BTC/ETH trên Dashboard thành interactive + auto-save. Fix dropdown chọn tài khoản bị trùng màu (chữ đen trên nền đen).
 
 # z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json
+# z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
