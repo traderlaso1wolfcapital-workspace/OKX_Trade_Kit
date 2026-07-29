@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.242")
+            return json.load(f).get("version", "1.0.243")
     except:
-        return "1.0.242"
+        return "1.0.243"
 
 APP_VERSION = get_app_version()
 
@@ -957,7 +957,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("5m")
         
-        self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB SMC (Xanh/Đỏ)")
+        self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
         self.chk_show_ob.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 11px;")
         
@@ -2341,6 +2341,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                     if (!obs || !overlay) return;
                                     overlay.innerHTML = '';
                                     const w = overlay.clientWidth || (container ? container.clientWidth : 800);
+                                    const canvas = (chartObj && chartObj.div) ? chartObj.div.querySelector('canvas') : null;
+                                    const paneW = canvas ? canvas.clientWidth : (w - 65);
 
                                     obs.forEach(ob => {{
                                         const y1 = series.priceToCoordinate(ob.high);
@@ -2364,24 +2366,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         }}
 
                                         const bg = isBull ? 'rgba(21, 101, 192, 0.38)' : 'rgba(198, 40, 40, 0.38)';
-                                        const border = isBull ? 'rgba(30, 136, 229, 0.75)' : 'rgba(229, 57, 53, 0.75)';
 
                                         const box = document.createElement('div');
                                         box.style.position = 'absolute';
                                         box.style.top = topY + 'px';
                                         box.style.left = startX + 'px';
-                                        box.style.width = Math.max(20, (w - startX - 55)) + 'px';
+                                        box.style.width = Math.max(20, (paneW - startX)) + 'px';
                                         box.style.height = h + 'px';
                                         box.style.backgroundColor = bg;
-                                        box.style.border = '1px solid ' + border;
+                                        box.style.border = '1px solid transparent';
                                         box.style.boxSizing = 'border-box';
                                         box.style.borderRadius = '2px';
                                         box.style.display = 'flex';
                                         box.style.alignItems = 'center';
-
-                                        const lblText = isBull ? `Bullish OB [${{ob.low.toFixed(2)}}]` : `Bearish OB [${{ob.high.toFixed(2)}}]`;
-                                        const textColor = isBull ? '#64b5f6' : '#e57373';
-                                        box.innerHTML = `<span style="color:${{textColor}}; font-size:11px; font-weight:bold; margin-left:5px; pointer-events:none; white-space:nowrap; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${{lblText}}</span>`;
 
                                         overlay.appendChild(box);
                                     }});

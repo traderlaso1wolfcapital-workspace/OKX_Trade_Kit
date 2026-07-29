@@ -622,7 +622,7 @@ def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
                     ob.raw_high = max(ob.raw_high, new_ob.raw_high) if ob.raw_high > Decimal("0") else new_ob.raw_high
                 if new_ob.raw_low > Decimal("0"):
                     ob.raw_low = min(ob.raw_low, new_ob.raw_low) if ob.raw_low > Decimal("0") else new_ob.raw_low
-                ob.bar_time = max(ob.bar_time, new_ob.bar_time)
+                ob.bar_time = min(ob.bar_time, new_ob.bar_time)
                 merged = True
                 return True
                 
