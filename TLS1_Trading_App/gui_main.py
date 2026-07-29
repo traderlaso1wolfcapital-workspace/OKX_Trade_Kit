@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.243")
+            return json.load(f).get("version", "1.0.244")
     except:
-        return "1.0.243"
+        return "1.0.244"
 
 APP_VERSION = get_app_version()
 
@@ -924,8 +924,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         log_header.addWidget(QtWidgets.QLabel("Màn hình logs hệ thống (realtime):"))
         log_header.addStretch(1)
         
-        btn_clear_log = QtWidgets.QPushButton("🗑️ Xóa Màn Hình Logs")
-        btn_clear_log.setStyleSheet("max-width: 150px; padding: 5px;")
+        btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
+        btn_clear_log.setStyleSheet("max-width: 100px; padding: 5px;")
         
         self.log_display = QtWidgets.QPlainTextEdit()
         self.log_display.setReadOnly(True)
@@ -952,10 +952,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.setContentsMargins(10, 10, 10, 0)
         
         self.combo_coin = QtWidgets.QComboBox()
-        self.combo_coin.addItems(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"])
+        for p in ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
+            self.combo_coin.addItem(p.replace("-SWAP", ""), p)
+        self.combo_coin.setFixedWidth(100)
         self.combo_tf = QtWidgets.QComboBox()
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("5m")
+        self.combo_tf.setFixedWidth(60)
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
@@ -988,7 +991,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
-            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentText(), bar="5m", parent=self)
+            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar="5m", parent=self)
             self.live_chart_worker.chart_data_signal.connect(self.update_live_chart)
             
             self.combo_coin.currentTextChanged.connect(self.on_chart_config_changed)
@@ -2233,7 +2236,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.live_chart_worker.bar = self.combo_tf.currentText()
             self._chart_initialized = False
             if getattr(self, 'chart_widget', None):
-                self.chart_widget.watermark(f'{self.live_chart_worker.inst_id} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
+                self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
                 self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
                 self.chart_widget.spinner(True)
 
