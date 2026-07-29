@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.244")
+            return json.load(f).get("version", "1.0.245")
     except:
-        return "1.0.244"
+        return "1.0.245"
 
 APP_VERSION = get_app_version()
 
@@ -836,9 +836,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         top_panel.setSpacing(15)
 
         # Nhóm Hành Động
-        control_box = QtWidgets.QGroupBox("Hành Động")
+        control_box = QtWidgets.QWidget()
         control_layout = QtWidgets.QHBoxLayout(control_box)
-        control_layout.setContentsMargins(15, 20, 15, 15)
+        control_layout.setContentsMargins(0, 5, 15, 5)
         control_layout.setSpacing(10)
 
         self.btn_start = QtWidgets.QPushButton("▶ BẮT ĐẦU CHẠY BOT")

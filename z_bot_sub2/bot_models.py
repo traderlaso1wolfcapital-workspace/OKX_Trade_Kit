@@ -25,7 +25,7 @@ class OrderBlock:
     bar_low: Decimal         # parsedLows[parsedIndex] — vùng OB (đã filter volatility)
     bar_time: int            # timestamp nến OB
     bias: int                # +1 = BULLISH, -1 = BEARISH
-    source: str = "SWING"    # "SWING" hoặc "INTERNAL"
+    source: str = "SWING"    # "SWING" hoặc "INTERNAL"k
     crossed: bool = False    # đã bị mitigate hoặc đã có lệnh khớp
     has_triggered: bool = False  # đã từng có lệnh khớp từ OB này
     raw_high: Decimal = Decimal("0")  # Đỉnh râu nguyên bản (dùng cho SL)
