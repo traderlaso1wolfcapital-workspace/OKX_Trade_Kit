@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.241")
+            return json.load(f).get("version", "1.0.242")
     except:
-        return "1.0.241"
+        return "1.0.242"
 
 APP_VERSION = get_app_version()
 
@@ -2379,9 +2379,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         box.style.display = 'flex';
                                         box.style.alignItems = 'center';
 
-                                        const lblText = isBull ? `Bullish OB [${ob.low.toFixed(2)}]` : `Bearish OB [${ob.high.toFixed(2)}]`;
+                                        const lblText = isBull ? `Bullish OB [${{ob.low.toFixed(2)}}]` : `Bearish OB [${{ob.high.toFixed(2)}}]`;
                                         const textColor = isBull ? '#64b5f6' : '#e57373';
-                                        box.innerHTML = `<span style="color:${textColor}; font-size:11px; font-weight:bold; margin-left:5px; pointer-events:none; white-space:nowrap; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${lblText}</span>`;
+                                        box.innerHTML = `<span style="color:${{textColor}}; font-size:11px; font-weight:bold; margin-left:5px; pointer-events:none; white-space:nowrap; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${{lblText}}</span>`;
 
                                         overlay.appendChild(box);
                                     }});
