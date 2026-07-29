@@ -149,11 +149,11 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.59")
+            return json.load(f).get("version", "1.0.240")
     except:
-        return "1.0.59"
+        return "1.0.240"
 
-APP_VERSION = "1.0.239"
+APP_VERSION = get_app_version()
 
 IS_LOGGED_IN = False
 CURRENT_USER = None
@@ -474,6 +474,34 @@ class LiveChartWorker(QtCore.QThread):
                                             chart_data["markers"] = markers[self.inst_id]
                                 except Exception:
                                     pass
+
+                            # Tính toán Order Blocks cho Bot Sub2 SMC
+                            try:
+                                import z_bot_sub2.bot_strategy as sub2_strat
+                                from z_bot_sub2.bot_models import AssetTracker
+                                from decimal import Decimal
+                                tk = AssetTracker()
+                                times = [int(c[0]) for c in candles]
+                                opens = [Decimal(c[1]) for c in candles]
+                                highs = [Decimal(c[2]) for c in candles]
+                                lows = [Decimal(c[3]) for c in candles]
+                                closes = [Decimal(c[4]) for c in candles]
+                                vol = sub2_strat.get_volatility_measure(closes, highs, lows)
+                                sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
+                                
+                                ob_boxes = []
+                                for ob in (tk.swing_obs + tk.internal_obs):
+                                    if not ob.crossed:
+                                        ob_boxes.append({
+                                            "high": float(ob.bar_high),
+                                            "low": float(ob.bar_low),
+                                            "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
+                                            "bias": int(ob.bias),
+                                            "source": str(ob.source)
+                                        })
+                                chart_data["ob_boxes"] = ob_boxes
+                            except Exception:
+                                pass
 
                             self.chart_data_signal.emit(chart_data)
             except Exception:
@@ -911,10 +939,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("5m")
         
+        self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB SMC (Xanh/Đỏ)")
+        self.chk_show_ob.setChecked(True)
+        self.chk_show_ob.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 11px;")
+        
         control_layout.addWidget(QtWidgets.QLabel("Cặp giao dịch:"))
         control_layout.addWidget(self.combo_coin)
         control_layout.addWidget(QtWidgets.QLabel("Timeframe:"))
         control_layout.addWidget(self.combo_tf)
+        control_layout.addWidget(self.chk_show_ob)
         control_layout.addStretch()
         
         chart_layout.addLayout(control_layout)
@@ -1370,7 +1403,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "H2: x3.0\n"
             "H4: x5.0"
         )
-        add_field(l_risk, 0, "Volume limit lệnh (USDT):", self.input_pos_vol, tooltip_text)
+        add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.input_pos_vol, tooltip_text)
         
         self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %"); self.input_tp_pct.setValue(0.80)
         self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %"); self.input_sl_pct.setValue(0.80)
@@ -1477,6 +1510,31 @@ class BotInstanceWidget(QtWidgets.QWidget):
             h.addStretch()
             layout_obj.addLayout(h, row, col, 1, colspan)
 
+        # 0. DANH MỤC GIAO DỊCH
+        grp_active_coins = QtWidgets.QGroupBox("Danh Mục Giao Dịch")
+        grp_active_coins.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
+        
+        import os
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="#4CAF50" stroke-width="4" d="M4 12l5 5L20 6"/></svg>'
+        svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
+        if not os.path.exists(svg_path):
+            with open(svg_path, "w", encoding="utf-8") as f:
+                f.write(svg_content)
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        
+        self.smc_chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
+        self.smc_chk_cfg_xau.setStyleSheet(cb_style)
+        self.smc_chk_cfg_btc = QtWidgets.QCheckBox("BTC-USDT-SWAP")
+        self.smc_chk_cfg_btc.setStyleSheet(cb_style)
+        self.smc_chk_cfg_eth = QtWidgets.QCheckBox("ETH-USDT-SWAP")
+        self.smc_chk_cfg_eth.setStyleSheet(cb_style)
+        
+        l_active_coins.addWidget(self.smc_chk_cfg_xau)
+        l_active_coins.addWidget(self.smc_chk_cfg_btc)
+        l_active_coins.addWidget(self.smc_chk_cfg_eth)
+        layout.addWidget(grp_active_coins)
+
         # 1. DANH MỤC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Danh Mục Chiến Thuật SMC")
         l_toggles = QtWidgets.QGridLayout(grp_toggles)
@@ -1488,14 +1546,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         grp_risk = QtWidgets.QGroupBox("Quản Lý Vốn & Rủi Ro")
         l_risk = QtWidgets.QGridLayout(grp_risk)
         self.smc_chk_dynamic_risk = ToggleSwitch()
-        add_checkbox(l_risk, 0, 0, "Bật quản lý Volume theo % vốn", self.smc_chk_dynamic_risk, "Nếu bật, bot sẽ dùng % vốn dưới đây để vào lệnh.", 2)
-        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox(); self.smc_input_risk_pct.setSuffix(" %")
-        add_field(l_risk, 1, "Vào lệnh theo % vốn:", self.smc_input_risk_pct, "Phần trăm tài khoản sẽ vào lệnh (Risk per trade).")
+        self.smc_chk_dynamic_risk.setChecked(False)
+        self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox()
+        
         self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000)
-        add_field(l_risk, 2, "Vốn Limit cố định:", self.smc_input_pos_vol, "Sử dụng nếu quản lý vốn động bị tắt.")
+        add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.smc_input_pos_vol, "Khối lượng vốn cố định (USDT) cho mỗi lệnh Limit SMC.")
         
         self.smc_input_rr = QtWidgets.QDoubleSpinBox(); self.smc_input_rr.setDecimals(1)
-        add_field(l_risk, 3, "Tỷ lệ Risk:Reward (RR):", self.smc_input_rr, "Tỷ lệ lợi nhuận/rủi ro cho mỗi setup SMC (VD: 2.0 = 1:2).")
+        add_field(l_risk, 1, "Tỷ lệ Risk:Reward (RR):", self.smc_input_rr, "Tỷ lệ lợi nhuận/rủi ro cho mỗi setup SMC (VD: 2.0 = 1:2).")
         layout.addWidget(grp_risk)
 
         # 3. CẤU TRÚC SMC & PIVOT
@@ -1530,6 +1588,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_field(l_smc, 7, "Số lệnh chạy tối đa:", self.smc_input_max_setup, "Số lượng lệnh (setups) SMC tối đa được mở cùng lúc.")
         
         layout.addWidget(grp_smc)
+        grp_smc.hide()
+        
+        layout.addStretch(1)
 
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH SMC (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
@@ -1616,9 +1677,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         try:
             if self.strategy_id == "sub2":
                 self.smc_chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_SMC", getattr(bot_config, "ENABLE_STRATEGY_SMC", True))))
-                self.smc_chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", True))))
+                self.smc_chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", False))))
                 self.smc_input_risk_pct.setValue(float(cfg.get("RISK_PER_TRADE_PCT", getattr(bot_config, "RISK_PER_TRADE_PCT", 0.01))) * 100)
-                self.smc_input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 150))))
+                self.smc_input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 100))))
 
                 # Smart Money Concepts
                 # Smart Money Concepts
@@ -1661,7 +1722,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     tp_map = {"RR": "Risk:Reward", "NEAREST_OB": "Nearest opposite OB", "FALLBACK_RR": "Opposite OB, fallback RR"}
                     tpm = cfg.get("OB_TP_MODE", getattr(bot_config, "OB_TP_MODE", "RR"))
                     self.smc_combo_tp.setCurrentText(tp_map.get(tpm, "Risk:Reward"))
-                    self.smc_input_rr.setValue(float(cfg.get("OB_RR_RATIO", getattr(bot_config, "OB_RR_RATIO", 2.0))))
+                    self.smc_input_rr.setValue(float(cfg.get("OB_RR_RATIO", getattr(bot_config, "OB_RR_RATIO", 1.0))))
                     self.smc_input_max_setup.setValue(int(cfg.get("OB_MAX_ACTIVE_SETUPS", getattr(bot_config, "OB_MAX_ACTIVE_SETUPS", 10))))
                     self.smc_input_ob_max.setValue(int(cfg.get("OB_MAX_COUNT", getattr(bot_config, "OB_MAX_COUNT", 20))))
                 except AttributeError:
@@ -1684,7 +1745,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.008)))) * 100)
             self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.008)))) * 100)
-            self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", float(getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 150.0)))))
+            self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", float(getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 100.0)))))
             
             self.input_dca_gap_pct.setValue(float(cfg.get("DCA_GAP_THRESHOLD_PCT", float(getattr(bot_config, "DCA_GAP_THRESHOLD_PCT", 0.01)))) * 100)
             self.input_confluence_pct.setValue(float(cfg.get("EMA_CONFLUENCE_TOLERANCE_PCT", float(getattr(bot_config, "EMA_CONFLUENCE_TOLERANCE_PCT", 0.01)))) * 100)
@@ -1703,15 +1764,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.input_btc_vol_mult.setValue(float(cfg.get("VOL_MULTIPLIERS", {}).get("BTC", float(btc_cfg.get("vol_mult", 1.0)))))
             self.input_eth_vol_mult.setValue(float(cfg.get("VOL_MULTIPLIERS", {}).get("ETH", float(eth_cfg.get("vol_mult", 1.3)))))
             
+            enabled_coins = cfg.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
             if hasattr(self, 'chk_cfg_btc'):
-                enabled_coins = cfg.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
                 self.chk_cfg_btc.setChecked("BTC" in enabled_coins)
                 self.chk_cfg_eth.setChecked("ETH" in enabled_coins)
                 self.chk_cfg_xau.setChecked("XAU" in enabled_coins)
-                if hasattr(self, 'dash_chk_btc'):
-                    self.dash_chk_btc.setChecked("BTC" in enabled_coins)
-                    self.dash_chk_eth.setChecked("ETH" in enabled_coins)
-                    self.dash_chk_xau.setChecked("XAU" in enabled_coins)
+            if hasattr(self, 'smc_chk_cfg_btc'):
+                self.smc_chk_cfg_btc.setChecked("BTC" in enabled_coins)
+                self.smc_chk_cfg_eth.setChecked("ETH" in enabled_coins)
+                self.smc_chk_cfg_xau.setChecked("XAU" in enabled_coins)
+            if hasattr(self, 'dash_chk_btc'):
+                self.dash_chk_btc.setChecked("BTC" in enabled_coins)
+                self.dash_chk_eth.setChecked("ETH" in enabled_coins)
+                self.dash_chk_xau.setChecked("XAU" in enabled_coins)
         except Exception as e: 
             print('Error setting defaults:', e)
 
@@ -1969,6 +2034,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "OB_MAX_ACTIVE_SETUPS": self.smc_input_max_setup.value(),
                 "OB_MAX_COUNT": self.smc_input_ob_max.value(),
             })
+            smc_enabled = []
+            if getattr(self, 'smc_chk_cfg_xau', None) and self.smc_chk_cfg_xau.isChecked(): smc_enabled.append("XAU")
+            if getattr(self, 'smc_chk_cfg_btc', None) and self.smc_chk_cfg_btc.isChecked(): smc_enabled.append("BTC")
+            if getattr(self, 'smc_chk_cfg_eth', None) and self.smc_chk_cfg_eth.isChecked(): smc_enabled.append("ETH")
+            if smc_enabled:
+                cfg["ENABLED_COINS"] = smc_enabled
         else:
             enabled = []
             if getattr(self, 'chk_cfg_xau', None) and self.chk_cfg_xau.isChecked(): enabled.append("XAU")
@@ -2202,6 +2273,113 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                 except:
                                     pass
                             self._last_markers_hash = m_hash
+
+                    # Vẽ Vùng Order Block SMC (Dải bôi Xanh/Đỏ nhạt, bắt đầu từ nến OB, KHÔNG chữ, KHÔNG đường kẻ ngang)
+                    if "ob_boxes" in data and getattr(self, 'chk_show_ob', None) and self.chk_show_ob.isChecked():
+                        ob_boxes = data["ob_boxes"]
+                        js_code = f"""
+                        (function() {{
+                            try {{
+                                let chartObj = window['{self.chart_widget.id}'] || window.{self.chart_widget.id};
+                                if (!chartObj && window.pythonObject) {{
+                                    for (let key in window) {{
+                                        if (window[key] && window[key].series) {{
+                                            chartObj = window[key];
+                                            break;
+                                        }}
+                                    }}
+                                }}
+                                if (!chartObj || !chartObj.series) return;
+                                const series = chartObj.series;
+                                const chart = chartObj.chart;
+                                
+                                // Xóa toàn bộ price lines cũ nếu có
+                                if (window._smc_ob_lines) {{
+                                    window._smc_ob_lines.forEach(l => {{ try {{ series.removePriceLine(l); }} catch(e){{}} }});
+                                    window._smc_ob_lines = [];
+                                }}
+
+                                const container = chartObj.container || (chartObj.div ? chartObj.div : document.body);
+                                let overlay = document.getElementById('smc_ob_shaded_overlay');
+                                if (!overlay) {{
+                                    overlay = document.createElement('div');
+                                    overlay.id = 'smc_ob_shaded_overlay';
+                                    overlay.style.position = 'absolute';
+                                    overlay.style.top = '0';
+                                    overlay.style.left = '0';
+                                    overlay.style.width = '100%';
+                                    overlay.style.height = '100%';
+                                    overlay.style.pointerEvents = 'none';
+                                    overlay.style.zIndex = '4';
+                                    overlay.style.overflow = 'hidden';
+                                    if (container && container.style) container.style.position = 'relative';
+                                    (container || document.body).appendChild(overlay);
+                                }}
+
+                                window._active_smc_obs = {json.dumps(ob_boxes)};
+
+                                function drawObShadedBands() {{
+                                    const obs = window._active_smc_obs;
+                                    if (!obs || !overlay) return;
+                                    overlay.innerHTML = '';
+                                    const w = overlay.clientWidth || (container ? container.clientWidth : 800);
+
+                                    obs.forEach(ob => {{
+                                        const y1 = series.priceToCoordinate(ob.high);
+                                        const y2 = series.priceToCoordinate(ob.low);
+                                        if (y1 === null || y2 === null) return;
+
+                                        const topY = Math.min(y1, y2);
+                                        const botY = Math.max(y1, y2);
+                                        const h = Math.max(botY - topY, 4);
+                                        const isBull = (ob.bias === 1);
+
+                                        let startX = 50;
+                                        if (chart && chart.timeScale && ob.time && ob.time > 0) {{
+                                            try {{
+                                                const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+                                                const xCoord = chart.timeScale().timeToCoordinate(secTime);
+                                                if (xCoord !== null && xCoord > 0) {{
+                                                    startX = Math.max(10, Math.floor(xCoord));
+                                                }}
+                                            }} catch(e) {{}}
+                                        }}
+
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.38)' : 'rgba(198, 40, 40, 0.38)';
+                                        const border = isBull ? 'rgba(30, 136, 229, 0.75)' : 'rgba(229, 57, 53, 0.75)';
+
+                                        const box = document.createElement('div');
+                                        box.style.position = 'absolute';
+                                        box.style.top = topY + 'px';
+                                        box.style.left = startX + 'px';
+                                        box.style.width = Math.max(20, (w - startX - 55)) + 'px';
+                                        box.style.height = h + 'px';
+                                        box.style.backgroundColor = bg;
+                                        box.style.borderTop = '1px solid ' + border;
+                                        box.style.borderBottom = '1px solid ' + border;
+                                        box.style.boxSizing = 'border-box';
+                                        box.style.borderRadius = '1px';
+
+                                        overlay.appendChild(box);
+                                    }});
+                                }}
+
+                                window._drawObShadedBands = drawObShadedBands;
+                                drawObShadedBands();
+
+                                if (!window._smc_ob_subscribed && chart && chart.timeScale) {{
+                                    window._smc_ob_subscribed = true;
+                                    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {{
+                                        if (window._drawObShadedBands) window._drawObShadedBands();
+                                    }});
+                                }}
+                            }} catch(err) {{}}
+                        }})();
+                        """
+                        try:
+                            self.chart_widget.run_script(js_code)
+                        except Exception:
+                            pass
             except Exception as e:
                 import traceback
                 traceback.print_exc()

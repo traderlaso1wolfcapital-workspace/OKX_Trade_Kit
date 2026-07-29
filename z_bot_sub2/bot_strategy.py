@@ -877,12 +877,12 @@ def load_global_config_from_json(env_paths: dict, globals_ref: Any):
             with open(config_path, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
                 
-                if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg: globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = float(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"])
+                if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg: globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
                 if "LEVERAGE" in cfg: globals_ref.LEVERAGE = int(cfg["LEVERAGE"])
-                if "SWING_VOLUME_USDT" in cfg: globals_ref.SWING_VOLUME_USDT = float(cfg["SWING_VOLUME_USDT"])
-                if "SWING_RISK_PCT" in cfg: globals_ref.SWING_RISK_PCT = float(cfg["SWING_RISK_PCT"])
-                if "INTERNAL_VOLUME_USDT" in cfg: globals_ref.INTERNAL_VOLUME_USDT = float(cfg["INTERNAL_VOLUME_USDT"])
-                if "INTERNAL_RISK_PCT" in cfg: globals_ref.INTERNAL_RISK_PCT = float(cfg["INTERNAL_RISK_PCT"])
+                if "SWING_VOLUME_USDT" in cfg: globals_ref.SWING_VOLUME_USDT = Decimal(str(cfg["SWING_VOLUME_USDT"]))
+                if "SWING_RISK_PCT" in cfg: globals_ref.SWING_RISK_PCT = Decimal(str(cfg["SWING_RISK_PCT"]))
+                if "INTERNAL_VOLUME_USDT" in cfg: globals_ref.INTERNAL_VOLUME_USDT = Decimal(str(cfg["INTERNAL_VOLUME_USDT"]))
+                if "INTERNAL_RISK_PCT" in cfg: globals_ref.INTERNAL_RISK_PCT = Decimal(str(cfg["INTERNAL_RISK_PCT"]))
                 if "INTERNAL_LEVERAGE" in cfg: globals_ref.INTERNAL_LEVERAGE = int(cfg["INTERNAL_LEVERAGE"])
                 
                 if "SMC_TRADE" in cfg: globals_ref.SMC_TRADE = bool(cfg["SMC_TRADE"])
@@ -890,6 +890,7 @@ def load_global_config_from_json(env_paths: dict, globals_ref: Any):
                 if "OB_DIRECTION" in cfg: globals_ref.OB_DIRECTION = cfg["OB_DIRECTION"]
                 if "OB_MAX_ACTIVE_SETUPS" in cfg: globals_ref.OB_MAX_ACTIVE_SETUPS = int(cfg["OB_MAX_ACTIVE_SETUPS"])
                 if "ENABLE_STRATEGY_SMC" in cfg: globals_ref.ENABLE_STRATEGY_SMC = bool(cfg["ENABLE_STRATEGY_SMC"])
+                if "ENABLED_COINS" in cfg: globals_ref.ENABLED_COINS = cfg["ENABLED_COINS"]
                 
                 # Update COIN_PORTFOLIO mapping
                 for item in globals_ref.COIN_PORTFOLIO:

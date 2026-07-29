@@ -212,7 +212,7 @@ def main():
     pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
 
     for cfg in bot_config.COIN_PORTFOLIO:
-        try: client.request("POST", "/api/v5/account/set-leverage", body={"instId": cfg["swap"], "lever": str(bot_config.POSITION_LEVERAGE), "mgnMode": bot_config.POSITION_MODE})
+        try: client.request("POST", "/api/v5/account/set-leverage", body={"instId": cfg["swap"], "lever": str(bot_config.LEVERAGE), "mgnMode": bot_config.POSITION_MODE})
         except: pass
         tk = AssetTracker()
         tk.swap_id = cfg["swap"]
@@ -371,21 +371,25 @@ def main():
                     is_limit_setup_cycle = True
                     last_limit_setup = now
 
-                # CHẠY ĐA LUỒNG (THREAD POOL) THAY VÌ FOR LOOP TUẦN TỰ
-                with concurrent.futures.ThreadPoolExecutor(max_workers=len(bot_config.COIN_PORTFOLIO)) as executor:
-                    futures = []
-                    for cfg in bot_config.COIN_PORTFOLIO:
-                        futures.append(executor.submit(
+                # --- Xử lý đa luồng (Multi-threading) chống trễ mạng (Sub1 Engine Pattern) ---
+                if not hasattr(sys, '_bot_sub2_executor'):
+                    sys._bot_sub2_executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(32, len(bot_config.COIN_PORTFOLIO) * 2))
+                
+                try:
+                    with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
+                        _gcfg = json.load(f)
+                        enabled_coins = _gcfg.get("ENABLED_COINS", ["XAU", "BTC", "ETH"])
+                except:
+                    enabled_coins = getattr(bot_config, "ENABLED_COINS", ["XAU", "BTC", "ETH"])
+                
+                futures = []
+                for cfg in bot_config.COIN_PORTFOLIO:
+                    if cfg.get("coin", "") in enabled_coins:
+                        futures.append(sys._bot_sub2_executor.submit(
                             bot_sub2.run_strategy_cycle,
                             client, cfg, pMode, state_matrix, env_paths, system_config, is_limit_setup_cycle
                         ))
-                    
-                    # Chờ tất cả quét xong
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception as e:
-                            print(f"Error in ThreadPool run_strategy_cycle: {e}")
+                concurrent.futures.wait(futures)
 
             # 4. CẬP NHẬT GIAO DIỆN TERMINAL (20 giây)
             if now - last_dashboard_update >= 20.0:

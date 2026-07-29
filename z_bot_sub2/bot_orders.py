@@ -62,9 +62,11 @@ def clean_ob_orders(client, inst_id: str, cl_prefix: str, side: str = None):
                 if side is None or o.get("posSide") == side:
                     cancel_batch.append({"instId": inst_id, "ordId": o["ordId"]})
         if cancel_batch:
-            client.request("POST", "/api/v5/trade/cancel-batch-orders", body=cancel_batch)
-    except:
-        pass
+            for i in range(0, len(cancel_batch), 20):
+                client.request("POST", "/api/v5/trade/cancel-batch-orders", body=cancel_batch[i:i+20])
+                time.sleep(0.1)
+    except Exception as e:
+        print(f"⚠️ [clean_ob_orders]: Lỗi khi hủy lệnh rác {inst_id}: {e}")
 
 
 # Global counter để tránh trùng clOrdId trong cùng 1 giây

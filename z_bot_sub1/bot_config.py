@@ -29,7 +29,7 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("200")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("100")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệnh (0.005 = 0.5%)
 

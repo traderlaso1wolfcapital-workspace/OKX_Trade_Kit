@@ -19,18 +19,18 @@ M30_LIMIT_CANDLES = 600             # Số nến M30 fetch (600 nến 30m ≈ 30
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-USE_DYNAMIC_RISK = True             # Bật quản lý vốn động theo % tài khoản
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("40")   # Vốn cố định nếu tắt Dynamic Risk
+USE_DYNAMIC_RISK = False            # Bắt buộc dùng Volume cố định
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("100") # Vốn cố định mặc định (100 USDT)
 RISK_PER_TRADE_PCT = Decimal("0.01") # Risk per trade theo % vốn (1%)
 LEVERAGE = 100                      # Đòn bẩy
 POSITION_MODE = "cross"             # Chế độ Margin
 
 # -- Volume & Risk riêng cho Swing OB (lệnh chính) --
-SWING_VOLUME_USDT = Decimal("70")    # Volume USDT cho Swing OB
+SWING_VOLUME_USDT = Decimal("100")   # Volume USDT cho Swing OB (100 USDT)
 SWING_RISK_PCT = Decimal("0.02")     # Risk % cho Swing OB (2%)
 
 # -- Volume & Risk riêng cho Internal OB (lệnh phụ) --
-INTERNAL_VOLUME_USDT = Decimal("40") # Volume USDT cho Internal OB
+INTERNAL_VOLUME_USDT = Decimal("100")# Volume USDT cho Internal OB (100 USDT)
 INTERNAL_RISK_PCT = Decimal("0.01")  # Risk % cho Internal OB (1%)
 INTERNAL_LEVERAGE = 50               # Đòn bẩy riêng cho Internal OB (isolated)
 
@@ -117,8 +117,9 @@ SMC_TRADE = True                    # Show OB Trade Setup
 OB_SOURCE = "SWING"                 # "ALL" | "INTERNAL" | "SWING" ← CHỈ DÙNG SWING OB
 OB_DIRECTION = "BOTH"               # "BOTH" | "LONG_ONLY" | "SHORT_ONLY"
 OB_TP_MODE = "RR"                   # "RR" | "NEAREST_OB" | "FALLBACK_RR"
-OB_RR_RATIO_TREND = Decimal("5.0")   # RR cho Swing OB (thuận trend chính, 1:5)
-OB_RR_RATIO_INTERNAL = Decimal("1.0") # RR cho Internal OB (tất cả các hướng, 1:1)
+OB_RR_RATIO_TREND = Decimal("1.0")   # RR cho Swing OB (1:1)
+OB_RR_RATIO_INTERNAL = Decimal("1.0") # RR cho Internal OB (1:1)
+OB_RR_RATIO = Decimal("1.0")          # RR mặc định (1:1)
 OB_MAX_ACTIVE_SETUPS = 40           # Max setups giữ lại cùng lúc
 
 # ==============================================================================
@@ -129,8 +130,10 @@ CL_ORD_PREFIX = "scvsub2"
 
 # --- DANH MỤC COIN ---
 COIN_PORTFOLIO = [
+    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "vol_mult": "1.0"},
     {"coin": "BTC", "swap": "BTC-USDT-SWAP", "vol_mult": "1.0"},
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "vol_mult": "0.8"},
 ]
+ENABLED_COINS = ["XAU", "BTC", "ETH"]
 # z7713 | Chuyển M15, RR 1:1, OB_SOURCE="SWING"
 # z7716 | Tách RR thành OB_RR_RATIO_TREND (1:5) và OB_RR_RATIO_COUNTER (1:1)

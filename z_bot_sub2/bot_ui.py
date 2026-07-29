@@ -122,9 +122,11 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     print(f"{r2_c1:<{col1_w}} | {r2_c2:<{col2_w}} | {r2_c3:<{col3_w}} | {r2_c4:<{col4_w}}")
     print("=" * 97)
     
+    sorted_trackers = dict(sorted(trackers.items(), key=lambda x: (0 if "BTC" in x[0] else 1, x[0])))
+
     # CHIẾN THUẬT ĐANG KÍCH HOẠT
     print("\n⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT:")
-    for symbol, tracker in trackers.items():
+    for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         # In trạng thái của SMC Sub2
         detail = "Order Block SMC (Thuận Trend)"
@@ -139,9 +141,9 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     # BẢNG COIN — Cột OB luôn width cố định 23 ký tự, dấu | thẳng hàng
     OB_W = 23  # width cố định cho mỗi cột OB ZONE
     # Header động theo trend: MAIN = thuận trend, HEDGE = ngược trend
-    if any(t.swing_trend == 1 for t in trackers.values()):
+    if any(t.swing_trend == 1 for t in sorted_trackers.values()):
         h1, h2 = "OB MAIN (M15 LONG)", "OB HEDGE (M30 SHORT)"
-    elif any(t.swing_trend == -1 for t in trackers.values()):
+    elif any(t.swing_trend == -1 for t in sorted_trackers.values()):
         h1, h2 = "OB MAIN (M15 SHORT)", "OB HEDGE (M30 LONG)"
     else:
         h1, h2 = "OB MAIN (M15)", "OB HEDGE (M30)"
@@ -150,7 +152,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     print(f" {'COIN':<4} | {'PRICE':>9} | {'TREND':<6} | {h1:^{OB_W}} | {h2:^{OB_W}} | {'STATUS'}")
     print(f"-" * 95)
     
-    for symbol, tracker in trackers.items():
+    for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         price = f"{float(tracker.live_price):.2f}"
         
@@ -199,7 +201,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     all_int_pending = {}
     all_swing_pending = {}
     
-    for symbol, tracker in trackers.items():
+    for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         pending = [s for s in tracker.trade_setups if not s.triggered]
         int_p = [s for s in pending if s.ob_source == "INTERNAL"]
@@ -219,7 +221,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
             all_swing_pending[coin] = {"LONG": long_s, "SHORT": short_s}
     
     int_printed = False
-    for coin in sorted(all_int_pending.keys()):
+    for coin in sorted(all_int_pending.keys(), key=lambda c: (0 if "BTC" in c else 1, c)):
         data = all_int_pending[coin]
         if data["LONG"]:
             print(f"    ✧ {coin:<4}      Chờ khớp LONG Internal: {', '.join(data['LONG'])} (RR 1:1)")
@@ -232,7 +234,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
         print("")
     
     swing_printed = False
-    for coin in sorted(all_swing_pending.keys()):
+    for coin in sorted(all_swing_pending.keys(), key=lambda c: (0 if "BTC" in c else 1, c)):
         data = all_swing_pending[coin]
         for s in data.get("LONG", []):
             ep = float(s.entry_price); sl_px = float(s.stop_loss); tp_px = float(s.take_profit)
@@ -255,7 +257,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     # ✜ ĐÃ KHỚP (triggered)
     print("\n✜ TÌNH TRẠNG VỊ THẾ (ĐÃ KHỚP):")
     any_triggered = False
-    for symbol, tracker in trackers.items():
+    for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         triggered = [s for s in tracker.trade_setups if s.triggered]
         for s in triggered:
