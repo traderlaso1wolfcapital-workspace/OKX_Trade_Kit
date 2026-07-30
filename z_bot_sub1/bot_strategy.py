@@ -664,7 +664,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         try:
             _amt = (new_pos_amt - old_pos_amt) if old_has else new_pos_amt
             current_vol_usdt = Decimal(str(_amt)) * Decimal(str(contract_val)) * Decimal(str(avg_px))
-            _target_usdt = Decimal("200")
+            _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "400")))
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
                 if gcfg_path and os.path.exists(gcfg_path):
@@ -935,18 +935,16 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             BẮT BUỘC KHỞI ĐẦU: Quét tổng volume thực tế trên sàn, so sánh với Setting Base Volume trong JSON
             để quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã được DCA trong khối volume đó.
             """
-            _target_usdt = Decimal("200")
+            _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "400")))
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
                 if gcfg_path and os.path.exists(gcfg_path):
                     with open(gcfg_path, "r", encoding="utf-8") as f:
                         _gcfg = json.load(f)
-                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _gcfg:
+                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _gcfg and Decimal(str(_gcfg["POSITION_VOLUME_HIGH_CONFIDENCE"])) > 0:
                             _target_usdt = Decimal(str(_gcfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
-                elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
-                    _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+                pass
 
             _coin_vol_mult = Decimal("1.0")
             for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
