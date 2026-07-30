@@ -2868,19 +2868,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_update.setEnabled(False)
 
     def run_update_app(self):
-        # ⚡ Hộp thoại cảnh báo & xác định tình trạng vị thế trước khi cập nhật
+        # 💡 Hộp thoại nhắc nhở nhẹ nhàng trước khi cập nhật
         msg_box = QtWidgets.QMessageBox(self)
-        msg_box.setWindowTitle("⚠️ CẢNH BÁO QUAN TRỌNG TRƯỚC KHI CẬP NHẬT")
-        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Warning)
-        msg_box.setText("<b>VUI LÒNG KIỂM TRA VỊ THẾ TRÊN SÀN!</b>")
+        msg_box.setWindowTitle("💡 Nhắc Nhở Trước Khi Cập Nhật")
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Information)
+        msg_box.setText("<b>Lưu ý nhỏ về vị thế trên sàn</b>")
         msg_box.setInformativeText(
-            "Để hạn chế tối đa rủi ro cho tài khoản, các Sếp vui lòng kiểm tra và đảm bảo <b>KHÔNG còn lệnh/vị thế nào đang chạy</b> trên sàn OKX trước khi thực hiện cập nhật ứng dụng.\n\n"
-            "• <b>Xác nhận cập nhật</b>: Tiến hành tải và cập nhật phiên bản mới ngay lập tức.\n"
-            "• <b>Quay lại kiểm tra</b>: Hủy cập nhật để Sếp kiểm tra lại vị thế trên tài khoản."
+            "Để quá trình cập nhật diễn ra an toàn nhất, Sếp lưu ý kiểm tra và nên đóng các lệnh/vị thế đang chạy trên sàn OKX trước khi cập nhật nhé.\n\n"
+            "• <b>Cập nhật ngay</b>: Tiến hành tải và cập nhật phiên bản mới.\n"
+            "• <b>Để sau</b>: Hủy để Sếp kiểm tra lại tài khoản trước."
         )
-        btn_confirm = msg_box.addButton("Xác nhận cập nhật", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
-        btn_cancel = msg_box.addButton("Quay lại kiểm tra", QtWidgets.QMessageBox.ButtonRole.RejectRole)
-        msg_box.setDefaultButton(btn_cancel)
+        btn_confirm = msg_box.addButton("Cập nhật ngay", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        btn_cancel = msg_box.addButton("Để sau", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        msg_box.setDefaultButton(btn_confirm)
         
         msg_box.setStyleSheet("""
             QMessageBox {
@@ -2891,16 +2891,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 font-size: 13px;
             }
             QPushButton {
-                background-color: #f3f4f6;
-                color: #000000;
-                border: 1px solid #d1d5db;
+                background-color: #2E7D32;
+                color: #ffffff;
+                border: none;
                 border-radius: 4px;
                 padding: 6px 16px;
                 font-weight: bold;
                 font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #e5e7eb;
+                background-color: #1b5e20;
             }
         """)
         
