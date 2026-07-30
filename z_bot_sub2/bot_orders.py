@@ -77,7 +77,12 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
     _ORDER_COUNTER += 1
     px_str = f"{round_to_tick(setup.entry_price, tick_sz):.5f}"
     side = "buy" if setup.bias == BULLISH else "sell"
-    pos_side = "long" if setup.bias == BULLISH else "short"
+    pMode = getattr(client, 'pMode', 'net_mode')
+    if pMode == "net_mode" or pMode == "net":
+        pos_side = "net"
+    else:
+        pos_side = "long" if setup.bias == BULLISH else "short"
+        
     cl_id = f"{cl_prefix}{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
     try:
         # Đồng nhất sử dụng POSITION_MODE và LEVERAGE cho mọi OB (tránh lỗi mismatch OKX)
@@ -98,13 +103,28 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         if resp and resp.get("code") == "0":
             return True, ""
         err_msg = resp.get("msg", "Unknown") if resp else "No response"
-        # Chi tiết lỗi từ data[0].sMsg
         if resp and "data" in resp and resp["data"]:
             for item in resp["data"]:
                 s_msg = item.get("sMsg", "")
                 if s_msg:
                     err_msg = s_msg
                     break
+
+        # Nếu gặp lỗi posSide error (51000), tự động fallback retry giữa net và long/short
+        if "posSide" in err_msg or "51000" in str(resp.get("code", "")) or "51000" in err_msg:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
+            resp_retry = client.request("POST", "/api/v5/trade/order", body={
+                "instId": inst_id, "tdMode": td_mode,
+                "side": side, "posSide": fallback_pos_side, "ordType": "limit", "sz": sz_str,
+                "px": px_str, "clOrdId": cl_id
+            })
+            if resp_retry and resp_retry.get("code") == "0":
+                client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
+                return True, ""
+            if resp_retry and "data" in resp_retry and resp_retry["data"]:
+                for item in resp_retry["data"]:
+                    if item.get("sMsg"): err_msg = item["sMsg"]
+
         return False, err_msg
     except RuntimeError as e:
         return False, str(e)
@@ -113,8 +133,12 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
 
 
 def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz: Decimal, cl_prefix: str, td_mode: str = "cross", live_price: Decimal = None, pos_side: str = None) -> bool:
-    if not pos_side or pos_side == "net":
+    pMode = getattr(client, 'pMode', 'net_mode')
+    if pMode == "net_mode" or pMode == "net" or pos_side == "net":
+        pos_side = "net"
+    elif not pos_side:
         pos_side = "long" if setup.bias == BULLISH else "short"
+        
     tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
     sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
     tp_side = "sell" if setup.bias == BULLISH else "buy"
@@ -140,7 +164,7 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
         elif setup.bias == BEARISH and sl_dec < lp:
             sl_valid = False
 
-    tp_ok = not tp_valid  # Nếu không cần đặt thì coi như OK
+    tp_ok = not tp_valid
     sl_ok = not sl_valid
 
     # Đặt lệnh TP
@@ -159,8 +183,22 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
                 tp_ok = True
                 print(f"🔒 [SMC] {inst_id}: TP set @ {tp_px} ({td_mode})")
             else:
-                err = resp.get("msg","?") if resp else "NoResp"
-                print(f"🚫 [SMC] {inst_id}: TP FAILED - {err}")
+                # Nếu lỗi posSide, thử retry với posSide ngược lại (net vs long/short)
+                fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
+                resp_retry = client.request("POST", "/api/v5/trade/order-algo", body={
+                    "instId": inst_id, "tdMode": td_mode,
+                    "side": tp_side, "posSide": fallback_pos_side,
+                    "ordType": "conditional", "sz": pos_sz,
+                    "tpTriggerPx": tp_px, "tpOrdPx": "-1",
+                    "clOrdId": tp_cl_id
+                })
+                if resp_retry and resp_retry.get("code") == "0":
+                    tp_ok = True
+                    client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
+                    print(f"🔒 [SMC] {inst_id}: TP set @ {tp_px} ({td_mode}) [fallback]")
+                else:
+                    err = resp.get("msg","?") if resp else "NoResp"
+                    print(f"🚫 [SMC] {inst_id}: TP FAILED - {err}")
         except Exception as e:
             print(f"🚫 [SMC] {inst_id}: TP EXCEPTION - {e}")
 
@@ -180,8 +218,21 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
                 sl_ok = True
                 print(f"🔒 [SMC] {inst_id}: SL set @ {sl_px} ({td_mode})")
             else:
-                err = resp.get("msg","?") if resp else "NoResp"
-                print(f"🚫 [SMC] {inst_id}: SL FAILED - {err}")
+                fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
+                resp_retry = client.request("POST", "/api/v5/trade/order-algo", body={
+                    "instId": inst_id, "tdMode": td_mode,
+                    "side": tp_side, "posSide": fallback_pos_side,
+                    "ordType": "conditional", "sz": pos_sz,
+                    "slTriggerPx": sl_px, "slOrdPx": "-1",
+                    "clOrdId": sl_cl_id
+                })
+                if resp_retry and resp_retry.get("code") == "0":
+                    sl_ok = True
+                    client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
+                    print(f"🔒 [SMC] {inst_id}: SL set @ {sl_px} ({td_mode}) [fallback]")
+                else:
+                    err = resp.get("msg","?") if resp else "NoResp"
+                    print(f"🚫 [SMC] {inst_id}: SL FAILED - {err}")
         except Exception as e:
             print(f"🚫 [SMC] {inst_id}: SL EXCEPTION - {e}")
 

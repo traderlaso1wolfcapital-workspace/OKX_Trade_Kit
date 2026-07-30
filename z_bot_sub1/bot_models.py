@@ -7,7 +7,7 @@ def record_trade_marker(coin: str, side: str, price: float, status: str = "activ
     try:
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
-        marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'json_data')
+        marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'z_bot_sub1', 'json_data')
         os.makedirs(marker_dir, exist_ok=True)
         marker_file = os.path.join(marker_dir, "trade_markers.json")
         markers = {}

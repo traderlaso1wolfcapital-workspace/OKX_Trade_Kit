@@ -142,14 +142,39 @@ def main():
                 elif k == "OKX_PASSPHRASE": passphrase = v
                 elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
 
+    if not api_key or not secret_key or not passphrase:
+        fallback_files = [
+            os.path.join(os.path.dirname(env_file), ".api_sub1"),
+            os.path.join(user_data_dir, "z_bot_sub1", ".api_sub1"),
+            os.path.join(user_data_dir, "z_bot_sub2", ".api_sub1")
+        ]
+        for fpath in fallback_files:
+            if os.path.exists(fpath) and fpath != env_file:
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "=" in line:
+                                k, v = line.strip().split("=", 1)
+                                v = v.strip("\"'")
+                                if k == "OKX_API_KEY": api_key = v
+                                elif k == "OKX_SECRET_KEY": secret_key = v
+                                elif k == "OKX_PASSPHRASE": passphrase = v
+                                elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
+                    if api_key and secret_key and passphrase:
+                        print(f"💡 [API KEY FALLBACK]: Đã tự động đọc API Key từ [{os.path.basename(fpath)}] cho Bot Sub 2!")
+                        break
+                except: pass
+
     if not api_key or not secret_key or not passphrase: 
         raise ValueError(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.")
 
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
     # =========================================================================
-    lock_file = os.path.join(user_data_dir, "json_data", f"{acc_name}.pid")
-    os.makedirs(os.path.join(user_data_dir, "json_data"), exist_ok=True)
+    sub2_dir = os.path.join(user_data_dir, "z_bot_sub2")
+    JSON_DATA_DIR = os.path.join(sub2_dir, "json_data")
+    os.makedirs(JSON_DATA_DIR, exist_ok=True)
+    lock_file = os.path.join(JSON_DATA_DIR, f"{acc_name}.pid")
     
     if HAS_PSUTIL:
         if os.path.exists(lock_file):
@@ -191,16 +216,35 @@ def main():
     else:
         print(f"⚠️ [LOCK] Single Instance Lock bị vô hiệu hóa (thiếu psutil). Không thể ngăn chặn chạy trùng.")
 
-    JSON_DATA_DIR = os.path.join(user_data_dir, "json_data")
-    os.makedirs(JSON_DATA_DIR, exist_ok=True)
-
+    config_filename = f"{acc_name}_global_config.json"
     env_paths = {
-        "FILE_GLOBAL_CONFIG": os.path.join(JSON_DATA_DIR, f"{acc_name}_global_config.json"),
+        "FILE_GLOBAL_CONFIG": os.path.join(JSON_DATA_DIR, config_filename),
         "JSON_EVOLUTION_DATA_FILE": os.path.join(JSON_DATA_DIR, f"{acc_name}_du_lieu_tien_hoa.json"),
         "FILE_MTF_STATES": os.path.join(JSON_DATA_DIR, f"{acc_name}_mtf_states.json"),
         "ENV_NAME": env_file,
         "ENV_FILE_NAME": env_file
     }
+
+    if not os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
+        try:
+            default_sub2_cfg = {
+                "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                "ENABLE_STRATEGY_SMC": True,
+                "TIMEFRAME_BASE": "1H",
+                "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+                "OB_RR_RATIO_TREND": "5.00",
+                "OB_RR_RATIO_COUNTER": "1.00",
+                "USE_DYNAMIC_RISK": False,
+                "RISK_PER_TRADE_PCT": "0.0050",
+                "SMC_MODE": "All Setups",
+                "SMC_STYLE": "Normal",
+                "OB_SOURCE": "ALL",
+                "OB_DIRECTION": "BOTH",
+                "OB_TP_MODE": "RR"
+            }
+            with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
+                json.dump(default_sub2_cfg, f, indent=4)
+        except Exception: pass
 
     # Dọn sạch các file flag cũ của tài khoản này
     for flag_name in ["stop", "reset_wallet", "reset_nen"]:
@@ -217,7 +261,12 @@ def main():
     
     try: client.request("POST", "/api/v5/account/set-position-mode", body={"posMode": "long_short"})
     except: pass
-    pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
+    try:
+        res = client.request("GET", "/api/v5/account/config")
+        pMode = res["data"][0].get("posMode", "net_mode") if (res and "data" in res and res["data"]) else "net_mode"
+    except:
+        pMode = "net_mode"
+    client.pMode = pMode
 
     for cfg in bot_config.COIN_PORTFOLIO:
         try: client.request("POST", "/api/v5/account/set-leverage", body={"instId": cfg["swap"], "lever": str(bot_config.LEVERAGE), "mgnMode": bot_config.POSITION_MODE})

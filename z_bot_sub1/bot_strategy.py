@@ -66,57 +66,7 @@ TRADE_HISTORY_CACHE = None
 LAST_HISTORY_DUMP = 0
 
 def _sync_update_post_trade_monitoring(coin: str, current_price: float, env_paths: dict, globals_ref: Any):
-    global TRADE_HISTORY_CACHE, LAST_HISTORY_DUMP
-    import time
-    
-    if TRADE_HISTORY_CACHE is None:
-        if not os.path.exists(env_paths["FILE_TRADE_HISTORY"]): 
-            TRADE_HISTORY_CACHE = []
-        else:
-            try:
-                with open(env_paths["FILE_TRADE_HISTORY"], "r", encoding="utf-8") as f: 
-                    TRADE_HISTORY_CACHE = json.load(f)
-            except:
-                TRADE_HISTORY_CACHE = []
-    
-    try:
-        logs = TRADE_HISTORY_CACHE
-        needs_dump = False
-        status_changed = False
-        
-        for log in logs:
-            if log.get("status") == "pending" and log.get("coin") == coin:
-                needs_dump = True
-                log["so_vong_quet"] = log.get("so_vong_quet", 0) + 1
-                if "gia_cao_nhat_sau_dong" in log and current_price > log["gia_cao_nhat_sau_dong"]: log["gia_cao_nhat_sau_dong"] = float(current_price)
-                if "gia_thap_nhat_sau_dong" in log and current_price < log["gia_thap_nhat_sau_dong"]: log["gia_thap_nhat_sau_dong"] = float(current_price)
-                
-                if log.get("phe") == "LONG":
-                    if log.get("gia_cao_nhat_sau_dong", 0) >= log.get("moc_tp_gia_lap", 0):
-                        log["ket_luan_ai"] = "ĐÓNG SAI: Giá chạy cố chạm mốc TP giả lập!"; log["status"] = "completed"
-                        status_changed = True
-                    elif log.get("gia_thap_nhat_sau_dong", float('inf')) <= log.get("moc_sl_gia_lap", float('-inf')):
-                        log["ket_luan_ai"] = "ĐÓNG ĐÚNG: Giá sập sâu chạm SL giả lập!"; log["status"] = "completed"
-                        status_changed = True
-                elif log.get("phe") == "SHORT":
-                    if log.get("gia_thap_nhat_sau_dong", float('inf')) <= log.get("moc_tp_gia_lap", float('-inf')):
-                        log["ket_luan_ai"] = "ĐÓNG SAI: Giá chạy cố chạm mốc TP giả lập!"; log["status"] = "completed"
-                        status_changed = True
-                    elif log.get("gia_cao_nhat_sau_dong", 0) >= log.get("moc_sl_gia_lap", 0):
-                        log["ket_luan_ai"] = "ĐÓNG ĐÚNG: Giá dựng cột chạm SL giả lập!"; log["status"] = "completed"
-                        status_changed = True
-                        
-                if log.get("so_vong_quet", 0) >= 4800 and log["status"] == "pending":
-                    log["ket_luan_ai"] = "HÒA HOÃN: Sau 160 phút giá vẫn không chạm biên."; log["status"] = "completed"
-                    status_changed = True
-                    
-        now = time.time()
-        if needs_dump and (status_changed or now - LAST_HISTORY_DUMP >= 60.0):
-            with open(env_paths["FILE_TRADE_HISTORY"], "w", encoding="utf-8") as f:
-                json.dump(logs, f, indent=2, ensure_ascii=False)
-            LAST_HISTORY_DUMP = now
-            
-    except: pass
+    pass
 
 def update_post_trade_monitoring(*args, **kwargs):
     import sys
@@ -664,7 +614,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         try:
             _amt = (new_pos_amt - old_pos_amt) if old_has else new_pos_amt
             current_vol_usdt = Decimal(str(_amt)) * Decimal(str(contract_val)) * Decimal(str(avg_px))
-            _target_usdt = Decimal("400")
+            _target_usdt = Decimal("100")
             # Ưu tiên đọc trực tiếp từ file JSON cấu hình đã lưu trong AppData ổ C
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
@@ -676,7 +626,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("400"))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "100")))
 
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
@@ -936,7 +886,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             BẮT BUỘC KHỞI ĐẦU: Quét tổng volume thực tế trên sàn, so sánh với Setting Base Volume trong JSON
             để quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã được DCA trong khối volume đó.
             """
-            _target_usdt = Decimal("400")
+            _target_usdt = Decimal("100")
             # Ưu tiên đọc trực tiếp từ file JSON cấu hình đã lưu trong AppData ổ C
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
@@ -948,7 +898,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "400")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "100")))
 
             _coin_vol_mult = Decimal("1.0")
             for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
@@ -1302,7 +1252,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             if not okx_fetched:
                 exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
                 try:
-                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
+                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 100)))
                     _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                     if _risk > 0:
                         _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
@@ -1503,7 +1453,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             if not okx_fetched:
                 exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
                 try:
-                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 500)))
+                    _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 100)))
                     _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                     if _risk > 0:
                         _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")

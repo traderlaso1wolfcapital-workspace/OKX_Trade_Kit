@@ -100,14 +100,15 @@ def auto_reset_state_on_update(data_dir, base_dir):
                 
         if current_version != app_version:
             print(f"App updated: {current_version} -> {app_version}. Resetting states...")
-            json_dir = os.path.join(data_dir, "json_data")
-            if os.path.exists(json_dir):
-                for fpath in glob.glob(os.path.join(json_dir, "*mtf_states.json")):
-                    try:
-                        os.remove(fpath)
-                        print(f"Deleted old state: {fpath}")
-                    except Exception:
-                        pass
+            for b_name in ["z_bot_sub1", "z_bot_sub2"]:
+                json_dir = os.path.join(data_dir, b_name, "json_data")
+                if os.path.exists(json_dir):
+                    for fpath in glob.glob(os.path.join(json_dir, "*mtf_states.json")):
+                        try:
+                            os.remove(fpath)
+                            print(f"Deleted old state: {fpath}")
+                        except Exception:
+                            pass
                         
             import shutil
             for cache_name in ["__pycache__", "cache", "GPUCache", "QtWebEngine"]:
@@ -418,7 +419,8 @@ class BotSubprocessWorker(QtCore.QThread):
         if self.process:
             self.log_signal.emit("\n🛑 Đang gửi tín hiệu dừng tiến trình...")
             try:
-                flag_path = os.path.join(USER_DATA_DIR, "json_data", f"stop_{self.strategy}.flag")
+                flag_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy}", "json_data", f"stop_{self.strategy}.flag")
+                os.makedirs(os.path.dirname(flag_path), exist_ok=True)
                 with open(flag_path, "w") as f: f.write("stop")
                 
                 for _ in range(15):
@@ -464,19 +466,21 @@ class LiveChartWorker(QtCore.QThread):
                                 "candles": [c[:6] for c in candles]
                             }
                             
-                            # Đọc markers
+                            # Đọc markers từ cả Sub1 và Sub2
                             import os
                             import json
                             local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
-                            marker_file = os.path.join(local_app_data, 'TLS1_Trading', 'json_data', 'trade_markers.json')
-                            if os.path.exists(marker_file):
-                                try:
-                                    with open(marker_file, 'r', encoding='utf-8') as f:
-                                        markers = json.load(f)
-                                        if self.inst_id in markers:
-                                            chart_data["markers"] = markers[self.inst_id]
-                                except Exception:
-                                    pass
+                            for sub_dir in ["z_bot_sub1", "z_bot_sub2"]:
+                                marker_file = os.path.join(local_app_data, 'TLS1_Trading', sub_dir, 'json_data', 'trade_markers.json')
+                                if os.path.exists(marker_file):
+                                    try:
+                                        with open(marker_file, 'r', encoding='utf-8') as f:
+                                            markers = json.load(f)
+                                            if self.inst_id in markers:
+                                                if "markers" not in chart_data: chart_data["markers"] = []
+                                                chart_data["markers"].extend(markers[self.inst_id])
+                                    except Exception:
+                                        pass
 
                             # Tính toán Order Blocks cho Bot Sub2 SMC
                             try:
@@ -550,8 +554,14 @@ class LiveChartWorker(QtCore.QThread):
                                 pass
 
                             self.chart_data_signal.emit(chart_data)
+                        else:
+                            self.chart_data_signal.emit({"type": "chart_data", "candles": []})
+                    else:
+                        self.chart_data_signal.emit({"type": "chart_data", "candles": []})
+                else:
+                    self.chart_data_signal.emit({"type": "chart_data", "candles": []})
             except Exception:
-                pass
+                self.chart_data_signal.emit({"type": "chart_data", "candles": []})
             self._trigger.wait(5.0)
             
     def stop(self):
@@ -682,13 +692,54 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
     def reload_accounts(self):
         self.api_files = []
+        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        os.makedirs(json_data_dir, exist_ok=True)
+        
+        default_sub1_cfg = {
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+            "ENABLE_STRATEGY_MAIN": True,
+            "ENABLE_STRATEGY_XOLE": True,
+            "ENABLE_DYNAMIC_EMA200_TP": False,
+            "ENABLE_DYNAMIC_PINGPONG_TP": False,
+            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ENABLE_SIDEWAY_SAFE_EXIT": False,
+            "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
+            "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+            "ENABLE_TRAILING_SL": False,
+            "ENABLE_MAX_ROI_EXIT": False,
+            "ENABLE_SIDEWAY_VAP_EXIT": False,
+            "ENABLE_H4_FLIP_CLOSE": True,
+            "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+            "TP_TARGET_OPTIMAL": "0.01200",
+            "SL_TARGET_OPTIMAL": "0.01200",
+            "EVOLUTION_CYCLE_SECONDS": 3600,
+            "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+            "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
+        }
+
+        default_sub2_cfg = {
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+            "ENABLE_STRATEGY_SMC": True,
+            "TIMEFRAME_BASE": "1H",
+            "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+            "OB_RR_RATIO_TREND": "5.00",
+            "OB_RR_RATIO_COUNTER": "1.00",
+            "USE_DYNAMIC_RISK": False,
+            "RISK_PER_TRADE_PCT": "0.0050",
+            "SMC_MODE": "All Setups",
+            "SMC_STYLE": "Normal",
+            "OB_SOURCE": "ALL",
+            "OB_DIRECTION": "BOTH",
+            "OB_TP_MODE": "RR"
+        }
+
         if os.path.exists(PROJECT_DIR):
             proj_bot_dir = os.path.join(PROJECT_DIR, f"z_bot_{self.strategy_id}")
             if os.path.exists(proj_bot_dir):
                 self.api_files.extend([f for f in os.listdir(proj_bot_dir) if f.startswith('.api') and not f.endswith('.bak')])
         bot_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}")
         os.makedirs(bot_dir, exist_ok=True)
-        # Tự động tạo 5 tài khoản phụ rỗng mặc định cho Bot này nếu chưa có
+        # Tự động tạo 5 tài khoản phụ rỗng mặc định & các file JSON cấu hình mặc định nếu chưa có
         for i in range(1, 6):
             default_env = os.path.join(bot_dir, f".api_sub{i}")
             if not os.path.exists(default_env):
@@ -696,6 +747,24 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     with open(default_env, "w", encoding="utf-8") as f:
                         f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
                 except: pass
+
+            if self.strategy_id == "sub2":
+                c_name = f"sub2_sub{i}_global_config.json"
+                m_name = "sub2_global_config.json"
+                cur_cfg = default_sub2_cfg
+            else:
+                c_name = f"sub{i}_global_config.json"
+                m_name = "sub1_global_config.json"
+                cur_cfg = default_sub1_cfg
+
+            for cfg_f in [c_name, m_name]:
+                c_path = os.path.join(json_data_dir, cfg_f)
+                if not os.path.exists(c_path):
+                    try:
+                        with open(c_path, "w", encoding="utf-8") as f:
+                            json.dump(cur_cfg, f, indent=4)
+                    except: pass
+
         if os.path.exists(bot_dir):
             self.api_files.extend([f for f in os.listdir(bot_dir) if f.startswith('.api') and not f.endswith('.bak') and f not in self.api_files])
         if '.api' not in self.api_files:
@@ -709,10 +778,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         else:
             for env in self.api_files:
                 if env == ".api":
-                    display = "Tài khoản chính (Main)"
+                    display = "Tài khoản chính"
                 else:
                     sub_name = env.replace(".api_sub", "")
-                    display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
+                    display = f"Tài khoản phụ {sub_name}"
                 self.account_dropdown.addItem(display, env)
         self.account_dropdown.blockSignals(False)
 
@@ -809,10 +878,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         else:
             for env in self.api_files:
                 if env == ".api":
-                    display = "Tài khoản chính (Main)"
+                    display = "Tài khoản chính"
                 else:
                     sub_name = env.replace(".api_sub", "")
-                    display = f"Tài khoản phụ {sub_name} (Sub {sub_name})"
+                    display = f"Tài khoản phụ {sub_name}"
                 self.account_dropdown.addItem(display, env)
 
         target_env = ".api" if self.strategy_id == "main" else f".api_{self.strategy_id}"
@@ -1577,10 +1646,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.smc_chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
         self.smc_chk_cfg_xau.setStyleSheet(cb_style)
+        self.smc_chk_cfg_xau.setChecked(True)
         self.smc_chk_cfg_btc = QtWidgets.QCheckBox("BTC-USDT-SWAP")
         self.smc_chk_cfg_btc.setStyleSheet(cb_style)
+        self.smc_chk_cfg_btc.setChecked(True)
         self.smc_chk_cfg_eth = QtWidgets.QCheckBox("ETH-USDT-SWAP")
         self.smc_chk_cfg_eth.setStyleSheet(cb_style)
+        self.smc_chk_cfg_eth.setChecked(True)
         
         l_active_coins.addWidget(self.smc_chk_cfg_xau)
         l_active_coins.addWidget(self.smc_chk_cfg_btc)
@@ -1595,6 +1667,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.smc_combo_tf_base = QtWidgets.QComboBox()
         self.smc_combo_tf_base.addItems(["5m", "15m", "30m", "1H", "2H", "4H"])
+        self.smc_combo_tf_base.setCurrentText("1H")
         add_field(l_toggles, 1, "Timeframe base:", self.smc_combo_tf_base, "Khung thời gian chính để giao dịch thuận xu hướng.")
         layout.addWidget(grp_toggles)
 
@@ -1605,13 +1678,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.smc_chk_dynamic_risk.setChecked(False)
         self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox()
         
-        self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000)
+        self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000); self.smc_input_pos_vol.setValue(100.00)
         add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.smc_input_pos_vol, "Khối lượng vốn cố định (USDT) cho mỗi lệnh Limit SMC.")
         
-        self.smc_input_rr_trend = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_trend.setDecimals(1)
+        self.smc_input_rr_trend = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_trend.setDecimals(1); self.smc_input_rr_trend.setValue(5.0)
         add_field(l_risk, 1, "Tỷ lệ Risk:Reward thuận trend:", self.smc_input_rr_trend, "Tỷ lệ lợi nhuận/rủi ro thuận xu hướng (VD: 5.0 = 1:5).")
 
-        self.smc_input_rr_counter = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_counter.setDecimals(1)
+        self.smc_input_rr_counter = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_counter.setDecimals(1); self.smc_input_rr_counter.setValue(1.0)
         add_field(l_risk, 2, "Tỷ lệ Risk:Reward ngược trend:", self.smc_input_rr_counter, "Tỷ lệ lợi nhuận/rủi ro ngược xu hướng (VD: 1.0 = 1:1).")
         layout.addWidget(grp_risk)
 
@@ -1723,7 +1796,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     return 0
             bot_config = DummyConfig()
         cfg = {}
-        config_path = os.path.join(USER_DATA_DIR, "json_data", f"{acc_name}_global_config.json")
+        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        os.makedirs(json_data_dir, exist_ok=True)
+        config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f: cfg = json.load(f)
@@ -1842,28 +1917,34 @@ class BotInstanceWidget(QtWidgets.QWidget):
             print('Error setting defaults:', e)
 
     def _on_dash_coin_toggled(self, coin, state):
-        """Đồng bộ checkbox trên Dashboard xuống Cấu Hình và lưu tự động."""
+        """Đồng bộ checkbox trên Dashboard xuống Cấu Hình (cả Sub 1 & Sub 2) và lưu tự động."""
         checked = bool(state)
-        cfg_map = {"xau": "chk_cfg_xau", "btc": "chk_cfg_btc", "eth": "chk_cfg_eth"}
-        cfg_attr = cfg_map.get(coin)
-        if cfg_attr and hasattr(self, cfg_attr):
-            getattr(self, cfg_attr).setChecked(checked)
+        if self.strategy_id == "sub2":
+            smc_cfg_map = {"xau": "smc_chk_cfg_xau", "btc": "smc_chk_cfg_btc", "eth": "smc_chk_cfg_eth"}
+            cfg_attr = smc_cfg_map.get(coin)
+            if cfg_attr and hasattr(self, cfg_attr):
+                getattr(self, cfg_attr).setChecked(checked)
+        else:
+            cfg_map = {"xau": "chk_cfg_xau", "btc": "chk_cfg_btc", "eth": "chk_cfg_eth"}
+            cfg_attr = cfg_map.get(coin)
+            if cfg_attr and hasattr(self, cfg_attr):
+                getattr(self, cfg_attr).setChecked(checked)
         
         # Auto-save ENABLED_COINS vào file config
         try:
             acc_name = self.get_acc_name()
-            json_data_dir = os.path.join(USER_DATA_DIR, "json_data")
+            json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+            os.makedirs(json_data_dir, exist_ok=True)
             config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
             cfg = {}
             if os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
             enabled = []
-            if self.dash_chk_xau.isChecked(): enabled.append("XAU")
-            if self.dash_chk_btc.isChecked(): enabled.append("BTC")
-            if self.dash_chk_eth.isChecked(): enabled.append("ETH")
+            if getattr(self, 'dash_chk_xau', None) and self.dash_chk_xau.isChecked(): enabled.append("XAU")
+            if getattr(self, 'dash_chk_btc', None) and self.dash_chk_btc.isChecked(): enabled.append("BTC")
+            if getattr(self, 'dash_chk_eth', None) and self.dash_chk_eth.isChecked(): enabled.append("ETH")
             cfg["ENABLED_COINS"] = enabled
-            os.makedirs(json_data_dir, exist_ok=True)
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=4)
         except Exception as e:
@@ -2001,6 +2082,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_save_api.setEnabled(True)
         # -------------------------------
         
+        bot_label = "Bot Sub 2 (SMC Order Block)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
         env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         with open(env_path, "w", encoding="utf-8") as f:
@@ -2011,9 +2093,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
         if not api_key and not secret_key:
-            msg.setText("Đã xóa trắng cấu hình API Key thành công!")
+            msg.setText(f"🔑 Đã xóa trắng cấu hình API Key cho [{bot_label}] ({env_file})!")
         else:
-            msg.setText("Đã xác thực và lưu API Key thành công!")
+            msg.setText(f"🔑 Đã xác thực và lưu API Key thành công cho [{bot_label}] ({env_file})!")
         msg.exec()
 
     def save_strategy_settings(self):
@@ -2027,7 +2109,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             msg.exec()
             return
         acc_name = self.get_acc_name()
-        json_data_dir = os.path.join(USER_DATA_DIR, "json_data")
+        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
         config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         
@@ -2038,71 +2120,28 @@ class BotInstanceWidget(QtWidgets.QWidget):
             except: pass
 
         if self.strategy_id == "sub2":
-            # Map GUI text -> internal enum
-            src_map = {"Internal + Swing": "ALL", "Internal OB": "INTERNAL", "Swing OB": "SWING"}
-            dir_map = {"Both": "BOTH", "Long only": "LONG_ONLY", "Short only": "SHORT_ONLY"}
-            tp_map = {"Risk:Reward": "RR", "Nearest opposite OB": "NEAREST_OB", "Opposite OB, fallback RR": "FALLBACK_RR"}
-            cfg.update({
-                # Vốn & Rủi ro
-                "ENABLE_STRATEGY_SMC": self.smc_chk_main.isChecked(),
-                "USE_DYNAMIC_RISK": self.smc_chk_dynamic_risk.isChecked(),
-                "RISK_PER_TRADE_PCT": str(round(self.smc_input_risk_pct.value() / 100.0, 4)),
-                "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.smc_input_pos_vol.value(), 2)),
-                # Smart Money Concepts
-                "SMC_MODE": self.smc_combo_mode.currentText(),
-                "SMC_STYLE": self.smc_combo_style.currentText(),
-                # Internal Structure
-                "SMC_SHOW_INTERNAL": self.smc_chk_show_int.isChecked(),
-                "SMC_INT_BULL": self.smc_combo_int_bull.currentText(),
-                "SMC_INT_BEAR": self.smc_combo_int_bear.currentText(),
-                "SMC_INT_CONF": self.smc_chk_int_conf.isChecked(),
-                "INTERNAL_LENGTH": self.smc_input_internal.value(),
-                # Swing Structure
-                "SMC_SHOW_SWING": self.smc_chk_show_swing.isChecked(),
-                "SMC_SWING_BULL": self.smc_combo_swing_bull.currentText(),
-                "SMC_SWING_BEAR": self.smc_combo_swing_bear.currentText(),
-                "SMC_SHOW_SWING_PTS": self.smc_chk_show_swing_pts.isChecked(),
-                "SWING_LENGTH": self.smc_input_swing.value(),
-                "SMC_SHOW_HL": self.smc_chk_show_hl.isChecked(),
-                # Order Blocks
-                "SMC_INT_OB": self.smc_chk_int_ob.isChecked(),
-                "SMC_INT_OB_CNT": self.smc_input_int_ob.value(),
-                "SMC_SWING_OB": self.smc_chk_swing_ob.isChecked(),
-                "SMC_SWING_OB_CNT": self.smc_input_swing_ob.value(),
-                "SMC_OB_FILTER": self.smc_combo_ob_filter.currentText(),
-                "SMC_OB_MITIG": self.smc_combo_ob_mitig.currentText(),
-                "OB_VOLATILITY_MULT": str(round(self.smc_input_ob_vol.value(), 2)),
-                # EQH/EQL
-                "SMC_EQH": self.smc_chk_eqh.isChecked(),
-                "SMC_EQH_BARS": self.smc_input_eqh_bars.value(),
-                "SMC_EQH_THR": str(round(self.smc_input_eqh_thr.value(), 2)),
-                # FVG
-                "SMC_FVG": self.smc_chk_fvg.isChecked(),
-                "SMC_FVG_AUTO": self.smc_chk_fvg_auto.isChecked(),
-                "SMC_FVG_EXTEND": self.smc_input_fvg_extend.value(),
-                # MTF Levels
-                "SMC_DAILY": self.smc_chk_daily.isChecked(),
-                "SMC_WEEKLY": self.smc_chk_weekly.isChecked(),
-                "SMC_MONTHLY": self.smc_chk_monthly.isChecked(),
-                # Zones
-                "SMC_ZONES": self.smc_chk_zones.isChecked(),
-                # OB Trade Setup
-                "SMC_TRADE": self.smc_chk_trade.isChecked(),
-                "OB_SOURCE": src_map.get(self.smc_combo_source.currentText(), "ALL"),
-                "OB_DIRECTION": dir_map.get(self.smc_combo_dir.currentText(), "BOTH"),
-                "OB_TP_MODE": tp_map.get(self.smc_combo_tp.currentText(), "RR"),
-                "TIMEFRAME_BASE": self.smc_combo_tf_base.currentText(),
-                "OB_RR_RATIO_TREND": str(round(self.smc_input_rr_trend.value(), 2)),
-                "OB_RR_RATIO_COUNTER": str(round(self.smc_input_rr_counter.value(), 2)),
-                "OB_MAX_ACTIVE_SETUPS": self.smc_input_max_setup.value(),
-                "OB_MAX_COUNT": self.smc_input_ob_max.value(),
-            })
             smc_enabled = []
             if getattr(self, 'smc_chk_cfg_xau', None) and self.smc_chk_cfg_xau.isChecked(): smc_enabled.append("XAU")
             if getattr(self, 'smc_chk_cfg_btc', None) and self.smc_chk_cfg_btc.isChecked(): smc_enabled.append("BTC")
             if getattr(self, 'smc_chk_cfg_eth', None) and self.smc_chk_cfg_eth.isChecked(): smc_enabled.append("ETH")
-            if smc_enabled:
-                cfg["ENABLED_COINS"] = smc_enabled
+            
+            cfg.update({
+                "ENABLED_COINS": smc_enabled if smc_enabled else ["XAU", "BTC", "ETH"],
+                "ENABLE_STRATEGY_SMC": self.smc_chk_main.isChecked() if hasattr(self, 'smc_chk_main') else True,
+                "TIMEFRAME_BASE": self.smc_combo_tf_base.currentText() if hasattr(self, 'smc_combo_tf_base') else "5m",
+                "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.smc_input_pos_vol.value(), 2)) if hasattr(self, 'smc_input_pos_vol') else "100.00",
+                "OB_RR_RATIO_TREND": str(round(self.smc_input_rr_trend.value(), 2)) if hasattr(self, 'smc_input_rr_trend') else "0.00",
+                "OB_RR_RATIO_COUNTER": str(round(self.smc_input_rr_counter.value(), 2)) if hasattr(self, 'smc_input_rr_counter') else "0.00",
+            })
+            if hasattr(self, 'smc_chk_dynamic_risk'): cfg["USE_DYNAMIC_RISK"] = self.smc_chk_dynamic_risk.isChecked()
+            if hasattr(self, 'smc_input_risk_pct'): cfg["RISK_PER_TRADE_PCT"] = str(round(self.smc_input_risk_pct.value() / 100.0, 4))
+            if hasattr(self, 'smc_combo_source'): cfg["OB_SOURCE"] = self.smc_combo_source.currentText()
+            if hasattr(self, 'smc_combo_dir'): cfg["OB_DIRECTION"] = self.smc_combo_dir.currentText()
+            if hasattr(self, 'smc_combo_tp'): cfg["OB_TP_MODE"] = self.smc_combo_tp.currentText()
+            if hasattr(self, 'smc_input_swing'): cfg["SWING_LENGTH"] = self.smc_input_swing.value()
+            if hasattr(self, 'smc_input_internal'): cfg["INTERNAL_LENGTH"] = self.smc_input_internal.value()
+            if hasattr(self, 'smc_input_ob_max'): cfg["OB_MAX_COUNT"] = self.smc_input_ob_max.value()
+            if hasattr(self, 'smc_input_ob_vol'): cfg["OB_VOLATILITY_MULT"] = str(round(self.smc_input_ob_vol.value(), 2))
         else:
             enabled = []
             if getattr(self, 'chk_cfg_xau', None) and self.chk_cfg_xau.isChecked(): enabled.append("XAU")
@@ -2116,50 +2155,53 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
                 "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),
                 "ALTCOIN_FOLLOW_BTC_EMA": self.chk_altcoin_follow_btc_ema.isChecked(),
-            "ENABLE_SIDEWAY_SAFE_EXIT": self.chk_sideway_safe.isChecked(),
-            "ENABLE_SQUEEZE_ESCAPE_EXIT": self.chk_squeeze_escape.isChecked(),
-            "ENABLE_SAFEGUARD_ENTRY_EXIT": self.chk_safeguard_entry.isChecked(),
-            "ENABLE_TRAILING_SL": self.chk_trailing_sl.isChecked(),
-            "ENABLE_MAX_ROI_EXIT": self.chk_max_roi.isChecked(),
-            "ENABLE_SIDEWAY_VAP_EXIT": self.chk_sideway_vap.isChecked(),
-            "ENABLE_H4_FLIP_CLOSE": self.chk_h4_flip.isChecked(),
-            "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
-            "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
-            "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
-            "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
+                "ENABLE_SIDEWAY_SAFE_EXIT": self.chk_sideway_safe.isChecked(),
+                "ENABLE_SQUEEZE_ESCAPE_EXIT": self.chk_squeeze_escape.isChecked(),
+                "ENABLE_SAFEGUARD_ENTRY_EXIT": self.chk_safeguard_entry.isChecked(),
+                "ENABLE_TRAILING_SL": self.chk_trailing_sl.isChecked(),
+                "ENABLE_MAX_ROI_EXIT": self.chk_max_roi.isChecked(),
+                "ENABLE_SIDEWAY_VAP_EXIT": self.chk_sideway_vap.isChecked(),
+                "ENABLE_H4_FLIP_CLOSE": self.chk_h4_flip.isChecked(),
+                "TP_TARGET_OPTIMAL": str(round(self.input_tp_pct.value() / 100.0, 5)),
+                "SL_TARGET_OPTIMAL": str(round(self.input_sl_pct.value() / 100.0, 5)),
+                "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
+                "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
+                "LEVERAGES": {
+                    "XAU": getattr(self, 'input_xau_lever', None).value() if hasattr(self, 'input_xau_lever') else 50,
+                    "BTC": self.input_btc_lever.value(),
+                    "ETH": self.input_eth_lever.value()
+                },
+                "VOL_MULTIPLIERS": {
+                    "BTC": str(round(self.input_btc_vol_mult.value(), 2)),
+                    "ETH": str(round(self.input_eth_vol_mult.value(), 2))
+                }
+            })
 
-            "LEVERAGES": {
-                "BTC": self.input_btc_lever.value(),
-                "ETH": self.input_eth_lever.value()
-            },
-            "VOL_MULTIPLIERS": {
-                "BTC": str(round(self.input_btc_vol_mult.value(), 2)),
-                "ETH": str(round(self.input_eth_vol_mult.value(), 2))
-            }
-        })
-
-        # ⚡ BẢO MẬT: Bộc lọc các thông số thuật toán lõi khỏi JSON để khách hàng không thể đọc/sửa lén
-        # Các thông số này sẽ tự động được lấy từ bot_config.py (đã được biên dịch ngầm vào .exe)
         for key in ["DCA_GAP_THRESHOLD_PCT", "EMA_CONFLUENCE_TOLERANCE_PCT", "BASE_ENTRY_OFFSET_PCT", 
                     "REQUIRED_ACCUMULATION_CANDLES", "QUANTUM_BUFFER_CANDLES", "QUANTUM_FORTH_CANDLES"]:
             cfg.pop(key, None)
 
         if os.path.exists(config_path):
-            try:
-                os.remove(config_path)
+            try: os.remove(config_path)
             except: pass
 
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4)
             
-        if hasattr(self, 'dash_chk_btc') and self.strategy_id != "sub2":
-            self.dash_chk_btc.setChecked(self.chk_cfg_btc.isChecked())
-            self.dash_chk_eth.setChecked(self.chk_cfg_eth.isChecked())
-            self.dash_chk_xau.setChecked(self.chk_cfg_xau.isChecked())
+        if hasattr(self, 'dash_chk_btc'):
+            if self.strategy_id == "sub2":
+                if hasattr(self, 'smc_chk_cfg_btc'): self.dash_chk_btc.setChecked(self.smc_chk_cfg_btc.isChecked())
+                if hasattr(self, 'smc_chk_cfg_eth'): self.dash_chk_eth.setChecked(self.smc_chk_cfg_eth.isChecked())
+                if hasattr(self, 'smc_chk_cfg_xau'): self.dash_chk_xau.setChecked(self.smc_chk_cfg_xau.isChecked())
+            else:
+                if hasattr(self, 'chk_cfg_btc'): self.dash_chk_btc.setChecked(self.chk_cfg_btc.isChecked())
+                if hasattr(self, 'chk_cfg_eth'): self.dash_chk_eth.setChecked(self.chk_cfg_eth.isChecked())
+                if hasattr(self, 'chk_cfg_xau'): self.dash_chk_xau.setChecked(self.chk_cfg_xau.isChecked())
             
+        bot_label = "Bot Sub 2 (SMC Order Block)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
-        msg.setText(f"Đã lưu Cấu Hình Chiến Thuật vào {env_file}!")
+        msg.setText(f"⚙️ Đã lưu Cấu Hình Chiến Thuật cho [{bot_label}] ({env_file}) thành công!\n\nFile lưu: {os.path.basename(config_path)}")
         msg.exec()
 
     def _verify_env_security(self, env_path):
@@ -2223,7 +2265,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
             QtWidgets.QMessageBox.critical(self, "Khóa Bảo Mật", f"LỖI BẢO MẬT: API Key trong cấu hình {env_file} không hợp lệ hoặc KHÔNG thuộc quyền sở hữu của UID {CURRENT_UID}.\n\nHệ thống đã khóa lệnh chạy Bot để bảo vệ an toàn!")
             return
         
-        flag_path = os.path.join(USER_DATA_DIR, "json_data", f"stop_{self.strategy_id}.flag")
+        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        os.makedirs(flag_dir, exist_ok=True)
+        flag_path = os.path.join(flag_dir, f"stop_{self.strategy_id}.flag")
         if os.path.exists(flag_path):
             try: os.remove(flag_path)
             except: pass
@@ -2250,14 +2294,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def reset_wallet(self):
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-        flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_wallet_{self.strategy_id}.flag")
+        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        os.makedirs(flag_dir, exist_ok=True)
+        flag = os.path.join(flag_dir, f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
         QtWidgets.QMessageBox.information(self, "Thông báo", "Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-        flag = os.path.join(USER_DATA_DIR, "json_data", f"reset_nen_{self.strategy_id}.flag")
+        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        os.makedirs(flag_dir, exist_ok=True)
+        flag = os.path.join(flag_dir, f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
         self.append_log("\n♻️ [HỆ THỐNG]: Đã kích hoạt lệnh Reset Đếm Nến.")
         QtWidgets.QMessageBox.information(self, "Thông báo", "Đã kích hoạt lệnh Reset Đếm Nến thành công!")
@@ -2308,39 +2356,38 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     else:
                         self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
+                else:
+                    self.chart_widget.spinner(False)
                         
-                    # Vẽ markers
-                    if "markers" in data and self._chart_initialized:
-                        markers = data["markers"]
-                        # Tính hash để xem có cần vẽ lại không
-                        import hashlib
-                        m_str = json.dumps(markers, sort_keys=True)
-                        m_hash = hashlib.md5(m_str.encode()).hexdigest()
-                        
-                        if getattr(self, '_last_markers_hash', None) != m_hash:
-                            self.chart_widget.clear_markers()
-                            import datetime
-                            for m in markers:
-                                # Màu sắc
-                                if m.get("status") == "active":
-                                    color = '#00FF00' if m["side"] == "LONG" else '#FF0000'
-                                else:
-                                    color = '#005500' if m["side"] == "LONG" else '#8B0000'
-                                    
-                                shape = 'arrow_up' if m["side"] == "LONG" else 'arrow_down'
-                                pos = 'below' if m["side"] == "LONG" else 'above'
-                                text = 'B' if m["side"] == "LONG" else 'S'
+                # Vẽ markers
+                if "markers" in data and getattr(self, '_chart_initialized', False):
+                    markers = data["markers"]
+                    import hashlib
+                    m_str = json.dumps(markers, sort_keys=True)
+                    m_hash = hashlib.md5(m_str.encode()).hexdigest()
+                    
+                    if getattr(self, '_last_markers_hash', None) != m_hash:
+                        self.chart_widget.clear_markers()
+                        import datetime
+                        for m in markers:
+                            if m.get("status") == "active":
+                                color = '#00FF00' if m["side"] == "LONG" else '#FF0000'
+                            else:
+                                color = '#005500' if m["side"] == "LONG" else '#8B0000'
                                 
-                                # Lightweight chart cần datetime
-                                try:
-                                    dt = datetime.datetime.fromtimestamp(m["time"] / 1000)
-                                    self.chart_widget.marker(time=dt, position=pos, shape=shape, color=color, text=text)
-                                except:
-                                    pass
-                            self._last_markers_hash = m_hash
+                            shape = 'arrow_up' if m["side"] == "LONG" else 'arrow_down'
+                            pos = 'below' if m["side"] == "LONG" else 'above'
+                            text = 'B' if m["side"] == "LONG" else 'S'
+                            
+                            try:
+                                dt = datetime.datetime.fromtimestamp(m["time"] / 1000)
+                                self.chart_widget.marker(time=dt, position=pos, shape=shape, color=color, text=text)
+                            except:
+                                pass
+                        self._last_markers_hash = m_hash
 
-                    # Vẽ Vùng Order Block SMC (Dải bôi Xanh/Đỏ nhạt, bắt đầu từ nến OB, KHÔNG chữ, KHÔNG đường kẻ ngang)
-                    if "ob_boxes" in data and getattr(self, 'chk_show_ob', None) and self.chk_show_ob.isChecked():
+                # Vẽ Vùng Order Block SMC (Dải bôi Xanh/Đỏ nhạt, bắt đầu từ nến OB, KHÔNG chữ, KHÔNG đường kẻ ngang)
+                if "ob_boxes" in data and getattr(self, 'chk_show_ob', None) and self.chk_show_ob.isChecked():
                         ob_boxes = data["ob_boxes"]
                         js_code = f"""
                         (function() {{
@@ -2641,10 +2688,58 @@ class MainWindow(QtWidgets.QMainWindow):
     def scan_env_files(self):
         env_files = set()
         
-        # Tự động lót ổ 5 tài khoản phụ lúc khởi động cho cả Sub1 và Sub2
+        # Dọn dẹp thư mục json_data rác ở gốc nếu còn tồn tại
+        legacy_root_json = os.path.join(USER_DATA_DIR, "json_data")
+        if os.path.exists(legacy_root_json):
+            try:
+                import shutil
+                shutil.rmtree(legacy_root_json, ignore_errors=True)
+            except Exception: pass
+
+        default_sub1_cfg = {
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+            "ENABLE_STRATEGY_MAIN": True,
+            "ENABLE_STRATEGY_XOLE": True,
+            "ENABLE_DYNAMIC_EMA200_TP": False,
+            "ENABLE_DYNAMIC_PINGPONG_TP": False,
+            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ENABLE_SIDEWAY_SAFE_EXIT": False,
+            "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
+            "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+            "ENABLE_TRAILING_SL": False,
+            "ENABLE_MAX_ROI_EXIT": False,
+            "ENABLE_SIDEWAY_VAP_EXIT": False,
+            "ENABLE_H4_FLIP_CLOSE": True,
+            "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+            "TP_TARGET_OPTIMAL": "0.01200",
+            "SL_TARGET_OPTIMAL": "0.01200",
+            "EVOLUTION_CYCLE_SECONDS": 3600,
+            "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+            "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
+        }
+
+        default_sub2_cfg = {
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+            "ENABLE_STRATEGY_SMC": True,
+            "TIMEFRAME_BASE": "1H",
+            "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+            "OB_RR_RATIO_TREND": "5.00",
+            "OB_RR_RATIO_COUNTER": "1.00",
+            "USE_DYNAMIC_RISK": False,
+            "RISK_PER_TRADE_PCT": "0.0050",
+            "SMC_MODE": "All Setups",
+            "SMC_STYLE": "Normal",
+            "OB_SOURCE": "ALL",
+            "OB_DIRECTION": "BOTH",
+            "OB_TP_MODE": "RR"
+        }
+
         for b_name in ["z_bot_sub1", "z_bot_sub2"]:
             b_dir = os.path.join(USER_DATA_DIR, b_name)
             os.makedirs(b_dir, exist_ok=True)
+            b_json_dir = os.path.join(b_dir, "json_data")
+            os.makedirs(b_json_dir, exist_ok=True)
+
             for i in range(1, 6):
                 default_env = os.path.join(b_dir, f".api_sub{i}")
                 if not os.path.exists(default_env):
@@ -2652,6 +2747,18 @@ class MainWindow(QtWidgets.QMainWindow):
                         with open(default_env, "w", encoding="utf-8") as f:
                             f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
                     except: pass
+                
+                # Pre-create default JSON configs inside z_bot_sub*/json_data
+                cfg_names = [f"sub{i}_global_config.json"]
+                if i == 1:
+                    cfg_names.append("sub1_global_config.json" if b_name == "z_bot_sub1" else "sub2_global_config.json")
+                for c_name in cfg_names:
+                    c_path = os.path.join(b_json_dir, c_name)
+                    if not os.path.exists(c_path):
+                        try:
+                            with open(c_path, "w", encoding="utf-8") as f:
+                                json.dump(default_sub1_cfg if b_name == "z_bot_sub1" else default_sub2_cfg, f, indent=4)
+                        except: pass
                 
         # Tiếp tục quét như bình thường
         for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
@@ -2803,7 +2910,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.api_files)
         self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.api_files)
-        self.panel_sub2 = BotInstanceWidget("sub2", "Bot Mỏ Chim (Sub 2)", self.api_files)
+        self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC - OB (Sub 2)", self.api_files)
         # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)
         
         self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")

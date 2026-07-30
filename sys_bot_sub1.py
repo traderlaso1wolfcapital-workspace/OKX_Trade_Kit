@@ -137,14 +137,38 @@ def main():
                 elif k == "OKX_PASSPHRASE": passphrase = v
                 elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
 
+    if not api_key or not secret_key or not passphrase:
+        fallback_files = [
+            os.path.join(os.path.dirname(env_file), ".api_sub1"),
+            os.path.join(user_data_dir, "z_bot_sub1", ".api_sub1"),
+            os.path.join(user_data_dir, "z_bot_sub2", ".api_sub1")
+        ]
+        for fpath in fallback_files:
+            if os.path.exists(fpath) and fpath != env_file:
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "=" in line:
+                                k, v = line.strip().split("=", 1)
+                                v = v.strip("\"'")
+                                if k == "OKX_API_KEY": api_key = v
+                                elif k == "OKX_SECRET_KEY": secret_key = v
+                                elif k == "OKX_PASSPHRASE": passphrase = v
+                                elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
+                    if api_key and secret_key and passphrase:
+                        print(f"💡 [API KEY FALLBACK]: Đã tự động đọc API Key từ [{os.path.basename(fpath)}] cho Bot Sub 1!")
+                        break
+                except: pass
+
     if not api_key or not secret_key or not passphrase: 
         raise ValueError(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.")
 
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
-    # =========================================================================
-    lock_file = os.path.join(user_data_dir, "json_data", f"{acc_name}.pid")
-    os.makedirs(os.path.join(user_data_dir, "json_data"), exist_ok=True)
+    sub1_dir = os.path.join(user_data_dir, "z_bot_sub1")
+    JSON_DATA_DIR = os.path.join(sub1_dir, "json_data")
+    os.makedirs(JSON_DATA_DIR, exist_ok=True)
+    lock_file = os.path.join(JSON_DATA_DIR, f"{acc_name}.pid")
     
     if HAS_PSUTIL:
         if os.path.exists(lock_file):
@@ -186,9 +210,6 @@ def main():
     else:
         print(f"⚠️ [LOCK] Single Instance Lock bị vô hiệu hóa (thiếu psutil). Không thể ngăn chặn chạy trùng.")
 
-    JSON_DATA_DIR = os.path.join(user_data_dir, "json_data")
-    os.makedirs(JSON_DATA_DIR, exist_ok=True)
-
     env_paths = {
         "FILE_GLOBAL_CONFIG": os.path.join(JSON_DATA_DIR, f"{acc_name}_global_config.json"),
         "JSON_EVOLUTION_DATA_FILE": os.path.join(JSON_DATA_DIR, f"{acc_name}_du_lieu_tien_hoa.json"),
@@ -200,9 +221,38 @@ def main():
         "ENV_FILE_NAME": env_file
     }
 
-    for path in [env_paths["FILE_RSI_BEHAVIOR"], env_paths["FILE_WAIT_LOG"]]:
-        if not os.path.exists(path):
-            with open(path, "w", encoding="utf-8") as f: f.write("[]" if "nhat_ky" in path else "{}")
+    if not os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
+        try:
+            default_sub1_cfg = {
+                "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                "ENABLE_STRATEGY_MAIN": True,
+                "ENABLE_STRATEGY_XOLE": True,
+                "ENABLE_DYNAMIC_EMA200_TP": False,
+                "ENABLE_DYNAMIC_PINGPONG_TP": False,
+                "ALTCOIN_FOLLOW_BTC_EMA": True,
+                "ENABLE_SIDEWAY_SAFE_EXIT": False,
+                "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
+                "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+                "ENABLE_TRAILING_SL": False,
+                "ENABLE_MAX_ROI_EXIT": False,
+                "ENABLE_SIDEWAY_VAP_EXIT": False,
+                "ENABLE_H4_FLIP_CLOSE": True,
+                "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
+                "TP_TARGET_OPTIMAL": "0.01200",
+                "SL_TARGET_OPTIMAL": "0.01200",
+                "EVOLUTION_CYCLE_SECONDS": 3600,
+                "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+                "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
+            }
+            with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
+                json.dump(default_sub1_cfg, f, indent=4)
+        except Exception: pass
+
+    # Tự động dọn dẹp các file log rác nặng máy cũ (RSI macro log, nhật ký phiên)
+    for path in [env_paths["FILE_RSI_BEHAVIOR"], env_paths["FILE_WAIT_LOG"], env_paths["FILE_TRADE_HISTORY"]]:
+        if os.path.exists(path):
+            try: os.remove(path)
+            except: pass
 
 
     # Dọn sạch các file flag cũ của tài khoản này khi khởi động lại bot để tránh tình trạng nhận diện nhầm lệnh dừng từ phiên cũ
