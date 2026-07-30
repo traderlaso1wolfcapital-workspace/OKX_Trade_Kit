@@ -149,9 +149,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.246")
+            return json.load(f).get("version", "1.0.247")
     except:
-        return "1.0.246"
+        return "1.0.247"
 
 APP_VERSION = get_app_version()
 
@@ -489,16 +489,41 @@ class LiveChartWorker(QtCore.QThread):
                                 vol = sub2_strat.get_volatility_measure(closes, highs, lows)
                                 sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
                                 
-                                ob_boxes = []
+                                raw_obs = []
                                 for ob in (tk.swing_obs + tk.internal_obs):
                                     if not ob.crossed:
-                                        ob_boxes.append({
+                                        raw_obs.append({
                                             "high": float(ob.bar_high),
                                             "low": float(ob.bar_low),
                                             "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
                                             "bias": int(ob.bias),
                                             "source": str(ob.source)
                                         })
+                                
+                                # Gom các vùng OB trùng lấp thành 1 vùng
+                                ob_boxes = []
+                                for bias in [1, -1]:
+                                    b_obs = [o for o in raw_obs if o["bias"] == bias]
+                                    if not b_obs: continue
+                                    # Sắp xếp theo giá low tăng dần
+                                    b_obs.sort(key=lambda x: x["low"])
+                                    merged = []
+                                    for o in b_obs:
+                                        if not merged:
+                                            merged.append(o)
+                                        else:
+                                            last = merged[-1]
+                                            # Kiểm tra xem có giao nhau không (last.high >= o.low)
+                                            if last["high"] >= o["low"]:
+                                                # Hợp nhất
+                                                last["high"] = max(last["high"], o["high"])
+                                                if o["time"] > 0 and last["time"] > 0:
+                                                    last["time"] = min(last["time"], o["time"])
+                                                elif o["time"] > 0:
+                                                    last["time"] = o["time"]
+                                            else:
+                                                merged.append(o)
+                                    ob_boxes.extend(merged)
                                 chart_data["ob_boxes"] = ob_boxes
                                 
                                 # Add trade setups as markers
