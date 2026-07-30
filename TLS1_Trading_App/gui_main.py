@@ -437,14 +437,20 @@ class LiveChartWorker(QtCore.QThread):
     
     def __init__(self, inst_id="BTC-USDT-SWAP", bar="5m", parent=None):
         super().__init__(parent)
+        import threading
         self.inst_id = inst_id
         self.bar = bar
         self._is_running = True
+        self._trigger = threading.Event()
+
+    def trigger_fetch(self):
+        self._trigger.set()
         
     def run(self):
         import requests
         import time
         while self._is_running:
+            self._trigger.clear()
             try:
                 resp = requests.get(f"https://www.okx.com/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300", timeout=5)
                 if resp.status_code == 200:
@@ -546,10 +552,11 @@ class LiveChartWorker(QtCore.QThread):
                             self.chart_data_signal.emit(chart_data)
             except Exception:
                 pass
-            time.sleep(5)
+            self._trigger.wait(5.0)
             
     def stop(self):
         self._is_running = False
+        self._trigger.set()
         self.wait()
 
 class HoverSoundFilter(QtCore.QObject):
@@ -2267,13 +2274,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def on_chart_config_changed(self):
         if getattr(self, 'live_chart_worker', None):
-            self.live_chart_worker.inst_id = self.combo_coin.currentText()
+            coin_code = self.combo_coin.currentData() or f"{self.combo_coin.currentText()}-USDT-SWAP"
+            self.live_chart_worker.inst_id = coin_code
             self.live_chart_worker.bar = self.combo_tf.currentText()
             self._chart_initialized = False
             if getattr(self, 'chart_widget', None):
                 self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
                 self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
                 self.chart_widget.spinner(True)
+            self.live_chart_worker.trigger_fetch()
 
     def update_live_chart(self, data):
         if getattr(self, 'chart_widget', None):
