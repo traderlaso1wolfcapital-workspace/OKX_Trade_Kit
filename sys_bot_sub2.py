@@ -89,16 +89,15 @@ def main():
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
-        # Khi đóng gói, file cấu hình API nằm trong thư mục dữ liệu người dùng
-        local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
-        user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         for _ in range(4):
             if os.path.isdir(os.path.join(base_dir, "z_bot_sub2")):
                 break
             base_dir = os.path.dirname(base_dir)
-        user_data_dir = base_dir
+
+    local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+    user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
 
     if getattr(sys, 'frozen', False):
         CURRENT_DIR = os.path.dirname(sys.executable)
@@ -108,14 +107,23 @@ def main():
     env_arg = sys.argv[1] if len(sys.argv) > 1 else ".api_sub2"
     env_basename = os.path.basename(env_arg)
     
-    # Thử tìm file ở user_data_dir trước (nơi GUI lưu), rồi mới fallback về base_dir
-    env_file = os.path.join(user_data_dir, "z_bot_sub2", env_basename)
-    if not os.path.exists(env_file):
-        env_file = os.path.join(base_dir, "z_bot_sub2", env_basename)
+    # Tìm file ở nhiều đường dẫn khả thi (ưu tiên user_data_dir trước)
+    possible_paths = [
+        os.path.join(user_data_dir, "z_bot_sub2", env_basename),
+        os.path.join(user_data_dir, env_basename),
+        os.path.join(base_dir, "z_bot_sub2", env_basename),
+        os.path.join(base_dir, env_basename),
+    ]
     
-    if not os.path.exists(env_file):
-        print(f"❌ [LỖI] Không tìm thấy file cấu hình API: {env_file}")
-        print("Vui lòng tạo file .api_sub2 trong thư mục z_bot_sub2 hoặc chỉ định đúng file.")
+    env_file = None
+    for p in possible_paths:
+        if os.path.exists(p):
+            env_file = p
+            break
+            
+    if not env_file:
+        print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 2!")
+        print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 2' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!")
         sys.exit(1)
         
     acc_name = os.path.basename(env_file).replace(".api_sub2", "").replace(".api", "").replace("_", "")
