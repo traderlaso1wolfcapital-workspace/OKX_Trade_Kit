@@ -92,7 +92,7 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
             pass
         resp = client.request("POST", "/api/v5/trade/order", body={
             "instId": inst_id, "tdMode": td_mode,
-            "side": side, "ordType": "limit", "sz": sz_str,
+            "side": side, "posSide": pos_side, "ordType": "limit", "sz": sz_str,
             "px": px_str, "clOrdId": cl_id
         })
         if resp and resp.get("code") == "0":
@@ -112,7 +112,9 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         return False, f"Exception: {e}"
 
 
-def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz: Decimal, cl_prefix: str, td_mode: str = "cross", live_price: Decimal = None, pos_side: str = "net") -> bool:
+def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz: Decimal, cl_prefix: str, td_mode: str = "cross", live_price: Decimal = None, pos_side: str = None) -> bool:
+    if not pos_side or pos_side == "net":
+        pos_side = "long" if setup.bias == BULLISH else "short"
     tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
     sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
     tp_side = "sell" if setup.bias == BULLISH else "buy"

@@ -44,13 +44,13 @@ import dotenv
 
 if getattr(sys, 'frozen', False):
     _base = os.path.dirname(sys.executable)
-    # Sử dụng AppData/Local để đảm bảo luôn có quyền ghi file, tránh lỗi PermissionError
-    local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
-    USER_DATA_DIR = os.path.join(local_app_data, 'TLS1_Trading')
-    os.makedirs(USER_DATA_DIR, exist_ok=True)
 else:
     _base = os.path.dirname(os.path.abspath(__file__))
-    USER_DATA_DIR = None
+
+# Sử dụng AppData/Local để đảm bảo luôn có quyền ghi file, tránh rác thư mục code
+local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+USER_DATA_DIR = os.path.join(local_app_data, 'TLS1_Trading')
+os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 # Tìm ngược lên thư mục gốc OKX_Trade_Kit (chứa z_bot_sub1)
 PROJECT_DIR = _base
@@ -58,9 +58,6 @@ for _ in range(4):
     if os.path.isdir(os.path.join(PROJECT_DIR, "z_bot_sub1")):
         break
     PROJECT_DIR = os.path.dirname(PROJECT_DIR)
-
-if not USER_DATA_DIR:
-    USER_DATA_DIR = PROJECT_DIR
 
 _GLOBAL_AUDIO_PLAYERS = []
 
