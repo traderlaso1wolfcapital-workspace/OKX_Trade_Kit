@@ -119,6 +119,7 @@ OB_DIRECTION = "BOTH"               # "BOTH" | "LONG_ONLY" | "SHORT_ONLY"
 OB_TP_MODE = "RR"                   # "RR" | "NEAREST_OB"
 OB_RR_RATIO_TREND = Decimal("5.0")   # RR thuận trend mặc định
 OB_RR_RATIO_COUNTER = Decimal("1.0") # RR ngược trend mặc định
+OB_RR_RATIO_INTERNAL = OB_RR_RATIO_COUNTER # Alias cho bot_strategy.py
 OB_RR_RATIO = Decimal("5.0")          # RR mặc định
 OB_MAX_ACTIVE_SETUPS = 10           # Số lượng setup chờ tối đa mỗi coin
 OB_MAX_COUNT = 20                   # Giới hạn mảng OB
