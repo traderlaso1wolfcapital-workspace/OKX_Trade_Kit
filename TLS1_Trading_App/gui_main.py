@@ -676,10 +676,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def reload_accounts(self):
         self.api_files = []
         if os.path.exists(PROJECT_DIR):
-            self.api_files.extend([f for f in os.listdir(PROJECT_DIR) if f.startswith('.api') and not f.endswith('.bak')])
-        bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+            proj_bot_dir = os.path.join(PROJECT_DIR, f"z_bot_{self.strategy_id}")
+            if os.path.exists(proj_bot_dir):
+                self.api_files.extend([f for f in os.listdir(proj_bot_dir) if f.startswith('.api') and not f.endswith('.bak')])
+        bot_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}")
         os.makedirs(bot_dir, exist_ok=True)
-        # Tự động tạo 5 tài khoản phụ rỗng mặc định nếu chưa có
+        # Tự động tạo 5 tài khoản phụ rỗng mặc định cho Bot này nếu chưa có
         for i in range(1, 6):
             default_env = os.path.join(bot_dir, f".api_sub{i}")
             if not os.path.exists(default_env):
@@ -714,7 +716,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             text = text.strip()
             if not text: return
             env_name = f".api_{text}"
-            bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
+            bot_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}")
             os.makedirs(bot_dir, exist_ok=True)
             env_path = os.path.join(bot_dir, env_name)
             if not os.path.exists(env_path):
@@ -2630,16 +2632,17 @@ class MainWindow(QtWidgets.QMainWindow):
     def scan_env_files(self):
         env_files = set()
         
-        # Tự động lót ổ 5 tài khoản phụ lúc khởi động
-        bot_dir = os.path.join(USER_DATA_DIR, "z_bot_sub1")
-        os.makedirs(bot_dir, exist_ok=True)
-        for i in range(1, 6):
-            default_env = os.path.join(bot_dir, f".api_sub{i}")
-            if not os.path.exists(default_env):
-                try:
-                    with open(default_env, "w", encoding="utf-8") as f:
-                        f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
-                except: pass
+        # Tự động lót ổ 5 tài khoản phụ lúc khởi động cho cả Sub1 và Sub2
+        for b_name in ["z_bot_sub1", "z_bot_sub2"]:
+            b_dir = os.path.join(USER_DATA_DIR, b_name)
+            os.makedirs(b_dir, exist_ok=True)
+            for i in range(1, 6):
+                default_env = os.path.join(b_dir, f".api_sub{i}")
+                if not os.path.exists(default_env):
+                    try:
+                        with open(default_env, "w", encoding="utf-8") as f:
+                            f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
+                    except: pass
                 
         # Tiếp tục quét như bình thường
         for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
