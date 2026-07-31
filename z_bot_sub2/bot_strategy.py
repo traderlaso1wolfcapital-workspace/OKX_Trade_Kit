@@ -734,59 +734,81 @@ def run_strategy_cycle(
             ct_val = Decimal(spec_data["ctVal"])
             min_sz = Decimal(spec_data["minSz"])
             
-            # Lấy tất cả lệnh pending hiện tại trên sàn
+            # Lấy tất cả lệnh pending hiện tại trên sàn OKX cho cặp này
             pending_orders = client.request("GET", "/api/v5/trade/orders-pending",
                                             params={"instType": "SWAP", "instId": swap_id}).get("data", [])
-            our_order_ids = set()
+            existing_px_set = set()
             for o in pending_orders:
-                cid = o.get("clOrdId", "")
-                if cid.startswith(CL_ORD_PREFIX):
-                    our_order_ids.add(cid)
+                if o.get("clOrdId", "").startswith(CL_ORD_PREFIX):
+                    try:
+                        existing_px_set.add(round_to_tick(Decimal(str(o.get("px", "0"))), tick_sz))
+                    except: pass
             
             # === GỘP OB ZONE TRÙNG LẶP TRƯỚC KHI ĐẶT LỆNH ===
             merge_ob_zones(tracker, Decimal("0.005"))  # 0.5% threshold
             
-            # ⚡ Volume riêng cho Swing vs Internal OB
+            # ⚡ Gài lệnh limit riêng cho từng setup chưa khớp
             now_ts = int(time.time())
             for setup in tracker.trade_setups:
                 if setup.triggered:
                     continue
                 
-                # === FILTER BIÊN ĐỘ OKX: chỉ gửi nếu entry trong ±0.45% live_price ===
-                lp = tracker.live_price
-                if lp > 0:
-                    max_limit = lp * Decimal("1.0045")
-                    min_limit = lp * Decimal("0.9955")
-                    if setup.bias == BULLISH and setup.entry_price > max_limit:
-                        continue  # Entry LONG quá xa phía trên, bỏ qua
-                    if setup.bias == BEARISH and setup.entry_price < min_limit:
-                        continue  # Entry SHORT quá xa phía dưới, bỏ qua
-                
-                last_attempt = getattr(setup, "last_order_attempt", 0)
-                if now_ts - last_attempt < 60:
+                setup_px_rounded = round_to_tick(setup.entry_price, tick_sz)
+                if setup_px_rounded in existing_px_set:
+                    setup.order_placed = True
                     continue
                 
-                has_order_on_exchange = any(
-                    cid.startswith(CL_ORD_PREFIX) for cid in our_order_ids
-                )
-                
-                if has_order_on_exchange:
-                    setup.order_placed = True
-                    setup.last_order_attempt = now_ts
+                last_attempt = getattr(setup, "last_order_attempt", 0)
+                if now_ts - last_attempt < 30:
                     continue
                 
                 setup.last_order_attempt = now_ts
-                # Chọn volume theo loại OB
-                if setup.ob_source == "SWING":
-                    pos_usdt = SWING_VOLUME_USDT
-                else:
+                # Chọn volume theo loại OB: Internal = 50 USDT, Swing = 100 USDT
+                if setup.ob_source == "INTERNAL":
                     pos_usdt = INTERNAL_VOLUME_USDT
+                else:
+                    pos_usdt = SWING_VOLUME_USDT
+                
+                # ⚡ Kiểm tra giá lọt qua Entry để ép khớp Market (bắt Entry đẹp hơn)
+                lp = tracker.live_price
+                if lp > 0:
+                    is_crossed = (setup.bias == BULLISH and lp <= setup.entry_price) or (setup.bias == BEARISH and lp >= setup.entry_price)
+                    if is_crossed:
+                        if getattr(bot_config, "FORCE_MARKET_ENTRY_ON_CROSS", True):
+                            max_slip = getattr(bot_config, "MAX_MARKET_SLIPPAGE_PCT", Decimal("0.008"))
+                            if abs(lp - setup.entry_price) / setup.entry_price <= max_slip:
+                                sz_raw = round_to_tick(pos_usdt / (lp * ct_val), lot_sz)
+                                sz_str = str(max(sz_raw, min_sz))
+                                ok, err_detail = place_ob_market_order(client, swap_id, setup, sz_str, tick_sz, CL_ORD_PREFIX)
+                                if ok:
+                                    orig_risk = abs(setup.entry_price - setup.stop_loss)
+                                    orig_tp_dist = abs(setup.take_profit - setup.entry_price)
+                                    
+                                    # Lùi SL & TP theo khoảng tương ứng từ giá Market vừa khớp
+                                    if setup.bias == BULLISH:
+                                        setup.entry_price = lp
+                                        setup.stop_loss = lp - orig_risk
+                                        setup.take_profit = lp + orig_tp_dist
+                                    else:
+                                        setup.entry_price = lp
+                                        setup.stop_loss = lp + orig_risk
+                                        setup.take_profit = lp - orig_tp_dist
+
+                                    setup.triggered = True
+                                    setup.order_placed = True
+                                    print(f"🚀 [SMC MARKET] {cfg.get('coin', swap_id)}: ÉP KHỚP MARKET {('LONG' if setup.bias == BULLISH else 'SHORT')} ({setup.ob_source}) @ {float(lp):.2f} | LÙI SL VỀ {float(setup.stop_loss):.2f} (Khoảng SL gốc: {float(orig_risk):.2f})")
+                                    continue
+                                else:
+                                    print(f"🚫 [SMC MARKET] OKX từ chối Market: {err_detail}")
+                        continue  # Bỏ qua không gài Limit nếu đã lọt Entry
+
                 sz_raw = round_to_tick(pos_usdt / (tracker.live_price * ct_val), lot_sz)
                 sz_str = str(max(sz_raw, min_sz))
                 ok, err_detail = place_ob_limit_order(client, swap_id, setup, sz_str, tick_sz, CL_ORD_PREFIX)
                 if ok:
                     setup.order_placed = True
-                    print(f"📊 [SMC] {cfg.get('coin', swap_id)}: Đặt limit {('LONG' if setup.bias == BULLISH else 'SHORT')} @ {float(setup.entry_price):.2f} | SL: {float(setup.stop_loss):.2f} | TP: {float(setup.take_profit):.2f}")
+                    existing_px_set.add(setup_px_rounded)
+                    print(f"📊 [SMC] {cfg.get('coin', swap_id)}: Đặt limit {('LONG' if setup.bias == BULLISH else 'SHORT')} ({setup.ob_source}) @ {float(setup.entry_price):.2f} (Vol: {pos_usdt} U)")
                 else:
                     print(f"🚫 [SMC] {cfg.get('coin', swap_id)}: OKX từ chối lệnh {('LONG' if setup.bias == BULLISH else 'SHORT')} @ {float(setup.entry_price):.2f} - {err_detail}")
                     if "51008" in err_detail or "Insufficient" in err_detail:

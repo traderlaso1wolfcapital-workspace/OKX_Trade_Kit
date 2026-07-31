@@ -85,9 +85,14 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         
     cl_id = f"{cl_prefix}{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
     try:
-        # Đồng nhất sử dụng POSITION_MODE và LEVERAGE cho mọi OB (tránh lỗi mismatch OKX)
-        td_mode = POSITION_MODE
-        lever = str(LEVERAGE)
+        # Phân biệt mode & đòn bẩy: Internal OB dùng isolated (50x), Swing OB dùng cross (100x)
+        if setup.ob_source == "INTERNAL":
+            td_mode = "isolated"
+            lever = str(INTERNAL_LEVERAGE)
+        else:
+            td_mode = POSITION_MODE
+            lever = str(LEVERAGE)
+
         # Set leverage trước khi đặt lệnh
         try:
             client.request("POST", "/api/v5/account/set-leverage", body={
@@ -128,6 +133,45 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         return False, err_msg
     except RuntimeError as e:
         return False, str(e)
+    except Exception as e:
+        return False, f"Exception: {e}"
+
+
+def place_ob_market_order(client, inst_id: str, setup: TradeSetup, sz_str: str, tick_sz: Decimal, cl_prefix: str) -> tuple[bool, str]:
+    global _ORDER_COUNTER
+    _ORDER_COUNTER += 1
+    side = "buy" if setup.bias == BULLISH else "sell"
+    pMode = getattr(client, 'pMode', 'net_mode')
+    if pMode == "net_mode" or pMode == "net":
+        pos_side = "net"
+    else:
+        pos_side = "long" if setup.bias == BULLISH else "short"
+        
+    cl_id = f"{cl_prefix}mkt{_ORDER_COUNTER:03d}{int(time.time())}"[:32]
+    try:
+        if setup.ob_source == "INTERNAL":
+            td_mode = "isolated"
+            lever = str(INTERNAL_LEVERAGE)
+        else:
+            td_mode = POSITION_MODE
+            lever = str(LEVERAGE)
+
+        try:
+            client.request("POST", "/api/v5/account/set-leverage", body={
+                "instId": inst_id, "lever": lever, "mgnMode": td_mode
+            })
+        except:
+            pass
+
+        resp = client.request("POST", "/api/v5/trade/order", body={
+            "instId": inst_id, "tdMode": td_mode,
+            "side": side, "posSide": pos_side, "ordType": "market", "sz": sz_str,
+            "clOrdId": cl_id
+        })
+        if resp and resp.get("code") == "0":
+            return True, ""
+        err_msg = resp.get("msg", "Unknown") if resp else "No response"
+        return False, err_msg
     except Exception as e:
         return False, f"Exception: {e}"
 

@@ -54,13 +54,12 @@ def format_with_commas(value, decimals=2):
         return "0.00"
 
 def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
-    """Hiển thị Dashboard UI cho Bot Sub2"""
-
-    print(f"\nbot_sub2.py {env_paths.get('ENV_FILE_NAME', '.api')}")
+    """Hiển thị Dashboard UI cho Bot Sub2 theo format chuẩn mực của Sub1"""
 
     sync_time = datetime.now().strftime('%H:%M:%S')
     
     # Lấy thông tin ví
+    von_goc = 2000.00
     von_hien_tai = 2000.00
     loi_nhuan = 0.00
     tang_truong = 0.00
@@ -76,6 +75,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
                 evo_data = json.load(f)
                 if "wallet_stats" in evo_data:
                     w = evo_data["wallet_stats"]
+                    von_goc = w.get("von_goc", 2000.00)
                     von_hien_tai = w.get("von_hien_tai", 2000.00)
                     loi_nhuan = w.get("loi_nhuan", 0.00)
                     tang_truong = w.get("tang_truong", 0.00)
@@ -92,55 +92,39 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
                 if all_mfe: ai_avg_mfe = sum(all_mfe) / len(all_mfe)
         except: pass
 
-    total_ob = sum(len(t.swing_obs) + len(t.internal_obs) for t in trackers.values())
-    total_setups = sum(len([s for s in t.trade_setups if not s.triggered]) for t in trackers.values())
-
     pnl_sign = "+" if loi_nhuan >= 0 else ""
     growth_sign = "+" if tang_truong >= 0 else ""
 
-    print("=" * 97)
     bot_name = "SMC ORDER BLOCK"
-    BOT_VERSION = "v1.0"
-    
-    col1_w, col2_w, col3_w, col4_w = 23, 34, 14, 17
-    r1_c1 = f"☢  {bot_name} {BOT_VERSION}"
-    r1_c2 = f"EQUITY: {format_with_commas(von_hien_tai, 2)} USDT ({growth_sign}{tang_truong:.2f}%)"
-    r1_c3 = f"OB COUNT: {total_ob}"
-    
-    rr_ratio = 0.0
-    if ai_avg_mae > 0: rr_ratio = ai_avg_mfe / ai_avg_mae
-    rr_str = f"{int(rr_ratio)}" if rr_ratio == int(rr_ratio) else f"{rr_ratio:.1f}"
-    
-    r1_c4 = f"WINRATE: {ai_winrate:.1f}% / {total_pos}"
-    
-    r2_c1 = f"    {sync_time}    "
-    r2_c2 = f"PNL   : {pnl_sign}{format_with_commas(loi_nhuan, 2)} USD"
-    r2_c3 = f"SETUPS  : {total_setups}"
-    r2_c4 = f"R/R    : 1 / {rr_str}"
+    c1, c2, c3, c4 = 20, 26, 20, 16
+    line_w = 94
 
-    print(f"{r1_c1:<{col1_w}} | {r1_c2:<{col2_w}} | {r1_c3:<{col3_w}} | {r1_c4:<{col4_w}}")
-    print(f"{r2_c1:<{col1_w}} | {r2_c2:<{col2_w}} | {r2_c3:<{col3_w}} | {r2_c4:<{col4_w}}")
-    print("=" * 97)
+    mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
+    mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
+    target_vol = 100.0
+
+    r0 = f"  {'⚡ ' + bot_name:^{c1-1}} | {'💰 LỢI NHUẬN':^{c2-1}} | {'🏦 TÀI KHOẢN':^{c3-1}} | 🎯 HIỆU SUẤT"
+    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
+    r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
+
+    bar  = "-" * line_w
+    dbar = "=" * line_w
+
+    print(f"\n  bot_sub2.py {env_paths.get('ENV_FILE_NAME', '.api')}")
+    print(dbar)
+    print(r0)
+    print(bar)
+    print(r1)
+    print(r2)
+    print(dbar)
     
-    sorted_trackers = dict(sorted(trackers.items(), key=lambda x: (0 if "BTC" in x[0] else 1, x[0])))
+    sorted_trackers = dict(sorted(trackers.items(), key=lambda x: (0 if "XAU" in x[0] else (1 if "BTC" in x[0] else 2), x[0])))
 
-    # CHIẾN THUẬT ĐANG KÍCH HOẠT
-    print("\n⚡ CHIẾN THUẬT ĐANG KÍCH HOẠT:")
-    for symbol, tracker in sorted_trackers.items():
-        coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
-        # In trạng thái của SMC Sub2
-        detail = "Order Block SMC (Thuận Trend)"
-        if tracker.swing_trend == 1:
-            detail = "Order Block SMC (LONG)"
-        elif tracker.swing_trend == -1:
-            detail = "Order Block SMC (SHORT)"
-        else:
-            detail = "Order Block SMC (CHỜ TÍN HIỆU)"
-        print(f"       · {coin:<4}: THUẬN XU HƯỚNG  {detail}")
+    # 2. CHIẾN THUẬT ĐANG KÍCH HOẠT: (Giữ tiêu đề, ẩn chi tiết)
+    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT:")
 
-    # BẢNG COIN — Cột OB luôn width cố định 23 ký tự, dấu | thẳng hàng
+    # 3. BẢNG COIN (Giữ nguyên)
     OB_W = 23  # width cố định cho mỗi cột OB ZONE
-    # Header động theo trend: MAIN = thuận trend, HEDGE = ngược trend
     if any(t.swing_trend == 1 for t in sorted_trackers.values()):
         h1, h2 = "OB MAIN (M15 LONG)", "OB HEDGE (M30 SHORT)"
     elif any(t.swing_trend == -1 for t in sorted_trackers.values()):
@@ -160,17 +144,13 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
         elif tracker.swing_trend == -1: trend_str = "BEAR ▼"
         else: trend_str = "SIDE ◆"
         
-        # M15 Swing OB (chưa crossed)
         m15_active = [ob for ob in tracker.swing_obs if not ob.crossed]
-        # M30 OB (chưa crossed)
         m30_active = [ob for ob in tracker.m30_swing_obs if not ob.crossed]
         
         if tracker.swing_trend == 1:
-            # BULL: MAIN = M15 Bullish OB (LONG), HEDGE = M30 Bearish OB (SHORT)
             main_obs = [ob for ob in m15_active if ob.bias == BULLISH]
             hedge_obs = [ob for ob in m30_active if ob.bias == BEARISH]
         elif tracker.swing_trend == -1:
-            # BEAR: MAIN = M15 Bearish OB (SHORT), HEDGE = M30 Bullish OB (LONG)
             main_obs = [ob for ob in m15_active if ob.bias == BEARISH]
             hedge_obs = [ob for ob in m30_active if ob.bias == BULLISH]
         else:
@@ -194,89 +174,90 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
 
     print("-" * 95)
     
-    # ✜ TÌNH TRẠNG VỊ THẾ (chỉ pending, chưa khớp)
-    print("\n✜ TÌNH TRẠNG VỊ THẾ (CHỜ KHỚP):")
-    any_pending = False
-    
-    all_int_pending = {}
-    all_swing_pending = {}
+    # 4. ✜ TÌNH TRẠNG VỊ THẾ:
+    print("\n✜ TÌNH TRẠNG VỊ THẾ:")
+    pos_lines = []
     
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
-        pending = [s for s in tracker.trade_setups if not s.triggered]
-        int_p = [s for s in pending if s.ob_source == "INTERNAL"]
-        swing_p = [s for s in pending if s.ob_source == "SWING"]
+        lines_desc = []
         
-        if int_p:
-            long_i = [s for s in int_p if s.bias == BULLISH]
-            short_i = [s for s in int_p if s.bias == BEARISH]
-            all_int_pending[coin] = {
-                "LONG": [f"{float(s.entry_price):.2f}" for s in long_i],
-                "SHORT": [f"{float(s.entry_price):.2f}" for s in short_i]
-            }
-        
-        if swing_p:
-            long_s = [s for s in swing_p if s.bias == BULLISH]
-            short_s = [s for s in swing_p if s.bias == BEARISH]
-            all_swing_pending[coin] = {"LONG": long_s, "SHORT": short_s}
-    
-    int_printed = False
-    for coin in sorted(all_int_pending.keys(), key=lambda c: (0 if "BTC" in c else 1, c)):
-        data = all_int_pending[coin]
-        if data["LONG"]:
-            print(f"    ✧ {coin:<4}      Chờ khớp LONG Internal: {', '.join(data['LONG'])} (RR 1:1)")
-            int_printed = True; any_pending = True
-        if data["SHORT"]:
-            print(f"    ✧ {coin:<4}      Chờ khớp SHORT Internal: {', '.join(data['SHORT'])} (RR 1:1)")
-            int_printed = True; any_pending = True
-    
-    if int_printed:
-        print("")
-    
-    swing_printed = False
-    for coin in sorted(all_swing_pending.keys(), key=lambda c: (0 if "BTC" in c else 1, c)):
-        data = all_swing_pending[coin]
-        for s in data.get("LONG", []):
-            ep = float(s.entry_price); sl_px = float(s.stop_loss); tp_px = float(s.take_profit)
-            rr_val = abs(tp_px - ep) / abs(ep - sl_px) if abs(ep - sl_px) > 0 else 0
-            line = f"    ✧ {coin:<4} ╭─  Chờ khớp LONG (Swing) tại {ep:.2f} (RR 1:{rr_val:.0f})"
-            indent = " " * line.index("╭─")
-            print(line); print(f"{indent}╰─  SL: {sl_px:.2f} | TP: {tp_px:.2f}")
-            swing_printed = True; any_pending = True
-        for s in data.get("SHORT", []):
-            ep = float(s.entry_price); sl_px = float(s.stop_loss); tp_px = float(s.take_profit)
-            rr_val = abs(tp_px - ep) / abs(ep - sl_px) if abs(ep - sl_px) > 0 else 0
-            line = f"    ✧ {coin:<4} ╭─  Chờ khớp SHORT (Swing) tại {ep:.2f} (RR 1:{rr_val:.0f})"
-            indent = " " * line.index("╭─")
-            print(line); print(f"{indent}╰─  SL: {sl_px:.2f} | TP: {tp_px:.2f}")
-            swing_printed = True; any_pending = True
-    
-    if not any_pending:
-        print("  · Chưa có lệnh chờ khớp nào.")
-    
-    # ✜ ĐÃ KHỚP (triggered)
-    print("\n✜ TÌNH TRẠNG VỊ THẾ (ĐÃ KHỚP):")
-    any_triggered = False
-    for symbol, tracker in sorted_trackers.items():
-        coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
+        # --- A. Lệnh ĐÃ KHỚP (Triggered Setups) ĐƯA LÊN ĐẦU TIÊN ---
         triggered = [s for s in tracker.trade_setups if s.triggered]
-        for s in triggered:
-            ep = float(s.entry_price); sl_px = float(s.stop_loss); tp_px = float(s.take_profit)
-            side = "LONG" if s.bias == BULLISH else "SHORT"
-            src = "Swing" if s.ob_source == "SWING" else "Internal"
-            rr_val = abs(tp_px - ep) / abs(ep - sl_px) if abs(ep - sl_px) > 0 else 0
-            # Tính ROI dựa trên live_price
-            if s.bias == BULLISH:
-                roi = ((float(tracker.live_price) - ep) / ep * 100) if ep > 0 else 0
-            else:
-                roi = ((ep - float(tracker.live_price)) / ep * 100) if ep > 0 else 0
-            tpsl_status = "🔒 Có TP/SL" if s.tp_sl_placed else "⚠️ Chưa cài"
-            print(f"    ✧ {coin:<4} ╭─  Đã khớp {side} ({src}): Entry {ep:.2f}  RR 1:{rr_val:.0f}  |  ROI {roi:+.2f}%  |  {tpsl_status}")
-            any_triggered = True
+        if triggered:
+            trig_internal = [s for s in triggered if s.ob_source == "INTERNAL"]
+            trig_swing = [s for s in triggered if s.ob_source == "SWING"]
+            
+            for src_name, group_list in [("Internal", trig_internal), ("Swing", trig_swing)]:
+                if not group_list: continue
+                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
+                    sub_setups = [s for s in group_list if s.bias == side_val]
+                    if not sub_setups: continue
+                    prices = " - ".join([f"{float(s.entry_price):,.2f}" for s in sub_setups])
+                    vol_val = (50.0 if src_name == "Internal" else 100.0) * len(sub_setups)
+                    roi = float(tracker.max_roi_long) if side_str == "LONG" else float(tracker.max_roi_short)
+                    mae = float(tracker.mae_max_pct_long) if side_str == "LONG" else float(tracker.mae_max_pct_short)
+                    lines_desc.append(f"Đã khớp {side_str} ({src_name}) {prices} = {vol_val:.0f} U → ROI ({roi:+.1f}% / -{mae:.1f}%)")
+
+        # --- B. Lệnh CHỜ KHỚP (Pending Setups) ĐƯA BÊN DƯỚI ---
+        pending = [s for s in tracker.trade_setups if not s.triggered]
+        if pending:
+            pend_internal = [s for s in pending if s.ob_source == "INTERNAL"]
+            pend_swing = [s for s in pending if s.ob_source == "SWING"]
+            
+            if pend_internal:
+                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
+                    sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_internal if s.bias == side_val]
+                    if sub_p:
+                        lines_desc.append(f"Chờ Entry {side_str} (Internal): {' - '.join(sub_p)}")
+            if pend_swing:
+                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
+                    sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_swing if s.bias == side_val]
+                    if sub_p:
+                        lines_desc.append(f"Chờ Entry {side_str} (Swing): {' - '.join(sub_p)}")
+
+        # Xây dựng các nhánh cây ╭─ ├─ ╰─
+        if lines_desc:
+            line_main = f"    {coin:<4} ╭─  {lines_desc[0]}"
+            idx_branch = line_main.index("╭─")
+            indent_branch = " " * idx_branch
+            coin_lines = [line_main]
+            for i, desc in enumerate(lines_desc[1:]):
+                prefix = "╰─" if i == len(lines_desc[1:]) - 1 else "├─"
+                coin_lines.append(f"{indent_branch}{prefix}  {desc}")
+            pos_lines.append((0 if "XAU" in coin else (1 if "BTC" in coin else 2), coin, coin_lines))
+        else:
+            pos_lines.append((0 if "XAU" in coin else (1 if "BTC" in coin else 2), coin, [f"    {coin:<4} ╭─  Chưa có vị thế"]))
+
+    pos_lines.sort(key=lambda x: (0 if "XAU" in x[1] else (1 if "BTC" in x[1] else 2), x[1]))
+    is_first = True
+    for _, coin, lines in pos_lines:
+        if not is_first:
+            print("")
+        is_first = False
+        for l in lines:
+            print(l)
     
-    if not any_triggered:
-        print("  · Chưa có lệnh nào đã khớp.")
-    print("")
+    # 5. ☯ LỊCH SỬ LỆNH VỪA ĐÓNG:
+    print("\n☯ LỊCH SỬ LỆNH VỪA ĐÓNG:")
+    has_closed = False
+    for symbol, tracker in sorted_trackers.items():
+        coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
+        closed_list = getattr(tracker, "closed_history", [])
+        if closed_list:
+            has_closed = True
+            for entry in reversed(closed_list[-3:]):
+                pnl_val = entry.get("pnl", 0.0)
+                roi_val = entry.get("roi", 0.0)
+                pnl_str = f"Lời +{pnl_val:.2f}$" if pnl_val >= 0 else f"Lỗ {pnl_val:.2f}$"
+                side = entry.get("side", "LONG")
+                dca_str = f" cụm DCA [{entry['dca']}]" if entry.get("dca") else ""
+                print(f"  ✧ · [{coin}]: Đã đóng {side} ({roi_val:+.1f}%){dca_str} → {pnl_str}")
+    
+    if not has_closed:
+        print("  · Chưa có lệnh nào được đóng trong phiên này.")
+    print("=" * 95 + "\n" * 3)
 # z7713 | Thiết kế lại bảng COIN: OB ZONE, LONG @, SHORT @, STATUS
 # z7716 | Dashboard mới: OB ZONE LONG / OB ZONE SHORT với hiển thị RR. Bỏ cột LONG @ / SHORT @.
 # z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
+

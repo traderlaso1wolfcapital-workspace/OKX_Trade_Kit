@@ -30,7 +30,7 @@ SWING_VOLUME_USDT = Decimal("100")   # Volume USDT cho Swing OB (100 USDT)
 SWING_RISK_PCT = Decimal("0.02")     # Risk % cho Swing OB (2%)
 
 # -- Volume & Risk riêng cho Internal OB (lệnh phụ) --
-INTERNAL_VOLUME_USDT = Decimal("100")# Volume USDT cho Internal OB (100 USDT)
+INTERNAL_VOLUME_USDT = Decimal("50") # Volume USDT cho Internal OB (50 USDT = 1/2 Swing volume)
 INTERNAL_RISK_PCT = Decimal("0.01")  # Risk % cho Internal OB (1%)
 INTERNAL_LEVERAGE = 50               # Đòn bẩy riêng cho Internal OB (isolated)
 
@@ -114,7 +114,7 @@ SMC_ZONES = False                   # Premium/Discount Zones
 #     tradeSetupTPModeInput, tradeSetupRRInput, tradeSetupMaxActiveInput, tradeSetupKeepPreviousInput
 # ==============================================================================
 SMC_TRADE = True                    # Show OB Trade Setup
-OB_SOURCE = "SWING"                 # "ALL" | "INTERNAL" | "SWING" ← CHỈ DÙNG SWING OB
+OB_SOURCE = "ALL"                   # "ALL" | "INTERNAL" | "SWING" (Tạo cả lệnh Swing OB và Internal OB)
 OB_DIRECTION = "BOTH"               # "BOTH" | "LONG_ONLY" | "SHORT_ONLY"
 OB_TP_MODE = "RR"                   # "RR" | "NEAREST_OB"
 OB_RR_RATIO_TREND = Decimal("5.0")   # RR thuận trend mặc định
@@ -124,6 +124,10 @@ OB_RR_RATIO = Decimal("5.0")          # RR mặc định
 OB_MAX_ACTIVE_SETUPS = 10           # Số lượng setup chờ tối đa mỗi coin
 OB_MAX_COUNT = 20                   # Giới hạn mảng OB
 OB_CLEANUP_CROSSED = True           # Tự động dọn dẹp OB đã bị mitigate
+
+# -- Ép vào lệnh Market khi giá lọt qua Entry (bắt Entry tốt hơn) --
+FORCE_MARKET_ENTRY_ON_CROSS = True   # Ép khớp Market ngay khi giá lọt qua Entry
+MAX_MARKET_SLIPPAGE_PCT = Decimal("0.008") # Trượt giá tối đa 0.8% để bảo vệ tài khoản
 
 # ==============================================================================
 # 12. HỆ THỐNG & KẾT NỐI
