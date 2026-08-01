@@ -104,7 +104,6 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     target_vol = 100.0
 
     r0 = f"  {'⚡ ' + bot_name:^{c1-1}} | {'💰 LỢI NHUẬN':^{c2-1}} | {'🏦 TÀI KHOẢN':^{c3-1}} | 🎯 HIỆU SUẤT"
-    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
     r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
 
     bar  = "-" * line_w
@@ -118,6 +117,17 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     print(r2)
     print(dbar)
     
+    try:
+        config_path = env_paths.get("FILE_GLOBAL_CONFIG", "")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                _gcfg = json.load(f)
+                enabled_coins = _gcfg.get("ENABLED_COINS", ["XAU", "BTC", "ETH"])
+        else:
+            enabled_coins = ["XAU", "BTC", "ETH"]
+    except:
+        enabled_coins = ["XAU", "BTC", "ETH"]
+
     sorted_trackers = dict(sorted(trackers.items(), key=lambda x: (0 if "XAU" in x[0] else (1 if "BTC" in x[0] else 2), x[0])))
 
     # 2. CHIẾN THUẬT ĐANG KÍCH HOẠT: (Giữ tiêu đề, ẩn chi tiết)
@@ -139,6 +149,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         price = f"{float(tracker.live_price):.2f}"
+        is_coin_enabled = (coin in enabled_coins)
         
         if tracker.swing_trend == 1: trend_str = "BULL ▲"
         elif tracker.swing_trend == -1: trend_str = "BEAR ▼"
@@ -161,11 +172,13 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
         hedge_zone = f"{float(hedge_obs[0].bar_low):.2f} - {float(hedge_obs[0].bar_high):.2f}" if hedge_obs else "-- - --"
         
         pending = [s for s in tracker.trade_setups if not s.triggered]
-        if tracker.has_long:
+        if not is_coin_enabled and not (tracker.has_long or tracker.has_short):
+            status = "ĐÃ KHÓA"
+        elif tracker.has_long:
             status = f"GỒNG LONG +{float(tracker.max_roi_long):.1f}%"
         elif tracker.has_short:
             status = f"GỒNG SHORT +{float(tracker.max_roi_short):.1f}%"
-        elif pending:
+        elif pending and is_coin_enabled:
             status = f"CHỜ {len(pending)} SETUP"
         else:
             status = "QUAN SÁT"
@@ -181,6 +194,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         lines_desc = []
+        is_coin_enabled = (coin in enabled_coins)
         
         # --- A. Lệnh ĐÃ KHỚP (Triggered Setups) ĐƯA LÊN ĐẦU TIÊN ---
         triggered = [s for s in tracker.trade_setups if s.triggered]
@@ -199,22 +213,23 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
                     mae = float(tracker.mae_max_pct_long) if side_str == "LONG" else float(tracker.mae_max_pct_short)
                     lines_desc.append(f"Đã khớp {side_str} ({src_name}) {prices} = {vol_val:.0f} U → ROI ({roi:+.1f}% / -{mae:.1f}%)")
 
-        # --- B. Lệnh CHỜ KHỚP (Pending Setups) ĐƯA BÊN DƯỚI ---
-        pending = [s for s in tracker.trade_setups if not s.triggered]
-        if pending:
-            pend_internal = [s for s in pending if s.ob_source == "INTERNAL"]
-            pend_swing = [s for s in pending if s.ob_source == "SWING"]
-            
-            if pend_internal:
-                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
-                    sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_internal if s.bias == side_val]
-                    if sub_p:
-                        lines_desc.append(f"Chờ Entry {side_str} (Internal): {' - '.join(sub_p)}")
-            if pend_swing:
-                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
-                    sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_swing if s.bias == side_val]
-                    if sub_p:
-                        lines_desc.append(f"Chờ Entry {side_str} (Swing): {' - '.join(sub_p)}")
+        # --- B. Lệnh CHỜ KHỚP (Pending Setups) ĐƯA BÊN DƯỚI (CHỈ HỆN KHI COIN ĐƯỢC TÍCH MỞ) ---
+        if is_coin_enabled:
+            pending = [s for s in tracker.trade_setups if not s.triggered]
+            if pending:
+                pend_internal = [s for s in pending if s.ob_source == "INTERNAL"]
+                pend_swing = [s for s in pending if s.ob_source == "SWING"]
+                
+                if pend_internal:
+                    for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
+                        sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_internal if s.bias == side_val]
+                        if sub_p:
+                            lines_desc.append(f"Chờ Entry {side_str} (Internal): {' - '.join(sub_p)}")
+                if pend_swing:
+                    for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
+                        sub_p = [f"{float(s.entry_price):,.2f}" for s in pend_swing if s.bias == side_val]
+                        if sub_p:
+                            lines_desc.append(f"Chờ Entry {side_str} (Swing): {' - '.join(sub_p)}")
 
         # Xây dựng các nhánh cây ╭─ ├─ ╰─
         if lines_desc:
@@ -227,7 +242,8 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
                 coin_lines.append(f"{indent_branch}{prefix}  {desc}")
             pos_lines.append((0 if "XAU" in coin else (1 if "BTC" in coin else 2), coin, coin_lines))
         else:
-            pos_lines.append((0 if "XAU" in coin else (1 if "BTC" in coin else 2), coin, [f"    {coin:<4} ╭─  Chưa có vị thế"]))
+            no_pos_msg = "Đã khoá giao dịch" if not is_coin_enabled else "Chưa có vị thế"
+            pos_lines.append((0 if "XAU" in coin else (1 if "BTC" in coin else 2), coin, [f"    {coin:<4} ╭─  {no_pos_msg}"]))
 
     pos_lines.sort(key=lambda x: (0 if "XAU" in x[1] else (1 if "BTC" in x[1] else 2), x[1]))
     is_first = True

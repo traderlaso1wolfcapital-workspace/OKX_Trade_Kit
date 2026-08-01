@@ -441,11 +441,11 @@ def main():
                 
                 futures = []
                 for cfg in bot_config.COIN_PORTFOLIO:
-                    if cfg.get("coin", "") in enabled_coins:
-                        futures.append(sys._bot_sub2_executor.submit(
-                            bot_sub2.run_strategy_cycle,
-                            client, cfg, pMode, state_matrix, env_paths, system_config, is_limit_setup_cycle
-                        ))
+                    is_enabled = cfg.get("coin", "") in enabled_coins
+                    futures.append(sys._bot_sub2_executor.submit(
+                        bot_sub2.run_strategy_cycle,
+                        client, cfg, pMode, state_matrix, env_paths, system_config, is_limit_setup_cycle, is_enabled
+                    ))
                 concurrent.futures.wait(futures)
 
             # 4. CẬP NHẬT GIAO DIỆN TERMINAL (20 giây)

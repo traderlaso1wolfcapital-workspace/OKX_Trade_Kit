@@ -383,7 +383,7 @@ def check_entry_touch(tracker: AssetTracker) -> bool:
 def run_strategy_cycle(
     client, cfg: dict, pMode: str,
     state_matrix: dict, env_paths: dict, system_config: dict,
-    is_limit_setup_cycle: bool
+    is_limit_setup_cycle: bool, is_enabled: bool = True
 ):
     swap_id = cfg["swap"]
     tracker = state_matrix[swap_id]
@@ -722,6 +722,12 @@ def run_strategy_cycle(
         except Exception as e:
             print(f"🚫 [SMC] Lỗi Exception khi quét/đặt TP/SL: {e}")
         
+        # ⚡ NẾU COIN BỊ BỎ TÍCH GIAO DỊCH (is_enabled == False) -> HỦY SẠCH LỆNH CHỜ TRÊN OKX & XÓA SETUP CHỜ
+        if not is_enabled:
+            clean_ob_orders(client, swap_id, CL_ORD_PREFIX)
+            tracker.trade_setups = [s for s in tracker.trade_setups if s.triggered]
+            return
+
         # ---------------------------------------------------------------
         # ⚡ QUÉT SÀN & ĐẶT LỆNH LIMIT OKX (đồng bộ trạng thái thực tế)
         # ---------------------------------------------------------------
