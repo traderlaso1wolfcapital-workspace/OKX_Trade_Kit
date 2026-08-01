@@ -3430,7 +3430,7 @@ class UpdateDialog(QtWidgets.QDialog):
         title_label.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: 900; background: transparent;")
         content_layout.addWidget(title_label)
 
-        important_label = QtWidgets.QLabel("Important: Please update to the latest version to ensure optimal trading performance & SMC OB algorithm features.")
+        important_label = QtWidgets.QLabel("Important: Khuyên dùng phiên bản mới nhất để đảm bảo hiệu suất vận hành và độ ổn định hệ thống.")
         important_label.setStyleSheet("color: #d1d5db; font-size: 12px; font-weight: normal; background: transparent;")
         important_label.setWordWrap(True)
         content_layout.addWidget(important_label)
@@ -3438,16 +3438,16 @@ class UpdateDialog(QtWidgets.QDialog):
         content_layout.addSpacing(6)
 
         # Hotfix / New Features Header
-        features_header = QtWidgets.QLabel("New Features & Improvements")
+        features_header = QtWidgets.QLabel("Nội Dung Nâng Cấp & Tối Ưu")
         features_header.setStyleSheet("color: #ffffff; font-size: 17px; font-weight: bold; background: transparent;")
         content_layout.addWidget(features_header)
 
         changelog_text = (
-            "• Updated SMC Order Block algorithm with Dual Timeframe OB zones\n"
-            "• Added Isolated Margin (50x) support for Internal OB setups\n"
-            "• Optimized terminal dashboard tree structure & entry price grouping\n"
-            "• Auto market execution on entry cross with proportional SL shift\n"
-            "• Modern OBS Studio Dark Accent UI theme for all system notifications"
+            "• Tối ưu hóa thuật toán phân tích thị trường & khớp lệnh giao dịch\n"
+            "• Nâng cấp hệ thống quản lý vị thế và đồng bộ dữ liệu Realtime\n"
+            "• Cải tiến giao diện Terminal hiển thị danh mục theo dõi trực quan hơn\n"
+            "• Tối ưu hiệu năng ứng dụng, cơ chế xử lý kết nối và trải nghiệm người dùng\n"
+            "• Cập nhật hệ thống thông báo chuẩn giao diện Dark Accent"
         )
         if changelog:
             changelog_text = changelog
