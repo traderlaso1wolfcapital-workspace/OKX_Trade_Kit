@@ -3381,6 +3381,229 @@ class HWIDAuthDialog(QtWidgets.QDialog):
         btn_relogin.clicked.connect(self.accept)
         layout.addWidget(btn_relogin)
 
+class UpdateDialog(QtWidgets.QDialog):
+    def __init__(self, new_version="1.0.250", changelog="", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("New update available")
+        self.setFixedSize(560, 480)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #161922;
+                border: 1px solid #2d3345;
+                border-top: 3px solid #ff9800;
+                border-radius: 8px;
+            }
+            QLabel {
+                background: transparent;
+            }
+        """)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        lbl_sub = QtWidgets.QLabel("There is a new update available:")
+        lbl_sub.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: 500;")
+        layout.addWidget(lbl_sub)
+
+        # Content Card / Scroll Area for Changelog
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background-color: #222634;
+                border: 1px solid #363d4e;
+                border-radius: 6px;
+            }
+            QWidget#scrollContent {
+                background-color: #222634;
+            }
+        """)
+
+        scroll_content = QtWidgets.QWidget()
+        scroll_content.setObjectName("scrollContent")
+        content_layout = QtWidgets.QVBoxLayout(scroll_content)
+        content_layout.setContentsMargins(16, 16, 16, 16)
+        content_layout.setSpacing(12)
+
+        title_label = QtWidgets.QLabel(f"TLS1 Trading App {new_version}")
+        title_label.setStyleSheet("color: #ffffff; font-size: 22px; font-weight: 900; background: transparent;")
+        content_layout.addWidget(title_label)
+
+        important_label = QtWidgets.QLabel("Important: Please update to the latest version to ensure optimal trading performance & SMC OB algorithm features.")
+        important_label.setStyleSheet("color: #d1d5db; font-size: 12px; font-weight: normal; background: transparent;")
+        important_label.setWordWrap(True)
+        content_layout.addWidget(important_label)
+
+        content_layout.addSpacing(6)
+
+        # Hotfix / New Features Header
+        features_header = QtWidgets.QLabel("New Features & Improvements")
+        features_header.setStyleSheet("color: #ffffff; font-size: 17px; font-weight: bold; background: transparent;")
+        content_layout.addWidget(features_header)
+
+        changelog_text = (
+            "• Updated SMC Order Block algorithm with Dual Timeframe OB zones\n"
+            "• Added Isolated Margin (50x) support for Internal OB setups\n"
+            "• Optimized terminal dashboard tree structure & entry price grouping\n"
+            "• Auto market execution on entry cross with proportional SL shift\n"
+            "• Modern OBS Studio Dark Accent UI theme for all system notifications"
+        )
+        if changelog:
+            changelog_text = changelog
+
+        changelog_label = QtWidgets.QLabel(changelog_text)
+        changelog_label.setStyleSheet("color: #cbd5e1; font-size: 12px; line-height: 1.6; background: transparent;")
+        changelog_label.setWordWrap(True)
+        content_layout.addWidget(changelog_label)
+
+        content_layout.addStretch()
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        # Bottom Button Bar
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.setSpacing(10)
+
+        btn_layout.addStretch()
+
+        self.btn_update = QtWidgets.QPushButton("Update Now")
+        self.btn_update.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_update.setStyleSheet("""
+            QPushButton {
+                background-color: #353c4d;
+                color: #ffffff;
+                border: 1px solid #4a5468;
+                border-radius: 5px;
+                padding: 7px 18px;
+                font-weight: bold;
+                font-size: 12px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #ff9800;
+                color: #161922;
+                border: 1px solid #ff9800;
+            }
+            QPushButton:pressed {
+                background-color: #e68a00;
+                color: #ffffff;
+            }
+        """)
+
+        self.btn_later = QtWidgets.QPushButton("Remind me Later")
+        self.btn_later.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_later.setStyleSheet("""
+            QPushButton {
+                background-color: #262a36;
+                color: #d1d5db;
+                border: 1px solid #363d4e;
+                border-radius: 5px;
+                padding: 7px 18px;
+                font-weight: 500;
+                font-size: 12px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #353c4d;
+                color: #ffffff;
+                border: 1px solid #4a5468;
+            }
+        """)
+
+        self.btn_skip = QtWidgets.QPushButton("Skip Version")
+        self.btn_skip.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_skip.setStyleSheet("""
+            QPushButton {
+                background-color: #262a36;
+                color: #9ca3af;
+                border: 1px solid #363d4e;
+                border-radius: 5px;
+                padding: 7px 18px;
+                font-weight: 500;
+                font-size: 12px;
+                min-width: 90px;
+            }
+            QPushButton:hover {
+                background-color: #353c4d;
+                color: #ffffff;
+                border: 1px solid #4a5468;
+            }
+        """)
+
+        self.btn_update.clicked.connect(self.on_update_click)
+        self.btn_later.clicked.connect(self.reject)
+        self.btn_skip.clicked.connect(self.reject)
+
+        btn_layout.addWidget(self.btn_update)
+        btn_layout.addWidget(self.btn_later)
+        btn_layout.addWidget(self.btn_skip)
+
+        layout.addLayout(btn_layout)
+
+    def on_update_click(self):
+        play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.6)
+        white_dialog_qss = """
+            QDialog, QMessageBox, QProgressDialog, QWidget, QFrame, QDialogButtonBox {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
+            QLabel, QLabel#qt_msgbox_label, QLabel#qt_msgboxbox_ex_label {
+                color: #000000 !important;
+                background-color: transparent !important;
+                font-size: 13px !important;
+            }
+            QPushButton {
+                background-color: #e6e6e6 !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+                border-radius: 6px;
+                padding: 7px 18px;
+                font-weight: bold;
+                font-size: 12px;
+                min-width: 90px;
+                min-height: 28px;
+            }
+            QPushButton:hover {
+                background-color: #ff9800 !important;
+                color: #ffffff !important;
+                border: 1px solid #ff9800 !important;
+            }
+            QProgressBar {
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                text-align: center;
+                background-color: #f0f0f0;
+                color: #000000;
+            }
+            QProgressBar::chunk {
+                background-color: #ff9800;
+                border-radius: 4px;
+            }
+        """
+        
+        parent_win = self.parent() or self
+        progress = QtWidgets.QProgressDialog("Đang tải gói nâng cấp TLS1 Trading App v1.0.250...", "Hủy", 0, 100, parent_win)
+        progress.setStyleSheet(white_dialog_qss)
+        progress.setWindowTitle("Tải Bản Cập Nhật Mới")
+        progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+        progress.show()
+
+        for i in range(1, 101):
+            time.sleep(0.02)
+            progress.setValue(i)
+            QtWidgets.QApplication.processEvents()
+            if progress.wasCanceled():
+                break
+
+        progress.close()
+        info_box = QtWidgets.QMessageBox(parent_win)
+        info_box.setStyleSheet(white_dialog_qss)
+        info_box.setWindowTitle("Update Success")
+        info_box.setText("<b>Tải xong phiên bản cập nhật v1.0.250 thành công!</b><br><br>App sẽ tự động khởi động lại.")
+        info_box.exec()
+        self.accept()
+
 class LoginDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -3695,6 +3918,7 @@ def main():
 
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet("""
+        /* Global UI Elements */
         QComboBox QAbstractItemView, QComboBox QListView {
             background-color: #ffffff;
             color: #000000;
@@ -3709,6 +3933,96 @@ def main():
             color: #ffffff;
             border: 1px solid #4caf50;
             padding: 2px;
+        }
+
+        /* ============================================================================
+           GLOBAL DIALOG THEME (Nền trắng #ffffff, Chữ đen #000000, Accent Cam #ff9800)
+           ============================================================================ */
+        QMessageBox, QMessageBox QWidget, QMessageBox QFrame, QMessageBox QDialogButtonBox,
+        QProgressDialog, QProgressDialog QWidget, QProgressDialog QFrame,
+        QInputDialog, QInputDialog QWidget, QInputDialog QFrame,
+        QFileDialog, QFileDialog QWidget, QFileDialog QFrame {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
+            font-size: 13px;
+        }
+
+        QMessageBox {
+            border: 1px solid #cccccc;
+            border-top: 3px solid #ff9800;
+            border-radius: 8px;
+        }
+
+        QMessageBox QLabel, QMessageBox QLabel *, QLabel#qt_msgbox_label, QLabel#qt_msgboxbox_ex_label,
+        QProgressDialog QLabel, QProgressDialog QLabel *, QInputDialog QLabel, QInputDialog QLabel *, QFileDialog QLabel {
+            color: #000000 !important;
+            background-color: transparent !important;
+            font-size: 13px !important;
+        }
+
+        /* Khung chứa văn bản nội dung & ô nhập liệu */
+        QMessageBox QTextEdit, QProgressDialog QTextEdit, QInputDialog QLineEdit, QFileDialog QLineEdit {
+            background-color: #f8f9fa !important;
+            color: #000000 !important;
+            border: 1px solid #cccccc !important;
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        QInputDialog QLineEdit:focus {
+            border: 1px solid #ff9800 !important;
+        }
+
+        /* Nút bấm trong các Dialog thông báo */
+        QMessageBox QPushButton, QProgressDialog QPushButton, QInputDialog QPushButton, QFileDialog QPushButton {
+            background-color: #e6e6e6 !important;
+            color: #000000 !important;
+            border: 1px solid #cccccc !important;
+            border-radius: 6px;
+            padding: 7px 18px;
+            font-weight: bold;
+            font-size: 12px;
+            min-width: 90px;
+            min-height: 28px;
+        }
+
+        QMessageBox QPushButton:hover, QProgressDialog QPushButton:hover, QInputDialog QPushButton:hover, QFileDialog QPushButton:hover {
+            background-color: #ff9800 !important;
+            color: #ffffff !important;
+            border: 1px solid #ff9800 !important;
+        }
+
+        QMessageBox QPushButton:pressed, QProgressDialog QPushButton:pressed, QInputDialog QPushButton:pressed, QFileDialog QPushButton:pressed {
+            background-color: #e68a00 !important;
+            color: #ffffff !important;
+        }
+
+        QMessageBox QPushButton:focus, QInputDialog QPushButton:focus {
+            border: 1px solid #ff9800 !important;
+            outline: none;
+        }
+
+        /* Scrollbars trong Dialogs */
+        QMessageBox QScrollBar:vertical, QProgressDialog QScrollBar:vertical {
+            background: #161922 !important;
+            width: 10px;
+            margin: 2px;
+            border-radius: 4px;
+        }
+
+        QMessageBox QScrollBar::handle:vertical, QProgressDialog QScrollBar::handle:vertical {
+            background: #333a4c !important;
+            min-height: 20px;
+            border-radius: 4px;
+        }
+
+        QMessageBox QScrollBar::handle:vertical:hover, QProgressDialog QScrollBar::handle:vertical:hover {
+            background: #ff9800 !important;
+        }
+
+        QMessageBox QScrollBar::add-line:vertical, QProgressDialog QScrollBar::add-line:vertical {
+            height: 0px;
         }
     """)
     
