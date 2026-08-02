@@ -41,6 +41,10 @@ import requests
 import numpy as np
 import pandas as pd
 import dotenv
+import hmac
+import hashlib
+import base64
+from datetime import datetime, timezone
 
 if getattr(sys, 'frozen', False):
     _base = os.path.dirname(sys.executable)
@@ -569,6 +573,90 @@ class LiveChartWorker(QtCore.QThread):
         self._trigger.set()
         self.wait()
 
+
+class OKXPositionsWorker(QtCore.QThread):
+    positions_signal = QtCore.pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._is_running = True
+        self.api_key = ""
+        self.secret_key = ""
+        self.passphrase = ""
+        self.demo_mode = False
+
+    def update_credentials(self, api_key, secret_key, passphrase, demo_mode):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.passphrase = passphrase
+        self.demo_mode = demo_mode
+
+    def _sign_request(self, timestamp, method, request_path):
+        message = timestamp + method + request_path
+        mac = hmac.new(bytes(self.secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        return base64.b64encode(mac.digest()).decode('utf-8')
+
+    def run(self):
+        while self._is_running:
+            if not self.api_key or not self.secret_key:
+                time.sleep(3)
+                continue
+            
+            try:
+                base_url = "https://www.okx.com"
+                
+                # Fetch positions
+                path_pos = "/api/v5/account/positions?instType=SWAP"
+                ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                headers_pos = {
+                    "OK-ACCESS-KEY": self.api_key,
+                    "OK-ACCESS-SIGN": self._sign_request(ts, "GET", path_pos),
+                    "OK-ACCESS-TIMESTAMP": ts,
+                    "OK-ACCESS-PASSPHRASE": self.passphrase,
+                    "x-simulated-trading": "1" if self.demo_mode else "0"
+                }
+                res_pos = requests.get(base_url + path_pos, headers=headers_pos, timeout=5).json()
+                
+                if res_pos.get("code") == "0":
+                    positions = res_pos.get("data", [])
+                    
+                    # Fetch pending algos (TP/SL)
+                    path_algo = "/api/v5/trade/orders-pending?ordType=algo"
+                    ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                    headers_algo = {
+                        "OK-ACCESS-KEY": self.api_key,
+                        "OK-ACCESS-SIGN": self._sign_request(ts2, "GET", path_algo),
+                        "OK-ACCESS-TIMESTAMP": ts2,
+                        "OK-ACCESS-PASSPHRASE": self.passphrase,
+                        "x-simulated-trading": "1" if self.demo_mode else "0"
+                    }
+                    res_algo = requests.get(base_url + path_algo, headers=headers_algo, timeout=5).json()
+                    algo_data = res_algo.get("data", []) if res_algo.get("code") == "0" else []
+                    
+                    # Merge TP/SL into positions
+                    for pos in positions:
+                        inst = pos.get("instId")
+                        pos["tp_list"] = []
+                        pos["sl_list"] = []
+                        for o in algo_data:
+                            if o.get("instId") == inst:
+                                if o.get("tpTriggerPx"):
+                                    pos["tp_list"].append(o.get("tpTriggerPx"))
+                                if o.get("slTriggerPx"):
+                                    pos["sl_list"].append(o.get("slTriggerPx"))
+                                    
+                    self.positions_signal.emit(positions)
+                else:
+                    print(f"OKX API Error in Positions: {res_pos}")
+            except Exception as e:
+                print(f"Error in OKXPositionsWorker run loop: {e}")
+                
+            time.sleep(3)
+
+    def stop(self):
+        self._is_running = False
+        self.wait()
+
 class HoverSoundFilter(QtCore.QObject):
     def __init__(self, tab_bar):
         super().__init__(tab_bar)
@@ -670,6 +758,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.worker = None
         self.init_ui()
         self.load_current_settings()
+        self.apply_current_api_to_worker()
 
     def set_welcome_name(self, name):
         if hasattr(self, 'webview_chat_fallback'):
@@ -1064,11 +1153,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_show_ob.setChecked(True)
         self.chk_show_ob.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 11px;")
         
+        self.chk_show_positions = QtWidgets.QCheckBox("☑ Vị thế OKX")
+        self.chk_show_positions.setChecked(True)
+        self.chk_show_positions.setStyleSheet("color: #ff9800; font-weight: bold; font-size: 11px;")
+        self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
+        
         control_layout.addWidget(QtWidgets.QLabel("Cặp giao dịch:"))
         control_layout.addWidget(self.combo_coin)
         control_layout.addWidget(QtWidgets.QLabel("Timeframe:"))
         control_layout.addWidget(self.combo_tf)
         control_layout.addWidget(self.chk_show_ob)
+        control_layout.addWidget(self.chk_show_positions)
         control_layout.addStretch()
         
         chart_layout.addLayout(control_layout)
@@ -1102,6 +1197,30 @@ class BotInstanceWidget(QtWidgets.QWidget):
             chart_layout.addWidget(QtWidgets.QLabel(f"Lỗi khởi tạo biểu đồ: {str(e)}"))
             self.chart_widget = None
 
+        # Khởi tạo bảng Vị thế OKX
+        self.tab_positions = QtWidgets.QWidget()
+        pos_layout = QtWidgets.QVBoxLayout(self.tab_positions)
+        pos_layout.setContentsMargins(0, 5, 0, 5)
+        
+        self.pos_table = QtWidgets.QTableWidget(0, 6)
+        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "Kích thước", "PNL thả nổi", "Chốt lời | Dừng lỗ"])
+        self.pos_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.pos_table.setStyleSheet("QTableWidget { background-color: #1e1e1e; color: #e0e0e0; gridline-color: #333333; border: 1px solid #333333; } QHeaderView::section { background-color: #2a2a2a; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; }")
+        self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        self.pos_table.verticalHeader().setVisible(False)
+        pos_layout.addWidget(self.pos_table)
+        
+        self.pos_worker = OKXPositionsWorker(self)
+        self.pos_worker.positions_signal.connect(self.update_positions_table)
+        # Sẽ load data ngay khi user chọn account (sự kiện load_selected_account sẽ được sửa lại để gọi apply_current_api_to_worker)
+        self.pos_worker.start()
+        
+        # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart)
+        self.pos_table.verticalHeader().setDefaultSectionSize(32)
+        self.tab_positions.setFixedHeight(140) # Vừa đủ header và 3 dòng lệnh
+        chart_layout.addWidget(self.tab_positions)
+
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         self.split_view.addWidget(self.tab_logs)
         self.split_view.addWidget(self.tab_chart)
@@ -1112,26 +1231,31 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_live_view.addTab(self.split_view, "📊 TỔNG QUAN (CHART & LOGS)")
 
         self.combo_layout_mode = QtWidgets.QComboBox()
-        self.combo_layout_mode.addItems(["Chế độ ngang", "Chế độ dọc"])
+        self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"]) # Chuyển "Chế độ dọc" làm mặc định
         self.combo_layout_mode.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         def on_layout_mode_changed(text):
             if not hasattr(self, 'split_view') or self.split_view is None:
                 return
+            
+            # Clear all
+            while self.split_view.count() > 0:
+                w = self.split_view.widget(0)
+                if w: w.setParent(None)
+                
             if "ngang" in text.lower():
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Horizontal)
                 self.split_view.insertWidget(0, self.tab_logs)
                 self.split_view.insertWidget(1, self.tab_chart)
                 self.split_view.setSizes([500, 500])
-                self.split_view.setStretchFactor(0, 5)
-                self.split_view.setStretchFactor(1, 5)
             else:
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Vertical)
                 self.split_view.insertWidget(0, self.tab_chart)
                 self.split_view.insertWidget(1, self.tab_logs)
-                self.split_view.setSizes([400, 600])
-                self.split_view.setStretchFactor(0, 4)
-                self.split_view.setStretchFactor(1, 6)
+                self.split_view.setSizes([600, 400])
+                
+            if hasattr(self, 'chk_show_positions'):
+                self.tab_positions.setVisible(self.chk_show_positions.isChecked())
                 
         self.combo_layout_mode.currentTextChanged.connect(on_layout_mode_changed)
         
@@ -1143,6 +1267,84 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_live_view.setCornerWidget(corner_widget, QtCore.Qt.Corner.TopRightCorner)
 
         dash_layout.addWidget(self.tab_live_view, 1)
+
+
+    def update_positions_table(self, positions):
+        if not hasattr(self, 'pos_table') or not self.pos_table:
+            return
+            
+        self.pos_table.setRowCount(len(positions))
+        for row, pos in enumerate(positions):
+            instId = pos.get("instId", "")
+            lever = pos.get("lever", "")
+            mgnMode = "Chéo" if pos.get("mgnMode") == "cross" else "Cô lập"
+            
+            # Cột 1
+            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({lever}x {mgnMode})")
+            
+            # Cột 2
+            entry_px = float(pos.get("avgPx", 0))
+            item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.4f}")
+            
+            # Cột 3
+            margin = float(pos.get("margin", 0))
+            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f} USDT")
+            
+            # Cột 4
+            size = float(pos.get("notionalUsd", pos.get("notional", 0)))
+            item4 = QtWidgets.QTableWidgetItem(f"{size:,.2f} USDT")
+            
+            # Cột 5
+            upl = float(pos.get("upl", 0))
+            upl_ratio = float(pos.get("uplRatio", 0)) * 100
+            item5 = QtWidgets.QTableWidgetItem(f"{upl:+.2f} USDT ({upl_ratio:+.2f}%)")
+            item5.setForeground(QtGui.QColor("#26a69a") if upl >= 0 else QtGui.QColor("#ef5350"))
+            
+            # Cột 6
+            tp_list = pos.get("tp_list", [])
+            sl_list = pos.get("sl_list", [])
+            tp_str = ", ".join(tp_list) if tp_list else "None"
+            sl_str = ", ".join(sl_list) if sl_list else "None"
+            item6 = QtWidgets.QTableWidgetItem(f"TP: {tp_str} | SL: {sl_str}")
+            
+            self.pos_table.setItem(row, 0, item1)
+            self.pos_table.setItem(row, 1, item2)
+            self.pos_table.setItem(row, 2, item3)
+            self.pos_table.setItem(row, 3, item4)
+            self.pos_table.setItem(row, 4, item5)
+            self.pos_table.setItem(row, 5, item6)
+            
+    def apply_current_api_to_worker(self):
+        if not hasattr(self, 'pos_worker'):
+            return
+        if not hasattr(self, 'get_selected_env'):
+            return
+            
+        env_file = self.get_selected_env()
+        if not env_file: return
+        
+        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+        if os.path.exists(env_path):
+            api_key, secret_key, passphrase, demo_mode = "", "", "", False
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if "=" in line:
+                            k, v = line.strip().split("=", 1)
+                            v = v.strip("\"'")
+                            if k == "OKX_API_KEY": api_key = v
+                            elif k == "OKX_SECRET_KEY": secret_key = v
+                            elif k == "OKX_PASSPHRASE": passphrase = v
+                            elif k == "OKX_IS_DEMO": demo_mode = (v.lower() == "true")
+                
+                self.pos_worker.update_credentials(
+                    api_key=api_key,
+                    secret_key=secret_key,
+                    passphrase=passphrase,
+                    demo_mode=demo_mode
+                )
+            except Exception as e:
+                print(f"Error in apply_current_api_to_worker: {e}")
 
     def setup_tab_api(self):
         scroll = QtWidgets.QScrollArea()
@@ -1746,6 +1948,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def on_account_changed(self, index=None):
         self.log_display.appendPlainText(f"🔌 Đã chuyển sang tài khoản: {self.get_selected_env()}")
         self.load_current_settings()
+        self.apply_current_api_to_worker()
 
     def load_current_settings(self):
         if self.strategy_id in ["trinhsat", "quansu"]:

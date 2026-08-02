@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import List, Optional, Tuple, Dict, Any
 
 from z_bot_sub2.bot_models import AssetTracker, Pivot, OrderBlock, TradeSetup, FairValueGap, EqualLevel
+from z_bot_sub2 import bot_config
 from z_bot_sub2.bot_config import (
     # Data & Timeframe
     TIMEFRAME_BASE, TIMEFRAME_HEDGE, LIMIT_CANDLES, M30_LIMIT_CANDLES,
