@@ -1099,10 +1099,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_live_view.tabBar().installEventFilter(self.live_view_hover_filter)
         self.tab_live_view.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.tab_live_view.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #333333; background-color: #161616; border-radius: 4px; margin-top: -1px; }
-            QTabBar::tab { background: #121212; color: #888888; padding: 7px 18px; border: 1px solid #2d2d2d; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
-            QTabBar::tab:selected { background: #161616; color: #ff9900; font-weight: bold; border: 1px solid #333333; border-top: 2px solid #ff9900; border-bottom: 2px solid #161616; }
-            QTabBar::tab:hover { background: #282828; color: #ffffff; }
+            QTabWidget::pane { border: 1px solid #333333; background-color: #1e1e1e; border-radius: 4px; margin-top: -1px; }
+            QTabBar::tab { background: #1a1a1a; color: #a0a0a0; padding: 7px 18px; border: 1px solid #333333; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
+            QTabBar::tab:selected { background: #2d2d2d; color: #FF9900; font-weight: bold; border: 1px solid #444444; border-bottom: 2px solid #2d2d2d; }
+            QTabBar::tab:hover { background: #333333; color: #ffffff; }
         """)
 
         # Tab 1: Logs
@@ -1111,7 +1111,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         console_layout.setContentsMargins(5, 5, 5, 5)
         
         log_header = QtWidgets.QHBoxLayout()
-        log_header.addWidget(QtWidgets.QLabel("Màn hình logs hệ thống (realtime):"))
+        log_header.addWidget(QtWidgets.QLabel("Terminal Logs:"))
         log_header.addStretch(1)
         
         btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
@@ -1143,13 +1143,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.setContentsMargins(0, 0, 0, 0)
         
         self.combo_coin = QtWidgets.QComboBox()
-        for p in ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
+        for p in ["BTC-USDT-SWAP", "XAU-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
             self.combo_coin.addItem(p.replace("-SWAP", ""), p)
+        self.combo_coin.setCurrentText("BTC-USDT")
         self.combo_coin.setFixedWidth(100)
         self.combo_tf = QtWidgets.QComboBox()
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
-        self.combo_tf.setCurrentText("5m")
-        self.combo_tf.setFixedWidth(60)
+        self.combo_tf.setCurrentText("1H")
+        self.combo_tf.setFixedWidth(48)
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
@@ -1160,9 +1161,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
         
-        control_layout.addWidget(QtWidgets.QLabel("Cặp giao dịch:"))
+        control_layout.setSpacing(10)
         control_layout.addWidget(self.combo_coin)
-        control_layout.addWidget(QtWidgets.QLabel("Timeframe:"))
         control_layout.addWidget(self.combo_tf)
         control_layout.addWidget(self.chk_show_ob)
         control_layout.addWidget(self.chk_show_positions)
@@ -1183,7 +1183,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                     border_up_color='#26a69a', border_down_color='#ef5350',
                                     wick_up_color='#26a69a', wick_down_color='#ef5350')
             self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
-            self.chart_widget.watermark(f'{self.combo_coin.currentText()} (Live)', color='rgba(255, 153, 0, 0.1)')
+            self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.combo_tf.currentText()})', color='rgba(255, 153, 0, 0.1)')
             self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='#2a2a2a')
             self.chart_widget.time_scale(right_offset=30)
             self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
@@ -1191,7 +1191,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
-            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar="5m", parent=self)
+            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar=self.combo_tf.currentText(), parent=self)
             self.live_chart_worker.chart_data_signal.connect(self.update_live_chart)
             
             self.combo_coin.currentTextChanged.connect(self.on_chart_config_changed)
