@@ -980,39 +980,96 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
         self.account_dropdown.currentIndexChanged.connect(self.on_account_changed)
 
-        # 3 Inner Tabs
-        self.tabs = QtWidgets.QTabWidget()
-        self.tabs.setObjectName("InnerTabs")
-        self.inner_hover_filter = HoverSoundFilter(self.tabs.tabBar())
-        self.tabs.tabBar().installEventFilter(self.inner_hover_filter)
-        self.tabs.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        layout.addWidget(self.tabs)
-        
+        self.account_dropdown.currentIndexChanged.connect(self.on_account_changed)
+
         # Đưa trạng thái (ĐANG DỪNG/CHẠY) xuống thanh công cụ chart / vị thế
         self.status_led = QtWidgets.QLabel("● ĐANG DỪNG")
         self.status_led.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
         self.status_led.setStyleSheet("color: #FF3333; padding: 5px 10px;")
 
-        # TAB 1: DASHBOARD
+        # Tối ưu UX: Màn hình Dashboard hiển thị trực tiếp 100% diện tích màn hình chính!
         self.tab_dashboard = QtWidgets.QWidget()
         self.setup_tab_dashboard()
-        self.tabs.addTab(self.tab_dashboard, "📊 Bảng Điều Khiển")
+        layout.addWidget(self.tab_dashboard)
 
         if self.strategy_id not in ["trinhsat", "quansu"]:
-            # TAB 2: API CONFIG
+            # Khởi tạo sẵn các tab cấu hình và cộng đồng (Sẵn sàng mở dạng Popup Modal khi ấn nút ⚙️ / 💬)
             self.tab_api = QtWidgets.QWidget()
             self.setup_tab_api()
-            self.tabs.addTab(self.tab_api, "🔑 Cấu Hình API Key")
 
-            # TAB 3: STRATEGY CONFIG
             self.tab_strategy = QtWidgets.QWidget()
             self.setup_tab_strategy()
-            self.tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
             
-            # TAB 4: COMMUNITY CHAT
             self.tab_community = QtWidgets.QWidget()
             self.setup_tab_community()
-            self.tabs.addTab(self.tab_community, "💬 Cộng Đồng")
+
+    def open_settings_dialog(self):
+        play_ui_sound("click.mp3", 0.5)
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle(f"⚙️ Cấu Hình Hệ Thống - {self.strategy_name}")
+        dlg.resize(680, 850) # Rộng 680px dãn vừa đủ loại bỏ hoàn toàn thanh kéo ngang
+        dlg.setStyleSheet("""
+            QDialog { background-color: #1e1e1e; color: #ffffff; }
+            QLabel { color: #ffffff; }
+            QPushButton { outline: none; border: none; }
+            QScrollBar:horizontal { height: 0px; background: transparent; }
+        """)
+        
+        dlg_layout = QtWidgets.QVBoxLayout(dlg)
+        dlg_layout.setContentsMargins(10, 10, 10, 10)
+        
+        settings_tabs = QtWidgets.QTabWidget()
+        settings_tabs.setObjectName("InnerTabs")
+        
+        if hasattr(self, 'tab_api') and self.tab_api:
+            settings_tabs.addTab(self.tab_api, "🔑 Cấu Hình API Key")
+        if hasattr(self, 'tab_strategy') and self.tab_strategy:
+            settings_tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
+            
+        dlg_layout.addWidget(settings_tabs)
+        
+        # Nút hoàn tất đóng cửa sổ
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch(1)
+        btn_close = QtWidgets.QPushButton("✅ Hoàn Tất & Đóng Cài Đặt")
+        btn_close.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
+        btn_close.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        btn_close.setStyleSheet("""
+            QPushButton { background-color: #2E7D32; color: #ffffff; min-height: 34px; padding: 6px 20px; border-radius: 4px; border: none; outline: none; font-weight: bold; }
+            QPushButton:hover { background-color: #388E3C; }
+        """)
+        btn_close.clicked.connect(dlg.accept)
+        btn_row.addWidget(btn_close)
+        dlg_layout.addLayout(btn_row)
+        
+        dlg.exec()
+        
+        # Giữ lại các widget cấu hình không bị giải phóng bộ nhớ khi dialog đóng
+        settings_tabs.clear()
+        if hasattr(self, 'tab_api') and self.tab_api:
+            self.tab_api.setParent(None)
+        if hasattr(self, 'tab_strategy') and self.tab_strategy:
+            self.tab_strategy.setParent(None)
+
+    def open_community_dialog(self):
+        play_ui_sound("click.mp3", 0.5)
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle("💬 Chat Cộng Đồng Trader TLS1")
+        dlg.resize(630, 840) # Tỉ lệ dọc 3:4 chuẩn
+        dlg.setStyleSheet("""
+            QDialog { background-color: #1e1e1e; color: #ffffff; }
+            QLabel { color: #ffffff; }
+        """)
+        
+        dlg_layout = QtWidgets.QVBoxLayout(dlg)
+        dlg_layout.setContentsMargins(10, 10, 10, 10)
+        
+        if hasattr(self, 'tab_community') and self.tab_community:
+            dlg_layout.addWidget(self.tab_community)
+            
+        dlg.exec()
+        if hasattr(self, 'tab_community') and self.tab_community:
+            self.tab_community.setParent(None)
 
     def setup_tab_dashboard(self):
         dash_layout = QtWidgets.QVBoxLayout(self.tab_dashboard)
@@ -1088,8 +1145,34 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_coins_layout.addWidget(self.dash_chk_btc)
         dash_coins_layout.addWidget(self.dash_chk_eth)
         top_panel.addWidget(self.dash_active_coins_box)
-        
         top_panel.addStretch(1)
+        
+        if self.strategy_id not in ["trinhsat", "quansu"]:
+            self.btn_open_settings = QtWidgets.QPushButton("⚙️ Cài Đặt")
+            self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
+            self.btn_open_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.btn_open_settings.setStyleSheet("""
+                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 26px; padding: 4px 12px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
+            """)
+            self.btn_open_settings_hover = ButtonHoverSoundFilter(self.btn_open_settings)
+            self.btn_open_settings.installEventFilter(self.btn_open_settings_hover)
+            self.btn_open_settings.clicked.connect(self.open_settings_dialog)
+
+            self.btn_open_community = QtWidgets.QPushButton("💬 Cộng Đồng")
+            self.btn_open_community.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
+            self.btn_open_community.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.btn_open_community.setStyleSheet("""
+                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 26px; padding: 4px 12px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton:hover { background-color: #00e5ff; color: #000000; font-weight: bold; border-color: #00e5ff; }
+            """)
+            self.btn_open_community_hover = ButtonHoverSoundFilter(self.btn_open_community)
+            self.btn_open_community.installEventFilter(self.btn_open_community_hover)
+            self.btn_open_community.clicked.connect(self.open_community_dialog)
+
+            top_panel.addWidget(self.btn_open_settings)
+            top_panel.addWidget(self.btn_open_community)
+
         dash_layout.addLayout(top_panel, 0)
 
 
@@ -1161,15 +1244,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
         
-        control_layout.setSpacing(10)
-        control_layout.addWidget(self.combo_coin)
-        control_layout.addWidget(self.combo_tf)
-        control_layout.addWidget(self.chk_show_ob)
-        control_layout.addWidget(self.chk_show_positions)
-        control_layout.addStretch()
-        control_layout.addWidget(self.status_led)
-        
-        chart_layout.addLayout(control_layout)
+        # Control layout widgets (combo_coin, combo_tf, chk_show_ob, chk_show_positions, status_led)
+        # will be added directly into tab_live_view Corner Widget!
         
         try:
             self.chart_widget = QtChart()
@@ -1236,18 +1312,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_positions.setFixedHeight(140) # Vừa đủ header và 3 dòng lệnh
         chart_layout.addWidget(self.tab_positions)
 
-        self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        self.split_view.addWidget(self.tab_logs)
+        self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
-        self.split_view.setSizes([500, 500])
-        self.split_view.setStretchFactor(0, 5)
-        self.split_view.setStretchFactor(1, 5)
+        self.split_view.addWidget(self.tab_logs)
+        self.split_view.setSizes([580, 380])
+        self.split_view.setStretchFactor(0, 6)
+        self.split_view.setStretchFactor(1, 4)
 
         self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
         self.combo_layout_mode = QtWidgets.QComboBox()
-        self.combo_layout_mode.addItems(["Chế độ ngang", "Chế độ dọc"])
-        self.combo_layout_mode.setCurrentText("Chế độ ngang")
+        self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"])
+        self.combo_layout_mode.setCurrentText("Chế độ dọc")
         self.combo_layout_mode.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         def on_layout_mode_changed(text):
@@ -1277,8 +1353,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         corner_widget = QtWidgets.QWidget()
         c_layout = QtWidgets.QHBoxLayout(corner_widget)
-        c_layout.setContentsMargins(0, 0, 10, 0)
+        c_layout.setContentsMargins(0, 0, 8, 0)
+        c_layout.setSpacing(8)
+        c_layout.addWidget(self.combo_coin)
+        c_layout.addWidget(self.combo_tf)
+        c_layout.addWidget(self.chk_show_ob)
+        c_layout.addWidget(self.chk_show_positions)
         c_layout.addWidget(self.combo_layout_mode)
+        c_layout.addWidget(self.status_led)
         
         self.tab_live_view.setCornerWidget(corner_widget, QtCore.Qt.Corner.TopRightCorner)
 
@@ -1469,11 +1551,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         actions_layout.setSpacing(10)
 
         self.btn_reset_wallet = HoverSoundButton("♻️ Reset Vốn Gốc (Audit)")
-        self.btn_reset_wallet.setStyleSheet("min-height: 40px; min-width: 150px;")
+        self.btn_reset_wallet.setStyleSheet("min-height: 40px; min-width: 150px; color: #ffffff; background-color: #2d2d2d; border: 1px solid #555; border-radius: 4px; font-weight: bold;")
         self.btn_reset_wallet.clicked.connect(self.reset_wallet)
 
         self.btn_reset_nen = HoverSoundButton("♻️ Reset Đếm Nến")
-        self.btn_reset_nen.setStyleSheet("min-height: 40px; min-width: 150px;")
+        self.btn_reset_nen.setStyleSheet("min-height: 40px; min-width: 150px; color: #ffffff; background-color: #2d2d2d; border: 1px solid #555; border-radius: 4px; font-weight: bold;")
         self.btn_reset_nen.clicked.connect(self.reset_nen)
 
         actions_layout.addWidget(self.btn_reset_wallet)
@@ -1509,13 +1591,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         layout.addStretch(1)
 
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_api)
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
         
         self.btn_save_api = HoverSoundButton("💾 LƯU CẤU HÌNH API KEY")
-        self.btn_save_api.setStyleSheet("background-color: #ff9900; color: black; min-height: 40px; font-weight: bold; font-size: 14px;")
+        self.btn_save_api.setStyleSheet("background-color: #ff9900; color: #000000; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_api.clicked.connect(self.save_api_settings)
         main_layout.addWidget(self.btn_save_api)
 
@@ -1834,9 +1917,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addStretch(1)
 
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)")
-        self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
+        self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
@@ -1971,9 +2055,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addStretch(1)
 
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH SMC (AUTO-RELOAD)")
-        self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: white; min-height: 40px; font-weight: bold; font-size: 14px;")
+        self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
@@ -2782,7 +2867,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"TLS1 Trading v{APP_VERSION}")
-        self.resize(1360, 768)
+        self.resize(860, 980)
         
         if getattr(sys, 'frozen', False):
             logo_path = os.path.join(sys._MEIPASS, "media", "logo.ico")
