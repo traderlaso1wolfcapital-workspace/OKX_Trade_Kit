@@ -1281,6 +1281,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
             self.chart_widget.spinner(True)
             
+            # Polyfill chống lỗi undefined object khi load JS asynchronously
+            self.chart_widget.run_script(f"""
+                if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
+                if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+                if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                
+                if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
+                if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+            """)
+            
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
             self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar=self.combo_tf.currentText(), parent=self)
@@ -2710,6 +2720,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
                     
                     if not getattr(self, '_chart_initialized', False):
+                        # Polyfill chống lỗi undefined object khi load JS asynchronously
+                        self.chart_widget.run_script(f"""
+                            if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
+                            if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                            if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                            
+                            if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
+                            if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                        """)
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
                         self.chart_widget.run_script(f"""
@@ -3213,7 +3232,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("<span style='color: white;'>Phát hành bởi:</span> <span style='color: #FF9900;'>Cộng đồng TRADER LÀ SỐ 1 - VIỆT NAM</span>")
+        title = QtWidgets.QLabel("<span style='color: white;'>Phát hành bởi cộng đồng: TRADER LÀ SỐ 1 - VIỆT NAM</span>")
         title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
         header_layout.addWidget(title)
         
@@ -4523,12 +4542,11 @@ def main():
     window.show()
 
     def show_login():
+        QtWidgets.QApplication.processEvents()
         # 1. Blur WebEngineView qua CSS an toàn
-        for i in range(window.bot_tabs.count()):
-            widget = window.bot_tabs.widget(i)
-            if hasattr(widget, 'chart_widget'):
-                try: widget.chart_widget.run_script("document.body.style.filter = 'blur(5px)';")
-                except: pass
+        if hasattr(window, 'chart_widget'):
+            try: window.chart_widget.run_script("document.body.style.filter = 'blur(5px)';")
+            except: pass
                 
         # 2. Chụp giao diện hiện tại
         screen = window.screen()
@@ -4549,21 +4567,20 @@ def main():
         
         # 4. Đục lỗ (xóa) phần của biểu đồ để lộ WebEngineView bên dưới (đã blur CSS)
         painter.setCompositionMode(QtGui.QPainter.CompositionMode.CompositionMode_Clear)
-        for i in range(window.bot_tabs.count()):
-            widget = window.bot_tabs.widget(i)
-            if hasattr(widget, 'chart_widget'):
-                try:
-                    webview = widget.chart_widget.get_webview()
-                    if webview.isVisible():
-                        pos = webview.mapTo(window, QtCore.QPoint(0, 0))
-                        hole = QtCore.QRect(pos, webview.size())
-                        painter.fillRect(hole, QtCore.Qt.GlobalColor.transparent)
-                except: pass
+        if hasattr(window, 'chart_widget'):
+            try:
+                webview = window.chart_widget.get_webview()
+                if webview.isVisible():
+                    pos = webview.mapTo(window, QtCore.QPoint(0, 0))
+                    hole = QtCore.QRect(pos, webview.size())
+                    painter.fillRect(hole, QtCore.Qt.GlobalColor.transparent)
+            except: pass
         painter.end()
         
         overlay = QtWidgets.QLabel(window)
         overlay.setGeometry(window.rect())
         overlay.setPixmap(blurred)
+        overlay.raise_()
         overlay.show()
         
         login = LoginDialog(window)
@@ -4572,11 +4589,9 @@ def main():
             overlay.deleteLater()
             
             # Xóa blur CSS cho WebEngineView
-            for i in range(window.bot_tabs.count()):
-                widget = window.bot_tabs.widget(i)
-                if hasattr(widget, 'chart_widget'):
-                    try: widget.chart_widget.run_script("document.body.style.filter = 'none';")
-                    except: pass
+            if hasattr(window, 'chart_widget'):
+                try: window.chart_widget.run_script("document.body.style.filter = 'none';")
+                except: pass
                     
             QtWidgets.QApplication.processEvents()
             

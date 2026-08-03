@@ -451,9 +451,9 @@ def main():
                     last_limit_setup = current_now
                 
                 # --- Xử lý đa luồng (Multi-threading) để loại bỏ độ trễ mạng ---
-                def process_coin(cfg):
+                def process_coin(cfg, is_enabled):
                     try:
-                        bot_sub1.run_strategy_cycle(client, cfg, pMode, state_matrix, env_paths, system_config, is_limit_setup_cycle)
+                        bot_sub1.run_strategy_cycle(client, cfg, pMode, state_matrix, env_paths, system_config, is_limit_setup_cycle, is_enabled)
                         if cfg['swap'] in state_matrix:
                             live_px = float(state_matrix[cfg['swap']].live_price)
                             bot_sub1.update_post_trade_monitoring(cfg['coin'], live_px, env_paths, bot_sub1)
@@ -473,8 +473,8 @@ def main():
                 
                 futures = []
                 for cfg in bot_sub1.COIN_PORTFOLIO: 
-                    if cfg["coin"] in enabled_coins:
-                        futures.append(sys._bot_sub1_executor.submit(process_coin, cfg))
+                    is_enabled = (cfg["coin"] in enabled_coins)
+                    futures.append(sys._bot_sub1_executor.submit(process_coin, cfg, is_enabled))
                 concurrent.futures.wait(futures)
                 # ----------------------------------------------------------------
                 

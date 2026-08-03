@@ -231,10 +231,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     if btc_tk and getattr(btc_tk, "trend", "") == "SIDEWAY":
         btc_trend_mode = "SIDEWAY"
 
-    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT: {btc_trend_mode}")
-    print("-" * 78)
-    print(f" {'Coin':^4} | {m5_lbl:^7} | {m15_lbl:^7} | {m30_lbl:^7} | {h1_lbl:^7} | {h2_lbl:^7} | {h4_lbl:^7} |   Price   ")
-    print("-" * 78)
+    # print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT: {btc_trend_mode}") # Ẩn theo yêu cầu
+    
+    table_lines = []
+    table_lines.append("-" * 78)
+    table_lines.append(f" {'Coin':^4} | {m5_lbl:^7} | {m15_lbl:^7} | {m30_lbl:^7} | {h1_lbl:^7} | {h2_lbl:^7} | {h4_lbl:^7} |   Price   ")
+    table_lines.append("-" * 78)
     
     exp_groups = {
         "POS": [],
@@ -274,7 +276,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     for cfg_idx, cfg in enumerate(COIN_PORTFOLIO):
         sid = cfg["swap"]
         if sid not in state_matrix: 
-            print(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'0.0':>9} ")
+            table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'0.0':>9} ")
             continue
             
         tk = state_matrix[sid]
@@ -298,7 +300,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         h2_str = fmt_tf_state(tk.mtf_states.get("H2", {"accum":0,"fail":0,"side":"none"}))
         h4_str = fmt_tf_state(tk.mtf_states.get("H4", {"accum":0,"fail":0,"side":"none"}))
         
-        print(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {format_with_commas(tk.live_price, 1):>9} ")
+        table_lines.append(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {format_with_commas(tk.live_price, 1):>9} ")
 
         # BÁO CÁO PHÂN TÍCH REALTIME
         has_any_exp = False
@@ -380,8 +382,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 active_tf_mult = float(globals_ref.TF_MULTIPLIERS.get(target_tf, Decimal("1.0")))
                 mode = "Midpoint(EMA89/EMA200)" if dist_ema >= 0.2 else "EMA200"
                 exp_groups["WAIT"].append((0, 0, cfg_idx, f"  ✧ [{cfg['coin']}]: Quan sát [{target_tf}] quanh {mode} ({dist_ema:.2f}%). Chờ Limit."))
-    print("-" * 78)
-
+    
     print("\n✜ Tình trạng vị thế:")
     # ⚡ Thu thập tất cả dòng output, sắp xếp theo chiến thuật
     def _get_mode_icon(tk, side):
@@ -424,7 +425,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             active_dca_tfs = [tf for tf, px in placed_long_dict.items() if px not in ("---", "ERR") and tf not in filled]
             has_dca = len(active_dca_tfs) > 0
             prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  →  ROI: (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
+            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
@@ -455,7 +456,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             active_dca_tfs = [tf for tf, px in placed_short_dict.items() if px not in ("---", "ERR") and tf not in filled_short]
             has_dca = len(active_dca_tfs) > 0
             prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  →  ROI: (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
+            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_short_dict[tf]))
@@ -594,6 +595,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) {reason_disp}")
     if not has_closed_history:
         smart_print("  · Chưa có lệnh nào được đóng trong phiên này.")
+    print("")
+    for line in table_lines:
+        print(line)
     print("=" * 78 + "\n")
 
 # z1951 | Áp dụng tỷ lệ Co giãn Động (Dynamic ATR Elasticity Ratio) vào hiển thị Entry Limit Offset

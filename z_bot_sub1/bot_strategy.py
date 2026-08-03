@@ -347,7 +347,7 @@ def get_nearest_opposite_ema200(tracker, side, pos_tf):
             if e34 > e200 and e89 > e200: return e200
     return Decimal("0")
 
-def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool): # pyright: ignore[reportGeneralTypeIssues]
+def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool, is_enabled: bool = True): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
 
     swap_id = cfg["swap"]
@@ -1943,6 +1943,19 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         is_limit_setup_cycle = False
         if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
             clean_limit_orders(client, swap_id, "cross")
+            tracker.placed_entry_px_long_by_tf = {}
+            tracker.placed_entry_px_short_by_tf = {}
+            tracker.placed_entry_px_long = "---"
+            tracker.placed_entry_px_short = "---"
+
+    if not is_enabled:
+        is_limit_setup_cycle = False
+        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
+            clean_limit_orders(client, swap_id, "cross")
+            tracker.placed_entry_px_long_by_tf = {}
+            tracker.placed_entry_px_short_by_tf = {}
+            tracker.placed_entry_px_long = "---"
+            tracker.placed_entry_px_short = "---"
             tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
             
         # 2. Đóng hoà lệnh dương (ROI >= +0.1%)
