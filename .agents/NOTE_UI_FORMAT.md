@@ -1,18 +1,37 @@
-# QUY CHUẨN THIẾT KẾ GIAO DIỆN TERMINAL (UI FORMAT GUIDE)
+# QUY CHUẨN THIẾT KẾ GIAO DIỆN APP & TERMINAL (UNIFIED UI FORMAT GUIDE)
 
-Tài liệu này ghi nhớ toàn bộ quy chuẩn thiết kế giao diện hiển thị Terminal cho hệ thống OKX Trading Bot v23.x.
-Mọi bot con (`bot_sub1.py`, `sys_bot_trinhsat.py`, `sys_bot_quansu.py`...) phải tuân thủ theo `bot_main.py` làm chuẩn.
+Tài liệu này ghi nhớ toàn bộ quy chuẩn thiết kế giao diện hiển thị GUI và Terminal cho hệ thống OKX Trading Bot (TLS1 Company).
+**BẮT BUỘC:** Mọi Bot con (Main/Sub1, Sub2 SMC-OB, Sub3...) phải tuân thủ 100% chung 1 khuôn mẫu giao diện (Shared Template & Design System). Các bot CHỈ KHÁC NHAU ở Thuật toán giao dịch và Bảng cấu hình tham số.
 
-Cập nhật lần cuối: 2026-06-30 (Đồng bộ theo PLAN_BOT_MAIN.md v23.x — z1948)
+Cập nhật lần cuối: 2026-08-03 (Thống nhất theo yêu cầu CEO - Unified UI System)
 
 ---
 
-## 1. Độ Rộng Giao Diện Mặc Định (Line Width)
+## 1. Độ Rộng Giao Diện Terminal Log (Line Width & Text Style)
 
-- Mỗi dòng hiển thị có độ dài chính xác là **97 ký tự**.
-- **Đường phân cách chính (Double border)**: `=` × 97
-- **Đường phân cách phụ (Single border)**: `-` × 97
-- **Word-wrap**: Dùng hàm `smart_print()` để tự động xuống dòng, đảm bảo từ ngữ không bị cắt đứt giữa chừng. Dòng tiếp theo căn lề 4 dấu cách.
+- **Độ dài dòng tối đa:** Đúng **78 ký tự** (phù hợp font Consolas 18px Bold khi Livestream trên điện thoại không bị vỡ dòng).
+- **Viền phân cách:** `=` × 78 và `-` × 78.
+- **Phong cách Chữ (Text Case):** Không dùng chữ IN HOA toàn bộ gây gắt mắt. Sử dụng Chữ in thường / Hoa đầu từ mềm mại:
+  - Header: `⚡ Thợ săn EMA200`, `💰 Lợi nhuận`, `🏦 Tài khoản`, `🎯 Hiệu suất`
+  - Cột: `Coin`, `Price`
+  - Tiêu đề mục: `✜ Tình trạng vị thế:`, `☯ Lịch sử lệnh vừa đóng:`
+
+---
+
+## 2. Quy Chuẩn GUI App (PyQt / PySide)
+
+- **Khuôn mẫu dùng chung:** Sử dụng chung class `BotInstanceWidget` cho tất cả các Tab Bot.
+- **Size Font Bảng Vị Thế:** Font gốc **`14px`** (Chữ thường `font-weight: normal`, không in đậm).
+- **Phân rã Font PNL Thả Nổi:**
+  - Con số $ Lãi/Lỗ đầu tiên: **`16px`** (+2 size, rực rỡ).
+  - Phần đuôi `USDT (+...%)`: **`14px`** (size gốc).
+- **Cột Ký Quỹ:** Hiển thị bằng đơn vị **`$`** (Tự động tính fallback `Margin = Kích thước / Đòn bẩy` nếu sàn chưa trả về `mgn`).
+- **Căn lề cột:**
+  - Cột Giá / Ký quỹ / Kích thước: Căn phải (`AlignRight`).
+  - Cột PNL thả nổi / Chốt lời | Dừng lỗ: Căn giữa (`AlignCenter`).
+- **Trạng thái Nút Bắt đầu / Dừng:**
+  - Khi Bot Dừng: Nút **BẮT ĐẦU CHẠY BOT** màu **Xanh lá** (`#2E7D32`), Nút **DỪNG HOẠT ĐỘNG** vô hiệu hóa màu **Xám** (`#555555`).
+  - Khi Bot Chạy: Nút **BẮT ĐẦU CHẠY BOT** vô hiệu hóa màu **Xám** (`#555555`), Nút **DỪNG HOẠT ĐỘNG** màu **Đỏ** (`#C62828`).
 
 ```python
 def smart_print(text, width=97, indent="    "):

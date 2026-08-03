@@ -95,15 +95,15 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     pnl_sign = "+" if loi_nhuan >= 0 else ""
     growth_sign = "+" if tang_truong >= 0 else ""
 
-    bot_name = "SMC ORDER BLOCK"
+    bot_name = "SMC Order Block"
     c1, c2, c3, c4 = 20, 26, 20, 16
-    line_w = 94
+    line_w = 78
 
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
     target_vol = 100.0
 
-    r0 = f"  {'⚡ ' + bot_name:^{c1-1}} | {'💰 LỢI NHUẬN':^{c2-1}} | {'🏦 TÀI KHOẢN':^{c3-1}} | 🎯 HIỆU SUẤT"
+    r0 = f"  {'⚡ ' + bot_name:^{c1-1}} | {'💰 Lợi nhuận':^{c2-1}} | {'🏦 Tài khoản':^{c3-1}} | 🎯 Hiệu suất"
     r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
     r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
 
@@ -131,21 +131,25 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
 
     sorted_trackers = dict(sorted(trackers.items(), key=lambda x: (0 if "XAU" in x[0] else (1 if "BTC" in x[0] else 2), x[0])))
 
-    # 2. CHIẾN THUẬT ĐANG KÍCH HOẠT: (Giữ tiêu đề, ẩn chi tiết)
-    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT:")
+    btc_tk = sorted_trackers.get("BTC-USDT-SWAP")
+    btc_trend_mode = "THUẬN XU HƯỚNG"
+    if btc_tk and getattr(btc_tk, "swing_trend", 0) == 0:
+        btc_trend_mode = "SIDEWAY"
+
+    print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT: {btc_trend_mode}")
 
     # 3. BẢNG COIN (Giữ nguyên)
-    OB_W = 23  # width cố định cho mỗi cột OB ZONE
+    OB_W = 15  # width cố định cho mỗi cột OB ZONE vừa khít 78 chars
     if any(t.swing_trend == 1 for t in sorted_trackers.values()):
-        h1, h2 = "OB MAIN (M15 LONG)", "OB HEDGE (M30 SHORT)"
+        h1, h2 = "M15 (LONG)", "M30 (SHORT)"
     elif any(t.swing_trend == -1 for t in sorted_trackers.values()):
-        h1, h2 = "OB MAIN (M15 SHORT)", "OB HEDGE (M30 LONG)"
+        h1, h2 = "M15 (SHORT)", "M30 (LONG)"
     else:
-        h1, h2 = "OB MAIN (M15)", "OB HEDGE (M30)"
+        h1, h2 = "M15 (OB)", "M30 (OB)"
     
-    print("\n" + f"-" * 95)
-    print(f" {'COIN':<4} | {'PRICE':>9} | {'TREND':<6} | {h1:^{OB_W}} | {h2:^{OB_W}} | {'STATUS'}")
-    print(f"-" * 95)
+    print("\n" + f"-" * 78)
+    print(f" {'Coin':<4} | {'Price':>9} | {'Trend':<6} | {h1:^{OB_W}} | {h2:^{OB_W}} | {'Status'}")
+    print(f"-" * 78)
     
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
@@ -169,8 +173,8 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
             main_obs = m15_active[:1]
             hedge_obs = m30_active[:1]
         
-        main_zone = f"{float(main_obs[0].bar_low):.2f} - {float(main_obs[0].bar_high):.2f}" if main_obs else "-- - --"
-        hedge_zone = f"{float(hedge_obs[0].bar_low):.2f} - {float(hedge_obs[0].bar_high):.2f}" if hedge_obs else "-- - --"
+        main_zone = f"{float(main_obs[0].bar_low):.2f}-{float(main_obs[0].bar_high):.2f}" if main_obs else "-- - --"
+        hedge_zone = f"{float(hedge_obs[0].bar_low):.2f}-{float(hedge_obs[0].bar_high):.2f}" if hedge_obs else "-- - --"
         
         pending = [s for s in tracker.trade_setups if not s.triggered]
         if not is_coin_enabled and not (tracker.has_long or tracker.has_short):
@@ -186,10 +190,10 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
             
         print(f" {coin:<4} | {price:>9} | {trend_str:<6} | {main_zone:^{OB_W}} | {hedge_zone:^{OB_W}} | {status}")
 
-    print("-" * 95)
+    print("-" * 78)
     
     # 4. ✜ TÌNH TRẠNG VỊ THẾ:
-    print("\n✜ TÌNH TRẠNG VỊ THẾ:")
+    print("\n✜ Tình trạng vị thế:")
     pos_lines = []
     
     for symbol, tracker in sorted_trackers.items():
@@ -256,7 +260,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
             print(l)
     
     # 5. ☯ LỊCH SỬ LỆNH VỪA ĐÓNG:
-    print("\n☯ LỊCH SỬ LỆNH VỪA ĐÓNG:")
+    print("\n☯ Lịch sử lệnh vừa đóng:")
     has_closed = False
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
@@ -273,7 +277,7 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     
     if not has_closed:
         print("  · Chưa có lệnh nào được đóng trong phiên này.")
-    print("=" * 95 + "\n" * 3)
+    print("=" * 78 + "\n")
 # z7713 | Thiết kế lại bảng COIN: OB ZONE, LONG @, SHORT @, STATUS
 # z7716 | Dashboard mới: OB ZONE LONG / OB ZONE SHORT với hiển thị RR. Bỏ cột LONG @ / SHORT @.
 # z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn

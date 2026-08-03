@@ -945,7 +945,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def init_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(4, 4, 4, 4)
 
         # Khởi tạo dropdown (sẽ được add vào tab API)
         self.account_dropdown = QtWidgets.QComboBox()
@@ -988,11 +988,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tabs.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         layout.addWidget(self.tabs)
         
-        # Đưa trạng thái (ĐANG DỪNG/CHẠY) lên thanh corner của Tab
+        # Đưa trạng thái (ĐANG DỪNG/CHẠY) xuống thanh công cụ chart / vị thế
         self.status_led = QtWidgets.QLabel("● ĐANG DỪNG")
         self.status_led.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
-        self.status_led.setStyleSheet("color: #FF3333; padding: 5px 15px;")
-        self.tabs.setCornerWidget(self.status_led, QtCore.Qt.Corner.TopRightCorner)
+        self.status_led.setStyleSheet("color: #FF3333; padding: 5px 10px;")
 
         # TAB 1: DASHBOARD
         self.tab_dashboard = QtWidgets.QWidget()
@@ -1036,6 +1035,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_start.setStyleSheet("""
             QPushButton { background-color: #2E7D32; color: white; min-height: 28px; min-width: 120px; padding: 5px 10px; border: 1px solid transparent; border-radius: 4px; }
             QPushButton:hover { background-color: #388E3C; border: 1px solid #ffaa00; }
+            QPushButton:disabled { background-color: #555555; color: #888888; border: 1px solid #444; }
         """)
         self.btn_start_hover = ButtonHoverSoundFilter(self.btn_start)
         self.btn_start.installEventFilter(self.btn_start_hover)
@@ -1099,15 +1099,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_live_view.tabBar().installEventFilter(self.live_view_hover_filter)
         self.tab_live_view.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.tab_live_view.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #333333; border-radius: 4px; }
-            QTabBar::tab { background: #1e1e1e; color: #a0a0a0; padding: 8px 20px; border: 1px solid #333; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }
-            QTabBar::tab:selected { background: #2d2d2d; color: #FF9900; font-weight: bold; }
-            QTabBar::tab:hover { background: #2e2e2e; }
+            QTabWidget::pane { border: 1px solid #333333; background-color: #161616; border-radius: 4px; margin-top: -1px; }
+            QTabBar::tab { background: #121212; color: #888888; padding: 7px 18px; border: 1px solid #2d2d2d; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
+            QTabBar::tab:selected { background: #161616; color: #ff9900; font-weight: bold; border: 1px solid #333333; border-top: 2px solid #ff9900; border-bottom: 2px solid #161616; }
+            QTabBar::tab:hover { background: #282828; color: #ffffff; }
         """)
 
         # Tab 1: Logs
         self.tab_logs = QtWidgets.QWidget()
         console_layout = QtWidgets.QVBoxLayout(self.tab_logs)
+        console_layout.setContentsMargins(5, 5, 5, 5)
         
         log_header = QtWidgets.QHBoxLayout()
         log_header.addWidget(QtWidgets.QLabel("Màn hình logs hệ thống (realtime):"))
@@ -1120,25 +1121,26 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setReadOnly(True)
         self.log_display.setMaximumBlockCount(100)
         self.log_display.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
-        self.log_display.setFont(QtGui.QFont("Courier New", 10))
+        self.log_display.setFont(QtGui.QFont("Consolas", 12))
+        self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.log_display.setStyleSheet(
-            "background-color: #f5f5f5; color: #000000; font-family: 'Courier New', 'Consolas', monospace; font-size: 13px;"
+            "background-color: #f5f5f5; color: #000000; font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace; font-size: 18px; font-weight: normal;"
             "border: 1px solid #cccccc; border-radius: 4px;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
         log_header.addWidget(btn_clear_log)
         console_layout.addLayout(log_header)
-        console_layout.addWidget(self.log_display)
+        console_layout.addWidget(self.log_display, 1)
 
 
         # Tab 2: Chart
         self.tab_chart = QtWidgets.QWidget()
         chart_layout = QtWidgets.QVBoxLayout(self.tab_chart)
-        chart_layout.setContentsMargins(0, 0, 0, 0)
+        chart_layout.setContentsMargins(5, 5, 5, 5)
         
         control_layout = QtWidgets.QHBoxLayout()
-        control_layout.setContentsMargins(10, 10, 10, 0)
+        control_layout.setContentsMargins(0, 0, 0, 0)
         
         self.combo_coin = QtWidgets.QComboBox()
         for p in ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
@@ -1151,11 +1153,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
-        self.chk_show_ob.setStyleSheet("color: #4caf50; font-weight: bold; font-size: 11px;")
+        self.chk_show_ob.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         
-        self.chk_show_positions = QtWidgets.QCheckBox("☑ Vị thế OKX")
+        self.chk_show_positions = QtWidgets.QCheckBox("Vị thế OKX")
         self.chk_show_positions.setChecked(True)
-        self.chk_show_positions.setStyleSheet("color: #ff9800; font-weight: bold; font-size: 11px;")
+        self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
         
         control_layout.addWidget(QtWidgets.QLabel("Cặp giao dịch:"))
@@ -1165,13 +1167,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.addWidget(self.chk_show_ob)
         control_layout.addWidget(self.chk_show_positions)
         control_layout.addStretch()
+        control_layout.addWidget(self.status_led)
         
         chart_layout.addLayout(control_layout)
         
         try:
             self.chart_widget = QtChart()
             self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2)
-            chart_layout.addWidget(self.chart_widget.get_webview())
+            webview = self.chart_widget.get_webview()
+            webview.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+            chart_layout.addWidget(webview, 1)
             
             self.chart_widget.layout(background_color='#0c0c0c', text_color='#e0e0e0', font_size=12)
             self.chart_widget.candle_style(up_color='#26a69a', down_color='#ef5350',
@@ -1204,8 +1209,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.pos_table = QtWidgets.QTableWidget(0, 6)
         self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "Kích thước", "PNL thả nổi", "Chốt lời | Dừng lỗ"])
-        self.pos_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.pos_table.setStyleSheet("QTableWidget { background-color: #1e1e1e; color: #e0e0e0; gridline-color: #333333; border: 1px solid #333333; } QHeaderView::section { background-color: #2a2a2a; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; }")
+        header = self.pos_table.horizontalHeader()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.pos_table.setStyleSheet(
+            "QTableWidget { background-color: #1e1e1e; color: #e0e0e0; font-size: 14px; font-weight: normal; gridline-color: #333333; border: 1px solid #333333; } "
+            "QTableWidget::item { padding: 4px 10px; font-size: 14px; font-weight: normal; } "
+            "QHeaderView::section { background-color: #2a2a2a; color: #ffffff; font-weight: bold; font-size: 14px; border: 1px solid #333333; padding: 5px 8px; }"
+        )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.pos_table.verticalHeader().setVisible(False)
@@ -1231,7 +1246,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_live_view.addTab(self.split_view, "📊 TỔNG QUAN (CHART & LOGS)")
 
         self.combo_layout_mode = QtWidgets.QComboBox()
-        self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"]) # Chuyển "Chế độ dọc" làm mặc định
+        self.combo_layout_mode.addItems(["Chế độ ngang", "Chế độ dọc"])
+        self.combo_layout_mode.setCurrentText("Chế độ ngang")
         self.combo_layout_mode.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         def on_layout_mode_changed(text):
@@ -1272,33 +1288,60 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
             return
-            
-        self.pos_table.setRowCount(len(positions))
-        for row, pos in enumerate(positions):
-            instId = pos.get("instId", "")
+
+        def _safe_float(val):
+            try:
+                return float(val) if val not in (None, "") else 0.0
+            except (ValueError, TypeError):
+                return 0.0
+
+        def _coin_priority(pos_item):
+            inst = str(pos_item.get("instId", "")).upper()
+            if "XAU" in inst: return 0
+            if "BTC" in inst: return 1
+            if "ETH" in inst: return 2
+            if "SOL" in inst: return 3
+            if "XRP" in inst: return 4
+            return 99
+
+        sorted_positions = sorted(positions, key=_coin_priority)
+        self.pos_table.setRowCount(len(sorted_positions))
+        for row, pos in enumerate(sorted_positions):
+            instId = str(pos.get("instId", "")).replace("-SWAP", "")
             lever = pos.get("lever", "")
             mgnMode = "Chéo" if pos.get("mgnMode") == "cross" else "Cô lập"
             
             # Cột 1
             item1 = QtWidgets.QTableWidgetItem(f"{instId} ({lever}x {mgnMode})")
+            item1.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
             # Cột 2
-            entry_px = float(pos.get("avgPx", 0))
-            item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.4f}")
-            
-            # Cột 3
-            margin = float(pos.get("margin", 0))
-            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f} USDT")
+            entry_px = _safe_float(pos.get("avgPx", 0))
+            item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}")
+            item2.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
             # Cột 4
-            size = float(pos.get("notionalUsd", pos.get("notional", 0)))
+            size = _safe_float(pos.get("notionalUsd", pos.get("notional", 0)))
             item4 = QtWidgets.QTableWidgetItem(f"{size:,.2f} USDT")
+            item4.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
+
+            # Cột 3
+            margin = _safe_float(pos.get("mgn", pos.get("margin", pos.get("imr", 0))))
+            lever_num = _safe_float(lever)
+            if margin == 0 and size > 0 and lever_num > 0:
+                margin = size / lever_num
+            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f}$")
+            item3.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
             # Cột 5
-            upl = float(pos.get("upl", 0))
-            upl_ratio = float(pos.get("uplRatio", 0)) * 100
-            item5 = QtWidgets.QTableWidgetItem(f"{upl:+.2f} USDT ({upl_ratio:+.2f}%)")
-            item5.setForeground(QtGui.QColor("#26a69a") if upl >= 0 else QtGui.QColor("#ef5350"))
+            upl = _safe_float(pos.get("upl", 0))
+            upl_ratio = _safe_float(pos.get("uplRatio", 0)) * 100
+            color_str = "#26a69a" if upl >= 0 else "#ef5350"
+            pnl_label = QtWidgets.QLabel(
+                f"<span style='font-size: 16px;'>{upl:+.2f}</span> <span style='font-size: 14px;'>USDT ({upl_ratio:+.2f}%)</span>"
+            )
+            pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            pnl_label.setStyleSheet(f"color: {color_str}; background: transparent; font-weight: normal;")
             
             # Cột 6
             tp_list = pos.get("tp_list", [])
@@ -1306,12 +1349,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             tp_str = ", ".join(tp_list) if tp_list else "None"
             sl_str = ", ".join(sl_list) if sl_list else "None"
             item6 = QtWidgets.QTableWidgetItem(f"TP: {tp_str} | SL: {sl_str}")
+            item6.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
             
             self.pos_table.setItem(row, 0, item1)
             self.pos_table.setItem(row, 1, item2)
             self.pos_table.setItem(row, 2, item3)
             self.pos_table.setItem(row, 3, item4)
-            self.pos_table.setItem(row, 4, item5)
+            self.pos_table.setCellWidget(row, 4, pnl_label)
             self.pos_table.setItem(row, 5, item6)
             
     def apply_current_api_to_worker(self):
@@ -2738,7 +2782,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"TLS1 Trading v{APP_VERSION}")
-        self.resize(1100, 850)
+        self.resize(1360, 768)
         
         if getattr(sys, 'frozen', False):
             logo_path = os.path.join(sys._MEIPASS, "media", "logo.ico")
@@ -2986,7 +3030,7 @@ class MainWindow(QtWidgets.QMainWindow):
         central_widget = QtWidgets.QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QtWidgets.QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(15, 5, 15, 15)
+        main_layout.setContentsMargins(6, 4, 6, 6)
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
@@ -3413,15 +3457,69 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
                 background-color: #e0e0e0;
             }
             
-            QTabWidget#OuterTabs::pane { border: 1px solid #2d2d2d; background-color: #151515; border-radius: 4px; }
-            QTabWidget#OuterTabs > QTabBar::tab { background-color: #111111; border: 1px solid #2d2d2d; padding: 10px 20px; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; font-size: 13px; }
-            QTabWidget#OuterTabs > QTabBar::tab:selected { background-color: #151515; color: #ffaa00; font-weight: bold; border-bottom-color: #151515; }
-            QTabWidget#OuterTabs > QTabBar::tab:hover { background-color: #2e2e2e; }
+            QTabWidget#OuterTabs::pane { 
+                border: 1px solid #3a3a3a; 
+                background-color: #242424; 
+                border-top-right-radius: 6px; 
+                border-bottom-left-radius: 6px; 
+                border-bottom-right-radius: 6px; 
+                margin-top: -1px;
+            }
+            QTabWidget#OuterTabs > QTabBar::tab { 
+                background-color: #141414; 
+                color: #888888; 
+                border: 1px solid #2d2d2d; 
+                padding: 10px 24px; 
+                border-top-left-radius: 6px; 
+                border-top-right-radius: 6px; 
+                margin-right: 4px; 
+                font-size: 14px; 
+                font-weight: bold;
+            }
+            QTabWidget#OuterTabs > QTabBar::tab:selected { 
+                background-color: #242424; 
+                color: #ffaa00; 
+                font-weight: bold; 
+                border: 1px solid #3a3a3a; 
+                border-top: 3px solid #ff9900; 
+                border-bottom: 2px solid #242424; 
+            }
+            QTabWidget#OuterTabs > QTabBar::tab:hover { 
+                background-color: #2c2c2c; 
+                color: #e0e0e0;
+            }
 
-            QTabWidget#InnerTabs::pane { border: 1px solid #2d2d2d; background-color: #1a1a1a; border-radius: 4px; }
-            QTabWidget#InnerTabs > QTabBar::tab { background-color: #111111; border: 1px solid #2d2d2d; padding: 8px 16px; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; }
-            QTabWidget#InnerTabs > QTabBar::tab:selected { background-color: #1a1a1a; color: #ff9900; font-weight: bold; border-bottom-color: #1a1a1a; }
-            QTabWidget#InnerTabs > QTabBar::tab:hover { background-color: #2e2e2e; }
+            QTabWidget#InnerTabs::pane { 
+                border: 1px solid #3d3d3d; 
+                background-color: #1e1e1e; 
+                border-top-right-radius: 4px; 
+                border-bottom-left-radius: 4px; 
+                border-bottom-right-radius: 4px; 
+                margin-top: -1px;
+            }
+            QTabWidget#InnerTabs > QTabBar::tab { 
+                background-color: #121212; 
+                color: #888888; 
+                border: 1px solid #2d2d2d; 
+                padding: 8px 18px; 
+                border-top-left-radius: 5px; 
+                border-top-right-radius: 5px; 
+                margin-right: 3px; 
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QTabWidget#InnerTabs > QTabBar::tab:selected { 
+                background-color: #1e1e1e; 
+                color: #ffaa00; 
+                font-weight: bold; 
+                border: 1px solid #3d3d3d; 
+                border-top: 2px solid #ffaa00; 
+                border-bottom: 2px solid #1e1e1e; 
+            }
+            QTabWidget#InnerTabs > QTabBar::tab:hover { 
+                background-color: #2a2a2a; 
+                color: #ffffff;
+            }
 
             QFrame#HeaderGroup { background-color: transparent; border: none; padding: 5px; margin-bottom: 5px; }
             QGroupBox { border: 1px solid #2d2d2d; margin-top: 10px; font-weight: bold; color: #ff9900; border-radius: 4px; }
