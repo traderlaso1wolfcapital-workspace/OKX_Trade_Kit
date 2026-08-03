@@ -4035,11 +4035,16 @@ class LoginDialog(QtWidgets.QDialog):
         layout.setSpacing(10)
         
         self.lbl_banner = QtWidgets.QLabel()
-        banner_path = os.path.join(PROJECT_DIR, "media", "banner.png")
+        possible_banner_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "banner.png"),
+            os.path.join(PROJECT_DIR, "TLS1_Trading_App", "media", "banner.png"),
+            os.path.join(PROJECT_DIR, "media", "banner.png"),
+        ]
         if getattr(sys, 'frozen', False):
-            banner_path = os.path.join(sys._MEIPASS, "media", "banner.png")
+            possible_banner_paths.insert(0, os.path.join(sys._MEIPASS, "media", "banner.png"))
             
-        if os.path.exists(banner_path):
+        banner_path = next((p for p in possible_banner_paths if os.path.exists(p)), None)
+        if banner_path:
             pixmap = QtGui.QPixmap(banner_path)
             pixmap = pixmap.scaledToWidth(360, QtCore.Qt.TransformationMode.SmoothTransformation)
             self.lbl_banner.setPixmap(pixmap)
