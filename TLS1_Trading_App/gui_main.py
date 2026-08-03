@@ -1243,7 +1243,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.split_view.setStretchFactor(0, 5)
         self.split_view.setStretchFactor(1, 5)
 
-        self.tab_live_view.addTab(self.split_view, "📊 TỔNG QUAN (CHART & LOGS)")
+        self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
         self.combo_layout_mode = QtWidgets.QComboBox()
         self.combo_layout_mode.addItems(["Chế độ ngang", "Chế độ dọc"])
@@ -2922,6 +2922,21 @@ class MainWindow(QtWidgets.QMainWindow):
             
             icon = "🟢" if i == index else "⚫"
             self.bot_tabs.setTabText(i, f"{icon} {base_name}")
+            
+        # Hiệu ứng thị giác chuyển trang mượt mà (Fade-in animation) khi đổi giữa các Bot
+        target_widget = self.bot_tabs.widget(index)
+        if target_widget:
+            try:
+                effect = QtWidgets.QGraphicsOpacityEffect(target_widget)
+                target_widget.setGraphicsEffect(effect)
+                anim = QtCore.QPropertyAnimation(effect, b"opacity", target_widget)
+                anim.setDuration(220)
+                anim.setStartValue(0.35)
+                anim.setEndValue(1.0)
+                anim.start(QtCore.QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+                anim.finished.connect(lambda: target_widget.setGraphicsEffect(None) if target_widget else None)
+                target_widget._fade_anim = anim
+            except Exception: pass
 
     def set_welcome_name(self, name):
         self.lbl_main_welcome.setText(f" Chúc sếp \"{name}\" giao dịch thuận lợi ")

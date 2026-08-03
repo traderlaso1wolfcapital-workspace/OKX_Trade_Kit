@@ -19,12 +19,11 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[03/08/2026]** - Chuẩn hóa toàn bộ giao diện App & Terminal theo 1 khuôn mẫu chung (Unified UI System):
-  1. **Tự động áp dụng chung cho mọi Bot (Main, Sub1, Sub2 SMC-OB, Sub3...):** Giao diện GUI dùng chung class `BotInstanceWidget`.
-  2. **Font Size & Style Bảng Vị Thế:** Font nền `14px` (Chữ thường `normal`), riêng PNL amount `16px` nổi bật; Căn lề số/USDT bên phải, PNL/TPSL căn giữa.
-  3. **Ký Quỹ:** Hiển thị theo đơn vị `$`, tự động tính fallback `Margin = Size / Leverage` nếu sàn chưa trả về `mgn`.
-  4. **Nút Bắt Đầu / Dừng:** Đồng bộ trạng thái màu sắc (Kích hoạt ➔ Xanh `#2E7D32` / Đỏ `#C62828`, Vô hiệu hóa ➔ Xám `#555555`).
-  5. **Terminal Log:** Chuẩn hóa chiều rộng 78 ký tự, chuyển toàn bộ nhãn tiêu đề từ Chữ IN HOA sang Chữ in thường/Hoa đầu từ mềm mại trên cả Sub1 và Sub2. (Mã patch: `z3500`)
+- **[03/08/2026]** - Tối ưu toàn bộ Giao diện GUI & Terminal Log theo tiêu chuẩn Monorepo:
+  1. **Font Size & Style Bảng Vị Thế:** Font nền `14px` (chữ thường `normal`), PNL amount `16px` nổi bật; Căn lề số/USDT bên phải, Ký quỹ tính bằng `$`.
+  2. **Trạng thái Nút bấm & Dropdown:** Nút Bắt đầu/Dừng đổi màu Xanh/Đỏ/Xám chuẩn; Dropdown chế độ xem mặc định đồng bộ `Chế độ ngang`.
+  3. **Tối ưu Độ phân giải & Khung hình 1080px (Tablet Fujitsu Q378):** Thu gọn margins viền ngoài từ 35px xuống 15px sát mép viền; Dóng hàng lề trên cùng 2 thẻ `Logs` và `TradingView Toolbar`; Cho phép Chart co giãn `Expanding` 100% lấp đầy diện tích thừa.
+  4. **Hiệu ứng Thị giác Đa tầng (Tab Visual Hierarchy & Fade Animation):** Tab chính (`Bot EMA200`, `Bot SMC - OB`) sáng chữ Vàng Kim (`#ffaa00`), viền cam 3px, triệt tiêu đường viền đáy nối liền khối với khung nội dung bên dưới; Bổ sung hiệu ứng chuyển động mượt mà `Fade-in Opacity Animation (220ms)` khi chuyển qua lại giữa các Tab Bot! (Mã patch: `z3500`)
 
 - **[01/08/2026]** - Lỗi `NameError: name 'bot_config' is not defined` tại `z_bot_sub2/bot_strategy.py:L783`. Đã fix: Bổ sung import module `from z_bot_sub2 import bot_config` ở đầu file `bot_strategy.py` để các lệnh `getattr(bot_config, ...)` truy cập đúng cấu hình toàn cục.
 
