@@ -1028,8 +1028,22 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
         dlg_layout.addWidget(settings_tabs)
         
-        # Nút hoàn tất đóng cửa sổ
+        # Nút Đăng Xuất được giấu vào đây thay vì nằm trên header
         btn_row = QtWidgets.QHBoxLayout()
+        btn_logout_in_settings = QtWidgets.QPushButton("🚪 Đăng Xuất")
+        btn_logout_in_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
+        btn_logout_in_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        btn_logout_in_settings.setStyleSheet("""
+            QPushButton { background-color: #333333; color: #ffffff; min-height: 30px; padding: 4px 14px; border-radius: 4px; border: none; outline: none; font-weight: bold; }
+            QPushButton:hover { background-color: #cc2222; color: #ffffff; }
+        """)
+        def _do_logout_from_settings():
+            dlg.accept()
+            main_win = self.window()
+            if hasattr(main_win, 'handle_logout'):
+                main_win.handle_logout()
+        btn_logout_in_settings.clicked.connect(_do_logout_from_settings)
+        btn_row.addWidget(btn_logout_in_settings)
         btn_row.addStretch(1)
         btn_close = QtWidgets.QPushButton("✅ Hoàn Tất & Đóng Cài Đặt")
         btn_close.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
@@ -1152,7 +1166,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
             self.btn_open_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_open_settings.setStyleSheet("""
-                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 26px; padding: 4px 12px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
                 QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
             """)
             self.btn_open_settings_hover = ButtonHoverSoundFilter(self.btn_open_settings)
@@ -1163,15 +1177,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_open_community.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
             self.btn_open_community.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_open_community.setStyleSheet("""
-                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 26px; padding: 4px 12px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
                 QPushButton:hover { background-color: #00e5ff; color: #000000; font-weight: bold; border-color: #00e5ff; }
             """)
             self.btn_open_community_hover = ButtonHoverSoundFilter(self.btn_open_community)
             self.btn_open_community.installEventFilter(self.btn_open_community_hover)
             self.btn_open_community.clicked.connect(self.open_community_dialog)
-
-            top_panel.addWidget(self.btn_open_settings)
-            top_panel.addWidget(self.btn_open_community)
+            # Cộng Đồng → sẽ được add vào header_layout bởi MainWindow
+            # Cài Đặt → sẽ được add vào corner_widget của tab_live_view
 
         dash_layout.addLayout(top_panel, 0)
 
@@ -1181,9 +1194,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.live_view_hover_filter = HoverSoundFilter(self.tab_live_view.tabBar())
         self.tab_live_view.tabBar().installEventFilter(self.live_view_hover_filter)
         self.tab_live_view.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.tab_live_view.tabBar().setExpanding(False)
+        self.tab_live_view.tabBar().setUsesScrollButtons(False)
         self.tab_live_view.setStyleSheet("""
             QTabWidget::pane { border: 1px solid #333333; background-color: #1e1e1e; border-radius: 4px; margin-top: -1px; }
-            QTabBar::tab { background: #1a1a1a; color: #a0a0a0; padding: 7px 18px; border: 1px solid #333333; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
+            QTabBar::tab { background: #1a1a1a; color: #a0a0a0; padding: 6px 14px; border: 1px solid #333333; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
             QTabBar::tab:selected { background: #2d2d2d; color: #FF9900; font-weight: bold; border: 1px solid #444444; border-bottom: 2px solid #2d2d2d; }
             QTabBar::tab:hover { background: #333333; color: #ffffff; }
         """)
@@ -1229,17 +1244,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         for p in ["BTC-USDT-SWAP", "XAU-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
             self.combo_coin.addItem(p.replace("-SWAP", ""), p)
         self.combo_coin.setCurrentText("BTC-USDT")
-        self.combo_coin.setFixedWidth(100)
+        self.combo_coin.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
+        
         self.combo_tf = QtWidgets.QComboBox()
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("1H")
-        self.combo_tf.setFixedWidth(48)
+        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
         self.chk_show_ob.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         
-        self.chk_show_positions = QtWidgets.QCheckBox("Vị thế OKX")
+        self.chk_show_positions = QtWidgets.QCheckBox("Vị thế")
         self.chk_show_positions.setChecked(True)
         self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
@@ -1309,7 +1325,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart)
         self.pos_table.verticalHeader().setDefaultSectionSize(32)
-        self.tab_positions.setFixedHeight(140) # Vừa đủ header và 3 dòng lệnh
+        self.tab_positions.setFixedHeight(148) # Vừa đủ header và 3 dòng lệnh
         chart_layout.addWidget(self.tab_positions)
 
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
@@ -1351,18 +1367,31 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
         self.combo_layout_mode.currentTextChanged.connect(on_layout_mode_changed)
         
-        corner_widget = QtWidgets.QWidget()
-        c_layout = QtWidgets.QHBoxLayout(corner_widget)
-        c_layout.setContentsMargins(0, 0, 8, 0)
-        c_layout.setSpacing(8)
-        c_layout.addWidget(self.combo_coin)
-        c_layout.addWidget(self.combo_tf)
-        c_layout.addWidget(self.chk_show_ob)
-        c_layout.addWidget(self.chk_show_positions)
-        c_layout.addWidget(self.combo_layout_mode)
-        c_layout.addWidget(self.status_led)
+        # Phục hồi Tab chủ Native của QTabWidget để bo liền khung với pane bên dưới
+        self.tab_live_view.tabBar().show()
         
-        self.tab_live_view.setCornerWidget(corner_widget, QtCore.Qt.Corner.TopRightCorner)
+        # Đưa tất cả công cụ vào TopRightCorner
+        right_corner = QtWidgets.QWidget()
+        rc_layout = QtWidgets.QHBoxLayout(right_corner)
+        rc_layout.setContentsMargins(0, 0, 8, 2)
+        rc_layout.setSpacing(8)
+        
+        rc_layout.addWidget(self.combo_coin)
+        rc_layout.addWidget(self.combo_tf)
+        rc_layout.addWidget(self.chk_show_ob)
+        rc_layout.addWidget(self.chk_show_positions)
+        rc_layout.addWidget(self.combo_layout_mode)
+        
+        if hasattr(self, 'btn_open_settings'):
+            self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
+            self.btn_open_settings.setStyleSheet("""
+                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
+            """)
+            rc_layout.addWidget(self.btn_open_settings)
+        
+        self.status_led.hide()
+        self.tab_live_view.setCornerWidget(right_corner, QtCore.Qt.Corner.TopRightCorner)
 
         dash_layout.addWidget(self.tab_live_view, 1)
 
@@ -2683,6 +2712,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     if not getattr(self, '_chart_initialized', False):
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
+                        self.chart_widget.run_script(f"""
+                            try {{
+                                let cw = window['{self.chart_widget.id}'];
+                                if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
+                                    cw.series.setMarkers = function(m) {{
+                                        try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
+                                    }};
+                                }}
+                            }} catch(e) {{}}
+                        """)
                         self._chart_initialized = True
                         self.chart_widget.spinner(False)
                     else:
@@ -2727,10 +2766,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                 let chartObj = window['{self.chart_widget.id}'] || window.{self.chart_widget.id};
                                 if (!chartObj && window.pythonObject) {{
                                     for (let key in window) {{
-                                        if (window[key] && window[key].series) {{
-                                            chartObj = window[key];
-                                            break;
-                                        }}
+                                        try {{
+                                            if (window[key] && window[key].series) {{
+                                                chartObj = window[key];
+                                                break;
+                                            }}
+                                        }} catch(e){{}}
                                     }}
                                 }}
                                 if (!chartObj || !chartObj.series) return;
@@ -2951,24 +2992,32 @@ class MainWindow(QtWidgets.QMainWindow):
                         break
             
             if user_info is None:
-                # Không có trong hệ thống -> Đóng ngay lập tức
-                sys.exit(0)
-                
+                QtWidgets.QMessageBox.warning(self, "⚠️ Không tìm thấy tài khoản",
+                    "Tài khoản của bạn không tồn tại trong hệ thống.\n"
+                    "Vui lòng liên hệ Admin TLS1 để được hỗ trợ.")
+                self.force_logout_to_login()
+                return
+                    
             status = user_info.get('status', 'ON')
             
             if status == 'LOCK':
-                # Bị khóa -> Đóng ngay lập tức
-                sys.exit(0)
-                
+                QtWidgets.QMessageBox.warning(self, "🔒 Tài Khoản Bị Khóa",
+                    "Tài khoản của bạn đã bị khóa.\n"
+                    "Vui lòng liên hệ Admin TLS1 để được hỗ trợ.")
+                self.force_logout_to_login()
+                return
+                    
             if status == 'PENDING 24H':
-                # Chờ xử lý -> Cảnh báo nhân đạo 24h
                 self.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")
                 return
 
             registered_hwid = user_info.get('hwid', '')
             if registered_hwid and registered_hwid != "None" and registered_hwid != get_hwid():
-                # Xóa HWID hoặc đổi máy -> Đóng ngay lập tức
-                sys.exit(0)
+                QtWidgets.QMessageBox.warning(self, "⚠️ Mã Máy Không Khớp",
+                    "Mã máy hiện tại không khớp với tài khoản đã đăng ký.\n"
+                    "Nếu bạn vừa đổi máy, vui lòng liên hệ Admin TLS1 để cập nhật mã máy.")
+                self.force_logout_to_login()
+                return
 
         except Exception:
             pass
@@ -2995,9 +3044,40 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, 'license_check_timer'):
             self.license_check_timer.stop()
             
-        # Hẹn giờ 24h (86,400,000 ms) sau thoát app
-        QtCore.QTimer.singleShot(86400000, lambda: sys.exit(0))
+        # Hẹn giờ 24h (86,400,000 ms) sau đó restart về màn hình đăng nhập
+        QtCore.QTimer.singleShot(86400000, self.force_logout_to_login)
 
+    def force_logout_to_login(self, reason=""):
+        """Dừng bot, dọn dẹp và restart về màn hình đăng nhập (không hỏi xác nhận)."""
+        # Dừng bộ định giờ license check để tránh gọi lại
+        if hasattr(self, 'license_check_timer'):
+            self.license_check_timer.stop()
+        # Dọn dẹp presence
+        if hasattr(self, 'presence_manager'):
+            try:
+                self.presence_manager.unregister()
+                self.presence_manager.stop()
+                self.presence_manager.wait(1000)
+            except: pass
+        # Restart app (subprocess.Popen mời + đóng cửa sổ hiện tại)
+        import subprocess
+        env = os.environ.copy()
+        env.pop("_MEIPASS2", None)
+        kwargs = {}
+        if sys.platform == 'win32':
+            kwargs['creationflags'] = 0x00000008
+            kwargs['close_fds'] = True
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable] + sys.argv[1:], env=env, **kwargs)
+        else:
+            subprocess.Popen([sys.executable] + sys.argv, env=env, **kwargs)
+        sys.exit(0)
+
+    def handle_logout(self):
+        play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
+        reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.force_logout_to_login()
 
     def update_tab_icons(self, index):
         for i in range(self.bot_tabs.count()):
@@ -3025,8 +3105,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def set_welcome_name(self, name):
         self.lbl_main_welcome.setText(f" Chúc sếp \"{name}\" giao dịch thuận lợi ")
-        self.lbl_main_welcome.show()
-        self.btn_main_logout.show()
+        self.lbl_main_welcome.hide()  # Tạm thời ẩn đi theo yêu cầu
         for i in range(self.bot_tabs.count()):
             widget = self.bot_tabs.widget(i)
             if hasattr(widget, 'set_welcome_name'):
@@ -3134,9 +3213,8 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("Phát hành bởi: Cộng đồng TRADER LÀ SỐ 1 - VIỆT NAM")
+        title = QtWidgets.QLabel("<span style='color: white;'>Phát hành bởi:</span> <span style='color: #FF9900;'>Cộng đồng TRADER LÀ SỐ 1 - VIỆT NAM</span>")
         title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
-        title.setStyleSheet("color: #FF9900;")
         header_layout.addWidget(title)
         
         header_layout.addStretch()
@@ -3145,42 +3223,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lbl_main_welcome.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold; font-style: italic; margin-right: 15px;")
         self.lbl_main_welcome.hide()
         
-        self.btn_main_logout = QtWidgets.QPushButton("Đăng Xuất")
-        self.btn_main_logout.setStyleSheet("""
-            QPushButton {
-                background-color: #333333; color: white; border-radius: 4px; padding: 5px 15px; font-size: 13px; font-weight: bold; margin-right: 10px;
-            }
-            QPushButton:hover { background-color: #ff3333; }
-        """)
-        self.btn_main_logout.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.btn_main_logout.hide()
-        
-        def on_main_logout():
-            play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
-            reply = QtWidgets.QMessageBox.question(self, 'Xác nhận', 'Bạn có chắc chắn muốn đăng xuất?', QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
-            if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-                # Dọn dẹp presence trước khi đăng xuất
-                if hasattr(self, 'presence_manager'):
-                    self.presence_manager.unregister()
-                    self.presence_manager.stop()
-                    self.presence_manager.wait(2000)
-                import sys, subprocess, os
-                self.close()
-                env = os.environ.copy()
-                env.pop("_MEIPASS2", None)
-                kwargs = {}
-                if sys.platform == 'win32':
-                    kwargs['creationflags'] = 0x00000008
-                    kwargs['close_fds'] = True
-                if getattr(sys, 'frozen', False):
-                    subprocess.Popen([sys.executable] + sys.argv[1:], env=env, **kwargs)
-                else:
-                    subprocess.Popen([sys.executable] + sys.argv, env=env, **kwargs)
-                sys.exit(0)
-                
-        self.btn_main_logout.clicked.connect(on_main_logout)
-        
-
         self.btn_update = QtWidgets.QPushButton("⏳ Đang kiểm tra cập nhật...")
         self.btn_update.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
@@ -3238,7 +3280,9 @@ class MainWindow(QtWidgets.QMainWindow):
         
         header_layout.addWidget(self.lbl_online_count)
         header_layout.addWidget(self.btn_update)
-        header_layout.addWidget(self.btn_main_logout)
+        # Nút Cộng Đồng sẽ được add trực tiếp sau khi panel_main khởi tạo
+        # btn_main_logout KHÔNG add vào layout (ẩn hoàn toàn), chỉ giữ trong memory để xử lý đăng xuất
+        self._header_layout = header_layout   # lưu lại để wire sau
 
         # Removed duplicate btn_update
         main_layout.addLayout(header_layout)
@@ -3261,6 +3305,16 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)
         
         self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")
+        
+        # Add nút Cộng Đồng thẳng vào header (thay hẳn Đăng Xuất)
+        if hasattr(self, '_header_layout') and hasattr(self.panel_main, 'btn_open_community'):
+            btn_com = self.panel_main.btn_open_community
+            btn_com.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
+            btn_com.setStyleSheet("""
+                QPushButton { background-color: #333333; color: #ffffff; border-radius: 4px; padding: 5px 15px; font-size: 13px; font-weight: bold; margin-right: 10px; }
+                QPushButton:hover { background-color: #00b8d4; color: #000000; }
+            """)
+            self._header_layout.addWidget(btn_com)
         
         self.bot_tabs.currentChanged.connect(self.update_tab_icons)
         self.update_tab_icons(0)
@@ -3325,13 +3379,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_update.setEnabled(True)
             self.remote_update_data = remote_data
         elif has_update is False:
-            self.btn_update.setText(f"✅ Bản mới nhất (v{APP_VERSION})")
-            self.btn_update.setStyleSheet("background-color: #333333; color: #aaaaaa; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
-            self.btn_update.setEnabled(False)
+            # Đã là bản mới nhất → ẩn nút đi, không chiếm diện tích
+            self.btn_update.setVisible(False)
         else:
-            self.btn_update.setText("❌ Lỗi kiểm tra cập nhật")
-            self.btn_update.setStyleSheet("background-color: #333333; color: gray; border-radius: 4px; padding: 5px 15px; font-weight: bold; font-size: 13px; margin-right: 10px;")
-            self.btn_update.setEnabled(False)
+            # Lỗi kiểm tra → ẩn luôn, không cần hiện thông báo lỗi trên giao diện
+            self.btn_update.setVisible(False)
 
     def run_update_app(self):
         # 💡 Hộp thoại nhắc nhở nhẹ nhàng trước khi cập nhật
@@ -3480,6 +3532,7 @@ del /f /q "%~f0"
             color: {color}; 
             font-size: 12px; 
             font-weight: bold; 
+            font-family: 'Segoe UI Emoji', 'Segoe UI', 'Arial', sans-serif;
             background: transparent;
             border: none;
             padding: 3px 10px;
@@ -4467,16 +4520,64 @@ def main():
 
     window = MainWindow()
     
-    blur_effect = QtWidgets.QGraphicsBlurEffect()
-    blur_effect.setBlurRadius(5)
-    window.setGraphicsEffect(blur_effect)
-    
     window.show()
 
     def show_login():
+        # 1. Blur WebEngineView qua CSS an toàn
+        for i in range(window.bot_tabs.count()):
+            widget = window.bot_tabs.widget(i)
+            if hasattr(widget, 'chart_widget'):
+                try: widget.chart_widget.run_script("document.body.style.filter = 'blur(5px)';")
+                except: pass
+                
+        # 2. Chụp giao diện hiện tại
+        screen = window.screen()
+        pixmap = screen.grabWindow(window.winId())
+        
+        # 3. Xử lý Blur toàn cục trên QGraphicsScene
+        scene = QtWidgets.QGraphicsScene()
+        item = QtWidgets.QGraphicsPixmapItem(pixmap)
+        blur = QtWidgets.QGraphicsBlurEffect()
+        blur.setBlurRadius(5)
+        item.setGraphicsEffect(blur)
+        scene.addItem(item)
+        
+        blurred = QtGui.QPixmap(pixmap.size())
+        blurred.fill(QtCore.Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(blurred)
+        scene.render(painter)
+        
+        # 4. Đục lỗ (xóa) phần của biểu đồ để lộ WebEngineView bên dưới (đã blur CSS)
+        painter.setCompositionMode(QtGui.QPainter.CompositionMode.CompositionMode_Clear)
+        for i in range(window.bot_tabs.count()):
+            widget = window.bot_tabs.widget(i)
+            if hasattr(widget, 'chart_widget'):
+                try:
+                    webview = widget.chart_widget.get_webview()
+                    if webview.isVisible():
+                        pos = webview.mapTo(window, QtCore.QPoint(0, 0))
+                        hole = QtCore.QRect(pos, webview.size())
+                        painter.fillRect(hole, QtCore.Qt.GlobalColor.transparent)
+                except: pass
+        painter.end()
+        
+        overlay = QtWidgets.QLabel(window)
+        overlay.setGeometry(window.rect())
+        overlay.setPixmap(blurred)
+        overlay.show()
+        
         login = LoginDialog(window)
         if login.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            window.setGraphicsEffect(None)
+            overlay.hide()
+            overlay.deleteLater()
+            
+            # Xóa blur CSS cho WebEngineView
+            for i in range(window.bot_tabs.count()):
+                widget = window.bot_tabs.widget(i)
+                if hasattr(widget, 'chart_widget'):
+                    try: widget.chart_widget.run_script("document.body.style.filter = 'none';")
+                    except: pass
+                    
             QtWidgets.QApplication.processEvents()
             
             if hasattr(login, 'logged_in_name'):
