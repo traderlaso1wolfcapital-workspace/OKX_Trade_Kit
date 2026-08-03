@@ -136,7 +136,7 @@ def replay_history(
                 ob = find_order_block(
                     sub_ph, sub_pl, sub_t,
                     pivot_used.bar_index, i, sbias, "SWING",
-                    highs=sub_h, lows=sub_l
+                    highs=sub_h, lows=sub_l, opens=sub_o, closes=sub_c
                 )
                 if ob:
                     add_ob_and_merge(tracker.swing_obs, ob)
@@ -172,7 +172,7 @@ def replay_history(
                 ob = find_order_block(
                     sub_ph, sub_pl, sub_t,
                     pivot_used.bar_index, i, ibias, "INTERNAL",
-                    highs=sub_h, lows=sub_l
+                    highs=sub_h, lows=sub_l, opens=sub_o, closes=sub_c
                 )
                 if ob:
                     add_ob_and_merge(tracker.internal_obs, ob)
@@ -232,6 +232,8 @@ def replay_history_m30(
         sub_t = times[:i + 1]
         sub_ph = parsed_highs[:i + 1]
         sub_pl = parsed_lows[:i + 1]
+        sub_o = opens[:i + 1]
+        sub_c = closes[:i + 1]
 
         c = closes[i]
         h = highs[i]
@@ -259,7 +261,7 @@ def replay_history_m30(
                 ob = find_order_block(
                     sub_ph, sub_pl, sub_t,
                     pivot_used.bar_index, i, sbias, "SWING",
-                    highs=sub_h, lows=sub_l
+                    highs=sub_h, lows=sub_l, opens=sub_o, closes=sub_c
                 )
                 if ob:
                     add_ob_and_merge(tracker.m30_swing_obs, ob)
@@ -606,7 +608,7 @@ def run_strategy_cycle(
                 pivot_used = tracker.swing_low if sbias == BULLISH else tracker.swing_high
                 if SMC_SWING_OB:
                     ob = find_order_block(sub_ph, sub_pl, sub_t, pivot_used.bar_index, i, sbias, "SWING",
-                                          highs=sub_h, lows=sub_l)
+                                          highs=sub_h, lows=sub_l, opens=sub_o, closes=sub_c)
                     if ob:
                         is_merged = add_ob_and_merge(tracker.swing_obs, ob)
                         # 1 OB -> 1 Setup theo bias, RR linh hoạt theo swing_trend
@@ -642,7 +644,7 @@ def run_strategy_cycle(
                 pivot_used = tracker.internal_low if ibias == BULLISH else tracker.internal_high
                 if SMC_INT_OB:
                     ob = find_order_block(sub_ph, sub_pl, sub_t, pivot_used.bar_index, i, ibias, "INTERNAL",
-                                          highs=sub_h, lows=sub_l)
+                                          highs=sub_h, lows=sub_l, opens=sub_o, closes=sub_c)
                     if ob:
                         is_merged = add_ob_and_merge(tracker.internal_obs, ob)
                         # ⚡ Cho phép Internal OB tạo setup nếu ngược trend
@@ -947,3 +949,4 @@ def _sync_save_mtf_states_sub2(swap_id: str, data: dict, mtf_file: str):
     except: pass
 
 # z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge) để tránh bị rối trên chart
+# z1950 | Update: Truyền tham số opens, closes vào find_order_block để sửa lỗi tính sai vùng OB theo SMC

@@ -151,9 +151,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.248")
+            return json.load(f).get("version", "1.0.271")
     except:
-        return "1.0.248"
+        return "1.0.271"
 
 APP_VERSION = get_app_version()
 
@@ -1284,11 +1284,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             # Polyfill chống lỗi undefined object khi load JS asynchronously
             self.chart_widget.run_script(f"""
                 if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
-                if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
                 
                 if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
             """)
             
             # Khởi chạy luồng lấy dữ liệu chart auto
@@ -2723,11 +2723,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         # Polyfill chống lỗi undefined object khi load JS asynchronously
                         self.chart_widget.run_script(f"""
                             if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                            if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
-                            if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
                             
                             if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                            if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                            if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
                         """)
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
@@ -2782,7 +2782,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         js_code = f"""
                         (function() {{
                             try {{
-                                let chartObj = window['{self.chart_widget.id}'] || window.{self.chart_widget.id};
+                                let chartObj = window['{self.chart_widget.id}'];
                                 if (!chartObj && window.pythonObject) {{
                                     for (let key in window) {{
                                         try {{
@@ -2842,7 +2842,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         const h = Math.max(botY - topY, 4);
                                         const isBull = (ob.bias === 1);
 
-                                        let startX = 50;
+                                        let startX = null;
                                         if (chart && chart.timeScale && ob.time && ob.time > 0) {{
                                             try {{
                                                 const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
@@ -2853,16 +2853,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             }} catch(e) {{}}
                                         }}
 
+                                        // Nếu không lấy được toạ độ hợp lệ (null), hoặc OB nằm ngoài màn hình bên trái quá xa
+                                        if (startX === null || startX < -1000) return;
+                                        
                                         // Nếu OB ở quá xa về bên phải so với cột giá thì không vẽ
                                         if (startX >= maxRightX) return;
-                                        
-                                        // Ẩn nếu OB nằm ngoài màn hình bên trái quá xa
-                                        if (startX < -1000) return;
 
                                         const boxWidth = maxRightX - startX;
                                         if (boxWidth <= 0) return;
 
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.38)' : 'rgba(198, 40, 40, 0.38)';
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.10)' : 'rgba(198, 40, 40, 0.10)';
 
                                         const box = document.createElement('div');
                                         box.style.position = 'absolute';
@@ -4762,3 +4762,4 @@ if __name__ == "__main__":
 
 # z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json
 # z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
+# z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
