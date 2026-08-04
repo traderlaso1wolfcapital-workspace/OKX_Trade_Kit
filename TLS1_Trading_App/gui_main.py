@@ -1401,21 +1401,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def close_position(self, inst_id, mgn_mode, pos_side):
         """Đóng vị thế trên OKX bằng Market Order thông qua API."""
-        reply = QtWidgets.QMessageBox.question(
-            self, "Xác nhận đóng lệnh",
-            f"Bạn chắc chắn muốn ĐÓNG vị thế {inst_id} ({pos_side})?\nLệnh Market sẽ được gửi ngay lập tức.",
-            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
-            QtWidgets.QMessageBox.StandardButton.No
-        )
-        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
-            return
-        
         try:
             if not hasattr(self, 'pos_worker') or not self.pos_worker.api_key:
                 QtWidgets.QMessageBox.warning(self, "Lỗi", "Chưa có API key. Vui lòng chọn tài khoản trước.")
                 return
             
-            import json, urllib.request
+            import json, requests
             base_url = "https://www.okx.com"
             path = "/api/v5/trade/close-position"
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
@@ -1438,18 +1429,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "OK-ACCESS-TIMESTAMP": ts,
                 "OK-ACCESS-PASSPHRASE": self.pos_worker.passphrase,
                 "Content-Type": "application/json",
-                "x-simulated-trading": "1" if self.pos_worker.demo_mode else "0"
+                "x-simulated-trading": "1" if self.pos_worker.demo_mode else "0",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
             }
             
-            req = urllib.request.Request(base_url + path, data=body.encode('utf-8'), headers=headers, method='POST')
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                result = json.loads(resp.read().decode())
-            
-            if result.get("code") == "0":
-                QtWidgets.QMessageBox.information(self, "Thành công", f"Đã gửi lệnh đóng vị thế {inst_id} thành công!")
+            resp = requests.post(base_url + path, data=body.encode('utf-8'), headers=headers, timeout=10)
+            if resp.status_code == 200:
+                result = resp.json()
+                if result.get("code") == "0":
+                    pass # Im lặng đóng lệnh thành công, không hiện popup
+                else:
+                    err_msg = result.get("msg", "Không rõ")
+                    QtWidgets.QMessageBox.warning(self, "Lỗi từ OKX", f"Không thể đóng lệnh: {err_msg}")
             else:
-                err_msg = result.get("msg", "Không rõ")
-                QtWidgets.QMessageBox.warning(self, "Lỗi từ OKX", f"Không thể đóng lệnh: {err_msg}")
+                try:
+                    err_json = resp.json()
+                    err_msg = err_json.get("msg", resp.text)
+                except:
+                    err_msg = resp.text
+                QtWidgets.QMessageBox.critical(self, "Lỗi HTTP", f"Lỗi {resp.status_code}: {err_msg}")
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Lỗi hệ thống", f"Lỗi khi đóng lệnh: {e}")
         

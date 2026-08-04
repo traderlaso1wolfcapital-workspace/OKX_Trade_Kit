@@ -19,6 +19,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Sửa lỗi HTTP 403 Forbidden và loại bỏ hộp thoại xác nhận khi Đóng Lệnh (Quick Close):
+  - **Nguyên nhân:** OKX/Cloudflare chặn thư viện `urllib.request` mặc định của Python do thiếu header User-Agent chuẩn (gây lỗi 403). Đồng thời, thao tác phải ấn "Yes" để đóng lệnh làm chậm trễ quá trình xử lý lệnh gấp.
+  - **Cập nhật:** Chuyển đổi hàm `close_position()` trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) sang sử dụng thư viện `requests` kèm `User-Agent: Mozilla/5.0` để vượt qua bộ lọc WAF. Đặc biệt, đã xóa bỏ hoàn toàn bảng cảnh báo `Bạn chắc chắn muốn ĐÓNG vị thế...` và thông báo thành công. Giờ đây, chỉ cần 1 click vào nút Đóng, lệnh Market sẽ lập tức đẩy thẳng lên sàn OKX để ép đóng vị thế không độ trễ (1-Click Close). (Mã patch: `z278`)
+
 - **[05/08/2026]** - Thu nhỏ font chữ phần trạng thái Long/Short ở Cột Cặp giao dịch:
   - **Cập nhật:** Đã chỉnh sửa định dạng hiển thị ở Cột 0 (Cặp giao dịch) trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Cụ thể, khi có lệnh đang chạy (vd: `BTC-USDT (Long 100x)`), phần hậu tố `(Long 100x)` sẽ được bọc vào thẻ `<span>` với `font-size: 12px;`, nhỏ hơn 2px so với phần chữ chính `BTC-USDT` (14px). Giúp chữ gọn gàng và phân cấp thông tin tốt hơn. (Mã patch: `z277`)
 
