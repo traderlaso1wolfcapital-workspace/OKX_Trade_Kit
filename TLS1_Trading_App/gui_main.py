@@ -1409,6 +1409,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
             return
+            
+        self._current_positions = positions
 
         def _safe_float(val):
             try:
@@ -2849,14 +2851,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
                         self.chart_widget.run_script(f"""
-                            try {{
-                                let cw = window['{self.chart_widget.id}'];
-                                if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
-                                    cw.series.setMarkers = function(m) {{
-                                        try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
-                                    }};
-                                }}
-                            }} catch(e) {{}}
+                            setInterval(function() {{
+                                try {{
+                                    let cw = window['{self.chart_widget.id}'];
+                                    if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
+                                        cw.series.setMarkers = function(m) {{
+                                            try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
+                                        }};
+                                    }}
+                                }} catch(e) {{}}
+                            }}, 1000);
                         """)
                         self._chart_initialized = True
                         self.chart_widget.spinner(False)
@@ -2980,7 +2984,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         const boxWidth = maxRightX - startX;
                                         if (boxWidth <= 0) return;
 
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.10)' : 'rgba(198, 40, 40, 0.10)';
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.35)' : 'rgba(198, 40, 40, 0.35)';
 
                                         const box = document.createElement('div');
                                         box.style.position = 'absolute';
@@ -3012,6 +3016,70 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         try:
                             self.chart_widget.run_script(js_code)
                         except Exception:
+                            pass
+                            
+                        # Vẽ Price Lines cho ENTRY, TP, SL
+                        try:
+                            if getattr(self, 'show_chart_pos_lines', True):
+                                current_coin = self.combo_coin.currentData()
+                                chart_positions = []
+                                if hasattr(self, '_current_positions'):
+                                    for pos in self._current_positions:
+                                        if pos.get("instId") == current_coin:
+                                            try:
+                                                if float(pos.get("pos", 0)) != 0:
+                                                    entry_px = float(pos.get("avgPx", 0))
+                                                    tp_list = [float(x) for x in pos.get("tp_list", []) if x]
+                                                    sl_list = [float(x) for x in pos.get("sl_list", []) if x]
+                                                    chart_positions.append({
+                                                        "entry": entry_px,
+                                                        "tp_list": tp_list,
+                                                        "sl_list": sl_list
+                                                    })
+                                            except: pass
+                                
+                                import hashlib
+                                pos_str = json.dumps(chart_positions)
+                                pos_hash = hashlib.md5(pos_str.encode()).hexdigest()
+                                
+                                if getattr(self, '_last_pos_lines_hash', None) != pos_hash:
+                                    js_lines = f"""
+                                    (function() {{
+                                        try {{
+                                            let chartObj = window['{self.chart_widget.id}'];
+                                            if (!chartObj && window.pythonObject) {{
+                                                for (let key in window) {{
+                                                    try {{
+                                                        if (window[key] && window[key].series) {{ chartObj = window[key]; break; }}
+                                                    }} catch(e){{}}
+                                                }}
+                                            }}
+                                            if (!chartObj || !chartObj.series) return;
+                                            const series = chartObj.series;
+                                            
+                                            if (window._my_price_lines) {{
+                                                window._my_price_lines.forEach(l => {{ try {{ series.removePriceLine(l); }} catch(e){{}} }});
+                                            }}
+                                            window._my_price_lines = [];
+                                            
+                                            const positions = {json.dumps(chart_positions)};
+                                            positions.forEach(p => {{
+                                                if (p.entry) {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#00B894', lineStyle: 2, lineWidth: 2, title: 'ENTRY' }}));
+                                                }}
+                                                p.tp_list.forEach(tp => {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 2, title: 'TP' }}));
+                                                }});
+                                                p.sl_list.forEach(sl => {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 2, title: 'SL' }}));
+                                                }});
+                                            }});
+                                        }} catch(err) {{}}
+                                    }})();
+                                    """
+                                    self.chart_widget.run_script(js_lines)
+                                    self._last_pos_lines_hash = pos_hash
+                        except Exception as e:
                             pass
             except Exception as e:
                 import traceback
@@ -4877,3 +4945,5 @@ if __name__ == "__main__":
 # z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
 # z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
 # z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
+# z244 | Update: Sửa hiển thị OB (tăng opacity lên 35%), thêm vẽ đường kẻ Entry, TP, SL lên chart.
+
