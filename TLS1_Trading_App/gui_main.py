@@ -1533,7 +1533,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if is_active:
                 lever = pos.get("lever", "")
                 side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
-                instId_text = f"{instId} ({side} {lever}x)"
+                instId_text = f"{instId} <span style='font-size: 12px;'>({side} {lever}x)</span>"
             else:
                 instId_text = instId
 

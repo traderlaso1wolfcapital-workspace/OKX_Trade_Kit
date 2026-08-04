@@ -19,6 +19,9 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Thu nhỏ font chữ phần trạng thái Long/Short ở Cột Cặp giao dịch:
+  - **Cập nhật:** Đã chỉnh sửa định dạng hiển thị ở Cột 0 (Cặp giao dịch) trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Cụ thể, khi có lệnh đang chạy (vd: `BTC-USDT (Long 100x)`), phần hậu tố `(Long 100x)` sẽ được bọc vào thẻ `<span>` với `font-size: 12px;`, nhỏ hơn 2px so với phần chữ chính `BTC-USDT` (14px). Giúp chữ gọn gàng và phân cấp thông tin tốt hơn. (Mã patch: `z277`)
+
 - **[05/08/2026]** - Sửa lỗi đen xì màn hình Chart (QWebEngineView) trên bản APP máy khách:
   - **Nguyên nhân:** Khi đóng gói bằng PyInstaller, thành phần WebEngine của PyQt6 thiếu tương thích với GPU/Driver đồ họa trên một số cấu hình máy khách, dẫn đến không thể render biểu đồ và xuất hiện màn hình đen.
   - **Cập nhật:** Đã chèn thêm các cờ `sys.argv.append("--disable-gpu")`, `--disable-software-rasterizer` và thiết lập biến môi trường `QTWEBENGINE_CHROMIUM_FLAGS` trong `gui_main.py` ngay trước khi khởi tạo `QApplication`. Điều này ép WebEngine sử dụng Software Rendering thay cho GPU, khắc phục triệt để lỗi đen màn hình trên tất cả các máy tính. (Mã patch: `z276`)
