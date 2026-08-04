@@ -201,22 +201,8 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
         lines_desc = []
         is_coin_enabled = (coin in enabled_coins)
         
-        # --- A. Lệnh ĐÃ KHỚP (Triggered Setups) ĐƯA LÊN ĐẦU TIÊN ---
-        triggered = [s for s in tracker.trade_setups if s.triggered]
-        if triggered:
-            trig_internal = [s for s in triggered if s.ob_source == "INTERNAL"]
-            trig_swing = [s for s in triggered if s.ob_source == "SWING"]
-            
-            for src_name, group_list in [("Internal", trig_internal), ("Swing", trig_swing)]:
-                if not group_list: continue
-                for side_val, side_str in [(BULLISH, "LONG"), (BEARISH, "SHORT")]:
-                    sub_setups = [s for s in group_list if s.bias == side_val]
-                    if not sub_setups: continue
-                    prices = " - ".join([f"{float(s.entry_price):,.2f}" for s in sub_setups])
-                    vol_val = (50.0 if src_name == "Internal" else 100.0) * len(sub_setups)
-                    roi = float(tracker.max_roi_long) if side_str == "LONG" else float(tracker.max_roi_short)
-                    mae = float(tracker.mae_max_pct_long) if side_str == "LONG" else float(tracker.mae_max_pct_short)
-                    lines_desc.append(f"Đã khớp {side_str} ({src_name}) {prices} = {vol_val:.0f} U → ROI ({roi:+.1f}% / -{mae:.1f}%)")
+        # --- A. Lệnh ĐÃ KHỚP (Triggered Setups) ---
+        # Bỏ qua in chi tiết vì đã có trên bảng Dashboard của GUI
 
         # --- B. Lệnh CHỜ KHỚP (Pending Setups) ĐƯA BÊN DƯỚI (CHỈ HỆN KHI COIN ĐƯỢC TÍCH MỞ) ---
         if is_coin_enabled:
@@ -259,24 +245,6 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
         for l in lines:
             print(l)
     
-    # 5. ☯ LỊCH SỬ LỆNH VỪA ĐÓNG:
-    print("\n☯ Lịch sử lệnh vừa đóng:")
-    has_closed = False
-    for symbol, tracker in sorted_trackers.items():
-        coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
-        closed_list = getattr(tracker, "closed_history", [])
-        if closed_list:
-            has_closed = True
-            for entry in reversed(closed_list[-3:]):
-                pnl_val = entry.get("pnl", 0.0)
-                roi_val = entry.get("roi", 0.0)
-                pnl_str = f"Lời +{pnl_val:.2f}$" if pnl_val >= 0 else f"Lỗ {pnl_val:.2f}$"
-                side = entry.get("side", "LONG")
-                dca_str = f" cụm DCA [{entry['dca']}]" if entry.get("dca") else ""
-                print(f"  ✧ · [{coin}]: Đã đóng {side} ({roi_val:+.1f}%){dca_str} → {pnl_str}")
-    
-    if not has_closed:
-        print("  · Chưa có lệnh nào được đóng trong phiên này.")
     print("=" * 78 + "\n")
 # z7713 | Thiết kế lại bảng COIN: OB ZONE, LONG @, SHORT @, STATUS
 # z7716 | Dashboard mới: OB ZONE LONG / OB ZONE SHORT với hiển thị RR. Bỏ cột LONG @ / SHORT @.

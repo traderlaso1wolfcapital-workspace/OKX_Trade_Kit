@@ -536,6 +536,7 @@ class LiveChartWorker(QtCore.QThread):
                                                 merged.append(o)
                                     ob_boxes.extend(merged)
                                 chart_data["ob_boxes"] = ob_boxes
+                                print(f"DEBUG: Found {len(ob_boxes)} OBs for {self.inst_id}")
                                 
                                 # Add trade setups as markers
                                 if "markers" not in chart_data:
@@ -1651,6 +1652,43 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def setup_tab_community(self):
         layout = QtWidgets.QVBoxLayout(self.tab_community)
         layout.setContentsMargins(10, 10, 10, 10)
+
+        def get_media_path(img_name):
+            import sys, os
+            if getattr(sys, 'frozen', False):
+                return os.path.join(sys._MEIPASS, "media", img_name)
+            p1 = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media", img_name)
+            if os.path.exists(p1): return p1
+            return os.path.join(os.path.dirname(__file__), "media", img_name)
+
+        btn_discord = QtWidgets.QPushButton()
+        btn_discord.setIcon(QtGui.QIcon(get_media_path("Discord.png")))
+        btn_discord.setIconSize(QtCore.QSize(28, 28))
+        btn_discord.setStyleSheet("background: transparent; border: none; margin-right: -10px;")
+        btn_discord.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        try: btn_discord.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
+        except: pass
+        btn_discord.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://discord.gg/cS4QXJTpnb")))
+        self.discord_hover = ButtonHoverSoundFilter(btn_discord)
+        btn_discord.installEventFilter(self.discord_hover)
+        
+        btn_telegram = QtWidgets.QPushButton()
+        btn_telegram.setIcon(QtGui.QIcon(get_media_path("Telegram.png")))
+        btn_telegram.setIconSize(QtCore.QSize(28, 28))
+        btn_telegram.setStyleSheet("background: transparent; border: none;")
+        btn_telegram.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        try: btn_telegram.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
+        except: pass
+        btn_telegram.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://t.me/traderlaso1")))
+        self.telegram_hover = ButtonHoverSoundFilter(btn_telegram)
+        btn_telegram.installEventFilter(self.telegram_hover)
+        
+        social_layout = QtWidgets.QHBoxLayout()
+        social_layout.addWidget(btn_discord)
+        social_layout.addWidget(btn_telegram)
+        social_layout.addStretch()
+        layout.addLayout(social_layout)
+
         
         title = QtWidgets.QLabel("💬 Cộng đồng TRADER LÀ SỐ 1 - Realtime Chat")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffb74d;")
@@ -1826,7 +1864,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_light_mode = QtWidgets.QCheckBox("Light Mode (Giao diện sáng)")
         self.chk_light_mode.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
-        self.chk_light_mode.stateChanged.connect(self.toggle_theme)
+        # self.chk_light_mode.stateChanged.connect(self.toggle_theme)
         
         lbl_logo = QtWidgets.QLabel()
         lbl_logo.setText("Logo TLS1")
@@ -1861,6 +1899,26 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins.addWidget(self.chk_cfg_btc)
         l_active_coins.addWidget(self.chk_cfg_eth)
         layout.addWidget(grp_active_coins)
+
+                # 0.2. KHUNG THỜI GIAN GIAO DỊCH
+        grp_tfs = QtWidgets.QGroupBox("Khung Thời Gian Giao Dịch")
+        grp_tfs.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_tfs = QtWidgets.QHBoxLayout(grp_tfs)
+        
+        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style)
+        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style)
+        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style)
+        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style)
+        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style)
+        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style)
+        
+        l_tfs.addWidget(self.chk_tf_m5)
+        l_tfs.addWidget(self.chk_tf_m15)
+        l_tfs.addWidget(self.chk_tf_m30)
+        l_tfs.addWidget(self.chk_tf_h1)
+        l_tfs.addWidget(self.chk_tf_h2)
+        l_tfs.addWidget(self.chk_tf_h4)
+        layout.addWidget(grp_tfs)
 
         # 1. CÔNG TẮC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Công Tắc Chiến Thuật")
@@ -2032,7 +2090,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.smc_chk_light_mode = QtWidgets.QCheckBox("Light Mode (Giao diện sáng)")
         self.smc_chk_light_mode.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
-        self.smc_chk_light_mode.stateChanged.connect(self.toggle_theme)
+        # self.smc_chk_light_mode.stateChanged.connect(self.toggle_theme)
         
         lbl_logo_smc = QtWidgets.QLabel()
         lbl_logo_smc.setText("Logo TLS1")
@@ -2279,6 +2337,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     pass
                 return
 
+            
+            enabled_tfs = cfg.get("ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+            if hasattr(self, 'chk_tf_m5'): self.chk_tf_m5.setChecked("M5" in enabled_tfs)
+            if hasattr(self, 'chk_tf_m15'): self.chk_tf_m15.setChecked("M15" in enabled_tfs)
+            if hasattr(self, 'chk_tf_m30'): self.chk_tf_m30.setChecked("M30" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h1'): self.chk_tf_h1.setChecked("H1" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h2'): self.chk_tf_h2.setChecked("H2" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h4'): self.chk_tf_h4.setChecked("H4" in enabled_tfs)
+            
             self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
             self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
             self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
@@ -2564,6 +2631,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             cfg.update({
                 "ENABLED_COINS": enabled,
                 "RESET_CONFIG_V23": True,
+                
+                "ENABLED_TFS": [tf for tf, chk in [("M5", getattr(self, 'chk_tf_m5', None)), 
+                                                   ("M15", getattr(self, 'chk_tf_m15', None)), 
+                                                   ("M30", getattr(self, 'chk_tf_m30', None)), 
+                                                   ("H1", getattr(self, 'chk_tf_h1', None)), 
+                                                   ("H2", getattr(self, 'chk_tf_h2', None)), 
+                                                   ("H4", getattr(self, 'chk_tf_h4', None))] if chk and chk.isChecked()],
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
@@ -2896,8 +2970,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             }} catch(e) {{}}
                                         }}
 
-                                        // Nếu không lấy được toạ độ hợp lệ (null), hoặc OB nằm ngoài màn hình bên trái quá xa
-                                        if (startX === null || startX < -1000) return;
+                                        // Nếu không lấy được toạ độ hợp lệ (null) thì vẽ từ sát lề trái
+                                        if (startX === null) startX = 0;
+                                        if (startX < -2000) startX = -2000;
                                         
                                         // Nếu OB ở quá xa về bên phải so với cột giá thì không vẽ
                                         if (startX >= maxRightX) return;
@@ -3299,34 +3374,6 @@ class MainWindow(QtWidgets.QMainWindow):
             if os.path.exists(p1):
                 return p1
             return os.path.join(PROJECT_DIR, "TLS1_Trading_App", "media", img_name)
-
-        btn_discord = QtWidgets.QPushButton()
-        btn_discord.setIcon(QtGui.QIcon(get_media_path("Discord.png")))
-        btn_discord.setIconSize(QtCore.QSize(28, 28))
-        btn_discord.setStyleSheet("background: transparent; border: none; margin-right: -10px;")
-        btn_discord.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_discord.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
-        btn_discord.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://discord.gg/cS4QXJTpnb")))
-        self.discord_hover = ButtonHoverSoundFilter(btn_discord)
-        btn_discord.installEventFilter(self.discord_hover)
-        # Add to social_layout later
-        
-        btn_telegram = QtWidgets.QPushButton()
-        btn_telegram.setIcon(QtGui.QIcon(get_media_path("Telegram.png")))
-        btn_telegram.setIconSize(QtCore.QSize(28, 28))
-        btn_telegram.setStyleSheet("background: transparent; border: none;")
-        btn_telegram.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_telegram.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
-        btn_telegram.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://t.me/traderlaso1")))
-        self.telegram_hover = ButtonHoverSoundFilter(btn_telegram)
-        btn_telegram.installEventFilter(self.telegram_hover)
-        
-        social_layout = QtWidgets.QHBoxLayout()
-        social_layout.setSpacing(0)
-        social_layout.addWidget(btn_discord)
-        social_layout.addWidget(btn_telegram)
-        social_layout.setContentsMargins(15, 0, 0, 0)
-        header_layout.insertLayout(1, social_layout)
         # Label hiển thị số người đang online
         self.lbl_online_count = QtWidgets.QLabel("")
         self.lbl_online_count.setStyleSheet("""
@@ -4828,3 +4875,4 @@ if __name__ == "__main__":
 # z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json
 # z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
 # z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
+# z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup

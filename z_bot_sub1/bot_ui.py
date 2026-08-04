@@ -405,66 +405,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         if tk.has_long:
             has_any = True
             icon, mode = _get_mode_icon(tk, "long")
-            mae_lev = tk.mae_max_pct_long * Decimal(str(leverage))
-            entry_px_str = f"{format_with_commas(tk.active_avg_px_long, 1):>8}"
-            sl_px_str = f"{format_with_commas(tk.active_sl_px_long, 1):>8}"
-            filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
-            if filled_tfs:
-                sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
-            else:
-                filled_str = fmt_tf("M5").ljust(18)
-            long_vol = f"{tk.long_pos_vol:.0f} U" if getattr(tk, "long_pos_vol", 0) > 0 else ""
-            long_vol_str = f" = {long_vol.ljust(6)} " if long_vol else " "
-            line_main = f"    {coin_name} ╭─ Đã khớp LONG [{filled_str.strip()}]{long_vol_str.rstrip()}"
-            indent_branch = "        "  # 8 spaces
-            lines = [line_main]
-            
             placed_long_dict = getattr(tk, "placed_entry_px_long_by_tf", {})
-            filled = getattr(tk, "pos_cycle_filled_tfs", [])
-            active_dca_tfs = [tf for tf, px in placed_long_dict.items() if px not in ("---", "ERR") and tf not in filled]
-            has_dca = len(active_dca_tfs) > 0
-            prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
-
-            if active_dca_tfs:
-                active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
-                for i, tf in enumerate(active_dca_tfs_sorted):
-                    prefix = "╰─" if i == len(active_dca_tfs_sorted) - 1 else "├─"
-                    vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}{prefix} Chờ DCA: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
-            pos_lines.append((mode, coin_name, lines))
-        if tk.has_short:
-            has_any = True
-            icon, mode = _get_mode_icon(tk, "short")
-            mae_lev = tk.mae_max_pct_short * Decimal(str(leverage))
-            entry_px_str = f"{format_with_commas(tk.active_avg_px_short, 1):>8}"
-            filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
-            if filled_tfs:
-                sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
-            else:
-                filled_str = fmt_tf("M5").ljust(18)
-            short_vol = f"{tk.short_pos_vol:.0f} U" if getattr(tk, "short_pos_vol", 0) > 0 else ""
-            short_vol_str = f" = {short_vol.ljust(6)} " if short_vol else " "
-            line_main = f"    {coin_name} ╭─ Đã khớp SHORT [{filled_str.strip()}]{short_vol_str.rstrip()}"
-            indent_branch = "        "  # 8 spaces
-            lines = [line_main]
-            
-            placed_short_dict = getattr(tk, "placed_entry_px_short_by_tf", {})
-            filled_short = getattr(tk, "pos_cycle_filled_tfs", [])
-            active_dca_tfs = [tf for tf, px in placed_short_dict.items() if px not in ("---", "ERR") and tf not in filled_short]
-            has_dca = len(active_dca_tfs) > 0
-            prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
-
-            if active_dca_tfs:
-                active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_short_dict[tf]))
-                for i, tf in enumerate(active_dca_tfs_sorted):
-                    prefix = "╰─" if i == len(active_dca_tfs_sorted) - 1 else "├─"
-                    vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}{prefix} Chờ DCA: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
-            pos_lines.append((mode, coin_name, lines))
         # DCA PENDING (có lệnh chờ nhưng chưa có vị thế mở)
         if not tk.has_long and not tk.has_short:
             has_pending = False
@@ -551,51 +492,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         is_first = False
         for line in lines:
             print(line)  # Dùng print thay smart_print để không bị wrap ╭─/╰─
-    print("\n☯ Lịch sử lệnh vừa đóng:")
-    has_closed_history = False
-    for cfg in COIN_PORTFOLIO:
-        sid = cfg["swap"]
-        coin_name = cfg["coin"]
-        if sid not in state_matrix: continue
-        tk = state_matrix[sid]
-        closed_list = getattr(tk, "closed_history", [])
-        if closed_list:
-            has_closed_history = True
-            recent = closed_list[-1:]
-            for entry in reversed(recent):
-                pnl_color = "+" if entry["roi"] > 0 else ""
-                roi_str = f"{pnl_color}{entry['roi']:.1f}%"
-                raw_dca = entry.get('dca_tfs', '')
-                if raw_dca:
-                    clean_dca = " ".join([fmt_tf(t) for t in raw_dca.replace(" + ", " ").split()])
-                    dca_str = f" cụm DCA [{clean_dca}]"
-                else:
-                    dca_str = ""
-                mode_icon = entry.get("mode_icon", "")
-                icon_str = f" {mode_icon}" if mode_icon else ""
-                
-                clean_reason = str(entry.get('reason', ''))
-                if "[Exchange_TP_Hit]" in clean_reason or "[Exchange_SL_Hit]" in clean_reason:
-                    clean_reason = clean_reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
-                    reason_disp = f"→ {clean_reason}" if clean_reason else ""
-                else:
-                    reason_disp = f"→ Lý do: {clean_reason}"
-                
-                smart_print(f"  ✧{icon_str} [{coin_name}]: Đã đóng {entry['side']} ({roi_str}){dca_str} {reason_disp}")
-        elif getattr(tk, "last_closed_side", ""):
-            has_closed_history = True
-            pnl_color = "+" if tk.last_closed_roi > 0 else ""
-            roi_str = f"{pnl_color}{tk.last_closed_roi:.1f}%"
-            reason = getattr(tk, "last_closed_reason", "Không rõ")
-            if "[Exchange_TP_Hit]" in reason or "[Exchange_SL_Hit]" in reason:
-                clean_reason = reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
-                reason_disp = f"→ {clean_reason}" if clean_reason else ""
-            else:
-                reason_disp = f"→ Lý do: {reason}"
-            smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) {reason_disp}")
-    if not has_closed_history:
-        smart_print("  · Chưa có lệnh nào được đóng trong phiên này.")
-    print("")
+
     for line in table_lines:
         print(line)
     print("=" * 78 + "\n")
