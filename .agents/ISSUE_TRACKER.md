@@ -19,6 +19,9 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Dọn dẹp File rác & Tự động Build Release v1.0.277 lên GitHub:
+  - **Cập nhật:** Đã xóa bỏ các file test/rác phát sinh (`diff_gui_main.txt`, `fix_bugs.py`, `test.py`). Chạy thành công `zBuild_To_GitHub.py`, nâng version đồng bộ lên **`v1.0.277`**, commit, gắn tag `v1.0.277` và đẩy toàn bộ source code lên GitHub. GitHub Actions đã được kích hoạt tự động build bản cập nhật mới nhất cho khách hàng. (Mã patch: `z275`)
+
 - **[05/08/2026]** - Áp dụng đồng bộ 100% toàn bộ cải tiến UI cho cả Bot SMC (Sub 2):
   - **Cập nhật:** Do `panel_main` (Bot EMA200) và `panel_sub2` (Bot SMC) dùng chung class `BotInstanceWidget` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py), toàn bộ các cải tiến UI (Bảng vị thế, Căn lề phải 3 space, Cột Ký quỹ 85px, PNL 16px, Cột TP/SL PNL USDT Xanh/Đỏ nhạt, Nút Đóng đỏ 15%, Splitter ratio 75/25, Tab Cam #FF9900) đã tự động đồng bộ hoàn toàn sang **Bot SMC**. Đồng thời cập nhật nhãn `Bot Sub 2 (SMC)` thống nhất toàn app. (Mã patch: `z274`)
 
