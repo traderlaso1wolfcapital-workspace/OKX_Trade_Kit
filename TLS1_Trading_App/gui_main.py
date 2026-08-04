@@ -757,6 +757,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.strategy_name = strategy_name
         self.api_files = env_files
         self.worker = None
+        self.show_chart_pos_lines = True
         self.init_ui()
         self.load_current_settings()
         self.apply_current_api_to_worker()
@@ -1406,6 +1407,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_layout.addWidget(self.tab_live_view, 1)
 
 
+
+    def close_position(self, inst_id, mgn_mode, pos_side):
+        # Placeholder or actual implementation for closing position
+        QtWidgets.QMessageBox.information(self, "Tính năng chưa hỗ trợ", "Tính năng đóng lệnh trực tiếp trên UI hiện chưa khả dụng. Xin vui lòng sử dụng terminal hoặc chức năng của OKX.")
+        
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
             return
