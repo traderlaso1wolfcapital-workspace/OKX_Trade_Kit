@@ -19,7 +19,11 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[05/08/2026]** - Sửa lỗi gạch ngang bóng mờ hiển thị chìm dưới lớp text khi có vị thế:
+- **[05/08/2026]** - Sửa lỗi Terminal Logs của Bot SMC (Sub2) không hiển thị Dashboard:
+  - **Nguyên nhân:** File `sys_bot_sub2.py` có gọi hàm `bot_ui.update_wallet_metrics()` trước khi in Dashboard, nhưng hàm này đã bị gỡ bỏ khỏi `bot_ui.py` (do bot tự đọc từ file JSON). Việc gọi hàm không tồn tại đã gây ra ngoại lệ `AttributeError`. Tệ hơn nữa, vòng lặp chính lại sử dụng `except Exception:` nuốt trọn mọi lỗi mà không in ra console, khiến Dashboard liên tục bị gián đoạn ngầm mà không có cảnh báo.
+  - **Cập nhật:** Đã xóa bỏ lời gọi hàm thừa `bot_ui.update_wallet_metrics()` trong [sys_bot_sub2.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/sys_bot_sub2.py), đồng thời bổ sung `import traceback` để in rõ lỗi nếu vòng lặp chính của bot gặp sự cố trong tương lai. Sau khi lộ diện lỗi `NameError: target_vol`, tôi cũng đã bổ sung logic lấy `target_vol` trực tiếp từ file cấu hình JSON hoặc dùng giá trị mặc định trong [bot_ui.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub2/bot_ui.py). Giao diện Terminal của Bot SMC nay đã xuất hiện lại đầy đủ và đẹp mắt. (Mã patch: `z286`)
+
+
   - **Nguyên nhân:** Khi bảng chuyển trạng thái từ Trống (không lệnh) sang Có lệnh, các ô chứa Widget (như PNL, Nút đóng) được đè lên trên lớp Text. Do background của Widget là trong suốt nên vạch ngang rỗng `—` của trạng thái cũ vẫn bị lộ bóng mờ từ bên dưới chiếu lên chữ.
   - **Cập nhật:** Theo yêu cầu tinh gọn giao diện, tôi đã gỡ bỏ hoàn toàn ký tự dấu gạch ngang `—` trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Giờ đây, khi không có lệnh, các ô dữ liệu sẽ trống hoàn toàn (chuỗi rỗng `""`). Điều này giúp giao diện bảng Vị thế trông sạch sẽ tuyệt đối và triệt tiêu vĩnh viễn hiện tượng bóng mờ. (Mã patch: `z285`)
 

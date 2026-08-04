@@ -102,6 +102,19 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     dbar = "=" * 78
     
     pnl_str = f"{pnl_sign}{format_with_commas(loi_nhuan, 2)}"
+    
+    target_vol = Decimal("100")
+    try:
+        import sys; globals_ref = sys.modules.get(__name__)
+        if hasattr(globals_ref, "SWING_VOLUME_USDT"):
+            target_vol = getattr(globals_ref, "SWING_VOLUME_USDT")
+        if os.path.exists(env_paths.get("FILE_GLOBAL_CONFIG", "")):
+            with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as _f:
+                _cfg = json.load(_f)
+                if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                    target_vol = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+    except: pass
+    
     vol_str_top = f"{format_with_commas(target_vol, 1)}"
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"

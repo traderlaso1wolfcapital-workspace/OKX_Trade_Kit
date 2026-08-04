@@ -451,7 +451,6 @@ def main():
             # 4. CẬP NHẬT GIAO DIỆN TERMINAL (20 giây)
             if now - last_dashboard_update >= 20.0:
                 last_dashboard_update = now
-                bot_ui.update_wallet_metrics(client, env_paths, system_config)
                 bot_ui.print_dashboard(state_matrix, env_paths)
 
             time.sleep(0.1)
@@ -459,7 +458,9 @@ def main():
         except KeyboardInterrupt:
             print("\n🛑 Người dùng đã bấm Ctrl+C, Dừng lại toàn bộ.")
             break
-        except Exception:
+        except Exception as e:
+            import traceback
+            print(f"\n❌ LỖI VÒNG LẶP CHÍNH (sys_bot_sub2): {e}\n{traceback.format_exc()}")
             time.sleep(1)
 
 if __name__ == "__main__":
