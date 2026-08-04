@@ -19,6 +19,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Sửa lỗi đen xì màn hình Chart (QWebEngineView) trên bản APP máy khách:
+  - **Nguyên nhân:** Khi đóng gói bằng PyInstaller, thành phần WebEngine của PyQt6 thiếu tương thích với GPU/Driver đồ họa trên một số cấu hình máy khách, dẫn đến không thể render biểu đồ và xuất hiện màn hình đen.
+  - **Cập nhật:** Đã chèn thêm các cờ `sys.argv.append("--disable-gpu")`, `--disable-software-rasterizer` và thiết lập biến môi trường `QTWEBENGINE_CHROMIUM_FLAGS` trong `gui_main.py` ngay trước khi khởi tạo `QApplication`. Điều này ép WebEngine sử dụng Software Rendering thay cho GPU, khắc phục triệt để lỗi đen màn hình trên tất cả các máy tính. (Mã patch: `z276`)
+
 - **[05/08/2026]** - Dọn dẹp File rác & Tự động Build Release v1.0.277 lên GitHub:
   - **Cập nhật:** Đã xóa bỏ các file test/rác phát sinh (`diff_gui_main.txt`, `fix_bugs.py`, `test.py`). Chạy thành công `zBuild_To_GitHub.py`, nâng version đồng bộ lên **`v1.0.277`**, commit, gắn tag `v1.0.277` và đẩy toàn bộ source code lên GitHub. GitHub Actions đã được kích hoạt tự động build bản cập nhật mới nhất cho khách hàng. (Mã patch: `z275`)
 

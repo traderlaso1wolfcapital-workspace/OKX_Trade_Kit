@@ -4814,6 +4814,13 @@ def main():
     except:
         pass
 
+    # Fix black screen issue cho biểu đồ (QWebEngineView) trên máy khách khi đóng gói PyInstaller
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer --disable-gpu-compositing"
+    if "--disable-gpu" not in sys.argv:
+        sys.argv.append("--disable-gpu")
+    if "--disable-software-rasterizer" not in sys.argv:
+        sys.argv.append("--disable-software-rasterizer")
+
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet("""
         /* Global UI Elements */
