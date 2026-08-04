@@ -1578,7 +1578,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             pnl_label = QtWidgets.QLabel()
             pnl_label.setText(
                 f"<span style='font-size: 16px; font-weight: normal; color: {color_str};'>{upl:+.2f}</span> "
-                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>USDT</span>   "
+                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>USDT</span>&nbsp;&nbsp;&nbsp;"
                 f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>({upl_ratio:+.2f}%)</span>"
             )
             pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)

@@ -19,6 +19,9 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Tăng khoảng cách hiển thị ở Cột PNL Thả nổi:
+  - **Cập nhật:** Đã xử lý lại chuỗi HTML hiển thị tại Cột 3 (PNL Thả nổi) trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Đổi 3 dấu cách thường thành ký tự `&nbsp;&nbsp;&nbsp;` để ép Qt nhận dạng chính xác 3 khoảng trắng giữa phần giá trị "USDT" và phần "Phần trăm (%)", giúp giao diện trông rộng rãi và dễ nhìn hơn. (Mã patch: `z281`)
+
 - **[05/08/2026]** - Sửa lỗi HTTP 403 Forbidden và loại bỏ hộp thoại xác nhận khi Đóng Lệnh (Quick Close):
   - **Nguyên nhân:** OKX/Cloudflare chặn thư viện `urllib.request` mặc định của Python do thiếu header User-Agent chuẩn (gây lỗi 403). Đồng thời, thao tác phải ấn "Yes" để đóng lệnh làm chậm trễ quá trình xử lý lệnh gấp.
   - **Cập nhật:** Chuyển đổi hàm `close_position()` trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) sang sử dụng thư viện `requests` kèm `User-Agent: Mozilla/5.0` để vượt qua bộ lọc WAF. Đặc biệt, đã xóa bỏ hoàn toàn bảng cảnh báo `Bạn chắc chắn muốn ĐÓNG vị thế...` và thông báo thành công. Giờ đây, chỉ cần 1 click vào nút Đóng, lệnh Market sẽ lập tức đẩy thẳng lên sàn OKX để ép đóng vị thế không độ trễ (1-Click Close). (Mã patch: `z278`)
