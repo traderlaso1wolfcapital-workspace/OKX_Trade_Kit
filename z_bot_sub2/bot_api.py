@@ -50,7 +50,17 @@ class OKXRestCore:
                     last_err = RuntimeError(f"HTTP 429 Rate Limit — retry {attempt+1}/{max_retries}")
                     time.sleep(1)
                     continue
-                resp.raise_for_status()
+                try:
+                    resp.raise_for_status()
+                except Exception as http_err:
+                    try:
+                        err_json = resp.json()
+                        if "msg" in err_json:
+                            raise Exception(f"OKX Error {err_json.get('code', '')}: {err_json.get('msg', '')}")
+                    except ValueError:
+                        pass
+                    raise http_err
+                
                 res_json = resp.json()
                 if res_json.get("code") != "0":
                     err_code = res_json.get("code", "")

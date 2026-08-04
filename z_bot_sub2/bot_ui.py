@@ -96,19 +96,30 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     growth_sign = "+" if tang_truong >= 0 else ""
 
     bot_name = "SMC Order Block"
-    c1, c2, c3, c4 = 20, 26, 20, 16
-    line_w = 78
-
+    
+    # Format giống v1.0.271
+    bar  = "-" * 78
+    dbar = "=" * 78
+    
+    pnl_str = f"{pnl_sign}{format_with_commas(loi_nhuan, 2)}"
+    vol_str_top = f"{format_with_commas(target_vol, 1)}"
     mfe_str = f"+{ai_avg_mfe:.1f}%" if ai_avg_mfe > 0 else "--"
     mae_str = f"-{ai_avg_mae:.1f}%" if ai_avg_mae > 0 else "--"
-    target_vol = 100.0
+    mm_str = f"{mfe_str} / {mae_str}"
+    
+    r0 = f" ⚡ {bot_name:<18}|   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  "
+    
+    r1_c1 = f"   {sync_time:^15}   "
+    r1_c2 = f" Gốc: {format_with_commas(von_goc, 2):>8} U "
+    r1_c3 = f" Tổng: {format_with_commas(von_hien_tai, 2):>8} U "
+    r1_c4 = f" Win: {ai_winrate:.1f}% / {total_pos:<3}"
+    r1 = f"{r1_c1:<21}|{r1_c2:<19}|{r1_c3:<19}|{r1_c4:<16}"
 
-    r0 = f"  {'⚡ ' + bot_name:^{c1-1}} | {'💰 Lợi nhuận':^{c2-1}} | {'🏦 Tài khoản':^{c3-1}} | 🎯 Hiệu suất"
-    r1 = f"   {sync_time:^{c1-1}} | {'Gốc : ' + format_with_commas(von_goc, 2) + ' U':<{c2}} | {'Tổng: ' + format_with_commas(von_hien_tai, 2) + ' U':<{c3}} | Win : {ai_winrate:.1f}% / {total_pos}"
-    r2 = f"   {'':<{c1-1}} | {'PNL : ' + pnl_sign + format_with_commas(loi_nhuan, 2) + ' U (' + growth_sign + f'{tang_truong:.0f}' + '%)':<{c2}} | {'Vol : ' + format_with_commas(target_vol, 1) + ' U':<{c3}} | M/M : {mfe_str} / {mae_str}"
-
-    bar  = "-" * line_w
-    dbar = "=" * line_w
+    r2_c1 = " " * 21
+    r2_c2 = f" PNL: {pnl_str:>8} U "
+    r2_c3 = f" Vol : {vol_str_top:>8} U "
+    r2_c4 = f" M/M: {mm_str:<10}"
+    r2 = f"{r2_c1:<21}|{r2_c2:<19}|{r2_c3:<19}|{r2_c4:<16}"
 
     print(f"\n  bot_sub2.py {env_paths.get('ENV_FILE_NAME', '.api')}")
     print(dbar)

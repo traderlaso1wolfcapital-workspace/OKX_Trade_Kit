@@ -536,7 +536,7 @@ class LiveChartWorker(QtCore.QThread):
                                                 merged.append(o)
                                     ob_boxes.extend(merged)
                                 chart_data["ob_boxes"] = ob_boxes
-                                print(f"DEBUG: Found {len(ob_boxes)} OBs for {self.inst_id}")
+                                # print(f"DEBUG: Found {len(ob_boxes)} OBs for {self.inst_id}")
                                 
                                 # Add trade setups as markers
                                 if "markers" not in chart_data:
@@ -552,6 +552,8 @@ class LiveChartWorker(QtCore.QThread):
                                             "time": int(t_ms) * 1000 if t_ms < 100000000000 else int(t_ms),
                                             "side": "LONG" if setup.bias == BULLISH else "SHORT",
                                             "price": float(setup.entry_price),
+                                            "tp": float(setup.take_profit) if hasattr(setup, 'take_profit') else None,
+                                            "sl": float(setup.stop_loss) if hasattr(setup, 'stop_loss') else None,
                                             "status": "inactive" if setup.triggered else "active",
                                             "type": "SETUP"
                                         })
@@ -1220,10 +1222,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setReadOnly(True)
         self.log_display.setMaximumBlockCount(100)
         self.log_display.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
-        self.log_display.setFont(QtGui.QFont("Consolas", 12))
+        self.log_display.setFont(QtGui.QFont("Consolas", 11))
         self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.log_display.setStyleSheet(
-            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 18px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
+            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 13px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
@@ -1277,21 +1279,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                     wick_up_color='#26a69a', wick_down_color='#ef5350')
             self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
             self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.combo_tf.currentText()})', color='rgba(255, 153, 0, 0.1)')
-            self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='#2a2a2a')
+            self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='rgba(42, 42, 42, 0.3)')
             self.chart_widget.time_scale(right_offset=30)
-            self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
-            self.chart_widget.spinner(True)
-            
-            # Polyfill chống lỗi undefined object khi load JS asynchronously
-            self.chart_widget.run_script(f"""
-                if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
-                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
-                
-                if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
-            """)
-            
+            pass
             # Khởi chạy luồng lấy dữ liệu chart auto
             self._chart_initialized = False
             self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar=self.combo_tf.currentText(), parent=self)
@@ -1310,19 +1300,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pos_layout = QtWidgets.QVBoxLayout(self.tab_positions)
         pos_layout.setContentsMargins(0, 5, 0, 5)
         
-        self.pos_table = QtWidgets.QTableWidget(0, 7)
-        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "Kích thước", "PNL thả nổi", "Chốt lời | Dừng lỗ", "Line"])
+        self.pos_table = QtWidgets.QTableWidget(0, 6)
+        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "PNL thả nổi", "Chốt lời | Dừng lỗ", ""])
         header = self.pos_table.horizontalHeader()
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(5, 60)
         self.pos_table.setStyleSheet(
-            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 14px; }"
-            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; }"
+            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 13px; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: normal; border: 1px solid #333333; padding: 3px; font-size: 13px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
@@ -1334,17 +1324,16 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Sẽ load data ngay khi user chọn account (sự kiện load_selected_account sẽ được sửa lại để gọi apply_current_api_to_worker)
         self.pos_worker.start()
         
-        # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart)
-        self.pos_table.verticalHeader().setDefaultSectionSize(32)
-        self.tab_positions.setFixedHeight(148) # Vừa đủ header và 3 dòng lệnh
-        chart_layout.addWidget(self.tab_positions)
+        # Chèn bảng vị thế trực tiếp vào split_view, không chèn vào chart_layout nữa
+        self.pos_table.verticalHeader().setDefaultSectionSize(28)
+        # Bỏ dòng chart_layout.addWidget(self.tab_positions)
 
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
+        self.split_view.addWidget(self.tab_positions)
         self.split_view.addWidget(self.tab_logs)
-        self.split_view.setSizes([580, 380])
-        self.split_view.setStretchFactor(0, 6)
-        self.split_view.setStretchFactor(1, 4)
+        self.split_view.setSizes([350, 250, 400])
+        # Không dùng setStretchFactor nữa vì setSizes đã quyết định ban đầu
 
         self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
@@ -1357,21 +1346,39 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if not hasattr(self, 'split_view') or self.split_view is None:
                 return
             
-            # Clear all
-            while self.split_view.count() > 0:
-                w = self.split_view.widget(0)
-                if w: w.setParent(None)
-                
+            # Khôi phục widget vào danh sách tạm để không bị xóa
+            self.tab_chart.setParent(None)
+            self.tab_positions.setParent(None)
+            self.tab_logs.setParent(None)
+            
             if "ngang" in text.lower():
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Horizontal)
-                self.split_view.insertWidget(0, self.tab_logs)
-                self.split_view.insertWidget(1, self.tab_chart)
+                
+                # Ở chế độ ngang, có thể chia đôi màn hình: Chart bên trái, Logs bên phải.
+                # Và tab_positions nằm ở dưới Chart trong 1 splitter dọc phụ, hoặc cứ ném cả 3 vào splitter ngang.
+                # Tuy nhiên, theo plan: "giữ [self.tab_logs, self.tab_chart] và lồng self.tab_positions bên dưới Chart"
+                # Ta sẽ tạo 1 khung dọc ảo chứa Chart + Positions
+                left_pane = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
+                left_pane.addWidget(self.tab_chart)
+                left_pane.addWidget(self.tab_positions)
+                left_pane.setSizes([600, 250])
+                
+                self.split_view.addWidget(left_pane)
+                self.split_view.addWidget(self.tab_logs)
                 self.split_view.setSizes([500, 500])
             else:
+                # Nếu đã có left_pane từ chế độ ngang, cần lấy lại tab_chart và tab_positions
+                if self.split_view.count() == 2:
+                    left_pane = self.split_view.widget(0)
+                    if isinstance(left_pane, QtWidgets.QSplitter):
+                        self.tab_chart.setParent(None)
+                        self.tab_positions.setParent(None)
+                
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Vertical)
-                self.split_view.insertWidget(0, self.tab_chart)
-                self.split_view.insertWidget(1, self.tab_logs)
-                self.split_view.setSizes([600, 400])
+                self.split_view.addWidget(self.tab_chart)
+                self.split_view.addWidget(self.tab_positions)
+                self.split_view.addWidget(self.tab_logs)
+                self.split_view.setSizes([350, 250, 400])
                 
             if hasattr(self, 'chk_show_positions'):
                 self.tab_positions.setVisible(self.chk_show_positions.isChecked())
@@ -1409,8 +1416,58 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
 
     def close_position(self, inst_id, mgn_mode, pos_side):
-        # Placeholder or actual implementation for closing position
-        QtWidgets.QMessageBox.information(self, "Tính năng chưa hỗ trợ", "Tính năng đóng lệnh trực tiếp trên UI hiện chưa khả dụng. Xin vui lòng sử dụng terminal hoặc chức năng của OKX.")
+        """Đóng vị thế trên OKX bằng Market Order thông qua API."""
+        reply = QtWidgets.QMessageBox.question(
+            self, "Xác nhận đóng lệnh",
+            f"Bạn chắc chắn muốn ĐÓNG vị thế {inst_id} ({pos_side})?\nLệnh Market sẽ được gửi ngay lập tức.",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+            return
+        
+        try:
+            if not hasattr(self, 'pos_worker') or not self.pos_worker.api_key:
+                QtWidgets.QMessageBox.warning(self, "Lỗi", "Chưa có API key. Vui lòng chọn tài khoản trước.")
+                return
+            
+            import json, urllib.request
+            base_url = "https://www.okx.com"
+            path = "/api/v5/trade/close-position"
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            
+            body = json.dumps({
+                "instId": inst_id,
+                "mgnMode": mgn_mode,
+                "posSide": pos_side,
+                "ccy": "",
+                "autoCxl": False
+            })
+            
+            message = ts + "POST" + path + body
+            mac = hmac.new(bytes(self.pos_worker.secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+            sign = base64.b64encode(mac.digest()).decode('utf-8')
+            
+            headers = {
+                "OK-ACCESS-KEY": self.pos_worker.api_key,
+                "OK-ACCESS-SIGN": sign,
+                "OK-ACCESS-TIMESTAMP": ts,
+                "OK-ACCESS-PASSPHRASE": self.pos_worker.passphrase,
+                "Content-Type": "application/json",
+                "x-simulated-trading": "1" if self.pos_worker.demo_mode else "0"
+            }
+            
+            req = urllib.request.Request(base_url + path, data=body.encode('utf-8'), headers=headers, method='POST')
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read().decode())
+            
+            if result.get("code") == "0":
+                QtWidgets.QMessageBox.information(self, "Thành công", f"Đã gửi lệnh đóng vị thế {inst_id} thành công!")
+            else:
+                err_msg = result.get("msg", "Không rõ")
+                QtWidgets.QMessageBox.warning(self, "Lỗi từ OKX", f"Không thể đóng lệnh: {err_msg}")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Lỗi hệ thống", f"Lỗi khi đóng lệnh: {e}")
         
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
@@ -1440,60 +1497,107 @@ class BotInstanceWidget(QtWidgets.QWidget):
             lever = pos.get("lever", "")
             mgnMode = "Chéo" if pos.get("mgnMode") == "cross" else "Cô lập"
             
-            # Cột 1
+            # Cột 1 (Cặp giao dịch)
             side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
-            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({side} {lever}x)")
+            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({side} {lever}x {mgnMode})")
             item1.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
-            # Cột 2
+            # Cột 2 (Giá vào lệnh)
             entry_px = _safe_float(pos.get("avgPx", 0))
             item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}")
             item2.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
-            # Cột 3 (Kích thước)
+            # Cột 3 (Ký quỹ)
             size = _safe_float(pos.get("notionalUsd", pos.get("notional", 0)))
-            item3 = QtWidgets.QTableWidgetItem(f"{size:,.2f} USDT")
+            margin = size / _safe_float(lever) if _safe_float(lever) > 0 else 0
+            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f}$")
             item3.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
+            
+            # Cột 4 (Nút Đóng) - đã bỏ cột Kích thước, thay bằng nút Đóng lệnh
 
-            # Cột 4 (PNL)
+            # Cột 5 (PNL)
             upl = _safe_float(pos.get("upl", 0))
             upl_ratio = _safe_float(pos.get("uplRatio", 0)) * 100
             color_str = "#26a69a" if upl >= 0 else "#ef5350"
             pnl_label = QtWidgets.QLabel(
-                f"<span style='font-size: 16px;'>{upl:+.2f}</span> <span style='font-size: 14px;'>USDT ({upl_ratio:+.2f}%)</span>"
+                f"<span style='font-size: 13px;'>{upl:+.2f} USDT</span> <span style='font-size: 12px;'>({upl_ratio:+.2f}%)</span>"
             )
             pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             pnl_label.setStyleSheet(f"color: {color_str}; background: transparent; font-weight: normal;")
             
-            # Cột 5 (TP/SL)
+            # Cột 6 (TP/SL)
             tp_list = pos.get("tp_list", [])
             sl_list = pos.get("sl_list", [])
-            tp_str = ", ".join(tp_list) if tp_list else "None"
-            sl_str = ", ".join(sl_list) if sl_list else "None"
-            item5 = QtWidgets.QTableWidgetItem(f"TP: {tp_str} | SL: {sl_str}")
-            item5.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
             
-            # Cột 6 (Line chk)
-            chk_icon = "☑" if self.show_chart_pos_lines else "☐"
-            item_chk = QtWidgets.QTableWidgetItem(chk_icon)
-            item_chk.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+            # --- Fallback: Lấy từ JSON data (Setup) nếu API OKX chưa trả về ---
+            if not tp_list or not sl_list:
+                try:
+                    import os, json
+                    acc_name = self.get_acc_name()
+                    base_coin = instId.replace("-USDT", "")
+                    json_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data", f"{acc_name}_{base_coin}_chart.json")
+                    if os.path.exists(json_path):
+                        with open(json_path, "r", encoding="utf-8") as f:
+                            c_data = json.load(f)
+                            if "markers" in c_data:
+                                is_long = float(pos.get("pos", 0)) > 0
+                                cands = [m for m in c_data["markers"] if m.get("type") == "SETUP" and ((m.get("side") == "LONG" and is_long) or (m.get("side") == "SHORT" and not is_long))]
+                                if cands:
+                                    best = min(cands, key=lambda m: abs(float(m.get("price", 0)) - entry_px))
+                                    b_px = float(best.get("price", 0))
+                                    if b_px > 0 and abs(entry_px - b_px) / b_px <= 0.05:
+                                        if not tp_list and best.get("tp"): tp_list.append(str(best.get("tp")))
+                                        if not sl_list and best.get("sl"): sl_list.append(str(best.get("sl")))
+                except:
+                    pass
+                    
+            # --- Fallback 2: Tính theo công thức RR / Cấu hình nếu vẫn chưa có ---
+            if not tp_list or not sl_list:
+                is_long = float(pos.get("pos", 0)) > 0
+                if self.strategy_id == "sub1" and entry_px > 0:
+                    tp_pct = getattr(self, "input_tp_pct").value() / 100.0 if hasattr(self, "input_tp_pct") else 0.012
+                    sl_pct = getattr(self, "input_sl_pct").value() / 100.0 if hasattr(self, "input_sl_pct") else 0.012
+                    if is_long:
+                        if not sl_list: sl_list.append(f"{entry_px * (1 - sl_pct):.2f}")
+                        if not tp_list: tp_list.append(f"{entry_px * (1 + tp_pct):.2f}")
+                    else:
+                        if not sl_list: sl_list.append(f"{entry_px * (1 + sl_pct):.2f}")
+                        if not tp_list: tp_list.append(f"{entry_px * (1 - tp_pct):.2f}")
+                elif self.strategy_id == "sub2" and entry_px > 0:
+                    rr_trend = getattr(self, "smc_input_rr_trend").value() if hasattr(self, "smc_input_rr_trend") else 5.0
+                    default_sl_pct = 0.01
+                    if is_long:
+                        if not sl_list: sl_list.append(f"{entry_px * (1 - default_sl_pct):.2f}")
+                        if not tp_list: tp_list.append(f"{entry_px * (1 + default_sl_pct * rr_trend):.2f}")
+                    else:
+                        if not sl_list: sl_list.append(f"{entry_px * (1 + default_sl_pct):.2f}")
+                        if not tp_list: tp_list.append(f"{entry_px * (1 - default_sl_pct * rr_trend):.2f}")
+            # ------------------------------------------------------------------
+
+            tp_str = ", ".join(tp_list) if tp_list else "—"
+            sl_str = ", ".join(sl_list) if sl_list else "—"
+            item5_tpsl = QtWidgets.QTableWidgetItem(f"{tp_str} | {sl_str}")
+            item5_tpsl.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
             
-            # Cột 7 (Close button)
-            btn_close = QtWidgets.QPushButton("✖ Đóng")
-            btn_close.setStyleSheet("background-color: #ef5350; color: white; padding: 2px 8px; border-radius: 2px; border: none; min-height: 20px; font-weight: bold; font-size: 11px;")
+            # Nút Đóng lệnh
+            raw_inst_id = str(pos.get("instId", ""))
+            raw_mgn_mode = str(pos.get("mgnMode", "cross"))
+            raw_pos_side = str(pos.get("posSide", "net"))
+            btn_close = QtWidgets.QPushButton("Đóng")
+            btn_close.setStyleSheet(
+                "QPushButton { background-color: #c62828; color: #ffffff; font-weight: bold; font-size: 12px; "
+                "border: none; border-radius: 3px; padding: 3px 8px; } "
+                "QPushButton:hover { background-color: #e53935; }"
+            )
             btn_close.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-            full_instId = pos.get("instId", "")
-            mgnMode = pos.get("mgnMode", "cross")
-            posSide = pos.get("posSide", "net")
-            btn_close.clicked.connect(lambda checked, i=full_instId, m=mgnMode, s=posSide: self.close_position(i, m, s))
+            btn_close.clicked.connect(lambda checked, iid=raw_inst_id, mm=raw_mgn_mode, ps=raw_pos_side: self.close_position(iid, mm, ps))
             
             self.pos_table.setItem(row, 0, item1)
             self.pos_table.setItem(row, 1, item2)
             self.pos_table.setItem(row, 2, item3)
             self.pos_table.setCellWidget(row, 3, pnl_label)
-            self.pos_table.setItem(row, 4, item5)
-            self.pos_table.setItem(row, 5, item_chk)
-            self.pos_table.setCellWidget(row, 6, btn_close)
+            self.pos_table.setItem(row, 4, item5_tpsl)
+            self.pos_table.setCellWidget(row, 5, btn_close)
             
     def apply_current_api_to_worker(self):
         if not hasattr(self, 'pos_worker'):
@@ -2491,7 +2595,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 import json
                 import datetime
                 
-                timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
+                timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds') + 'Z'
                 method = 'GET'
                 request_path = '/api/v5/account/config'
                 message = timestamp + method + request_path
@@ -2824,8 +2928,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self._chart_initialized = False
             if getattr(self, 'chart_widget', None):
                 self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
-                self.chart_widget.run_script(f'if (!{self.chart_widget.id}.spinner) Lib.Handler.makeSpinner({self.chart_widget.id})')
-                self.chart_widget.spinner(True)
+                pass
             self.live_chart_worker.trigger_fetch()
 
     def update_live_chart(self, data):
@@ -2845,36 +2948,121 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
                     
                     if not getattr(self, '_chart_initialized', False):
-                        # Polyfill chống lỗi undefined object khi load JS asynchronously
-                        self.chart_widget.run_script(f"""
-                            if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
-                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
-                            
-                            if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                            if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
-                        """)
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
-                        self.chart_widget.run_script(f"""
-                            setInterval(function() {{
-                                try {{
-                                    let cw = window['{self.chart_widget.id}'];
-                                    if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
-                                        cw.series.setMarkers = function(m) {{
-                                            try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
-                                        }};
+                        
+                        init_ob_js = f'''
+                        (function() {{
+                            try {{
+                                let chartObj = window['{self.chart_widget.id}'];
+                                if (!chartObj && window.pythonObject) {{
+                                    for (let key in window) {{
+                                        try {{
+                                            if (window[key] && window[key].series) {{
+                                                chartObj = window[key];
+                                                break;
+                                            }}
+                                        }} catch(e){{}}
                                     }}
-                                }} catch(e) {{}}
-                            }}, 1000);
-                        """)
+                                }}
+                                if (!chartObj || !chartObj.series) return;
+                                const series = chartObj.series;
+                                const chart = chartObj.chart;
+                                
+                                const container = chartObj.container || (chartObj.div ? chartObj.div : document.body);
+                                let overlay = document.getElementById('smc_ob_shaded_overlay');
+                                if (!overlay) {{
+                                    overlay = document.createElement('div');
+                                    overlay.id = 'smc_ob_shaded_overlay';
+                                    overlay.style.position = 'absolute';
+                                    overlay.style.top = '0';
+                                    overlay.style.left = '0';
+                                    overlay.style.width = '100%';
+                                    overlay.style.height = '100%';
+                                    overlay.style.pointerEvents = 'none';
+                                    overlay.style.zIndex = '4';
+                                    overlay.style.overflow = 'hidden';
+                                    if (container && container.style) container.style.position = 'relative';
+                                    (container || document.body).appendChild(overlay);
+                                }}
+
+                                window._active_smc_obs = [];
+
+                                function drawObShadedBands() {{
+                                    const obs = window._active_smc_obs;
+                                    if (!obs || !overlay) return;
+                                    overlay.innerHTML = '';
+                                    const w = overlay.clientWidth || (container ? container.clientWidth : 800);
+                                    
+                                    const PRICE_SCALE_WIDTH = 70;
+                                    const maxRightX = w - PRICE_SCALE_WIDTH;
+
+                                    obs.forEach(ob => {{
+                                        if (typeof series.priceToCoordinate !== 'function') return;
+                                        
+                                        const y1 = series.priceToCoordinate(ob.high);
+                                        const y2 = series.priceToCoordinate(ob.low);
+                                        if (y1 === null || y2 === null) return;
+
+                                        const topY = Math.min(y1, y2);
+                                        const botY = Math.max(y1, y2);
+                                        const h = Math.max(botY - topY, 4);
+                                        const isBull = (ob.bias === 1);
+
+                                        let startX = null;
+                                        if (chart && chart.timeScale && ob.time && ob.time > 0) {{
+                                            try {{
+                                                const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+                                                const xCoord = chart.timeScale().timeToCoordinate(secTime);
+                                                if (xCoord !== null) {{
+                                                    startX = Math.floor(xCoord);
+                                                }}
+                                            }} catch(e) {{}}
+                                        }}
+
+                                        if (startX === null) startX = 0;
+                                        if (startX < -2000) startX = -2000;
+                                        if (startX >= maxRightX) return;
+
+                                        const boxWidth = maxRightX - startX;
+                                        if (boxWidth <= 0) return;
+
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.1)' : 'rgba(198, 40, 40, 0.1)';
+
+                                        const box = document.createElement('div');
+                                        box.style.position = 'absolute';
+                                        box.style.top = topY + 'px';
+                                        box.style.left = startX + 'px';
+                                        box.style.width = boxWidth + 'px';
+                                        box.style.height = h + 'px';
+                                        box.style.backgroundColor = bg;
+                                        box.style.border = 'none';
+                                        box.style.boxSizing = 'border-box';
+                                        box.style.pointerEvents = 'none';
+
+                                        overlay.appendChild(box);
+                                    }});
+                                }}
+
+                                window._drawObShadedBands = drawObShadedBands;
+
+                                if (!window._smc_ob_subscribed && chart && chart.timeScale) {{
+                                    window._smc_ob_subscribed = true;
+                                    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {{
+                                        if (window._drawObShadedBands) window._drawObShadedBands();
+                                    }});
+                                }}
+                            }} catch(err) {{}}
+                        }})();
+                        '''
+                        self.chart_widget.win.run_script(init_ob_js)
+                        
                         self._chart_initialized = True
-                        self.chart_widget.spinner(False)
                     else:
                         self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
                 else:
-                    self.chart_widget.spinner(False)
+                    pass
                         
                 # Vẽ markers
                 if "markers" in data and getattr(self, '_chart_initialized', False):
@@ -2906,129 +3094,42 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 # Vẽ Vùng Order Block SMC (Dải bôi Xanh/Đỏ nhạt, bắt đầu từ nến OB, KHÔNG chữ, KHÔNG đường kẻ ngang)
                 if "ob_boxes" in data and getattr(self, 'chk_show_ob', None) and self.chk_show_ob.isChecked():
                         ob_boxes = data["ob_boxes"]
-                        js_code = f"""
-                        (function() {{
-                            try {{
-                                let chartObj = window['{self.chart_widget.id}'];
-                                if (!chartObj && window.pythonObject) {{
-                                    for (let key in window) {{
-                                        try {{
-                                            if (window[key] && window[key].series) {{
-                                                chartObj = window[key];
-                                                break;
-                                            }}
-                                        }} catch(e){{}}
-                                    }}
-                                }}
-                                if (!chartObj || !chartObj.series) return;
-                                const series = chartObj.series;
-                                const chart = chartObj.chart;
-                                
-                                // Xóa toàn bộ price lines cũ nếu có
-                                if (window._smc_ob_lines) {{
-                                    window._smc_ob_lines.forEach(l => {{ try {{ series.removePriceLine(l); }} catch(e){{}} }});
-                                    window._smc_ob_lines = [];
-                                }}
-
-                                const container = chartObj.container || (chartObj.div ? chartObj.div : document.body);
-                                let overlay = document.getElementById('smc_ob_shaded_overlay');
-                                if (!overlay) {{
-                                    overlay = document.createElement('div');
-                                    overlay.id = 'smc_ob_shaded_overlay';
-                                    overlay.style.position = 'absolute';
-                                    overlay.style.top = '0';
-                                    overlay.style.left = '0';
-                                    overlay.style.width = '100%';
-                                    overlay.style.height = '100%';
-                                    overlay.style.pointerEvents = 'none';
-                                    overlay.style.zIndex = '4';
-                                    overlay.style.overflow = 'hidden';
-                                    if (container && container.style) container.style.position = 'relative';
-                                    (container || document.body).appendChild(overlay);
-                                }}
-
-                                window._active_smc_obs = {json.dumps(ob_boxes)};
-
-                                function drawObShadedBands() {{
-                                    const obs = window._active_smc_obs;
-                                    if (!obs || !overlay) return;
-                                    overlay.innerHTML = '';
-                                    const w = overlay.clientWidth || (container ? container.clientWidth : 800);
-                                    
-                                    // Giá trị offset an toàn cho cột giá (price scale) bên phải
-                                    const PRICE_SCALE_WIDTH = 70;
-                                    const maxRightX = w - PRICE_SCALE_WIDTH;
-
-                                    obs.forEach(ob => {{
-                                        const y1 = series.priceToCoordinate(ob.high);
-                                        const y2 = series.priceToCoordinate(ob.low);
-                                        if (y1 === null || y2 === null) return;
-
-                                        const topY = Math.min(y1, y2);
-                                        const botY = Math.max(y1, y2);
-                                        const h = Math.max(botY - topY, 4);
-                                        const isBull = (ob.bias === 1);
-
-                                        let startX = null;
-                                        if (chart && chart.timeScale && ob.time && ob.time > 0) {{
-                                            try {{
-                                                const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-                                                const xCoord = chart.timeScale().timeToCoordinate(secTime);
-                                                if (xCoord !== null) {{
-                                                    startX = Math.floor(xCoord);
-                                                }}
-                                            }} catch(e) {{}}
-                                        }}
-
-                                        // Nếu không lấy được toạ độ hợp lệ (null) thì vẽ từ sát lề trái
-                                        if (startX === null) startX = 0;
-                                        if (startX < -2000) startX = -2000;
-                                        
-                                        // Nếu OB ở quá xa về bên phải so với cột giá thì không vẽ
-                                        if (startX >= maxRightX) return;
-
-                                        const boxWidth = maxRightX - startX;
-                                        if (boxWidth <= 0) return;
-
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.35)' : 'rgba(198, 40, 40, 0.35)';
-
-                                        const box = document.createElement('div');
-                                        box.style.position = 'absolute';
-                                        box.style.top = topY + 'px';
-                                        box.style.left = startX + 'px';
-                                        box.style.width = boxWidth + 'px';
-                                        box.style.height = h + 'px';
-                                        box.style.backgroundColor = bg;
-                                        box.style.border = 'none';
-                                        box.style.boxSizing = 'border-box';
-                                        box.style.pointerEvents = 'none';
-
-                                        overlay.appendChild(box);
-                                    }});
-                                }}
-
-                                window._drawObShadedBands = drawObShadedBands;
-                                drawObShadedBands();
-
-                                if (!window._smc_ob_subscribed && chart && chart.timeScale) {{
-                                    window._smc_ob_subscribed = true;
-                                    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {{
-                                        if (window._drawObShadedBands) window._drawObShadedBands();
-                                    }});
-                                }}
-                            }} catch(err) {{}}
-                        }})();
-                        """
+                        js_code = f'''
+                        if (window._drawObShadedBands) {{
+                            window._active_smc_obs = {json.dumps(ob_boxes)};
+                            window._drawObShadedBands();
+                        }}
+                        '''
                         try:
-                            self.chart_widget.run_script(js_code)
+                            self.chart_widget.win.run_script(js_code)
                         except Exception:
                             pass
+                        
+                        
                             
                         # Vẽ Price Lines cho ENTRY, TP, SL
                         try:
                             if getattr(self, 'show_chart_pos_lines', True):
                                 current_coin = self.combo_coin.currentData()
                                 chart_positions = []
+                                
+                                # 1. Lấy lệnh Limit (Pending Setups) từ OB
+                                if "markers" in data:
+                                    for m in data["markers"]:
+                                        if m.get("type") == "SETUP" and m.get("status") == "active":
+                                            tp_list = []
+                                            if m.get("tp"): tp_list.append(float(m.get("tp")))
+                                            sl_list = []
+                                            if m.get("sl"): sl_list.append(float(m.get("sl")))
+                                            
+                                            chart_positions.append({
+                                                "entry": float(m.get("price", 0)),
+                                                "tp_list": tp_list,
+                                                "sl_list": sl_list,
+                                                "title": f"Limit {m.get('side', '')}"
+                                            })
+                                
+                                # 2. Lấy vị thế thực tế
                                 if hasattr(self, '_current_positions'):
                                     for pos in self._current_positions:
                                         if pos.get("instId") == current_coin:
@@ -3037,6 +3138,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                                     entry_px = float(pos.get("avgPx", 0))
                                                     tp_list = [float(x) for x in pos.get("tp_list", []) if x]
                                                     sl_list = [float(x) for x in pos.get("sl_list", []) if x]
+                                                    
+                                                    # Fallback to RR system (OB Setup) if API doesn't have TP/SL
+                                                    if not tp_list or not sl_list:
+                                                        if "markers" in data:
+                                                            is_long = float(pos.get("pos", 0)) > 0
+                                                            cands = [m for m in data["markers"] if m.get("type") == "SETUP" and ((m.get("side") == "LONG" and is_long) or (m.get("side") == "SHORT" and not is_long))]
+                                                            if cands:
+                                                                best = min(cands, key=lambda m: abs(float(m.get("price", 0)) - entry_px))
+                                                                b_px = float(best.get("price", 0))
+                                                                if b_px > 0 and abs(entry_px - b_px) / b_px <= 0.05: # Sai số 5%
+                                                                    if not tp_list and best.get("tp"): tp_list.append(float(best.get("tp")))
+                                                                    if not sl_list and best.get("sl"): sl_list.append(float(best.get("sl")))
+                                                    
                                                     chart_positions.append({
                                                         "entry": entry_px,
                                                         "tp_list": tp_list,
@@ -3071,19 +3185,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             const positions = {json.dumps(chart_positions)};
                                             positions.forEach(p => {{
                                                 if (p.entry) {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#00B894', lineStyle: 2, lineWidth: 2, title: 'ENTRY' }}));
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#00B894', lineStyle: 2, lineWidth: 2, title: p.title || 'ENTRY' }}));
                                                 }}
                                                 p.tp_list.forEach(tp => {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 2, title: 'TP' }}));
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 1, title: 'TP' }}));
                                                 }});
                                                 p.sl_list.forEach(sl => {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 2, title: 'SL' }}));
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 1, title: 'SL' }}));
                                                 }});
                                             }});
                                         }} catch(err) {{}}
                                     }})();
                                     """
-                                    self.chart_widget.run_script(js_lines)
+                                    self.chart_widget.win.run_script(js_lines)
                                     self._last_pos_lines_hash = pos_hash
                         except Exception as e:
                             pass
@@ -3756,7 +3870,14 @@ del /f /q "%~f0"
             panel = getattr(self, attr, None)
             if panel and hasattr(panel, 'worker'):
                 try:
-                    panel.worker.stop()
+                    if hasattr(panel, 'pos_worker') and panel.pos_worker:
+                        panel.pos_worker.stop()
+                        panel.pos_worker.wait(1000)
+                    if hasattr(panel, 'live_chart_worker') and panel.live_chart_worker:
+                        panel.live_chart_worker.stop()
+                        panel.live_chart_worker.wait(1000)
+                    if hasattr(panel, 'worker') and panel.worker:
+                        panel.worker.stop()
                 except:
                     pass
                     
@@ -3932,9 +4053,15 @@ import uuid
 
 def get_hwid():
     hwid_string = ""
+    import platform
     try:
-        # Lấy UUID của bo mạch chủ
-        hwid_string = subprocess.check_output('wmic csproduct get uuid', shell=True).decode().split('\n')[1].strip()
+        if platform.system() == "Darwin":  # macOS
+            hwid_string = subprocess.check_output(
+                "ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/{print $3}'",
+                shell=True, stderr=subprocess.DEVNULL
+            ).decode().strip().strip('"')
+        else:  # Windows
+            hwid_string = subprocess.check_output('wmic csproduct get uuid', shell=True, stderr=subprocess.DEVNULL).decode().split('\n')[1].strip()
     except:
         pass
     if not hwid_string:
@@ -4931,10 +5058,12 @@ if __name__ == "__main__":
             elif strategy == "sub2":
                 load_and_run("sys_bot_sub2", "sys_bot_sub2.py", env_file)
 
+        except SystemExit as e:
+            sys.exit(e.code)
         except BaseException as e:
             import traceback
             print(f"CRITICAL ERROR IN BOT {strategy}: {e}\n{traceback.format_exc()}")
-        sys.exit(0)
+            sys.exit(1)
     else:
         main()
 
@@ -4952,4 +5081,5 @@ if __name__ == "__main__":
 # z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
 # z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
 # z244 | Update: Sửa hiển thị OB (tăng opacity lên 35%), thêm vẽ đường kẻ Entry, TP, SL lên chart.
+# z245 | Update: Giảm OB opacity 10%, TP/SL lineWidth 1px, grid mờ 30%. Thêm nút Đóng lệnh OKX (Market). Bỏ cột Kích thước, bỏ prefix TP:/SL:. Thêm fallback tính TP/SL từ RR setting. Fix wmic macOS, utcnow deprecated, DEBUG spam. Font 13px. Xóa 60+ file test rác. Fix closeEvent QThread.
 
