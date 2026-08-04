@@ -1246,7 +1246,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_coin.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         self.combo_tf = QtWidgets.QComboBox()
-        self.combo_tf.setFixedWidth(55)
+        self.combo_tf.setFixedWidth(45)
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("1H")
         self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
@@ -4876,3 +4876,4 @@ if __name__ == "__main__":
 # z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
 # z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
 # z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
+# z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
