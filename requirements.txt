@@ -6,3 +6,4 @@ numpy
 pandas
 python-dotenv
 PyQt6-WebEngine
+psutil

@@ -28,17 +28,9 @@ data['version'] = new_v
 with open(v_path, 'w', encoding='utf-8') as f:
     json.dump(data, f, indent=4)
 
-# 2. Update gui_main.py
-with open(g_path, 'r', encoding='utf-8') as f:
-    content = f.read()
-
-content = re.sub(r'APP_VERSION\s*=\s*".*?"', f'APP_VERSION = "{new_v}"', content)
-with open(g_path, 'w', encoding='utf-8') as f:
-    f.write(content)
-
 print(f"[1] Đã tự động tăng Version từ {old_v} len {new_v}")
 
-# 3. Git Commands
+# 2. Git Commands
 git = r"C:\Program Files\Git\cmd\git.exe"
 
 print("[2] Đang lưu thay đổi (Commit) dưới danh nghĩa Ẩn danh (TLS1 Admin)...")
