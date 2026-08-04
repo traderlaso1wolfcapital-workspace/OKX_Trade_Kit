@@ -1249,7 +1249,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_tf.setFixedWidth(45)
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("1H")
-        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
+        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px; min-width: 0px;")
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)

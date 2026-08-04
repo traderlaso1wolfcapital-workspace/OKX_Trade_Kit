@@ -13,7 +13,7 @@ def update_wallet_metrics(client, env_paths: dict, system_config: dict):
         balance_data = client.request("GET", "/api/v5/account/balance", params={"ccy": "USDT"})
         usdt_details = balance_data.get("data", [{}])[0].get("details", [])
         
-        current_equity = Decimal("2000.00")  
+        current_equity = Decimal("2000.00")
         for detail in usdt_details:
             if detail.get("ccy") == "USDT":
                 current_equity = Decimal(str(detail.get("eq", "2000.00")))
