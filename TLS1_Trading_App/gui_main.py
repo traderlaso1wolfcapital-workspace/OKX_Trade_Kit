@@ -1232,7 +1232,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setFont(QtGui.QFont("Consolas", 12))
         self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.log_display.setStyleSheet(
-            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 17px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
+            "background-color: #111111; color: #FFB000; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 17px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
