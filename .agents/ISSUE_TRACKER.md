@@ -19,6 +19,21 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Sửa lỗi gạch ngang bóng mờ hiển thị chìm dưới lớp text khi có vị thế:
+  - **Nguyên nhân:** Khi bảng chuyển trạng thái từ Trống (không lệnh) sang Có lệnh, các ô chứa Widget (như PNL, Nút đóng) được đè lên trên lớp Text. Do background của Widget là trong suốt nên vạch ngang rỗng `—` của trạng thái cũ vẫn bị lộ bóng mờ từ bên dưới chiếu lên chữ.
+  - **Cập nhật:** Theo yêu cầu tinh gọn giao diện, tôi đã gỡ bỏ hoàn toàn ký tự dấu gạch ngang `—` trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Giờ đây, khi không có lệnh, các ô dữ liệu sẽ trống hoàn toàn (chuỗi rỗng `""`). Điều này giúp giao diện bảng Vị thế trông sạch sẽ tuyệt đối và triệt tiêu vĩnh viễn hiện tượng bóng mờ. (Mã patch: `z285`)
+
+- **[05/08/2026]** - Thêm hiệu ứng âm thanh (Sound Effect) khi Đóng lệnh thành công:
+  - **Cập nhật:** Đã loại bỏ hoàn toàn cơ chế `winsound` hệ thống gây ra lỗi không có tiếng trên một số máy. Thay vào đó, tôi đã tích hợp trực tiếp file âm thanh **Cha-Ching! Money** (`Cha-Ching-the-sound.mp3`) do CEO tự tay cung cấp, kết hợp sử dụng thư viện `QMediaPlayer` của PyQt6 để phát ra tiếng ngay tại thời điểm gọi API đóng lệnh trả về thành công trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Trải nghiệm nghe giờ đây cực kỳ đã tai (tiếng thu tiền), báo hiệu cho người dùng biết lệnh đã được chốt một cách chắc chắn và phấn khích. (Mã patch: `z284`)
+
+- **[05/08/2026]** - Sửa lỗi giao diện Bảng vị thế bị "dính" số liệu sau khi Đóng lệnh:
+  - **Nguyên nhân:** Khi Đóng lệnh xong, vị thế chuyển sang trạng thái trống (inactive). Code cũ chỉ gán lại chữ trống (`—`) cho các ô dữ liệu nhưng quên chưa xóa các `CellWidget` (chứa Label màu và Nút Đóng) được đè lên từ trước đó.
+  - **Cập nhật:** Đã bổ sung hàm `self.pos_table.removeCellWidget(row, c)` vào vòng lặp làm mới bảng trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Ngay khi phát hiện không còn vị thế, toàn bộ các Widget cũ của cột PNL, TP/SL và Nút Đóng sẽ bị "cạo sạch" và trả về đúng ký tự `—` nguyên thủy như chưa từng có lệnh nào được mở. (Mã patch: `z283`)
+
+- **[05/08/2026]** - Sửa lỗi không thể Đóng Lệnh khi đang có lệnh Chốt lời/Dừng lỗ chờ xử lý (autoCxl):
+  - **Nguyên nhân:** OKX API trả về lỗi *"Cancel all pending close-orders before liquidation"* (Lỗi 51023) do sàn OKX chặn việc gọi API Đóng toàn bộ Vị thế (`close-position`) nếu Vị thế đó đang tồn tại các lệnh chờ như Chốt Lời / Dừng Lỗ (TP/SL).
+  - **Cập nhật:** Đã cập nhật lại thuộc tính `autoCxl` từ `False` thành `True` trong Payload truyền đi qua API ở hàm `close_position()` trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Việc này sẽ ra lệnh cho OKX tự động hủy tất cả các lệnh TP/SL đang treo cản đường, và lập tức đóng Vị thế bằng Market ngay sau đó. Đảm bảo Đóng lệnh thành công trong mọi điều kiện. (Mã patch: `z282`)
+
 - **[05/08/2026]** - Tăng khoảng cách hiển thị ở Cột PNL Thả nổi:
   - **Cập nhật:** Đã xử lý lại chuỗi HTML hiển thị tại Cột 3 (PNL Thả nổi) trong [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Đổi 3 dấu cách thường thành ký tự `&nbsp;&nbsp;&nbsp;` để ép Qt nhận dạng chính xác 3 khoảng trắng giữa phần giá trị "USDT" và phần "Phần trăm (%)", giúp giao diện trông rộng rãi và dễ nhìn hơn. (Mã patch: `z281`)
 

@@ -1416,7 +1416,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "mgnMode": mgn_mode,
                 "posSide": pos_side,
                 "ccy": "",
-                "autoCxl": False
+                "autoCxl": True
             })
             
             message = ts + "POST" + path + body
@@ -1437,7 +1437,24 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if resp.status_code == 200:
                 result = resp.json()
                 if result.get("code") == "0":
-                    pass # Im lặng đóng lệnh thành công, không hiện popup
+                    # Phát âm thanh Cha-Ching! Money bằng QMediaPlayer
+                    try:
+                        from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+                        from PyQt6.QtCore import QUrl
+                        import os
+                        if not hasattr(self, "cha_ching_player"):
+                            self.cha_ching_player = QMediaPlayer(self)
+                            self.cha_ching_audio = QAudioOutput(self)
+                            self.cha_ching_audio.setVolume(1.0)
+                            self.cha_ching_player.setAudioOutput(self.cha_ching_audio)
+                            mp3_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media", "Cha-Ching-the-sound.mp3")
+                            self.cha_ching_player.setSource(QUrl.fromLocalFile(mp3_path))
+                        
+                        # Stop if playing and play again
+                        self.cha_ching_player.stop()
+                        self.cha_ching_player.play()
+                    except Exception as e:
+                        print("Lỗi phát âm thanh:", e)
                 else:
                     err_msg = result.get("msg", "Không rõ")
                     QtWidgets.QMessageBox.warning(self, "Lỗi từ OKX", f"Không thể đóng lệnh: {err_msg}")
@@ -1548,15 +1565,20 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.pos_table.setCellWidget(row, 0, w0)
 
             if not is_active:
-                # Cặp coin chưa có lệnh: Các cột 1..5 để trống (—)
+                # Cặp coin chưa có lệnh: Các cột 1..5 để trống hoàn toàn
                 for c in range(1, 6):
-                    item_empty = QtWidgets.QTableWidgetItem("—")
+                    self.pos_table.removeCellWidget(row, c)
+                    item_empty = QtWidgets.QTableWidgetItem("")
                     item_empty.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
                     item_empty.setForeground(QtGui.QColor("#555555"))
                     self.pos_table.setItem(row, c, item_empty)
                 continue
 
             # --- Vị thế đang active ---
+            # Xóa chữ trống "—" ở các cột dùng CellWidget để không bị bóng mờ đè dưới background
+            for c in [0, 3, 4, 5]:
+                self.pos_table.setItem(row, c, QtWidgets.QTableWidgetItem(""))
+
             # Cột 1 (Giá vào lệnh): Căn lề phải cách 3 khoảng trống tạo khoảng thở
             entry_px = _safe_float(pos.get("avgPx", 0))
             item1 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}   ")
