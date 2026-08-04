@@ -74,6 +74,9 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[04/08/2026]** - Lỗi UI/UX: Padding các nút quá lớn, font chữ bảng quá nhỏ, Light Mode bị lỗi trùng màu đen trắng cho Terminal Logs & Table, nút Cộng Đồng thiếu text. Đã fix: Điều chỉnh lại `apply_theme` CSS rules cho QTableWidget, QPushButton, QComboBox; thêm explicit colors cho Light Mode và bổ sung text cho nút Discord/Telegram. (Mã patch: `z247`)
+
+- **[04/08/2026]** - Lỗi v1.0.242 Vùng OB (Order Block) bị ẩn/không hiển thị trên chart. Đã fix: Sửa cơ chế binding HTML overlay vào đúng thẻ cha (wrapper) thay vì thẻ div container sai lệch; Bổ sung vòng lặp retry chờ chart render xong (priceToCoordinate = null fallback); Tích hợp thêm đường chỉ Entry ngang (dashed line) kéo dài từ nến OB qua phía phải giống hệt OKX UI (Mã patch: `z243`).
 - **[01/08/2026]** - Hoàn thành Task-OKX-Pos-01: Tích hợp Bảng Vị thế OKX Realtime vào giữa Chart và Logs (Chế độ dọc) kèm tính năng Toggle Checkbox `☑ Vị thế OKX` trong `gui_main.py`. Cập nhật luồng `OKXPositionsWorker` kéo API trực tiếp. (Mã patch: `z-task-okx-pos-01`)
 - **[01/08/2026]** - Hoàn thành Task-Test-01: Thêm dòng log xác nhận cập nhật kiến trúc V2 vào hàm `main()` trong `sys_bot_sub2.py`. (Mã patch: `z-task-test-01`)
 

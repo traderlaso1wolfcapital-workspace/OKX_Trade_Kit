@@ -276,36 +276,68 @@ def find_order_block(
     parsed_highs: list, parsed_lows: list, times: list,
     pivot_bar_index: int, current_bar_index: int,
     bias: int, source: str,
-    highs: list = None, lows: list = None  # Giá nguyên bản (đỉnh/râu thật) cho SL
+    highs: list = None, lows: list = None,  # Giá nguyên bản (đỉnh/râu thật) cho SL
+    opens: list = None, closes: list = None # Giá open/close để xác định màu nến
 ) -> Optional[OrderBlock]:
     """
-    Port của storeOrderBlock():
-        BEARISH: a_rray = parsedHighs.slice(p_ivot.barIndex, bar_index)
-                 parsedIndex = p_ivot.barIndex + indexof(max)
-        BULLISH: a_rray = parsedLows.slice(p_ivot.barIndex, bar_index)
-                 parsedIndex = p_ivot.barIndex + indexof(min)
+    SMC Order Block Logic chuẩn:
+        BULLISH OB: Nến giảm cuối cùng (close < open) trước nhịp tăng phá vỡ cấu trúc.
+        BEARISH OB: Nến tăng cuối cùng (close > open) trước nhịp giảm phá vỡ cấu trúc.
+    Nếu không tìm thấy nến ngược màu, fallback về đỉnh cao nhất / đáy thấp nhất.
+    Vùng OB được vẽ từ high đến low của nguyên cây nến.
     """
     start = pivot_bar_index
     end = current_bar_index
     if start < 0 or end >= len(parsed_highs) or start >= end:
         return None
 
-    if bias == BEARISH:
-        sub = parsed_highs[start:end]
-        if not sub:
-            return None
-        best_i = sub.index(max(sub)) + start
+    best_i = -1
+    
+    # Chỉ sử dụng logic tìm nến ngược màu nếu opens và closes được truyền vào
+    if opens is not None and closes is not None:
+        if bias == BEARISH:
+            # Tìm nến TĂNG cuối cùng (close > open) ngược từ end về start
+            for i in range(end - 1, start - 1, -1):
+                if i < len(closes) and closes[i] > opens[i]:
+                    best_i = i
+                    break
+            # Fallback nếu không có nến tăng
+            if best_i == -1:
+                sub = parsed_highs[start:end]
+                if sub:
+                    best_i = sub.index(max(sub)) + start
+        else: # BULLISH
+            # Tìm nến GIẢM cuối cùng (close < open) ngược từ end về start
+            for i in range(end - 1, start - 1, -1):
+                if i < len(closes) and closes[i] < opens[i]:
+                    best_i = i
+                    break
+            # Fallback nếu không có nến giảm
+            if best_i == -1:
+                sub = parsed_lows[start:end]
+                if sub:
+                    best_i = sub.index(min(sub)) + start
     else:
-        sub = parsed_lows[start:end]
-        if not sub:
-            return None
-        best_i = sub.index(min(sub)) + start
+        # Logic cũ (fallback khi không có opens/closes)
+        if bias == BEARISH:
+            sub = parsed_highs[start:end]
+            if not sub:
+                return None
+            best_i = sub.index(max(sub)) + start
+        else:
+            sub = parsed_lows[start:end]
+            if not sub:
+                return None
+            best_i = sub.index(min(sub)) + start
 
-    # Lấy đỉnh/râu nguyên bản và parsed của đúng nến OB (1 nến gốc)
+    if best_i == -1:
+        return None
+
+    # Vùng OB SMC sử dụng râu thật của chính cây nến đó
     raw_h = highs[best_i] if highs and best_i < len(highs) else parsed_highs[best_i]
     raw_l = lows[best_i] if lows and best_i < len(lows) else parsed_lows[best_i]
-    bar_h = parsed_highs[best_i]
-    bar_l = parsed_lows[best_i]
+    bar_h = raw_h
+    bar_l = raw_l
 
     return OrderBlock(
         bar_high=bar_h,
@@ -633,3 +665,4 @@ def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
         return False
 
 # z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge), sửa TP H1 RR 1:5, H2 RR 1:1
+# z1950 | Update: Sửa lại logic find_order_block dùng chuẩn SMC (tìm nến ngược màu cuối cùng)

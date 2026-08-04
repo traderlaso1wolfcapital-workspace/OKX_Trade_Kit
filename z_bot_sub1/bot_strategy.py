@@ -333,7 +333,7 @@ def get_current_candle_start_ms(tf_str: str) -> int:
     return (ts_sec // period) * period * 1000
 
 def get_nearest_opposite_ema200(tracker, side, pos_tf):
-    tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+    tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
     try: start_idx = tfs.index(pos_tf) + 1
     except ValueError: return Decimal("0")
     for tf in tfs[start_idx:]:
@@ -414,7 +414,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             }
         
         # Đảm bảo toàn bộ các khung thời gian đều có đầy đủ cấu trúc
-        for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
+        for tf in [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]:
             tracker.mtf_states.setdefault(tf, {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False})
             
         tracker.placed_target_tf = "M5"
@@ -639,7 +639,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
                     break
             
-            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            tfs_order = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
             if not old_has:
                 # Cumulative matching (khi restart bot, tính tổng volume dồn)
                 cumulative_vols = {}
@@ -669,7 +669,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             for o in pending:
                 cl_id = o.get("clOrdId", "")
                 if cl_id.startswith(prefix):
-                    for tf_cand in ["M5", "M15", "M30", "H1", "H2", "H4"]:
+                    for tf_cand in [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]:
                         if cl_id[len(prefix):].startswith(tf_cand):
                             pending_tfs.add(tf_cand)
                             break
@@ -690,7 +690,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         except: pass
 
         # Fallback 3: Dò TF có EMA200 gần entry nhất
-        TFS = ["M5", "M15", "M30", "H1", "H2", "H4"]
+        TFS = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
         best_tf = None
         min_diff = Decimal("inf")
         for tf in TFS:
@@ -912,7 +912,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                 "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
             })
 
-            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            tfs_order = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
             cum_vols = {}
             cum = Decimal("0")
             for tf in tfs_order:
@@ -1609,7 +1609,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             return []
         
 
-        TFS = ["M5", "M15", "M30", "H1", "H2", "H4"]
+        TFS = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
         if trigger_tf not in TFS:
             return [trigger_tf]
         idx = TFS.index(trigger_tf)
@@ -1751,7 +1751,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         if not getattr(trk, "is_macro_overextended", False):
             return False, None, None, None, None, None
             
-        tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+        tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
         
         def is_raw_up(tf):
             e34 = getattr(trk, f"{tf.lower()}_ema34", trk.ema34 if tf == "M5" else Decimal("0"))
@@ -2057,7 +2057,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             if tracker.placed_entry_px_short == "---":
                 tracker.placed_entry_px_short_by_tf = {}
 
-            TFS_ALL = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            TFS_ALL = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
 
             actual_pending = []
             # ⚡ Khởi tạo mặc định để tránh lỗi "cannot access local variable"
@@ -2213,7 +2213,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                             print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã chạm về trạm H2. Mở lại lưới M5, M15, M30!")
 
             _is_overextended = getattr(tracker, "is_macro_overextended", False)
-            _blocked_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"] if _is_overextended else []
+            _blocked_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])] if _is_overextended else []
 
             aligned_long_tfs = get_aligned_tfs(start_tf, "UPTREND") if allowed_long else []
             # ⚡ DCA FILTER MỚI: Dùng pos_cycle_filled_tfs thay vì active_pos_tf
@@ -2721,3 +2721,4 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # z7717 | Marker Feature: Tích hợp ghi log trade_markers (B/S tag) tại thời điểm entry/exit để GUI vẽ lên Chart.
 
 # z7718 | Tắt tính năng log print ra console đối với các lệnh '[SYNC]' để app GUI không bị rác màn hình.
+# z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup

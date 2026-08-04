@@ -151,9 +151,9 @@ def get_app_version():
                 base_dir = os.path.dirname(base_dir)
         v_file = os.path.join(base_dir, "version.json")
         with open(v_file, "r", encoding="utf-8") as f:
-            return json.load(f).get("version", "1.0.248")
+            return json.load(f).get("version", "1.0.271")
     except:
-        return "1.0.248"
+        return "1.0.271"
 
 APP_VERSION = get_app_version()
 
@@ -536,6 +536,7 @@ class LiveChartWorker(QtCore.QThread):
                                                 merged.append(o)
                                     ob_boxes.extend(merged)
                                 chart_data["ob_boxes"] = ob_boxes
+                                print(f"DEBUG: Found {len(ob_boxes)} OBs for {self.inst_id}")
                                 
                                 # Add trade setups as markers
                                 if "markers" not in chart_data:
@@ -1155,9 +1156,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.dash_chk_eth.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
         self.dash_chk_eth.stateChanged.connect(lambda s: self._on_dash_coin_toggled("eth", s))
         
-        dash_coins_layout.addWidget(self.dash_chk_xau)
-        dash_coins_layout.addWidget(self.dash_chk_btc)
         dash_coins_layout.addWidget(self.dash_chk_eth)
+        self.dash_active_coins_box.hide()
         top_panel.addWidget(self.dash_active_coins_box)
         top_panel.addStretch(1)
         
@@ -1222,8 +1222,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setFont(QtGui.QFont("Consolas", 12))
         self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.log_display.setStyleSheet(
-            "background-color: #f5f5f5; color: #000000; font-family: 'Consolas', 'Cascadia Code', 'Courier New', monospace; font-size: 18px; font-weight: normal;"
-            "border: 1px solid #cccccc; border-radius: 4px;"
+            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 18px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
@@ -1247,9 +1246,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_coin.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         self.combo_tf = QtWidgets.QComboBox()
+        self.combo_tf.setFixedWidth(45)
         self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
         self.combo_tf.setCurrentText("1H")
-        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
+        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px; min-width: 0px;")
         
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
@@ -1284,11 +1284,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             # Polyfill chống lỗi undefined object khi load JS asynchronously
             self.chart_widget.run_script(f"""
                 if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
-                if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
                 
                 if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
+                if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}} }};
             """)
             
             # Khởi chạy luồng lấy dữ liệu chart auto
@@ -1309,19 +1309,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pos_layout = QtWidgets.QVBoxLayout(self.tab_positions)
         pos_layout.setContentsMargins(0, 5, 0, 5)
         
-        self.pos_table = QtWidgets.QTableWidget(0, 6)
-        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "Kích thước", "PNL thả nổi", "Chốt lời | Dừng lỗ"])
+        self.pos_table = QtWidgets.QTableWidget(0, 7)
+        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "Kích thước", "PNL thả nổi", "Chốt lời | Dừng lỗ", "Line"])
         header = self.pos_table.horizontalHeader()
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.pos_table.setStyleSheet(
-            "QTableWidget { background-color: #1e1e1e; color: #e0e0e0; font-size: 14px; font-weight: normal; gridline-color: #333333; border: 1px solid #333333; } "
-            "QTableWidget::item { padding: 4px 10px; font-size: 14px; font-weight: normal; } "
-            "QHeaderView::section { background-color: #2a2a2a; color: #ffffff; font-weight: bold; font-size: 14px; border: 1px solid #333333; padding: 5px 8px; }"
+            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 14px; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
@@ -1409,6 +1409,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
             return
+            
+        self._current_positions = positions
 
         def _safe_float(val):
             try:
@@ -1433,7 +1435,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
             mgnMode = "Chéo" if pos.get("mgnMode") == "cross" else "Cô lập"
             
             # Cột 1
-            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({lever}x {mgnMode})")
+            side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
+            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({side} {lever}x)")
             item1.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
             # Cột 2
@@ -1441,20 +1444,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}")
             item2.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
             
-            # Cột 4
+            # Cột 3 (Kích thước)
             size = _safe_float(pos.get("notionalUsd", pos.get("notional", 0)))
-            item4 = QtWidgets.QTableWidgetItem(f"{size:,.2f} USDT")
-            item4.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
-
-            # Cột 3
-            margin = _safe_float(pos.get("mgn", pos.get("margin", pos.get("imr", 0))))
-            lever_num = _safe_float(lever)
-            if margin == 0 and size > 0 and lever_num > 0:
-                margin = size / lever_num
-            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f}$")
+            item3 = QtWidgets.QTableWidgetItem(f"{size:,.2f} USDT")
             item3.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
-            
-            # Cột 5
+
+            # Cột 4 (PNL)
             upl = _safe_float(pos.get("upl", 0))
             upl_ratio = _safe_float(pos.get("uplRatio", 0)) * 100
             color_str = "#26a69a" if upl >= 0 else "#ef5350"
@@ -1464,20 +1459,35 @@ class BotInstanceWidget(QtWidgets.QWidget):
             pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             pnl_label.setStyleSheet(f"color: {color_str}; background: transparent; font-weight: normal;")
             
-            # Cột 6
+            # Cột 5 (TP/SL)
             tp_list = pos.get("tp_list", [])
             sl_list = pos.get("sl_list", [])
             tp_str = ", ".join(tp_list) if tp_list else "None"
             sl_str = ", ".join(sl_list) if sl_list else "None"
-            item6 = QtWidgets.QTableWidgetItem(f"TP: {tp_str} | SL: {sl_str}")
-            item6.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+            item5 = QtWidgets.QTableWidgetItem(f"TP: {tp_str} | SL: {sl_str}")
+            item5.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+            
+            # Cột 6 (Line chk)
+            chk_icon = "☑" if self.show_chart_pos_lines else "☐"
+            item_chk = QtWidgets.QTableWidgetItem(chk_icon)
+            item_chk.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+            
+            # Cột 7 (Close button)
+            btn_close = QtWidgets.QPushButton("✖ Đóng")
+            btn_close.setStyleSheet("background-color: #ef5350; color: white; padding: 2px 8px; border-radius: 2px; border: none; min-height: 20px; font-weight: bold; font-size: 11px;")
+            btn_close.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+            full_instId = pos.get("instId", "")
+            mgnMode = pos.get("mgnMode", "cross")
+            posSide = pos.get("posSide", "net")
+            btn_close.clicked.connect(lambda checked, i=full_instId, m=mgnMode, s=posSide: self.close_position(i, m, s))
             
             self.pos_table.setItem(row, 0, item1)
             self.pos_table.setItem(row, 1, item2)
             self.pos_table.setItem(row, 2, item3)
-            self.pos_table.setItem(row, 3, item4)
-            self.pos_table.setCellWidget(row, 4, pnl_label)
-            self.pos_table.setItem(row, 5, item6)
+            self.pos_table.setCellWidget(row, 3, pnl_label)
+            self.pos_table.setItem(row, 4, item5)
+            self.pos_table.setItem(row, 5, item_chk)
+            self.pos_table.setCellWidget(row, 6, btn_close)
             
     def apply_current_api_to_worker(self):
         if not hasattr(self, 'pos_worker'):
@@ -1644,6 +1654,43 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def setup_tab_community(self):
         layout = QtWidgets.QVBoxLayout(self.tab_community)
         layout.setContentsMargins(10, 10, 10, 10)
+
+        def get_media_path(img_name):
+            import sys, os
+            if getattr(sys, 'frozen', False):
+                return os.path.join(sys._MEIPASS, "media", img_name)
+            p1 = os.path.join(os.path.dirname(os.path.dirname(__file__)), "media", img_name)
+            if os.path.exists(p1): return p1
+            return os.path.join(os.path.dirname(__file__), "media", img_name)
+
+        btn_discord = QtWidgets.QPushButton()
+        btn_discord.setIcon(QtGui.QIcon(get_media_path("Discord.png")))
+        btn_discord.setIconSize(QtCore.QSize(28, 28))
+        btn_discord.setStyleSheet("background: transparent; border: none; margin-right: -10px;")
+        btn_discord.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        try: btn_discord.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
+        except: pass
+        btn_discord.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://discord.gg/cS4QXJTpnb")))
+        self.discord_hover = ButtonHoverSoundFilter(btn_discord)
+        btn_discord.installEventFilter(self.discord_hover)
+        
+        btn_telegram = QtWidgets.QPushButton()
+        btn_telegram.setIcon(QtGui.QIcon(get_media_path("Telegram.png")))
+        btn_telegram.setIconSize(QtCore.QSize(28, 28))
+        btn_telegram.setStyleSheet("background: transparent; border: none;")
+        btn_telegram.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        try: btn_telegram.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
+        except: pass
+        btn_telegram.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://t.me/traderlaso1")))
+        self.telegram_hover = ButtonHoverSoundFilter(btn_telegram)
+        btn_telegram.installEventFilter(self.telegram_hover)
+        
+        social_layout = QtWidgets.QHBoxLayout()
+        social_layout.addWidget(btn_discord)
+        social_layout.addWidget(btn_telegram)
+        social_layout.addStretch()
+        layout.addLayout(social_layout)
+
         
         title = QtWidgets.QLabel("💬 Cộng đồng TRADER LÀ SỐ 1 - Realtime Chat")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffb74d;")
@@ -1812,7 +1859,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
             layout_obj.addLayout(h_lbl, row, col, 1, colspan)
 
 
-        # 0. DANH MỤC GIAO DỊCH
+        # 0. GIAO DIỆN & LOGO
+        grp_ui = QtWidgets.QGroupBox("Giao Diện & Hệ Thống")
+        grp_ui.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_ui = QtWidgets.QHBoxLayout(grp_ui)
+        
+        self.chk_light_mode = QtWidgets.QCheckBox("Light Mode (Giao diện sáng)")
+        self.chk_light_mode.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
+        # self.chk_light_mode.stateChanged.connect(self.toggle_theme)
+        
+        lbl_logo = QtWidgets.QLabel()
+        lbl_logo.setText("Logo TLS1")
+        lbl_logo.setStyleSheet("color: #ff9900; font-weight: bold;")
+        
+        l_ui.addWidget(self.chk_light_mode)
+        l_ui.addWidget(lbl_logo)
+        l_ui.addStretch(1)
+        layout.addWidget(grp_ui)
+
+        # 0.1. DANH MỤC GIAO DỊCH
         grp_active_coins = QtWidgets.QGroupBox("Danh Mục Giao Dịch")
         grp_active_coins.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
         l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
@@ -1836,6 +1901,26 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins.addWidget(self.chk_cfg_btc)
         l_active_coins.addWidget(self.chk_cfg_eth)
         layout.addWidget(grp_active_coins)
+
+                # 0.2. KHUNG THỜI GIAN GIAO DỊCH
+        grp_tfs = QtWidgets.QGroupBox("Khung Thời Gian Giao Dịch")
+        grp_tfs.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_tfs = QtWidgets.QHBoxLayout(grp_tfs)
+        
+        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style)
+        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style)
+        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style)
+        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style)
+        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style)
+        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style)
+        
+        l_tfs.addWidget(self.chk_tf_m5)
+        l_tfs.addWidget(self.chk_tf_m15)
+        l_tfs.addWidget(self.chk_tf_m30)
+        l_tfs.addWidget(self.chk_tf_h1)
+        l_tfs.addWidget(self.chk_tf_h2)
+        l_tfs.addWidget(self.chk_tf_h4)
+        layout.addWidget(grp_tfs)
 
         # 1. CÔNG TẮC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Công Tắc Chiến Thuật")
@@ -2000,7 +2085,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
             h.addStretch()
             layout_obj.addLayout(h, row, col, 1, colspan)
 
-        # 0. DANH MỤC GIAO DỊCH
+        # 0. GIAO DIỆN & LOGO
+        grp_ui = QtWidgets.QGroupBox("Giao Diện & Hệ Thống")
+        grp_ui.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
+        l_ui = QtWidgets.QHBoxLayout(grp_ui)
+        
+        self.smc_chk_light_mode = QtWidgets.QCheckBox("Light Mode (Giao diện sáng)")
+        self.smc_chk_light_mode.setStyleSheet("font-size: 11px; font-weight: bold; color: #e0e0e0;")
+        # self.smc_chk_light_mode.stateChanged.connect(self.toggle_theme)
+        
+        lbl_logo_smc = QtWidgets.QLabel()
+        lbl_logo_smc.setText("Logo TLS1")
+        lbl_logo_smc.setStyleSheet("color: #ff9900; font-weight: bold;")
+        
+        l_ui.addWidget(self.smc_chk_light_mode)
+        l_ui.addWidget(lbl_logo_smc)
+        l_ui.addStretch(1)
+        layout.addWidget(grp_ui)
+
+        # 0.1. DANH MỤC GIAO DỊCH
         grp_active_coins = QtWidgets.QGroupBox("Danh Mục Giao Dịch")
         grp_active_coins.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
         l_active_coins = QtWidgets.QHBoxLayout(grp_active_coins)
@@ -2236,6 +2339,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     pass
                 return
 
+            
+            enabled_tfs = cfg.get("ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+            if hasattr(self, 'chk_tf_m5'): self.chk_tf_m5.setChecked("M5" in enabled_tfs)
+            if hasattr(self, 'chk_tf_m15'): self.chk_tf_m15.setChecked("M15" in enabled_tfs)
+            if hasattr(self, 'chk_tf_m30'): self.chk_tf_m30.setChecked("M30" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h1'): self.chk_tf_h1.setChecked("H1" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h2'): self.chk_tf_h2.setChecked("H2" in enabled_tfs)
+            if hasattr(self, 'chk_tf_h4'): self.chk_tf_h4.setChecked("H4" in enabled_tfs)
+            
             self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
             self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
             self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
@@ -2521,6 +2633,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             cfg.update({
                 "ENABLED_COINS": enabled,
                 "RESET_CONFIG_V23": True,
+                
+                "ENABLED_TFS": [tf for tf, chk in [("M5", getattr(self, 'chk_tf_m5', None)), 
+                                                   ("M15", getattr(self, 'chk_tf_m15', None)), 
+                                                   ("M30", getattr(self, 'chk_tf_m30', None)), 
+                                                   ("H1", getattr(self, 'chk_tf_h1', None)), 
+                                                   ("H2", getattr(self, 'chk_tf_h2', None)), 
+                                                   ("H4", getattr(self, 'chk_tf_h4', None))] if chk and chk.isChecked()],
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
@@ -2723,23 +2842,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         # Polyfill chống lỗi undefined object khi load JS asynchronously
                         self.chart_widget.run_script(f"""
                             if (!window['{self.chart_widget.id}']) window['{self.chart_widget.id}'] = {{}};
-                            if (!window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
-                            if (!window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
+                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].series) window['{self.chart_widget.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                            if (window['{self.chart_widget.id}'] && !window['{self.chart_widget.id}'].volumeSeries) window['{self.chart_widget.id}'].volumeSeries = {{ update: function(){{}}, setData: function(){{}} }};
                             
                             if (!window['{self.ema_line.id}']) window['{self.ema_line.id}'] = {{}};
-                            if (!window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
+                            if (window['{self.ema_line.id}'] && !window['{self.ema_line.id}'].series) window['{self.ema_line.id}'].series = {{ setMarkers: function(){{}}, update: function(){{}}, setData: function(){{}}, applyOptions: function(){{}} }};
                         """)
                         self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
                         self.ema_line.set(df[['time', 'EMA 200']].dropna())
                         self.chart_widget.run_script(f"""
-                            try {{
-                                let cw = window['{self.chart_widget.id}'];
-                                if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
-                                    cw.series.setMarkers = function(m) {{
-                                        try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
-                                    }};
-                                }}
-                            }} catch(e) {{}}
+                            setInterval(function() {{
+                                try {{
+                                    let cw = window['{self.chart_widget.id}'];
+                                    if (cw && cw.series && typeof cw.series.setMarkers !== 'function') {{
+                                        cw.series.setMarkers = function(m) {{
+                                            try {{ if (this.markers) this.markers().set(m); }} catch(e) {{}}
+                                        }};
+                                    }}
+                                }} catch(e) {{}}
+                            }}, 1000);
                         """)
                         self._chart_initialized = True
                         self.chart_widget.spinner(False)
@@ -2782,7 +2903,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         js_code = f"""
                         (function() {{
                             try {{
-                                let chartObj = window['{self.chart_widget.id}'] || window.{self.chart_widget.id};
+                                let chartObj = window['{self.chart_widget.id}'];
                                 if (!chartObj && window.pythonObject) {{
                                     for (let key in window) {{
                                         try {{
@@ -2842,7 +2963,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         const h = Math.max(botY - topY, 4);
                                         const isBull = (ob.bias === 1);
 
-                                        let startX = 50;
+                                        let startX = null;
                                         if (chart && chart.timeScale && ob.time && ob.time > 0) {{
                                             try {{
                                                 const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
@@ -2853,16 +2974,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             }} catch(e) {{}}
                                         }}
 
+                                        // Nếu không lấy được toạ độ hợp lệ (null) thì vẽ từ sát lề trái
+                                        if (startX === null) startX = 0;
+                                        if (startX < -2000) startX = -2000;
+                                        
                                         // Nếu OB ở quá xa về bên phải so với cột giá thì không vẽ
                                         if (startX >= maxRightX) return;
-                                        
-                                        // Ẩn nếu OB nằm ngoài màn hình bên trái quá xa
-                                        if (startX < -1000) return;
 
                                         const boxWidth = maxRightX - startX;
                                         if (boxWidth <= 0) return;
 
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.38)' : 'rgba(198, 40, 40, 0.38)';
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.35)' : 'rgba(198, 40, 40, 0.35)';
 
                                         const box = document.createElement('div');
                                         box.style.position = 'absolute';
@@ -2894,6 +3016,70 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         try:
                             self.chart_widget.run_script(js_code)
                         except Exception:
+                            pass
+                            
+                        # Vẽ Price Lines cho ENTRY, TP, SL
+                        try:
+                            if getattr(self, 'show_chart_pos_lines', True):
+                                current_coin = self.combo_coin.currentData()
+                                chart_positions = []
+                                if hasattr(self, '_current_positions'):
+                                    for pos in self._current_positions:
+                                        if pos.get("instId") == current_coin:
+                                            try:
+                                                if float(pos.get("pos", 0)) != 0:
+                                                    entry_px = float(pos.get("avgPx", 0))
+                                                    tp_list = [float(x) for x in pos.get("tp_list", []) if x]
+                                                    sl_list = [float(x) for x in pos.get("sl_list", []) if x]
+                                                    chart_positions.append({
+                                                        "entry": entry_px,
+                                                        "tp_list": tp_list,
+                                                        "sl_list": sl_list
+                                                    })
+                                            except: pass
+                                
+                                import hashlib
+                                pos_str = json.dumps(chart_positions)
+                                pos_hash = hashlib.md5(pos_str.encode()).hexdigest()
+                                
+                                if getattr(self, '_last_pos_lines_hash', None) != pos_hash:
+                                    js_lines = f"""
+                                    (function() {{
+                                        try {{
+                                            let chartObj = window['{self.chart_widget.id}'];
+                                            if (!chartObj && window.pythonObject) {{
+                                                for (let key in window) {{
+                                                    try {{
+                                                        if (window[key] && window[key].series) {{ chartObj = window[key]; break; }}
+                                                    }} catch(e){{}}
+                                                }}
+                                            }}
+                                            if (!chartObj || !chartObj.series) return;
+                                            const series = chartObj.series;
+                                            
+                                            if (window._my_price_lines) {{
+                                                window._my_price_lines.forEach(l => {{ try {{ series.removePriceLine(l); }} catch(e){{}} }});
+                                            }}
+                                            window._my_price_lines = [];
+                                            
+                                            const positions = {json.dumps(chart_positions)};
+                                            positions.forEach(p => {{
+                                                if (p.entry) {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#00B894', lineStyle: 2, lineWidth: 2, title: 'ENTRY' }}));
+                                                }}
+                                                p.tp_list.forEach(tp => {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 2, title: 'TP' }}));
+                                                }});
+                                                p.sl_list.forEach(sl => {{
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 2, title: 'SL' }}));
+                                                }});
+                                            }});
+                                        }} catch(err) {{}}
+                                    }})();
+                                    """
+                                    self.chart_widget.run_script(js_lines)
+                                    self._last_pos_lines_hash = pos_hash
+                        except Exception as e:
                             pass
             except Exception as e:
                 import traceback
@@ -3256,34 +3442,6 @@ class MainWindow(QtWidgets.QMainWindow):
             if os.path.exists(p1):
                 return p1
             return os.path.join(PROJECT_DIR, "TLS1_Trading_App", "media", img_name)
-
-        btn_discord = QtWidgets.QPushButton()
-        btn_discord.setIcon(QtGui.QIcon(get_media_path("Discord.png")))
-        btn_discord.setIconSize(QtCore.QSize(28, 28))
-        btn_discord.setStyleSheet("background: transparent; border: none; margin-right: -10px;")
-        btn_discord.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_discord.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
-        btn_discord.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://discord.gg/cS4QXJTpnb")))
-        self.discord_hover = ButtonHoverSoundFilter(btn_discord)
-        btn_discord.installEventFilter(self.discord_hover)
-        # Add to social_layout later
-        
-        btn_telegram = QtWidgets.QPushButton()
-        btn_telegram.setIcon(QtGui.QIcon(get_media_path("Telegram.png")))
-        btn_telegram.setIconSize(QtCore.QSize(28, 28))
-        btn_telegram.setStyleSheet("background: transparent; border: none;")
-        btn_telegram.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_telegram.clicked.connect(lambda: __import__('winsound').Beep(1000, 4))
-        btn_telegram.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://t.me/traderlaso1")))
-        self.telegram_hover = ButtonHoverSoundFilter(btn_telegram)
-        btn_telegram.installEventFilter(self.telegram_hover)
-        
-        social_layout = QtWidgets.QHBoxLayout()
-        social_layout.setSpacing(0)
-        social_layout.addWidget(btn_discord)
-        social_layout.addWidget(btn_telegram)
-        social_layout.setContentsMargins(15, 0, 0, 0)
-        header_layout.insertLayout(1, social_layout)
         # Label hiển thị số người đang online
         self.lbl_online_count = QtWidgets.QLabel("")
         self.lbl_online_count.setStyleSheet("""
@@ -3524,6 +3682,28 @@ del /f /q "%~f0"
             # Fallback mở trình duyệt nếu chạy code hoặc trên Mac
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
+    def apply_light_theme(self):
+        self.is_dark_mode = False
+        self.setStyleSheet("""
+            QMainWindow { background-color: #f5f5f7; }
+            QWidget { color: #111111; font-size: 14px; }
+            QTabWidget#OuterTabs > QTabBar::tab { background-color: #e0e0e0; color: #333333; border: 1px solid #cccccc; padding: 10px 24px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 4px; font-size: 14px; font-weight: bold; }
+            QTabWidget#OuterTabs > QTabBar::tab:selected { background-color: #ffffff; color: #00ccff; font-weight: bold; border-top: 3px solid #00ccff; border-bottom: 2px solid #ffffff; }
+            QTableWidget { background-color: #ffffff; color: #111111; gridline-color: #cccccc; border: 1px solid #cccccc; font-size: 13px; }
+            QHeaderView::section { background-color: #e0e0e0; color: #111111; font-weight: bold; border: 1px solid #cccccc; padding: 4px; }
+            QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit { background-color: #ffffff; color: #111111; border: 1px solid #cccccc; border-radius: 4px; padding: 4px; }
+        """)
+        
+    def toggle_theme(self, state):
+        if state == QtCore.Qt.CheckState.Checked.value:
+            self.apply_light_theme()
+            if hasattr(self, 'smc_chk_light_mode') and self.smc_chk_light_mode.isChecked() == False: self.smc_chk_light_mode.setChecked(True)
+            if hasattr(self, 'chk_light_mode') and self.chk_light_mode.isChecked() == False: self.chk_light_mode.setChecked(True)
+        else:
+            self.apply_dark_theme()
+            if hasattr(self, 'smc_chk_light_mode') and self.smc_chk_light_mode.isChecked(): self.smc_chk_light_mode.setChecked(False)
+            if hasattr(self, 'chk_light_mode') and self.chk_light_mode.isChecked(): self.chk_light_mode.setChecked(False)
+
     def start_presence(self, uid, nickname):
         """Khởi động PresenceManager sau khi login thành công."""
         self.presence_manager = PresenceManager(self)
@@ -3608,7 +3788,7 @@ del /f /q "%~f0"
         self.setStyleSheet("""
             QMainWindow { background-color: #121212; }
 QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00; padding: 5px; font-weight: bold; }
-            QWidget { color: #e0e0e0; font-family: "Segoe UI"; font-size: 13px; }
+            QWidget { color: #e0e0e0; font-size: 14px; }
             
             QDialog, QMessageBox, QProgressDialog, QInputDialog {
                 background-color: #ffffff;
@@ -3650,10 +3830,10 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             }
             QTabWidget#OuterTabs > QTabBar::tab:selected { 
                 background-color: #242424; 
-                color: #ffaa00; 
+                color: #00ccff; 
                 font-weight: bold; 
                 border: 1px solid #3a3a3a; 
-                border-top: 3px solid #ff9900; 
+                border-top: 3px solid #00ccff; 
                 border-bottom: 2px solid #242424; 
             }
             QTabWidget#OuterTabs > QTabBar::tab:hover { 
@@ -3682,10 +3862,10 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             }
             QTabWidget#InnerTabs > QTabBar::tab:selected { 
                 background-color: #1e1e1e; 
-                color: #ffaa00; 
+                color: #00ccff; 
                 font-weight: bold; 
                 border: 1px solid #3d3d3d; 
-                border-top: 2px solid #ffaa00; 
+                border-top: 2px solid #00ccff; 
                 border-bottom: 2px solid #1e1e1e; 
             }
             QTabWidget#InnerTabs > QTabBar::tab:hover { 
@@ -4762,3 +4942,8 @@ if __name__ == "__main__":
 
 # z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json
 # z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
+# z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
+# z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
+# z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
+# z244 | Update: Sửa hiển thị OB (tăng opacity lên 35%), thêm vẽ đường kẻ Entry, TP, SL lên chart.
+
