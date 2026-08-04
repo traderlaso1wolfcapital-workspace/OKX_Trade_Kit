@@ -577,6 +577,12 @@ class LiveChartWorker(QtCore.QThread):
         self.wait()
 
 
+class FocusClearTableWidget(QtWidgets.QTableWidget):
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.clearSelection()
+
+
 class OKXPositionsWorker(QtCore.QThread):
     positions_signal = QtCore.pyqtSignal(list)
 
@@ -1176,7 +1182,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_open_settings.installEventFilter(self.btn_open_settings_hover)
             self.btn_open_settings.clicked.connect(self.open_settings_dialog)
 
-            self.btn_open_community = QtWidgets.QPushButton("💬 Cộng Đồng")
+            self.btn_open_community = QtWidgets.QPushButton("💬 Join Cộng đồng")
             self.btn_open_community.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
             self.btn_open_community.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_open_community.setStyleSheet("""
@@ -1209,7 +1215,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Tab 1: Logs
         self.tab_logs = QtWidgets.QWidget()
         console_layout = QtWidgets.QVBoxLayout(self.tab_logs)
-        console_layout.setContentsMargins(5, 5, 5, 5)
+        console_layout.setContentsMargins(5, 2, 5, 5)
+        console_layout.setSpacing(4)
         
         log_header = QtWidgets.QHBoxLayout()
         log_header.addWidget(QtWidgets.QLabel("Terminal Logs:"))
@@ -1222,10 +1229,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.log_display.setReadOnly(True)
         self.log_display.setMaximumBlockCount(100)
         self.log_display.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
-        self.log_display.setFont(QtGui.QFont("Consolas", 11))
+        self.log_display.setFont(QtGui.QFont("Consolas", 12))
         self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.log_display.setStyleSheet(
-            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 13px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
+            "background-color: #111111; color: #d4d4d4; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 17px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
         )
         
         btn_clear_log.clicked.connect(self.log_display.clear)
@@ -1268,7 +1275,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         try:
             self.chart_widget = QtChart()
-            self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2)
+            self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2, price_line=False, price_label=False)
             webview = self.chart_widget.get_webview()
             webview.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             chart_layout.addWidget(webview, 1)
@@ -1300,22 +1307,25 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pos_layout = QtWidgets.QVBoxLayout(self.tab_positions)
         pos_layout.setContentsMargins(0, 5, 0, 5)
         
-        self.pos_table = QtWidgets.QTableWidget(0, 6)
-        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "PNL thả nổi", "Chốt lời | Dừng lỗ", ""])
+        self.pos_table = FocusClearTableWidget(0, 6)
+        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "PNL thả nổi", "Chốt lời | Dừng lỗ", "Cắt lệnh"])
         header = self.pos_table.horizontalHeader()
+        header.setMinimumSectionSize(75)
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Interactive)
+        self.pos_table.setColumnWidth(2, 85)
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.Fixed)
-        header.resizeSection(5, 60)
+        header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.pos_table.setStyleSheet(
-            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 13px; }"
-            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: normal; border: 1px solid #333333; padding: 3px; font-size: 13px; }"
+            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 14px; selection-background-color: #162e3b; selection-color: #ffffff; }"
+            "QTableWidget::item:selected { background-color: #162e3b; color: #ffffff; border: 1px solid #20687a; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 14px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.pos_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectItems)
         self.pos_table.verticalHeader().setVisible(False)
         pos_layout.addWidget(self.pos_table)
         
@@ -1324,16 +1334,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Sẽ load data ngay khi user chọn account (sự kiện load_selected_account sẽ được sửa lại để gọi apply_current_api_to_worker)
         self.pos_worker.start()
         
-        # Chèn bảng vị thế trực tiếp vào split_view, không chèn vào chart_layout nữa
-        self.pos_table.verticalHeader().setDefaultSectionSize(28)
-        # Bỏ dòng chart_layout.addWidget(self.tab_positions)
+        # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart, không dùng splitter riêng giữa chart và bảng vị thế)
+        self.pos_table.verticalHeader().setDefaultSectionSize(32)
+        self.tab_positions.setFixedHeight(148)
+        chart_layout.addWidget(self.tab_positions)
 
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
-        self.split_view.addWidget(self.tab_positions)
         self.split_view.addWidget(self.tab_logs)
-        self.split_view.setSizes([350, 250, 400])
-        # Không dùng setStretchFactor nữa vì setSizes đã quyết định ban đầu
+        self.split_view.setSizes([850, 150])
+        self.split_view.setStretchFactor(0, 1)
+        self.split_view.setStretchFactor(1, 0)
 
         self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
@@ -1346,39 +1357,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if not hasattr(self, 'split_view') or self.split_view is None:
                 return
             
-            # Khôi phục widget vào danh sách tạm để không bị xóa
-            self.tab_chart.setParent(None)
-            self.tab_positions.setParent(None)
-            self.tab_logs.setParent(None)
-            
             if "ngang" in text.lower():
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Horizontal)
-                
-                # Ở chế độ ngang, có thể chia đôi màn hình: Chart bên trái, Logs bên phải.
-                # Và tab_positions nằm ở dưới Chart trong 1 splitter dọc phụ, hoặc cứ ném cả 3 vào splitter ngang.
-                # Tuy nhiên, theo plan: "giữ [self.tab_logs, self.tab_chart] và lồng self.tab_positions bên dưới Chart"
-                # Ta sẽ tạo 1 khung dọc ảo chứa Chart + Positions
-                left_pane = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
-                left_pane.addWidget(self.tab_chart)
-                left_pane.addWidget(self.tab_positions)
-                left_pane.setSizes([600, 250])
-                
-                self.split_view.addWidget(left_pane)
-                self.split_view.addWidget(self.tab_logs)
-                self.split_view.setSizes([500, 500])
+                self.split_view.setSizes([600, 400])
             else:
-                # Nếu đã có left_pane từ chế độ ngang, cần lấy lại tab_chart và tab_positions
-                if self.split_view.count() == 2:
-                    left_pane = self.split_view.widget(0)
-                    if isinstance(left_pane, QtWidgets.QSplitter):
-                        self.tab_chart.setParent(None)
-                        self.tab_positions.setParent(None)
-                
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Vertical)
-                self.split_view.addWidget(self.tab_chart)
-                self.split_view.addWidget(self.tab_positions)
-                self.split_view.addWidget(self.tab_logs)
-                self.split_view.setSizes([350, 250, 400])
+                self.split_view.setSizes([850, 150])
                 
             if hasattr(self, 'chk_show_positions'):
                 self.tab_positions.setVisible(self.chk_show_positions.isChecked())
@@ -1490,49 +1474,126 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if "XRP" in inst: return 4
             return 99
 
-        sorted_positions = sorted(positions, key=_coin_priority)
-        self.pos_table.setRowCount(len(sorted_positions))
-        for row, pos in enumerate(sorted_positions):
-            instId = str(pos.get("instId", "")).replace("-SWAP", "")
-            lever = pos.get("lever", "")
-            mgnMode = "Chéo" if pos.get("mgnMode") == "cross" else "Cô lập"
+        # Phân loại vị thế theo 3 coin chính: XAU, BTC, ETH
+        pos_by_coin = {}
+        other_positions = []
+        for pos in positions:
+            inst = str(pos.get("instId", "")).upper()
+            if "XAU" in inst:
+                pos_by_coin["XAU"] = pos
+            elif "BTC" in inst:
+                pos_by_coin["BTC"] = pos
+            elif "ETH" in inst:
+                pos_by_coin["ETH"] = pos
+            else:
+                other_positions.append(pos)
+
+        # Xây dựng danh sách dòng: Luôn gồm [XAU, BTC, ETH] theo thứ tự, sau đó tới các coin khác
+        primary_coins = [("XAU", "XAU-USDT"), ("BTC", "BTC-USDT"), ("ETH", "ETH-USDT")]
+        rows_data = []
+        for coin_key, default_inst in primary_coins:
+            rows_data.append((coin_key, default_inst, pos_by_coin.get(coin_key)))
+        for pos in other_positions:
+            inst_id = str(pos.get("instId", "")).replace("-SWAP", "")
+            coin_key = inst_id.split("-")[0]
+            rows_data.append((coin_key, inst_id, pos))
+
+        self.pos_table.setRowCount(len(rows_data))
+
+        # Đọc danh sách ENABLED_COINS từ config
+        enabled_coins = ["BTC", "ETH", "XAU"]
+        try:
+            acc_name = self.get_acc_name()
+            json_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data", f"{acc_name}_global_config.json")
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding="utf-8") as f:
+                    cfg_data = json.load(f)
+                    enabled_coins = cfg_data.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
+        except:
+            pass
+
+        for row, (coin_key, default_inst, pos) in enumerate(rows_data):
+            instId = default_inst
+            is_active = pos is not None
             
-            # Cột 1 (Cặp giao dịch)
-            side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
-            item1 = QtWidgets.QTableWidgetItem(f"{instId} ({side} {lever}x {mgnMode})")
-            item1.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter))
+            # --- Cột 0: Cặp giao dịch (Checkbox + Tên Coin, Bỏ Chéo/Cô lập) ---
+            chk = QtWidgets.QCheckBox()
+            is_enabled_cfg = coin_key.upper() in [c.upper() for c in enabled_coins]
+            # Tự động tích chọn nếu coin được bật trong Settings HOẶC đang có vị thế active
+            is_checked = is_enabled_cfg or is_active
+            chk.setChecked(is_checked)
+            svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
+            chk.setStyleSheet(
+                f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} "
+                f"QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+            )
+            chk.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+            chk.toggled.connect(lambda checked, c=coin_key.lower(): self._on_dash_coin_toggled(c, checked))
             
-            # Cột 2 (Giá vào lệnh)
+            if is_active:
+                lever = pos.get("lever", "")
+                side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
+                instId_text = f"{instId} ({side} {lever}x)"
+            else:
+                instId_text = instId
+
+            lbl_sym = QtWidgets.QLabel(instId_text)
+            lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 14px;")
+
+            w0 = QtWidgets.QWidget()
+            l0 = QtWidgets.QHBoxLayout(w0)
+            l0.setContentsMargins(6, 0, 6, 0)
+            l0.setSpacing(6)
+            l0.addWidget(chk)
+            l0.addWidget(lbl_sym)
+            l0.addStretch(1)
+            self.pos_table.setCellWidget(row, 0, w0)
+
+            if not is_active:
+                # Cặp coin chưa có lệnh: Các cột 1..5 để trống (—)
+                for c in range(1, 6):
+                    item_empty = QtWidgets.QTableWidgetItem("—")
+                    item_empty.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+                    item_empty.setForeground(QtGui.QColor("#555555"))
+                    self.pos_table.setItem(row, c, item_empty)
+                continue
+
+            # --- Vị thế đang active ---
+            # Cột 1 (Giá vào lệnh): Căn lề phải cách 3 khoảng trống tạo khoảng thở
             entry_px = _safe_float(pos.get("avgPx", 0))
-            item2 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}")
-            item2.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
-            
-            # Cột 3 (Ký quỹ)
+            item1 = QtWidgets.QTableWidgetItem(f"{entry_px:,.2f}   ")
+            item1.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
+            self.pos_table.setItem(row, 1, item1)
+
+            # Cột 2 (Ký quỹ): Căn lề phải cách 3 khoảng trống tạo khoảng thở
+            lever = pos.get("lever", "100")
             size = _safe_float(pos.get("notionalUsd", pos.get("notional", 0)))
             margin = size / _safe_float(lever) if _safe_float(lever) > 0 else 0
-            item3 = QtWidgets.QTableWidgetItem(f"{margin:,.2f}$")
-            item3.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
-            
-            # Cột 4 (Nút Đóng) - đã bỏ cột Kích thước, thay bằng nút Đóng lệnh
+            item2 = QtWidgets.QTableWidgetItem(f"{margin:,.2f} $   ")
+            item2.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter))
+            self.pos_table.setItem(row, 2, item2)
 
-            # Cột 5 (PNL)
+            # Cột 3 (PNL thả nổi): Toàn bộ text 14px, riêng con số tiền PNL +2 size (16px)
             upl = _safe_float(pos.get("upl", 0))
             upl_ratio = _safe_float(pos.get("uplRatio", 0)) * 100
             color_str = "#26a69a" if upl >= 0 else "#ef5350"
-            pnl_label = QtWidgets.QLabel(
-                f"<span style='font-size: 13px;'>{upl:+.2f} USDT</span> <span style='font-size: 12px;'>({upl_ratio:+.2f}%)</span>"
+            pnl_label = QtWidgets.QLabel()
+            pnl_label.setText(
+                f"<span style='font-size: 16px; font-weight: normal; color: {color_str};'>{upl:+.2f}</span> "
+                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>USDT</span>   "
+                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>({upl_ratio:+.2f}%)</span>"
             )
             pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            pnl_label.setStyleSheet(f"color: {color_str}; background: transparent; font-weight: normal;")
-            
-            # Cột 6 (TP/SL)
+            pnl_label.setStyleSheet("background: transparent;")
+            self.pos_table.setCellWidget(row, 3, pnl_label)
+
+            # Cột 4 (Chốt lời | Dừng lỗ)
             tp_list = pos.get("tp_list", [])
             sl_list = pos.get("sl_list", [])
             
             # --- Fallback: Lấy từ JSON data (Setup) nếu API OKX chưa trả về ---
             if not tp_list or not sl_list:
                 try:
-                    import os, json
                     acc_name = self.get_acc_name()
                     base_coin = instId.replace("-USDT", "")
                     json_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data", f"{acc_name}_{base_coin}_chart.json")
@@ -1551,7 +1612,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 except:
                     pass
                     
-            # --- Fallback 2: Tính theo công thức RR / Cấu hình nếu vẫn chưa có ---
+            # --- Fallback 2: Tính theo công thức RR ---
             if not tp_list or not sl_list:
                 is_long = float(pos.get("pos", 0)) > 0
                 if self.strategy_id == "sub1" and entry_px > 0:
@@ -1572,32 +1633,66 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     else:
                         if not sl_list: sl_list.append(f"{entry_px * (1 + default_sl_pct):.2f}")
                         if not tp_list: tp_list.append(f"{entry_px * (1 - default_sl_pct * rr_trend):.2f}")
-            # ------------------------------------------------------------------
 
-            tp_str = ", ".join(tp_list) if tp_list else "—"
-            sl_str = ", ".join(sl_list) if sl_list else "—"
-            item5_tpsl = QtWidgets.QTableWidgetItem(f"{tp_str} | {sl_str}")
-            item5_tpsl.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
+            # --- Tính giá trị Lời/Lỗ PNL thực tế bằng USDT theo TP/SL ---
+            is_long = _safe_float(pos.get("pos", 0)) > 0 or str(pos.get("posSide", "")).lower() == "long"
             
-            # Nút Đóng lệnh
+            tp_pnl_str = "—"
+            tp_color = "#777777"
+            if tp_list and entry_px > 0 and size > 0:
+                try:
+                    tp_px = _safe_float(tp_list[0])
+                    if tp_px > 0:
+                        tp_pnl_val = size * (tp_px - entry_px) / entry_px if is_long else size * (entry_px - tp_px) / entry_px
+                        tp_pnl_str = f"+{tp_pnl_val:,.2f}" if tp_pnl_val >= 0 else f"{tp_pnl_val:,.2f}"
+                        tp_color = "#81c784" # สี xanh nhạt nhẹ nhàng
+                except:
+                    pass
+
+            sl_pnl_str = "—"
+            sl_color = "#777777"
+            if sl_list and entry_px > 0 and size > 0:
+                try:
+                    sl_px = _safe_float(sl_list[0])
+                    if sl_px > 0:
+                        sl_pnl_val = size * (sl_px - entry_px) / entry_px if is_long else size * (entry_px - sl_px) / entry_px
+                        sl_pnl_str = f"{sl_pnl_val:,.2f}" if sl_pnl_val <= 0 else f"+{sl_pnl_val:,.2f}"
+                        sl_color = "#ef5350" # Màu đỏ nhạt nhẹ nhàng
+                except:
+                    pass
+
+            tpsl_label = QtWidgets.QLabel()
+            tpsl_label.setText(
+                f"<span style='font-size: 14px; font-weight: normal; color: {tp_color};'>{tp_pnl_str}</span> "
+                f"<span style='font-size: 14px; font-weight: normal; color: #555555;'>|</span> "
+                f"<span style='font-size: 14px; font-weight: normal; color: {sl_color};'>{sl_pnl_str}</span>"
+            )
+            tpsl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            tpsl_label.setStyleSheet("background: transparent;")
+            self.pos_table.setCellWidget(row, 4, tpsl_label)
+
+            # Cột 5 (Cắt lệnh: Nút Đóng thu nhỏ 15% vừa ô)
             raw_inst_id = str(pos.get("instId", ""))
             raw_mgn_mode = str(pos.get("mgnMode", "cross"))
             raw_pos_side = str(pos.get("posSide", "net"))
+            
+            btn_container = QtWidgets.QWidget()
+            btn_layout = QtWidgets.QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(6, 1, 6, 1)
+            btn_layout.setSpacing(0)
+
             btn_close = QtWidgets.QPushButton("Đóng")
+            btn_close.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             btn_close.setStyleSheet(
-                "QPushButton { background-color: #c62828; color: #ffffff; font-weight: bold; font-size: 12px; "
-                "border: none; border-radius: 3px; padding: 3px 8px; } "
+                "QPushButton { background-color: #c62828; color: #ffffff; font-weight: bold; font-size: 13px; "
+                "border: none; border-radius: 4px; padding: 0px; } "
                 "QPushButton:hover { background-color: #e53935; }"
             )
             btn_close.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
             btn_close.clicked.connect(lambda checked, iid=raw_inst_id, mm=raw_mgn_mode, ps=raw_pos_side: self.close_position(iid, mm, ps))
+            btn_layout.addWidget(btn_close)
             
-            self.pos_table.setItem(row, 0, item1)
-            self.pos_table.setItem(row, 1, item2)
-            self.pos_table.setItem(row, 2, item3)
-            self.pos_table.setCellWidget(row, 3, pnl_label)
-            self.pos_table.setItem(row, 4, item5_tpsl)
-            self.pos_table.setCellWidget(row, 5, btn_close)
+            self.pos_table.setCellWidget(row, 5, btn_container)
             
     def apply_current_api_to_worker(self):
         if not hasattr(self, 'pos_worker'):
@@ -2675,7 +2770,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_save_api.setEnabled(True)
         # -------------------------------
         
-        bot_label = "Bot Sub 2 (SMC Order Block)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
+        bot_label = "Bot Sub 2 (SMC)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
         env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         with open(env_path, "w", encoding="utf-8") as f:
@@ -2798,7 +2893,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 if hasattr(self, 'chk_cfg_eth'): self.dash_chk_eth.setChecked(self.chk_cfg_eth.isChecked())
                 if hasattr(self, 'chk_cfg_xau'): self.dash_chk_xau.setChecked(self.chk_cfg_xau.isChecked())
             
-        bot_label = "Bot Sub 2 (SMC Order Block)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
+        bot_label = "Bot Sub 2 (SMC)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
         msg.setText(f"⚙️ Đã lưu Cấu Hình Chiến Thuật cho [{bot_label}] ({env_file}) thành công!\n\nFile lưu: {os.path.basename(config_path)}")
@@ -3027,7 +3122,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                         const boxWidth = maxRightX - startX;
                                         if (boxWidth <= 0) return;
 
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.1)' : 'rgba(198, 40, 40, 0.1)';
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
 
                                         const box = document.createElement('div');
                                         box.style.position = 'absolute';
@@ -3185,7 +3280,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             const positions = {json.dumps(chart_positions)};
                                             positions.forEach(p => {{
                                                 if (p.entry) {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#00B894', lineStyle: 2, lineWidth: 2, title: p.title || 'ENTRY' }}));
+                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#FFFFFF', lineStyle: 2, lineWidth: 1, title: p.title || 'ENTRY' }}));
                                                 }}
                                                 p.tp_list.forEach(tp => {{
                                                     window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 1, title: 'TP' }}));
@@ -3271,14 +3366,14 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         # -------------------------------------
         
-        # Check for updates in background (Quét định kỳ mỗi 30 phút)
+        # Check for updates in background (Quét định kỳ mỗi 30 phút khi app đang mở)
         self.update_check_timer = QtCore.QTimer(self)
         self.update_check_timer.setSingleShot(False)
-        self.update_check_timer.timeout.connect(self.check_update_background)
+        self.update_check_timer.timeout.connect(lambda: self.check_update_background(is_startup=False))
         self.update_check_timer.start(1800000) # 30 phút = 1800000 ms
         
-        # Vẫn giữ lịch quét lần đầu tiên sau khi app mở 2 giây cho nóng
-        QtCore.QTimer.singleShot(2000, self.check_update_background)
+        # Lần đầu mở app (2s sau startup): Quét và ÉP AUTO-UPDATE BẮT BUỘC nếu có bản mới
+        QtCore.QTimer.singleShot(2000, lambda: self.check_update_background(is_startup=True))
 
         # Setup background License verification timer (quét Google Sheet 30p 1 lần)
         self.license_check_timer = QtCore.QTimer(self)
@@ -3598,7 +3693,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.api_files)
         self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.api_files)
-        self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC - OB (Sub 2)", self.api_files)
+        self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC (Sub 2)", self.api_files)
         # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)
         
         self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")
@@ -3616,13 +3711,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bot_tabs.currentChanged.connect(self.update_tab_icons)
         self.update_tab_icons(0)
         # self.bot_tabs.addTab(self.panel_sub1, "🔵 Bot SUB 1")
-        self.bot_tabs.addTab(self.panel_sub2, "Bot SMC - OB")
+        self.bot_tabs.addTab(self.panel_sub2, "Bot SMC")
 
     def check_for_updates(self):
         # Không tự động check liên tục nữa để tránh đơ máy
         pass
 
-    def check_update_background(self):
+    def check_update_background(self, is_startup=False):
         def check():
             try:
                 import urllib.request, json
@@ -3636,17 +3731,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 local_version = APP_VERSION
                 
                 has_update = version.parse(remote_version) > version.parse(local_version)
-                return has_update, remote_version, remote_data
+                return has_update, remote_version, remote_data, is_startup
             except Exception:
-                return None, None, None
+                return None, None, None, is_startup
         
         self.update_worker = type('UpdateWorker', (QtCore.QThread,), {'run': lambda s: s.result_signal.emit(check()), 'result_signal': QtCore.pyqtSignal(tuple)})(self)
         self.update_worker.result_signal.connect(self.on_update_check_result)
         self.update_worker.start()
 
     def on_update_check_result(self, result):
-        has_update, remote_version, remote_data = result
+        if not result or len(result) < 4:
+            self.btn_update.setVisible(False)
+            return
+            
+        has_update, remote_version, remote_data, is_startup = result
         if has_update is True:
+            self.remote_update_data = remote_data
             self.btn_update.setText(f"🚀 Cập nhật ngay (v{remote_version})")
             
             # Tạo hiệu ứng nhấp nháy nhẹ nhàng đổi màu để thu hút chú ý
@@ -3674,7 +3774,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 toggle_color()
                 
             self.btn_update.setEnabled(True)
-            self.remote_update_data = remote_data
+            self.btn_update.setVisible(True)
+
+            # --- NẾU LÀ LẦN ĐẦU MỞ APP (STARTUP), ÉP AUTO-UPDATE BẮT BUỘC NGAY ---
+            if is_startup:
+                print(f"[AutoUpdate] Phát hiện bản cập nhật mới v{remote_version} khi mở app. Tiến hành tự động nâng cấp...")
+                QtCore.QTimer.singleShot(500, lambda: self.run_update_app(bypass_confirm=True))
         elif has_update is False:
             # Đã là bản mới nhất → ẩn nút đi, không chiếm diện tích
             self.btn_update.setVisible(False)
@@ -3682,53 +3787,52 @@ class MainWindow(QtWidgets.QMainWindow):
             # Lỗi kiểm tra → ẩn luôn, không cần hiện thông báo lỗi trên giao diện
             self.btn_update.setVisible(False)
 
-    def run_update_app(self):
-        # 💡 Hộp thoại nhắc nhở nhẹ nhàng trước khi cập nhật
-        msg_box = QtWidgets.QMessageBox(self)
-        msg_box.setWindowTitle("💡 Nhắc Nhở Trước Khi Cập Nhật")
-        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Information)
-        msg_box.setText("<b>Lưu ý nhỏ về vị thế trên sàn</b>")
-        msg_box.setInformativeText(
-            "Để quá trình cập nhật diễn ra an toàn nhất, Sếp lưu ý kiểm tra và nên đóng các lệnh/vị thế đang chạy trên sàn OKX trước khi cập nhật nhé.\n\n"
-            "• <b>Cập nhật ngay</b>: Tiến hành tải và cập nhật phiên bản mới.\n"
-            "• <b>Để sau</b>: Hủy để Sếp kiểm tra lại tài khoản trước."
-        )
-        btn_confirm = msg_box.addButton("Cập nhật ngay", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
-        btn_cancel = msg_box.addButton("Để sau", QtWidgets.QMessageBox.ButtonRole.RejectRole)
-        msg_box.setDefaultButton(btn_confirm)
-        
-        msg_box.setStyleSheet("""
-            QMessageBox {
-                background-color: #ffffff;
-            }
-            QLabel {
-                color: #000000;
-                font-size: 13px;
-            }
-            QPushButton {
-                background-color: #2E7D32;
-                color: #ffffff;
-                border: none;
-                border-radius: 4px;
-                padding: 6px 16px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #1b5e20;
-            }
-        """)
-        
-        msg_box.exec()
-        if msg_box.clickedButton() != btn_confirm:
-            return  # Khách chọn quay lại kiểm tra -> Hủy cập nhật
+    def run_update_app(self, bypass_confirm=False):
+        if not bypass_confirm:
+            # 💡 Hộp thoại nhắc nhở nhẹ nhàng trước khi cập nhật (khi khách nhấp thủ công)
+            msg_box = QtWidgets.QMessageBox(self)
+            msg_box.setWindowTitle("💡 Nhắc Nhở Trước Khi Cập Nhật")
+            msg_box.setIcon(QtWidgets.QMessageBox.Icon.Information)
+            msg_box.setText("<b>Lưu ý nhỏ về vị thế trên sàn</b>")
+            msg_box.setInformativeText(
+                "Để quá trình cập nhật diễn ra an toàn nhất, Sếp lưu ý kiểm tra và nên đóng các lệnh/vị thế đang chạy trên sàn OKX trước khi cập nhật nhé.\n\n"
+                "• <b>Cập nhật ngay</b>: Tiến hành tải và cập nhật phiên bản mới.\n"
+                "• <b>Để sau</b>: Hủy để Sếp kiểm tra lại tài khoản trước."
+            )
+            btn_confirm = msg_box.addButton("Cập nhật ngay", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            btn_cancel = msg_box.addButton("Để sau", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+            msg_box.setDefaultButton(btn_confirm)
+            
+            msg_box.setStyleSheet("""
+                QMessageBox {
+                    background-color: #ffffff;
+                }
+                QLabel {
+                    color: #000000;
+                    font-size: 13px;
+                }
+                QPushButton {
+                    background-color: #2E7D32;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 16px;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: #1b5e20;
+                }
+            """)
+            
+            msg_box.exec()
+            if msg_box.clickedButton() != btn_confirm:
+                return  # Khách chọn quay lại kiểm tra -> Hủy cập nhật
 
         url = "https://github.com/TLS1-Releases/TLS1_Trading_App_Releases/releases/latest"
         remote_version = None
         if hasattr(self, 'remote_update_data') and self.remote_update_data:
             remote_version = self.remote_update_data.get("version")
-            if remote_version:
-                url = f"https://github.com/TLS1-Releases/TLS1_Trading_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
 
         # Tự động tải ngầm nếu chạy file .exe trên Windows
         if os.name == 'nt' and getattr(sys, 'frozen', False) and remote_version:
@@ -3737,10 +3841,13 @@ class MainWindow(QtWidgets.QMainWindow):
             
             download_url = f"https://github.com/TLS1-Releases/TLS1_Trading_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
             
-            dlg = QtWidgets.QProgressDialog("Đang kết nối tải bản cập nhật...", "Hủy", 0, 100, self)
-            dlg.setWindowTitle("Cập nhật tự động")
+            cancel_btn_text = "Hủy" if not bypass_confirm else None
+            dlg = QtWidgets.QProgressDialog(f"Đang kết nối tải bản cập nhật v{remote_version}...", cancel_btn_text, 0, 100, self)
+            dlg.setWindowTitle("Cập nhật ứng dụng tự động")
             dlg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
             dlg.setMinimumDuration(0)
+            if bypass_confirm:
+                dlg.setCancelButton(None) # Ép tự động cập nhật khi mở app, không cho hủy
             dlg.show()
             
             current_exe_path = sys.executable
@@ -3752,11 +3859,11 @@ class MainWindow(QtWidgets.QMainWindow):
             bat_path = os.path.join(base_dir, "update_app.bat")
             
             def reporthook(blocknum, blocksize, totalsize):
-                if dlg.wasCanceled():
+                if not bypass_confirm and dlg.wasCanceled():
                     raise Exception("Đã huỷ tải xuống.")
                 if totalsize > 0:
                     percent = int(blocknum * blocksize * 100 / totalsize)
-                    dlg.setLabelText(f"Đang tải bản cập nhật mới v{remote_version}... {percent}%")
+                    dlg.setLabelText(f"🚀 Đang tự động nâng cấp phiên bản mới v{remote_version}... {percent}%\nVui lòng đợi ứng dụng tự khởi động lại!")
                     dlg.setValue(percent)
                     QtWidgets.QApplication.processEvents()
                     
@@ -3808,7 +3915,7 @@ del /f /q "%~f0"
             QMainWindow { background-color: #f5f5f7; }
             QWidget { color: #111111; font-size: 14px; }
             QTabWidget#OuterTabs > QTabBar::tab { background-color: #e0e0e0; color: #333333; border: 1px solid #cccccc; padding: 10px 24px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 4px; font-size: 14px; font-weight: bold; }
-            QTabWidget#OuterTabs > QTabBar::tab:selected { background-color: #ffffff; color: #00ccff; font-weight: bold; border-top: 3px solid #00ccff; border-bottom: 2px solid #ffffff; }
+            QTabWidget#OuterTabs > QTabBar::tab:selected { background-color: #ffffff; color: #FF9900; font-weight: bold; border-top: 3px solid #FF9900; border-bottom: 2px solid #ffffff; }
             QTableWidget { background-color: #ffffff; color: #111111; gridline-color: #cccccc; border: 1px solid #cccccc; font-size: 13px; }
             QHeaderView::section { background-color: #e0e0e0; color: #111111; font-weight: bold; border: 1px solid #cccccc; padding: 4px; }
             QTextEdit, QPlainTextEdit, QSpinBox, QDoubleSpinBox, QComboBox, QLineEdit { background-color: #ffffff; color: #111111; border: 1px solid #cccccc; border-radius: 4px; padding: 4px; }
@@ -3957,10 +4064,10 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             }
             QTabWidget#OuterTabs > QTabBar::tab:selected { 
                 background-color: #242424; 
-                color: #00ccff; 
+                color: #FF9900; 
                 font-weight: bold; 
                 border: 1px solid #3a3a3a; 
-                border-top: 3px solid #00ccff; 
+                border-top: 3px solid #FF9900; 
                 border-bottom: 2px solid #242424; 
             }
             QTabWidget#OuterTabs > QTabBar::tab:hover { 

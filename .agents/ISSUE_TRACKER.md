@@ -19,6 +19,83 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/08/2026]** - Áp dụng đồng bộ 100% toàn bộ cải tiến UI cho cả Bot SMC (Sub 2):
+  - **Cập nhật:** Do `panel_main` (Bot EMA200) và `panel_sub2` (Bot SMC) dùng chung class `BotInstanceWidget` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py), toàn bộ các cải tiến UI (Bảng vị thế, Căn lề phải 3 space, Cột Ký quỹ 85px, PNL 16px, Cột TP/SL PNL USDT Xanh/Đỏ nhạt, Nút Đóng đỏ 15%, Splitter ratio 75/25, Tab Cam #FF9900) đã tự động đồng bộ hoàn toàn sang **Bot SMC**. Đồng thời cập nhật nhãn `Bot Sub 2 (SMC)` thống nhất toàn app. (Mã patch: `z274`)
+
+- **[05/08/2026]** - Chuyển đổi Cột Chốt lời | Dừng lỗ hiển thị Giá trị PNL Lời/Lỗ dự kiến bằng USDT:
+  - **Cập nhật:** Thay thế hiển thị mức giá cũ (`4031.93 | 4129.87`) bằng giá trị Lời/Lỗ PNL thực tế dự kiến tính bằng USDT (`+12.50 | -12.50`) dựa trên TP/SL thực tế của lệnh đó trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Định dạng màu Chốt lời xanh lá nhạt (`#81c784`) và Dừng lỗ đỏ nhạt (`#ef5350`) mềm mại, dễ nhìn chuẩn theo yêu cầu CEO. (Mã patch: `z273`)
+
+- **[05/08/2026]** - Ép chiều cao nút Đóng mở rộng phủ dọc sát mép trên/dưới ô:
+  - **Cập nhật:** Thiết lập `btn_close.setSizePolicy(Expanding, Expanding)` và `setContentsMargins(6, 1, 6, 1)` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Ép chiều cao nút đỏ Đóng giãn rộng tối đa theo chiều dọc kề sát biên trên và đường gạch dưới ô (chỉ để khe mỏng 1px), đồng thời giữ nguyên độ thu gọn chiều ngang 6px hai bên. (Mã patch: `z272`)
+
+- **[05/08/2026]** - Nhả lại chiều dọc nút Đóng màu đỏ (chỉ còn ~7% lề trên/dưới):
+  - **Cập nhật:** Giảm lề đệm trên/dưới `setContentsMargins(6, 2, 6, 2)` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Giữ nguyên độ thu hẹp chiều ngang 6px đẹp mắt, tăng độ cao chiều dọc của nút đỏ Đóng để lề trên/dưới chỉ còn mỏng ~7% chuẩn theo ý kiến CEO. (Mã patch: `z271`)
+
+- **[05/08/2026]** - Đổi tên Nút Cộng Đồng trên Header thành "Join Cộng đồng":
+  - **Cập nhật:** Cập nhật text nút từ `💬 Cộng Đồng` thành **`💬 Join Cộng đồng`** trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) theo yêu cầu CEO. (Mã patch: `z270`)
+
+- **[05/08/2026]** - Thu nhỏ nút Đóng màu đỏ trong Bảng vị thế (-15% kích thước ô):
+  - **Cập nhật:** Bọc `btn_close` trong container widget `btn_container` và thiết lập `setContentsMargins(6, 4, 6, 4)` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Giảm kích thước nút đỏ khoảng -15% so với kích thước ô, tạo khoảng hở lề gọn gàng và bo góc thẩm mỹ. (Mã patch: `z269`)
+
+- **[05/08/2026]** - Đổi tên Tab Bot SMC và Khôi phục màu sắc chữ / viền trên màu Cam (#FF9900):
+  - **Cập nhật:** Trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py):
+    1. Đổi tên tab `Bot SMC - OB` ngắn gọn thành **`Bot SMC`**.
+    2. Khôi phục màu chữ active (`color: #FF9900`) và viền trên active (`border-top: 3px solid #FF9900`) của các Tab Bot chính (`QTabWidget#OuterTabs`) về màu cam sáng chuẩn bản cũ theo đúng yêu cầu CEO. (Mã patch: `z268`)
+
+- **[05/08/2026]** - Cơ chế Ép Cập Nhật Tự Động (Auto-Update) khi mở lại App & Thông báo khi đang chạy:
+  - **Cập nhật:** Tách biệt 2 kịch bản cập nhật trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py):
+    1. **Khi app đang chạy (`is_startup=False`):** Giữ nguyên nút thông báo nhấp nháy `🚀 Cập nhật ngay (vX.X.X)` ở góc trên giao diện, không can thiệp ngắt ngang các vị thế/bot đang giao dịch.
+    2. **Khi tắt app đi mở lại (`is_startup=True`):** Sau 2 giây mở app, nếu phát hiện có bản cập nhật mới sẽ **ÉP AUTO-UPDATE TỰ ĐỘNG BẮT BUỘC** (`bypass_confirm=True`), tự động tải bản cài mới, thay thế file `.exe` và khởi động lại app mới mà không bắt khách thao tác bất cứ nút nào. (Mã patch: `z267`)
+
+- **[05/08/2026]** - Điều chỉnh độ mờ Opacity khối Order Block (OB) lên 20%:
+  - **Cập nhật:** Đặt tham số mờ màu nền khối OB Bullish (`rgba(21, 101, 192, 0.2)`) và Bearish (`rgba(198, 40, 40, 0.2)`) về mức **`20%`** chuẩn hài hòa theo yêu cầu CEO trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z266`)
+
+- **[05/08/2026]** - Đẩy sạ thanh phân chia Splitter & Triệt tiêu khoảng trống thừa trên Terminal Logs:
+  - **Cập nhật:** Thiết lập `setSizes([850, 150])` cùng `setStretchFactor(0, 1)` và `setStretchFactor(1, 0)`, đồng thời siết lề trên `console_layout.setContentsMargins(5, 2, 5, 5)` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Đẩy vị trí mặc định của thanh phân chia `......` xuống kề sát dòng `Terminal Logs:`, triệt tiêu hoàn toàn khoảng trống tối màu dư thừa phía trên. (Mã patch: `z265`)
+
+- **[05/08/2026]** - Đẩy thanh phân chia (Splitter Handle) giữa Chart và Logs xuống phía dưới:
+  - **Cập nhật:** Điều chỉnh tỷ lệ Splitter dọc `setSizes([680, 220])` và `setStretchFactor(0, 7) / (1, 3)` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Đẩy thanh kéo splitter xuống phía dưới, ưu tiên 75% chiều cao cho vùng Chart & Bảng vị thế, loại bỏ khoảng không khoảng thừa phía trên `Terminal Logs:`. (Mã patch: `z264`)
+
+- **[05/08/2026]** - Tự động bỏ bôi màu (Clear Highlight) khi nhấp chuột ra ngoài Bảng Vị Thế:
+  - **Cập nhật:** Xây dựng class `FocusClearTableWidget` ghi đè sự kiện `focusOutEvent` để tự động gọi `clearSelection()` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Khi nhấp vào ô bất kỳ sẽ bôi màu highlight xanh cyan/teal mờ nổi bật, và khi nhấp chuột ra khu vực khác (như Chart, Logs, Nút bấm) sẽ tự động bỏ bôi màu và trả về trạng thái bình thường. (Mã patch: `z263`)
+
+- **[05/08/2026]** - Điều chỉnh kích thước Font chữ Terminal Logs về mức 17px:
+  - **Cập nhật:** Đặt kích thước font chữ Terminal Logs về **`17px`** (Consolas, monospace) theo yêu cầu CEO trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) giúp cân bằng vừa mắt nhất giữa độ to và mật độ dòng log. (Mã patch: `z262`)
+
+- **[05/08/2026]** - Khôi phục kích thước Font chữ Terminal Logs chuẩn 18px v1.0.271:
+  - **Cập nhật:** Đã kiểm tra lịch sử commit `a097cd2` (v1.0.271): Font size gốc của Terminal Logs chính xác là **`18px`** (Consolas, monospace). Đã khôi phục từ `13px` lên lại **`18px`** chuẩn trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) giúp các dòng log hiển thị to, rõ ràng và cực kỳ dễ đọc. (Mã patch: `z261`)
+
+- **[05/08/2026]** - Tinh chỉnh độ rộng cột Ký quỹ (Col 2) vừa vặn chuẩn 85px:
+  - **Cập nhật:** Căn chỉnh lại độ rộng cột *Ký quỹ* xuống mức **`85px`** vừa vặn hoàn hảo cho các lệnh có mức ký quỹ tối đa tới `999.00 $` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py), vừa đảm bảo vừa khít tinh tế vừa không chiếm dụng diện tích thừa của bảng. (Mã patch: `z260`)
+
+- **[05/08/2026]** - Mở rộng độ rộng tối thiểu cột Ký quỹ (Col 2):
+  - **Cập nhật:** Đặt chiều rộng cố định linh hoạt cho cột *Ký quỹ* tối thiểu `110px` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Đảm bảo khi đánh các lệnh ký quỹ lớn (như `100.00 $`, `1,500.00 $`, `10,000.00 $`) giao diện vẫn rộng rãi, không bao giờ bị co hẹp hay khuất ký tự `$`. (Mã patch: `z259`)
+
+- **[05/08/2026]** - Đồng bộ kích thước font chữ bảng vị thế chuẩn 14px:
+  - **Cập nhật:** Chuẩn hóa toàn bộ text hiển thị trong Bảng Vị Thế (tiêu đề, tên cặp coin, giá, ký quỹ, chữ `USDT`, phần `%` PNL, giá TP/SL) lên **14px**. Duy nhất con số tiền PNL thực tế (`-0.10` / `+1.41`) được tăng +2 size lên **16px** nổi bật trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z258`)
+
+- **[05/08/2026]** - Thêm khoảng thở (Right Padding Spaces) cho cột Giá vào lệnh và Ký quỹ:
+  - **Cập nhật:** Chèn 3 khoảng trống (`   `) phía cuối chuỗi ký tự hiển thị ở cột *Giá vào lệnh* và *Ký quỹ* giúp đẩy phần số và ký hiệu `$` lùi sang trái, tránh bị dính sát vào mép đường viền dọc bên phải trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z257`)
+
+- **[05/08/2026]** - Căn lề số thẳng hàng & Tăng font size con số PNL thả nổi:
+  - **Cập nhật:** Căn lề phải (`AlignRight`) cho cột *Giá vào lệnh* và *Ký quỹ* giúp thẳng hàng toàn bộ các dấu chấm thập phân `.` và ký hiệu `$`. Tăng +2 size (`16px`) riêng cho con số tiền PNL thực tế (`-0.10` / `+1.41`), giữ phần `USDT` và `%` ở size `13px` thường trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z256`)
+
+- **[05/08/2026]** - Ẩn vạch kẻ đứt giá và nhãn giá EMA200 trên Chart:
+  - **Cập nhật:** Đặt `price_line=False` và `price_label=False` khi khởi tạo `self.ema_line` trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) giúp ẩn đường kẻ đứt phụ và tag giá EMA200 khỏi trục giá bên phải. (Mã patch: `z255`)
+
+- **[05/08/2026]** - Đồng bộ StyleSheet Checkbox nguyên bản theo Ảnh 1 & Cấu hình chiến thuật:
+  - **Cập nhật:** Khôi phục chuẩn `cb_style` gốc (`border: 1px solid #777777; border-radius: 2px; background-color: transparent; image: url(check_green.svg)`) y hệt ô tích trong Popup Cấu hình chiến thuật và Dashboard cho Bảng Vị Thế trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z254`)
+
+- **[05/08/2026]** - Tự động tích chọn Checkbox đầu mỗi cặp coin:
+  - **Cập nhật:** Tự động bật tích chọn `[✓]` ở đầu mỗi dòng cặp coin trong Bảng Vị Thế khi phát hiện coin đó được bật trong Cấu hình (Settings) **HOẶC** đang có vị thế giao dịch active (`is_active = True`) trên sàn OKX. (Mã patch: `z253`)
+
+- **[05/08/2026]** - Chuẩn hóa định dạng PNL thả nổi theo bản cũ:
+  - **Cập nhật:** Giữ nguyên ký hiệu `USDT` (VD: `+25.69 USDT`), phân tách với phần tỷ lệ `%` bằng 3 khoảng trống `   ` (VD: `+25.69 USDT   (+58.73%)`), font size `14px` thường (`font-weight: normal`), căn giữa ô trong file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). (Mã patch: `z252`)
+
+- **[05/08/2026]** - Sửa lỗi runtime `UnboundLocalError: cannot access local variable 'os'`:
+  - **Nguyên nhân:** Khai báo trùng lặp `import os, json` nội bộ trong block fallback khiến Python coi `os` là biến local phạm vi hàm `update_positions_table`, gây crash văng ngoại lệ khi truy cập `os.path` trước đó.
+  - **Đã fix:** Loại bỏ re-import `os, json` dư thừa, sử dụng trực tiếp module `os` và `json` đã import ở top-level file [gui_main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py). Bảng vị thế hiển thị lại dữ liệu ổn định bình thường. (Mã patch: `z251`)
+
 - **[03/08/2026]** - Tối ưu toàn bộ Giao diện GUI & Terminal Log theo tiêu chuẩn Monorepo:
   1. **Font Size & Style Bảng Vị Thế:** Font nền `14px` (chữ thường `normal`), PNL amount `16px` nổi bật; Căn lề số/USDT bên phải, Ký quỹ tính bằng `$`.
   2. **Trạng thái Nút bấm & Dropdown:** Nút Bắt đầu/Dừng đổi màu Xanh/Đỏ/Xám chuẩn; Dropdown chế độ xem mặc định đồng bộ `Chế độ ngang`.
