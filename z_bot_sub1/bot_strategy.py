@@ -1023,14 +1023,38 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     btc_sync_tf_changed = True
                     btc_sync_tf_changed = True
                     # print(f"🔄 [SYNC] {coin_name} LONG active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
-            # SHORT: nếu cả BTC và Altcoin đều có short, sync TF
             if tracker.has_short and btc_tk_sync.has_short:
                 if tf_weight(btc_pos_tf) > tf_weight(getattr(tracker, "active_pos_tf", "M5")):
                     old_tf = getattr(tracker, "active_pos_tf", "M5")
                     tracker.active_pos_tf = btc_pos_tf
                     btc_sync_tf_changed = True
-                    btc_sync_tf_changed = True
                     # print(f"🔄 [SYNC] {coin_name} SHORT active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
+
+    if not is_enabled:
+        is_limit_setup_cycle = False
+        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
+            clean_limit_orders(client, swap_id, "cross")
+            tracker.placed_entry_px_long_by_tf = {}
+            tracker.placed_entry_px_short_by_tf = {}
+            tracker.placed_entry_px_long = "---"
+            tracker.placed_entry_px_short = "---"
+            
+        # Đóng toàn bộ lệnh Market nếu có vì coin bị tắt
+        if tracker.has_long and active_long_pos:
+            pos_l = active_long_pos[0]
+            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
+            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], "Disabled_Coin", "cross")
+            tracker.closure_reason_long = "Disabled_Coin"
+            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
+            
+        if tracker.has_short and active_short_pos:
+            pos_s = active_short_pos[0]
+            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
+            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], "Disabled_Coin", "cross")
+            tracker.closure_reason_short = "Disabled_Coin"
+            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
+            
+        return
 
     # ==============================================================================
     # ⚔️ QUẢN TRỊ VỊ THẾ & PHANH BẢO VỆ LIMIT CROSS
@@ -1948,44 +1972,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             tracker.placed_entry_px_long = "---"
             tracker.placed_entry_px_short = "---"
 
-    if not is_enabled:
-        is_limit_setup_cycle = False
-        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
-            clean_limit_orders(client, swap_id, "cross")
-            tracker.placed_entry_px_long_by_tf = {}
-            tracker.placed_entry_px_short_by_tf = {}
-            tracker.placed_entry_px_long = "---"
-            tracker.placed_entry_px_short = "---"
-            tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
-            
-        # 2. Đóng hoà lệnh dương (ROI >= +0.1%)
-        _roi_threshold = Decimal("0.1")
-        if tracker.has_long and active_long_pos:
-            pos_l = active_long_pos[0]
-            avg_px_l = tracker.active_avg_px_long
-            roi_l = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
-            if roi_l >= _roi_threshold:
-                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], "BTC_H4_Squeeze_BreakEven", "cross")
-                tracker.closure_reason_long = "BTC_H4_Squeeze"
-                tracker.record_exit("LONG", roi_l, "BTC_H4_Squeeze", "Cầu dao: BTC H4 Nén — Đóng hoà lệnh LONG")
-                msg = f"🚨 [CẦU DAO] {cfg['coin']}: BTC H4 đang Nén chờ đảo chiều! Đã đóng hoà LONG (ROI: +{roi_l:.2f}%)."
-                print(f"\n{msg}")
-                send_telegram_notification(msg)
-                
-        if tracker.has_short and active_short_pos:
-            pos_s = active_short_pos[0]
-            avg_px_s = tracker.active_avg_px_short
-            roi_s = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
-            if roi_s >= _roi_threshold:
-                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], "BTC_H4_Squeeze_BreakEven", "cross")
-                tracker.closure_reason_short = "BTC_H4_Squeeze"
-                tracker.record_exit("SHORT", roi_s, "BTC_H4_Squeeze", "Cầu dao: BTC H4 Nén — Đóng hoà lệnh SHORT")
-                msg = f"🚨 [CẦU DAO] {cfg['coin']}: BTC H4 đang Nén chờ đảo chiều! Đã đóng hoà SHORT (ROI: +{roi_s:.2f}%)."
-                print(f"\n{msg}")
-                send_telegram_notification(msg)
-
 
     if is_limit_setup_cycle and (is_btc_approved or xl_found) and (is_macro_approved or xl_found):
         if True: # Bỏ chặn is_sideway_strict để hỗ trợ rải lưới độc lập từng TF
@@ -2722,3 +2708,5 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
 # z7718 | Tắt tính năng log print ra console đối với các lệnh '[SYNC]' để app GUI không bị rác màn hình.
 # z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
+
+# z246 | Update: Fixed is_enabled checking to fully disable coins when unchecked

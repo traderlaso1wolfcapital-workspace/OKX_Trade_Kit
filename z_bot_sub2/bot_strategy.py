@@ -460,6 +460,26 @@ def run_strategy_cycle(
         except Exception as e:
             pass
 
+        if not is_enabled:
+            # Coin bị tắt -> Huỷ lệnh chờ, xóa setups
+            clean_ob_orders(client, swap_id, CL_ORD_PREFIX)
+            tracker.trade_setups = []
+            
+            # Đóng vị thế Market nếu đang có
+            if tracker.has_long and cross_long_amt > 0:
+                clean_algo_orders(client, swap_id, "cross", "long")
+                close_position_market(client, swap_id, "long", str(cross_long_amt), "Disabled_Coin", "cross")
+                tracker.closure_reason_long = "Disabled_Coin"
+                print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
+                
+            if tracker.has_short and cross_short_amt > 0:
+                clean_algo_orders(client, swap_id, "cross", "short")
+                close_position_market(client, swap_id, "short", str(cross_short_amt), "Disabled_Coin", "cross")
+                tracker.closure_reason_short = "Disabled_Coin"
+                print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
+                
+            return
+
         # ---------------------------------------------------------------
         # INITIALIZATION / RESET
         # ---------------------------------------------------------------
@@ -725,12 +745,6 @@ def run_strategy_cycle(
         except Exception as e:
             print(f"🚫 [SMC] Lỗi Exception khi quét/đặt TP/SL: {e}")
         
-        # ⚡ NẾU COIN BỊ BỎ TÍCH GIAO DỊCH (is_enabled == False) -> HỦY SẠCH LỆNH CHỜ TRÊN OKX & XÓA SETUP CHỜ
-        if not is_enabled:
-            clean_ob_orders(client, swap_id, CL_ORD_PREFIX)
-            tracker.trade_setups = [s for s in tracker.trade_setups if s.triggered]
-            return
-
         # ---------------------------------------------------------------
         # ⚡ QUÉT SÀN & ĐẶT LỆNH LIMIT OKX (đồng bộ trạng thái thực tế)
         # ---------------------------------------------------------------
@@ -950,3 +964,5 @@ def _sync_save_mtf_states_sub2(swap_id: str, data: dict, mtf_file: str):
 
 # z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge) để tránh bị rối trên chart
 # z1950 | Update: Truyền tham số opens, closes vào find_order_block để sửa lỗi tính sai vùng OB theo SMC
+
+# z246 | Update: Fixed is_enabled checking to fully disable coins when unchecked

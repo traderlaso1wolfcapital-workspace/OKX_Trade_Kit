@@ -2868,7 +2868,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if getattr(self, 'smc_chk_cfg_eth', None) and self.smc_chk_cfg_eth.isChecked(): smc_enabled.append("ETH")
             
             cfg.update({
-                "ENABLED_COINS": smc_enabled if smc_enabled else ["XAU", "BTC", "ETH"],
+                "ENABLED_COINS": smc_enabled,
                 "ENABLE_STRATEGY_SMC": self.smc_chk_main.isChecked() if hasattr(self, 'smc_chk_main') else True,
                 "TIMEFRAME_BASE": self.smc_combo_tf_base.currentText() if hasattr(self, 'smc_combo_tf_base') else "5m",
                 "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.smc_input_pos_vol.value(), 2)) if hasattr(self, 'smc_input_pos_vol') else "100.00",
@@ -4235,10 +4235,12 @@ def get_hwid():
     return "TLS-" + hashlib.md5(hwid_string.encode()).hexdigest()[:10].upper()
 
 class HWIDAuthDialog(QtWidgets.QDialog):
-    def __init__(self, hwid, custom_message="Tài khoản hợp lệ, nhưng CHƯA được cấp quyền sử dụng trên máy tính này.", parent=None):
+    def __init__(self, hwid, custom_message="Tài khoản hợp lệ, nhưng CHƯA được cấp quyền sử dụng trên máy tính này.", parent=None, uid=""):
         super().__init__(parent)
+        self.uid = uid
+        self.hwid = hwid
         self.setWindowTitle("Cần xác thực thiết bị")
-        self.setFixedSize(450, 280)
+        self.setFixedSize(500, 360)
         self.setStyleSheet("""
             QDialog { background-color: #1e1e1e; color: white; }
             QLabel { color: #cccccc; font-size: 14px; }
@@ -4257,6 +4259,9 @@ class HWIDAuthDialog(QtWidgets.QDialog):
             QPushButton#BtnRelogin:hover { background-color: #e68a00; }
             QPushButton#BtnClose { background-color: #444444; color: white; }
             QPushButton#BtnClose:hover { background-color: #666666; }
+            QLineEdit { background-color: #2d3345; border: 1px solid #ff9800; border-radius: 4px; padding: 5px; color: white; }
+            QPushButton#BtnSendHWID { background-color: #00cc66; color: white; }
+            QPushButton#BtnSendHWID:hover { background-color: #00ff88; }
         """)
         
         layout = QtWidgets.QVBoxLayout(self)
@@ -4288,13 +4293,29 @@ class HWIDAuthDialog(QtWidgets.QDialog):
         hwid_layout.addWidget(btn_hwid_val)
         hwid_layout.addStretch()
         layout.addLayout(hwid_layout)
-        
-        lbl_msg3 = QtWidgets.QLabel("Bước 2. Gửi mã máy (HWID) cho Admin TLS1 để được cấp quyền truy cập:")
+
+        # --- Nút Gửi HWID ---
+        lbl_msg3 = QtWidgets.QLabel("Bước 2. Nhập/Dán Mã Máy vào ô dưới và ấn Gửi lên hệ thống:")
         lbl_msg3.setStyleSheet("font-size: 12px; margin-left: 5px; color: #bbbbbb;")
-        lbl_msg3.setWordWrap(True)
         layout.addWidget(lbl_msg3)
+
+        send_layout = QtWidgets.QHBoxLayout()
+        self.input_hwid = QtWidgets.QLineEdit()
+        self.input_hwid.setPlaceholderText("Dán mã máy vào đây...")
+        self.input_hwid.setText(hwid) # Mặc định điền sẵn mã máy của họ
+        self.btn_send_hwid = QtWidgets.QPushButton("Gửi")
+        self.btn_send_hwid.setObjectName("BtnSendHWID")
+        self.btn_send_hwid.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         
-        layout.addStretch()
+        send_layout.addWidget(self.input_hwid)
+        send_layout.addWidget(self.btn_send_hwid)
+        layout.addLayout(send_layout)
+        
+        self.btn_send_hwid.clicked.connect(self.send_hwid_to_google_sheet)
+        
+        lbl_msg4 = QtWidgets.QLabel("Hoặc liên hệ Admin TLS1 nếu cần hỗ trợ:")
+        lbl_msg4.setStyleSheet("font-size: 12px; margin-left: 5px; color: #bbbbbb; margin-top: 5px;")
+        layout.addWidget(lbl_msg4)
         
         btn_layout = QtWidgets.QHBoxLayout()
         btn_tele = QtWidgets.QPushButton("Telegram")
@@ -4325,11 +4346,52 @@ class HWIDAuthDialog(QtWidgets.QDialog):
         
         layout.addSpacing(15)
 
-        btn_relogin = QtWidgets.QPushButton("Đăng Nhập")
+        btn_relogin = QtWidgets.QPushButton("Đăng Nhập Lại")
         btn_relogin.setObjectName("BtnRelogin")
         btn_relogin.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         btn_relogin.clicked.connect(self.accept)
         layout.addWidget(btn_relogin)
+
+    def send_hwid_to_google_sheet(self):
+        input_hwid_val = self.input_hwid.text().strip()
+        if not input_hwid_val:
+            QtWidgets.QMessageBox.warning(self, "Lỗi", "Vui lòng nhập Mã Máy (HWID)!")
+            return
+            
+        if not self.uid:
+            QtWidgets.QMessageBox.warning(self, "Lỗi", "Không tìm thấy UID của bạn, không thể tự động cập nhật.")
+            return
+
+        self.btn_send_hwid.setEnabled(False)
+        self.btn_send_hwid.setText("Đang gửi...")
+        QtWidgets.QApplication.processEvents()
+        
+        # BẠN CẦN THAY THẾ URL NÀY BẰNG WEB APP URL CỦA GOOGLE APPS SCRIPT
+        APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz_XXXXXXXXXX_XXXXXX/exec" 
+
+        try:
+            import requests
+            data = {
+                "uid": self.uid,
+                "hwid": input_hwid_val
+            }
+            # Sử dụng API của Apps Script, có thể cần timeout dài một chút
+            response = requests.post(APP_SCRIPT_URL, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("status") == "success":
+                    QtWidgets.QMessageBox.information(self, "Thành công", "Đã cập nhật HWID lên hệ thống thành công!\nHệ thống đã sẵn sàng, bạn có thể Đăng Nhập Lại.")
+                    self.accept()
+                else:
+                    QtWidgets.QMessageBox.warning(self, "Lỗi", f"Có lỗi xảy ra: {result.get('message', 'Không rõ')}")
+            else:
+                QtWidgets.QMessageBox.warning(self, "Lỗi", f"HTTP Error: {response.status_code}\nVui lòng liên hệ Admin.")
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "Lỗi", f"Lỗi kết nối tới hệ thống: {e}")
+            
+        self.btn_send_hwid.setEnabled(True)
+        self.btn_send_hwid.setText("Gửi")
 
 class UpdateDialog(QtWidgets.QDialog):
     def __init__(self, new_version="1.0.250", changelog="", parent=None):
@@ -4809,7 +4871,7 @@ class LoginDialog(QtWidgets.QDialog):
                 current_hwid = get_hwid()
                 
                 if not registered_hwid or registered_hwid == "None":
-                    res = HWIDAuthDialog(current_hwid, parent=self).exec()
+                    res = HWIDAuthDialog(current_hwid, uid=uid, parent=self).exec()
                     if res == QtWidgets.QDialog.DialogCode.Accepted:
                         self.check_login()
                         return
@@ -4819,7 +4881,7 @@ class LoginDialog(QtWidgets.QDialog):
                         
                 elif registered_hwid != current_hwid:
                     msg = "Tài khoản UID này đã được cấp quyền cho máy tính khác!\n\nKhông thể dùng chung 1 tài khoản cho nhiều máy.\nNếu bạn đổi máy, vui lòng liên hệ Admin để reset Mã Thiết Bị."
-                    res = HWIDAuthDialog(current_hwid, custom_message=msg, parent=self).exec()
+                    res = HWIDAuthDialog(current_hwid, custom_message=msg, uid=uid, parent=self).exec()
                     if res == QtWidgets.QDialog.DialogCode.Accepted:
                         self.check_login()
                         return
@@ -5257,3 +5319,5 @@ if __name__ == "__main__":
 # z291 | Bỏ nút chọn Demo trên GUI, ép chạy duy nhất trên tài khoản Thực (Live Trading).
 # z292 | Hỗ trợ tự động nhận diện và chuyển đổi tên miền OKX theo khu vực (như eea.okx.com cho châu Âu).
 
+
+# z246 | Update: Fixed empty coin list config saving & Added API POST for HWID Auth
