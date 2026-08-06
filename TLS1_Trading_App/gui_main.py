@@ -4939,8 +4939,11 @@ def main():
     except:
         pass
 
-    # Fix black screen issue cho biểu đồ (QWebEngineView) trên máy khách khi đóng gói PyInstaller
-    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-gpu-compositing"
+    # Bỏ qua log rác của Qt Multimedia (FFmpeg)
+    os.environ["QT_LOGGING_RULES"] = "qt.multimedia.ffmpeg*=false"
+
+    # Fix black screen issue cho biểu đồ (QWebEngineView) trên máy khách khi đóng gói PyInstaller và tắt log rác Chromium
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-gpu-compositing --log-level=3"
     if "--disable-gpu" not in sys.argv:
         sys.argv.append("--disable-gpu")
     if "--disable-gpu-compositing" not in sys.argv:
@@ -5327,3 +5330,4 @@ if __name__ == "__main__":
 
 # z246 | Update: Fixed empty coin list config saving & Added API POST for HWID Auth
 # z247 | Update: Hỗ trợ tên miền động (okx_domain) cho việc load biểu đồ nến (LiveChartWorker).
+# z248 | Update: Tắt log rác hiển thị trên console từ Chromium và FFmpeg.
