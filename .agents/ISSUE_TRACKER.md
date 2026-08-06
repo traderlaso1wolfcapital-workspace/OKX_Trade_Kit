@@ -19,6 +19,16 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[06/08/2026]** - Sửa lỗi đăng nhập báo "chưa đăng ký ref TLS1" (UID Minh Nguyễn), Sửa lỗi GPU/JS, và Tăng tốc Ép Cập Nhật tự động:
+  - **Nguyên nhân 1 (Đăng nhập):** Khi tải danh sách UID từ Google Sheet dưới dạng CSV, thư viện `requests.get` nhận diện sai encoding là `ISO-8859-1`. Chữ "ễ" trong "Minh Nguyễn" (UTF-8 byte `\xe1\xbb\x85`) bị giải mã thành ký tự Unicode Next Line (`\u0085`). Khi gọi `splitlines()`, python cắt dòng này làm đôi làm mất cột dữ liệu và loại bỏ UID, dẫn đến báo lỗi chưa đăng ký.
+  - **Nguyên nhân 2 (Lỗi JS callback):** Thư viện `lightweight_charts` gọi hàm JS gán `window.callbackFunction = window.pythonObject.callback` sau 200ms qua `on_js_load`, nhưng do `QWebChannel` khởi tạo bất đồng bộ bị trễ dẫn đến `window.pythonObject` là `undefined`, ném lỗi `TypeError` trong console.
+  - **Nguyên nhân 3 (Lỗi GPU virtual context):** Cờ Chromium cũ và `--use-gl=swiftshader` xung đột với `--disable-gpu`, gây ra lỗi cấu hình không được hỗ trợ trong console.
+  - **Cập nhật:** 
+    1. Thêm `response.encoding = 'utf-8'` trước khi parse CSV trong `check_login` tại [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py).
+    2. Định nghĩa một JS Object Descriptor tạm thời làm proxy cho `window.pythonObject` tại sự kiện `loadFinished` của webview để hứng callback an toàn trước khi `QWebChannel` load xong.
+    3. Đơn giản hóa cờ Chromium thành `--disable-gpu --disable-gpu-compositing` (loại bỏ `--disable-software-rasterizer` và `--use-gl=swiftshader`), giúp Chromium tự động dùng software rendering gốc mượt mà và không báo lỗi.
+    4. Rút ngắn thời gian quét cập nhật lúc khởi động từ `2000ms` xuống `100ms` để kiểm tra tức thì. Đồng thời, chỉnh sửa `QProgressDialog` hiển thị với parent là `activeModalWidget()` để đè lên trên màn hình đăng nhập `LoginDialog`, ép cập nhật tự động nhanh chóng và bắt buộc trước khi người dùng kịp đăng nhập. (Mã patch: `z288`)
+
 - **[05/08/2026]** - Sửa lỗi Terminal Logs của Bot SMC (Sub2) không hiển thị Dashboard:
   - **Nguyên nhân:** File `sys_bot_sub2.py` có gọi hàm `bot_ui.update_wallet_metrics()` trước khi in Dashboard, nhưng hàm này đã bị gỡ bỏ khỏi `bot_ui.py` (do bot tự đọc từ file JSON). Việc gọi hàm không tồn tại đã gây ra ngoại lệ `AttributeError`. Tệ hơn nữa, vòng lặp chính lại sử dụng `except Exception:` nuốt trọn mọi lỗi mà không in ra console, khiến Dashboard liên tục bị gián đoạn ngầm mà không có cảnh báo.
   - **Cập nhật:** Đã xóa bỏ lời gọi hàm thừa `bot_ui.update_wallet_metrics()` trong [sys_bot_sub2.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/sys_bot_sub2.py), đồng thời bổ sung `import traceback` để in rõ lỗi nếu vòng lặp chính của bot gặp sự cố trong tương lai. Sau khi lộ diện lỗi `NameError: target_vol`, tôi cũng đã bổ sung logic lấy `target_vol` trực tiếp từ file cấu hình JSON hoặc dùng giá trị mặc định trong [bot_ui.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub2/bot_ui.py). Giao diện Terminal của Bot SMC nay đã xuất hiện lại đầy đủ và đẹp mắt. (Mã patch: `z286`)

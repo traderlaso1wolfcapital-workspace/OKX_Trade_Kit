@@ -1277,6 +1277,31 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.chart_widget = QtChart()
             self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2, price_line=False, price_label=False)
             webview = self.chart_widget.get_webview()
+            
+            # Fix race condition cho QWebChannel/lightweight_charts để tránh lỗi undefined callback
+            fix_bridge_js = """
+            if (typeof window.pythonObject === 'undefined') {
+                let q = [], real = null;
+                Object.defineProperty(window, 'pythonObject', {
+                    get: function() {
+                        return { callback: function(m) {
+                            if (real && real.callback) { real.callback(m); } else { q.push(m); }
+                        }};
+                    },
+                    set: function(v) {
+                        real = v;
+                        if (real && real.callback) {
+                            while (q.length > 0) {
+                                try { real.callback(q.shift()); } catch(e) {}
+                            }
+                        }
+                    },
+                    configurable: true
+                });
+            }
+            """
+            webview.loadFinished.connect(lambda: webview.page().runJavaScript(fix_bridge_js))
+            
             webview.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
             chart_layout.addWidget(webview, 1)
             
@@ -3392,8 +3417,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_check_timer.timeout.connect(lambda: self.check_update_background(is_startup=False))
         self.update_check_timer.start(1800000) # 30 phút = 1800000 ms
         
-        # Lần đầu mở app (2s sau startup): Quét và ÉP AUTO-UPDATE BẮT BUỘC nếu có bản mới
-        QtCore.QTimer.singleShot(2000, lambda: self.check_update_background(is_startup=True))
+        # Lần đầu mở app (100ms sau startup): Quét và ÉP AUTO-UPDATE BẮT BUỘC nếu có bản mới
+        QtCore.QTimer.singleShot(100, lambda: self.check_update_background(is_startup=True))
 
         # Setup background License verification timer (quét Google Sheet 30p 1 lần)
         self.license_check_timer = QtCore.QTimer(self)
@@ -3862,7 +3887,8 @@ class MainWindow(QtWidgets.QMainWindow):
             download_url = f"https://github.com/TLS1-Releases/TLS1_Trading_App_Releases/releases/download/v{remote_version}/TLS1_Trading_Setup.exe"
             
             cancel_btn_text = "Hủy" if not bypass_confirm else None
-            dlg = QtWidgets.QProgressDialog(f"Đang kết nối tải bản cập nhật v{remote_version}...", cancel_btn_text, 0, 100, self)
+            parent_widget = QtWidgets.QApplication.activeModalWidget() or self
+            dlg = QtWidgets.QProgressDialog(f"Đang kết nối tải bản cập nhật v{remote_version}...", cancel_btn_text, 0, 100, parent_widget)
             dlg.setWindowTitle("Cập nhật ứng dụng tự động")
             dlg.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
             dlg.setMinimumDuration(0)
@@ -4736,6 +4762,7 @@ class LoginDialog(QtWidgets.QDialog):
             url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
             response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
             response.raise_for_status()
+            response.encoding = 'utf-8'
             content = response.text
             
             reader = csv.reader(content.splitlines())
@@ -4835,11 +4862,11 @@ def main():
         pass
 
     # Fix black screen issue cho biểu đồ (QWebEngineView) trên máy khách khi đóng gói PyInstaller
-    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-software-rasterizer --disable-gpu-compositing"
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu --disable-gpu-compositing"
     if "--disable-gpu" not in sys.argv:
         sys.argv.append("--disable-gpu")
-    if "--disable-software-rasterizer" not in sys.argv:
-        sys.argv.append("--disable-software-rasterizer")
+    if "--disable-gpu-compositing" not in sys.argv:
+        sys.argv.append("--disable-gpu-compositing")
 
     app = QtWidgets.QApplication(sys.argv)
     app.setStyleSheet("""
