@@ -31,7 +31,7 @@ with open(v_path, 'w', encoding='utf-8') as f:
 print(f"[1] Đã tự động tăng Version từ {old_v} len {new_v}")
 
 # 2. Git Commands
-git = r"C:\Program Files\Git\cmd\git.exe"
+git = "git"
 
 print("[2] Đang lưu thay đổi (Commit) dưới danh nghĩa Ẩn danh (TLS1 Admin)...")
 subprocess.run([git, "add", "."], check=False, cwd=base_dir)
