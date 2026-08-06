@@ -16,6 +16,37 @@ class OKXRestCore:
         self.passphrase = passphrase
         self.is_demo = is_demo
         self.BASE_URL = "https://www.okx.com"
+        
+        # Dynamically load regional domain from the active .env file
+        import sys, os
+        env_file = None
+        if len(sys.argv) > 1:
+            for arg in reversed(sys.argv):
+                if arg.endswith(".env"):
+                    if os.path.isabs(arg) and os.path.exists(arg):
+                        env_file = arg
+                        break
+                    else:
+                        local_app_data = os.environ.get('LOCALAPPDATA', os.path.expanduser('~'))
+                        user_data_dir = os.path.join(local_app_data, 'TLS1_Trading')
+                        for strategy in ["sub1", "sub2", "main"]:
+                            p = os.path.join(user_data_dir, f"z_bot_{strategy}", arg)
+                            if os.path.exists(p):
+                                env_file = p
+                                break
+                        if env_file:
+                            break
+        if env_file and os.path.exists(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.startswith("OKX_DOMAIN="):
+                            dom = line.strip().split("=")[1].strip('"\'')
+                            if dom:
+                                self.BASE_URL = f"https://{dom}"
+                                break
+            except:
+                pass
 
     def _make_headers(self, method: str, path: str, body: str = "") -> dict[str, str]:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"

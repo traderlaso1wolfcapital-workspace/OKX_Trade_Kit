@@ -19,6 +19,16 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[07/08/2026]** - Hỗ trợ API Key OKX tại châu Âu (Khu vực EEA):
+  - **Nguyên nhân:** OKX giới hạn các tài khoản đăng ký tại khu vực Châu Âu (EEA) bắt buộc phải sử dụng domain riêng là `eea.okx.com` (và Mỹ/Úc dùng `us.okx.com`). Do đó, nếu ứng dụng hardcode kết nối tới `www.okx.com`, OKX sẽ trả về lỗi `API key doesn't exist` (lỗi 50119 hoặc không hợp lệ) dù API Key và Passphrase hoàn toàn đúng.
+  - **Cập nhật:**
+    1. Trong [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py), cơ chế lưu API Key được nâng cấp để thử xác thực lần lượt qua 3 domain: `www.okx.com`, `eea.okx.com`, và `us.okx.com`. Khi domain nào trả về thành công, ứng dụng sẽ lưu domain đó vào cấu hình dưới biến `OKX_DOMAIN`. Đồng thời, sửa lại định dạng Timestamp sử dụng `.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'` thay vì `.isoformat()` (vốn sinh ra đuôi múi giờ `+00:00Z` không hợp lệ khiến OKX báo lỗi `Invalid OK-ACCESS-TIMESTAMP`).
+    2. Các tiểu trình giao dịch trong `gui_main.py` (`OKXPositionsWorker`, hàm đóng vị thế nhanh) và bộ lõi API của hai bot tại [z_bot_sub1/bot_api.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub1/bot_api.py) & [z_bot_sub2/bot_api.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub2/bot_api.py) được cập nhật để tự động đọc biến `OKX_DOMAIN` này từ file `.env` và sử dụng làm Endpoint kết nối, đảm bảo bot chạy mượt mà ở châu Âu và toàn cầu. (Mã patch: `z292`)
+
+- **[07/08/2026]** - Loại bỏ hoàn toàn Chế độ Demo (Simulated Trading) trên GUI và mã nguồn:
+  - **Nguyên nhân:** Khách hàng không có nhu cầu chạy Demo và hay bị nhầm lẫn giữa API Key Live và API Key Demo (gây ra lỗi 50101 từ sàn OKX khi chọn nhầm chế độ). Yêu cầu chỉ hỗ trợ giao dịch tài khoản thực (Live trading).
+  - **Cập nhật:** Trong file [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py), ẩn công tắc ToggleSwitch `chk_demo_mode` khỏi giao diện Cài đặt API, mặc định giá trị checkbox về `False`. Đồng thời, ép cứng giá trị biến `is_demo`/`demo_mode` về `False` khi đọc/lưu file cấu hình `.env` cũng như lúc gọi API xác thực khóa bảo mật UID, đảm bảo toàn bộ hệ thống hoạt động duy nhất trên môi trường tài khoản Thực. (Mã patch: `z291`)
+
 - **[06/08/2026]** - Sửa lỗi đăng nhập báo "chưa đăng ký ref TLS1" (UID Minh Nguyễn), Sửa lỗi GPU/JS, và Tăng tốc Ép Cập Nhật tự động:
   - **Nguyên nhân 1 (Đăng nhập):** Khi tải danh sách UID từ Google Sheet dưới dạng CSV, thư viện `requests.get` nhận diện sai encoding là `ISO-8859-1`. Chữ "ễ" trong "Minh Nguyễn" (UTF-8 byte `\xe1\xbb\x85`) bị giải mã thành ký tự Unicode Next Line (`\u0085`). Khi gọi `splitlines()`, python cắt dòng này làm đôi làm mất cột dữ liệu và loại bỏ UID, dẫn đến báo lỗi chưa đăng ký.
   - **Nguyên nhân 2 (Lỗi JS callback):** Thư viện `lightweight_charts` gọi hàm JS gán `window.callbackFunction = window.pythonObject.callback` sau 200ms qua `on_js_load`, nhưng do `QWebChannel` khởi tạo bất đồng bộ bị trễ dẫn đến `window.pythonObject` là `undefined`, ném lỗi `TypeError` trong console.

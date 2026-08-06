@@ -593,12 +593,14 @@ class OKXPositionsWorker(QtCore.QThread):
         self.secret_key = ""
         self.passphrase = ""
         self.demo_mode = False
+        self.okx_domain = "www.okx.com"
 
-    def update_credentials(self, api_key, secret_key, passphrase, demo_mode):
+    def update_credentials(self, api_key, secret_key, passphrase, demo_mode, okx_domain="www.okx.com"):
         self.api_key = api_key
         self.secret_key = secret_key
         self.passphrase = passphrase
         self.demo_mode = demo_mode
+        self.okx_domain = okx_domain
 
     def _sign_request(self, timestamp, method, request_path):
         message = timestamp + method + request_path
@@ -612,7 +614,7 @@ class OKXPositionsWorker(QtCore.QThread):
                 continue
             
             try:
-                base_url = "https://www.okx.com"
+                base_url = f"https://{self.okx_domain}"
                 
                 # Fetch positions
                 path_pos = "/api/v5/account/positions?instType=SWAP"
@@ -1432,7 +1434,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 return
             
             import json, requests
-            base_url = "https://www.okx.com"
+            base_url = f"https://{self.pos_worker.okx_domain}"
             path = "/api/v5/trade/close-position"
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
             
@@ -1751,6 +1753,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
         if os.path.exists(env_path):
             api_key, secret_key, passphrase, demo_mode = "", "", "", False
+            okx_domain = "www.okx.com"
             try:
                 with open(env_path, "r", encoding="utf-8") as f:
                     for line in f:
@@ -1760,13 +1763,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
                             if k == "OKX_API_KEY": api_key = v
                             elif k == "OKX_SECRET_KEY": secret_key = v
                             elif k == "OKX_PASSPHRASE": passphrase = v
-                            elif k == "OKX_IS_DEMO": demo_mode = (v.lower() == "true")
+                            elif k == "OKX_IS_DEMO": demo_mode = False
+                            elif k == "OKX_DOMAIN": okx_domain = v
                 
                 self.pos_worker.update_credentials(
                     api_key=api_key,
                     secret_key=secret_key,
                     passphrase=passphrase,
-                    demo_mode=demo_mode
+                    demo_mode=demo_mode,
+                    okx_domain=okx_domain
                 )
             except Exception as e:
                 print(f"Error in apply_current_api_to_worker: {e}")
@@ -1814,6 +1819,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_passphrase = QtWidgets.QLineEdit()
         self.input_passphrase.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.chk_demo_mode = ToggleSwitch(text_on="DEMO", text_off="THẬT", width=56, height=20)
+        self.chk_demo_mode.setChecked(False)
+        self.chk_demo_mode.hide()
         
         form_layout = QtWidgets.QFormLayout()
         form_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
@@ -1828,7 +1835,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_secret_key.setStyleSheet("min-width: 500px; max-width: 500px;")
         self.input_passphrase.setStyleSheet("min-width: 500px; max-width: 500px;")
         
-        form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
+        # form_layout.addRow("Chế Độ Giao Dịch:", self.chk_demo_mode)
         form_layout.addRow("Mã API (API Key):", self.input_api_key)
         form_layout.addRow("Khóa Bí Mật (Secret):", self.input_secret_key)
         form_layout.addRow("Cụm Mật Khẩu (Pass):", self.input_passphrase)
@@ -2488,7 +2495,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                             if k == "OKX_API_KEY": self.input_api_key.setText(v)
                             elif k == "OKX_SECRET_KEY": self.input_secret_key.setText(v)
                             elif k == "OKX_PASSPHRASE": self.input_passphrase.setText(v)
-                            elif k == "OKX_IS_DEMO": self.chk_demo_mode.setChecked(v.lower() == "true")
+                            elif k == "OKX_IS_DEMO": self.chk_demo_mode.setChecked(False)
 
         import importlib.util
         bot_dir = f"z_bot_{self.strategy_id}"
@@ -2718,7 +2725,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         api_key = self.input_api_key.text().strip()
         secret_key = self.input_secret_key.text().strip()
         passphrase = self.input_passphrase.text().strip()
-        is_demo = self.chk_demo_mode.isChecked()
+        is_demo = False
         
         # --- VERIFY API KEY WITH OKX ---
         if api_key or secret_key:
@@ -2735,15 +2742,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 import json
                 import datetime
                 
-                timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds') + 'Z'
+                timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                 method = 'GET'
                 request_path = '/api/v5/account/config'
                 message = timestamp + method + request_path
                 
                 mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod='sha256')
                 sign = base64.b64encode(mac.digest()).decode('utf-8')
-                
-                url = "https://www.okx.com" + request_path
                 
                 headers = {
                     'OK-ACCESS-KEY': api_key,
@@ -2755,52 +2760,52 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 }
                 if is_demo:
                     headers['x-simulated-trading'] = '1'
-                    
-                req = urllib.request.Request(url, headers=headers)
                 
-                with urllib.request.urlopen(req, timeout=5) as response:
-                    res = json.loads(response.read().decode('utf-8'))
-                    if res.get("code") != "0":
-                        raise Exception(res.get("msg", "Unknown OKX Error"))
-                        
-                    # --- KIỂM TRA BẢO MẬT UID CHÍNH/PHỤ ---
-                    global CURRENT_UID
-                    if CURRENT_UID != "admtls12021":
-                        data_arr = res.get("data", [])
-                        if data_arr:
-                            main_uid = data_arr[0].get("mainUid", "")
-                            if main_uid and str(main_uid) != str(CURRENT_UID):
-                                display_err = f"API Key này KHÔNG thuộc về UID {CURRENT_UID}!\n\nVui lòng chỉ nhập API Key của tài khoản chính hoặc tài khoản phụ trực thuộc UID {CURRENT_UID}."
-                                msg = QtWidgets.QMessageBox(self)
-                                msg.setWindowTitle("Lỗi API Key (Sai Chủ)")
-                                msg.setText(display_err)
-                                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
-                                msg.exec()
-                                self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
-                                self.btn_save_api.setEnabled(True)
-                                return
-            except urllib.error.HTTPError as e:
-                err_msg = str(e)
-                try:
-                    err_body = json.loads(e.read().decode('utf-8'))
-                    err_msg = err_body.get("msg", str(e))
-                except Exception:
-                    pass
+                # Try domains sequentially
+                domains_to_try = ["www.okx.com", "eea.okx.com", "us.okx.com"]
+                success_domain = None
+                last_err_msg = ""
+                res = None
                 
-                display_err = "API Key không hợp lệ hoặc sai Passphrase!"
-                if "Timestamp request expired" in err_msg:
-                    display_err = "Giờ máy tính của bạn chạy KHÔNG ĐÚNG thực tế!\nVui lòng đồng bộ lại giờ đồng hồ của Windows (Sync Time) trước khi sử dụng."
-                elif "APIKey does not match" in err_msg or "Invalid Sign" in err_msg:
-                    display_err = "API Key/Secret Key sai hoặc không phải của sàn OKX!"
-                msg = QtWidgets.QMessageBox(self)
-                msg.setWindowTitle("Lỗi API Key")
-                msg.setText(f"{display_err}\n\nChi tiết OKX: {err_msg}")
-                self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
-                msg.exec()
-                self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
-                self.btn_save_api.setEnabled(True)
-                return
+                for dom in domains_to_try:
+                    url = f"https://{dom}" + request_path
+                    req = urllib.request.Request(url, headers=headers)
+                    try:
+                        with urllib.request.urlopen(req, timeout=5) as response:
+                            res = json.loads(response.read().decode('utf-8'))
+                            if res.get("code") == "0":
+                                success_domain = dom
+                                break
+                            else:
+                                last_err_msg = res.get("msg", "Unknown OKX Error")
+                    except urllib.error.HTTPError as e:
+                        try:
+                            err_body = json.loads(e.read().decode('utf-8'))
+                            last_err_msg = err_body.get("msg", str(e))
+                        except Exception:
+                            last_err_msg = str(e)
+                    except Exception as e:
+                        last_err_msg = str(e)
                 
+                if not success_domain:
+                    raise Exception(last_err_msg or "Không thể kết nối đến OKX.")
+                
+                # --- KIỂM TRA BẢO MẬT UID CHÍNH/PHỤ ---
+                global CURRENT_UID
+                if CURRENT_UID != "admtls12021":
+                    data_arr = res.get("data", [])
+                    if data_arr:
+                        main_uid = data_arr[0].get("mainUid", "")
+                        if main_uid and str(main_uid) != str(CURRENT_UID):
+                            display_err = f"API Key này KHÔNG thuộc về UID {CURRENT_UID}!\n\nVui lòng chỉ nhập API Key của tài khoản chính hoặc tài khoản phụ trực thuộc UID {CURRENT_UID}."
+                            msg = QtWidgets.QMessageBox(self)
+                            msg.setWindowTitle("Lỗi API Key (Sai Chủ)")
+                            msg.setText(display_err)
+                            self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                            msg.exec()
+                            self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
+                            self.btn_save_api.setEnabled(True)
+                            return
             except Exception as e:
                 msg = QtWidgets.QMessageBox(self)
                 msg.setWindowTitle("Lỗi API Key")
@@ -2823,6 +2828,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
             f.write(f"OKX_API_KEY=\"{api_key}\"\n")
             f.write(f"OKX_SECRET_KEY=\"{secret_key}\"\n")
             f.write(f"OKX_PASSPHRASE=\"{passphrase}\"\n")
+            if api_key or secret_key:
+                f.write(f"OKX_DOMAIN=\"{success_domain}\"\n")
+            else:
+                f.write(f"OKX_DOMAIN=\"www.okx.com\"\n")
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
         if not api_key and not secret_key:
@@ -2950,15 +2959,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
         try:
             import hmac, base64, urllib.request, json, datetime
             api_key, secret_key, passphrase, is_demo = "", "", "", False
+            okx_domain = "www.okx.com"
             if not os.path.exists(env_path): return False
             with open(env_path, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("OKX_API_KEY="): api_key = line.strip().split("=")[1].strip('"')
                     elif line.startswith("OKX_SECRET_KEY="): secret_key = line.strip().split("=")[1].strip('"')
                     elif line.startswith("OKX_PASSPHRASE="): passphrase = line.strip().split("=")[1].strip('"')
-                    elif line.startswith("OKX_IS_DEMO="): is_demo = (line.strip().split("=")[1].strip('"').lower() == "true")
+                    elif line.startswith("OKX_IS_DEMO="): is_demo = False
+                    elif line.startswith("OKX_DOMAIN="): okx_domain = line.strip().split("=")[1].strip('"')
             if not api_key or not secret_key: return False
-            timestamp = datetime.datetime.utcnow().isoformat(timespec='milliseconds') + 'Z'
+            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
             request_path = '/api/v5/account/config'
             message = timestamp + 'GET' + request_path
             mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod='sha256')
@@ -2969,7 +2980,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             if is_demo: headers['x-simulated-trading'] = '1'
-            req = urllib.request.Request("https://www.okx.com" + request_path, headers=headers)
+            req = urllib.request.Request(f"https://{okx_domain}" + request_path, headers=headers)
             with urllib.request.urlopen(req, timeout=5) as response:
                 res = json.loads(response.read().decode('utf-8'))
                 if res.get("code") != "0": return False
@@ -5243,4 +5254,6 @@ if __name__ == "__main__":
 # z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
 # z244 | Update: Sửa hiển thị OB (tăng opacity lên 35%), thêm vẽ đường kẻ Entry, TP, SL lên chart.
 # z245 | Update: Giảm OB opacity 10%, TP/SL lineWidth 1px, grid mờ 30%. Thêm nút Đóng lệnh OKX (Market). Bỏ cột Kích thước, bỏ prefix TP:/SL:. Thêm fallback tính TP/SL từ RR setting. Fix wmic macOS, utcnow deprecated, DEBUG spam. Font 13px. Xóa 60+ file test rác. Fix closeEvent QThread.
+# z291 | Bỏ nút chọn Demo trên GUI, ép chạy duy nhất trên tài khoản Thực (Live Trading).
+# z292 | Hỗ trợ tự động nhận diện và chuyển đổi tên miền OKX theo khu vực (như eea.okx.com cho châu Âu).
 
