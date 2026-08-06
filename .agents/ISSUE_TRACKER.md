@@ -19,6 +19,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[07/08/2026]** - Sửa lỗi GitHub Actions Runner timeout (Job not acquired):
+  - **Nguyên nhân:** Lỗi "The job was not acquired by Runner of type hosted" xảy ra do máy chủ cấp phát (Runner pool) của GitHub bị quá tải không thể khởi tạo máy ảo, hoặc lỗi giới hạn hàng đợi. Hoàn toàn không phải do lỗi code logic ở `gui_main.py`.
+  - **Cập nhật:** Đã chỉnh sửa cấu hình file `.github/workflows/build-release.yml`, đổi hệ điều hành từ `windows-latest` sang bản fix cứng `windows-2022` và `macos-latest` sang `macos-13`. Việc ép version cụ thể giúp bypass lỗi kẹt hàng đợi của pool "latest" và mồi lại GitHub Actions chạy thành công. (Mã patch: `z249`)
+
 - **[07/08/2026]** - Sửa lỗi kết nối biểu đồ nến (LiveChartWorker) theo tên miền khu vực:
   - **Nguyên nhân:** Biểu đồ nến trong giao diện sử dụng `LiveChartWorker` kết nối cứng qua URL `https://www.okx.com/...`. Đối với người dùng ở các khu vực châu Âu/châu Mỹ bị chặn truy cập domain này, biểu đồ sẽ bị đen/trống hoặc không tải được dữ liệu, dù API Key đã được tự động định tuyến thành công qua tên miền phụ (`eea.okx.com` / `us.okx.com`).
   - **Cập nhật:** Cập nhật `LiveChartWorker` tại [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) để tự động lấy tên miền hoạt động (`okx_domain`) từ tiến trình `pos_worker` của Widget cha. Giờ đây, các yêu cầu tải nến biểu đồ cũng sẽ đi qua đúng tên miền khu vực tương tự như các yêu cầu giao dịch khác. (Mã patch: `z247`)
