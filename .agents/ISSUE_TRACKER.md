@@ -19,6 +19,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[07/08/2026]** - Sửa lỗi kết nối biểu đồ nến (LiveChartWorker) theo tên miền khu vực:
+  - **Nguyên nhân:** Biểu đồ nến trong giao diện sử dụng `LiveChartWorker` kết nối cứng qua URL `https://www.okx.com/...`. Đối với người dùng ở các khu vực châu Âu/châu Mỹ bị chặn truy cập domain này, biểu đồ sẽ bị đen/trống hoặc không tải được dữ liệu, dù API Key đã được tự động định tuyến thành công qua tên miền phụ (`eea.okx.com` / `us.okx.com`).
+  - **Cập nhật:** Cập nhật `LiveChartWorker` tại [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) để tự động lấy tên miền hoạt động (`okx_domain`) từ tiến trình `pos_worker` của Widget cha. Giờ đây, các yêu cầu tải nến biểu đồ cũng sẽ đi qua đúng tên miền khu vực tương tự như các yêu cầu giao dịch khác. (Mã patch: `z247`)
+
 - **[07/08/2026]** - Hỗ trợ API Key OKX tại châu Âu (Khu vực EEA):
   - **Nguyên nhân:** OKX giới hạn các tài khoản đăng ký tại khu vực Châu Âu (EEA) bắt buộc phải sử dụng domain riêng là `eea.okx.com` (và Mỹ/Úc dùng `us.okx.com`). Do đó, nếu ứng dụng hardcode kết nối tới `www.okx.com`, OKX sẽ trả về lỗi `API key doesn't exist` (lỗi 50119 hoặc không hợp lệ) dù API Key và Passphrase hoàn toàn đúng.
   - **Cập nhật:**

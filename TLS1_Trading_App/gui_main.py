@@ -458,7 +458,12 @@ class LiveChartWorker(QtCore.QThread):
         while self._is_running:
             self._trigger.clear()
             try:
-                resp = requests.get(f"https://www.okx.com/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300", timeout=5)
+                # Dynamically get okx_domain from parent's pos_worker if available
+                domain = "www.okx.com"
+                p = self.parent()
+                if p and hasattr(p, 'pos_worker') and p.pos_worker and hasattr(p.pos_worker, 'okx_domain'):
+                    domain = p.pos_worker.okx_domain
+                resp = requests.get(f"https://{domain}/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300", timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
                     if data.get("code") == "0":
@@ -5321,3 +5326,4 @@ if __name__ == "__main__":
 
 
 # z246 | Update: Fixed empty coin list config saving & Added API POST for HWID Auth
+# z247 | Update: Hỗ trợ tên miền động (okx_domain) cho việc load biểu đồ nến (LiveChartWorker).
