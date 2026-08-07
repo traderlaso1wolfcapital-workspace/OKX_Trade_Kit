@@ -81,6 +81,7 @@ def main():
     system_config["SHOULD_RESET_NEN"] = False
     system_config["LAST_EVOLUTION_TIMESTAMP"] = 0.0
     system_config["STARTUP_CLEANUP_DONE"] = False
+    system_config["BOT_START_TIME"] = time.time()
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
