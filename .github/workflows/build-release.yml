@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
             TLS1_Trading_App/version.json
 
   build-mac:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
