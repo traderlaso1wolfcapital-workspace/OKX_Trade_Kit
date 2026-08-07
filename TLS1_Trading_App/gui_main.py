@@ -990,7 +990,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     display = f"Tài khoản phụ {sub_name}"
                 self.account_dropdown.addItem(display, env)
 
-        target_env = ".api" if self.strategy_id == "main" else f".api_{self.strategy_id}"
+        target_env = ".api" if self.strategy_id == "sub1" else f".api_{self.strategy_id}"
         idx = self.account_dropdown.findData(target_env)
         if idx >= 0:
             self.account_dropdown.setCurrentIndex(idx)
@@ -1567,8 +1567,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
             # --- Cột 0: Cặp giao dịch (Checkbox + Tên Coin, Bỏ Chéo/Cô lập) ---
             chk = QtWidgets.QCheckBox()
             is_enabled_cfg = coin_key.upper() in [c.upper() for c in enabled_coins]
-            # Tự động tích chọn nếu coin được bật trong Settings HOẶC đang có vị thế active
-            is_checked = is_enabled_cfg or is_active
+            # Tự động tích chọn nếu coin được bật trong Settings
+            is_checked = is_enabled_cfg
             chk.setChecked(is_checked)
             svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
             chk.setStyleSheet(
@@ -2477,9 +2477,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def get_acc_name(self):
         env = self.get_selected_env()
-        if not env: return "main"
+        fallback = "sub2" if getattr(self, 'strategy_id', '') == "sub2" else "sub1"
+        if not env: return fallback
         acc_name = env.replace(".api", "").replace("_", "")
-        return "main" if acc_name == "" else acc_name
+        return fallback if acc_name == "" else acc_name
 
     def on_account_changed(self, index=None):
         self.log_display.appendPlainText(f"🔌 Đã chuyển sang tài khoản: {self.get_selected_env()}")
