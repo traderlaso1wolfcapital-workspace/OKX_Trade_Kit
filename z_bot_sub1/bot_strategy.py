@@ -965,26 +965,15 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         tracker.long_pos_vol, tracker.short_pos_vol = old_long_vol, old_short_vol
 
     if not is_enabled:
-        # Coin bị tắt -> Huỷ lệnh chờ, xóa setups
-        from z_bot_sub1.bot_orders import clean_algo_orders, clean_limit_orders, close_position_market
+        # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
+        # nhưng vẫn giữ vị thế Market đang mở và cho chạy tiếp các vòng lặp dưới để Bot quản lý dời SL/TP tự động
+        from z_bot_sub1.bot_orders import clean_limit_orders
         clean_limit_orders(client, swap_id, "cross")
-        
-        # Đóng vị thế Market nếu đang có
-        if tracker.has_long and cross_long_amt > 0:
-            clean_algo_orders(client, swap_id, "cross", "long")
-            close_position_market(client, swap_id, "long", str(cross_long_amt), "Disabled_Coin", "cross")
-            tracker.last_closed_reason = "Disabled_Coin"
-            print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
-            tracker.has_long = False
-            
-        if tracker.has_short and cross_short_amt > 0:
-            clean_algo_orders(client, swap_id, "cross", "short")
-            close_position_market(client, swap_id, "short", str(cross_short_amt), "Disabled_Coin", "cross")
-            tracker.last_closed_reason = "Disabled_Coin"
-            print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
-            tracker.has_short = False
-            
-        return
+        is_limit_setup_cycle = False
+        tracker.placed_entry_px_long_by_tf = {}
+        tracker.placed_entry_px_short_by_tf = {}
+        tracker.placed_entry_px_long = "---"
+        tracker.placed_entry_px_short = "---"
 
     try:
         if tracker.has_long:
