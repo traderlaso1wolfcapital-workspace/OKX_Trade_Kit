@@ -1364,7 +1364,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.pos_table.setStyleSheet(
             "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 15px; selection-background-color: #162e3b; selection-color: #ffffff; }"
             "QTableWidget::item:selected { background-color: #162e3b; color: #ffffff; border: 1px solid #20687a; }"
-            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 15px; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 14px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -4043,9 +4043,9 @@ del /f /q "%~f0"
         bars = ""
         for i in range(5):
             c = color if i < active_segments else "#444444"
-            bars += f"<span style='color: {c}; font-size: 14px; margin-right: 2px;'>▮</span>"
+            bars += f"<span style='color: {c}; font-size: 15px; margin-right: 2px;'>▮</span>"
             
-        html_content = f"<span style='color: #cccccc; font-weight: 500; font-family: Segoe UI, sans-serif;'>Slot: </span><span style='color: {color}; font-weight: 500; font-family: Segoe UI, sans-serif;'>{fake_count}/{max_slots}</span>  {bars}"
+        html_content = f"<span style='color: #cccccc; font-weight: bold; font-family: Segoe UI, Arial, sans-serif; font-size: 12px;'>Slot: </span><span style='color: {color}; font-weight: bold; font-family: Segoe UI, Arial, sans-serif; font-size: 12px;'>{fake_count}/{max_slots}</span>  {bars}"
         self.lbl_online_count.setText(html_content)
         self.lbl_online_count.setStyleSheet("""
             background: transparent;
