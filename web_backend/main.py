@@ -1,46 +1,49 @@
-from fastapi import FastAPI, Depends, HTTPException, WebSocket
-from sqlalchemy.orm import Session
-from . import models, database
+import socketio
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import json
+from sqlalchemy.orm import Session
+import uvicorn
 
-app = FastAPI(title="TLS1 Trading Web API")
+from .database import engine, Base, get_db
+from . import models
 
-# Configure CORS
+# Create Database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="TLS1 Trading OS Backend", version="1.0.0")
+
+# CORS middleware for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # In production, restrict this to the frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-models.Base.metadata.create_all(bind=database.engine)
+# Socket.IO setup
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+socket_app = socketio.ASGIApp(sio, app)
 
+@sio.event
+async def connect(sid, environ):
+    print(f"[Socket.IO] Client connected: {sid}")
+    await sio.emit('system_message', {'msg': 'Connected to TLS1 Trading OS'})
+
+@sio.event
+async def disconnect(sid):
+    print(f"[Socket.IO] Client disconnected: {sid}")
+
+# Basic REST endpoints
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "TLS1 Trading Engine Web API is running."}
+    return {"message": "Welcome to TLS1 Trading OS API"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 @app.get("/users")
-def get_users(db: Session = Depends(database.get_db)):
-    return db.query(models.User).all()
-
-from pydantic import BaseModel
-from .bot_manager import bot_manager
-
-class BotActionRequest(BaseModel):
-    uid: str
-    strategy: str
-    env_data: str = ""
-
-@app.post("/api/bot/start")
-def start_bot(req: BotActionRequest):
-    return bot_manager.start_bot(req.uid, req.strategy, req.env_data)
-
-@app.post("/api/bot/stop")
-def stop_bot(req: BotActionRequest):
-    return bot_manager.stop_bot(req.uid, req.strategy)
-
-@app.get("/api/bot/status")
-def get_bot_status(uid: str, strategy: str):
-    return {"status": bot_manager.get_status(uid, strategy)}
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = db.query(models.User).offset(skip).limit(limit).all()
+    return users

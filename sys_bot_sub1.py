@@ -122,7 +122,7 @@ def main():
         sys.exit(1)
         
     acc_name = os.path.basename(env_file).replace(".api_sub1", "").replace(".api", "").replace("_", "")
-    if acc_name == "": acc_name = "sub1"
+    if acc_name == "": acc_name = "main"
 
     # Tải API keys
     api_key, secret_key, passphrase = "", "", ""

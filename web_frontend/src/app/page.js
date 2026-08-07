@@ -1,49 +1,19 @@
-'use client';
-import dynamic from 'next/dynamic';
+import Link from 'next/link';
 
-const TradingChart = dynamic(() => import('../components/TradingChart'), {
-  ssr: false,
-});
-
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="app-container">
-      <div className="sidebar">
-        <div style={{ padding: '20px', borderBottom: '1px solid var(--border-color)', fontWeight: 'bold' }}>
-          TLS1 Trading SaaS
-        </div>
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button style={{ padding: '8px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Khởi động Bot
-          </button>
-          <button style={{ padding: '8px', background: 'var(--down-color)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Dừng Bot
-          </button>
-        </div>
-        <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
-          <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>Tình trạng Vị thế</h4>
-          {/* Position table placeholder */}
-          <div style={{ color: 'var(--text-tertiary)', fontSize: '14px' }}>Chưa có vị thế nào...</div>
-        </div>
-      </div>
-      
-      <div className="main-content">
-        <div className="top-nav">
-          <span style={{ fontWeight: 'bold', marginRight: '16px' }}>XAU-USDT-SWAP</span>
-          <span style={{ color: 'var(--up-color)', marginRight: '16px' }}>4,269.60</span>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Chỉ báo Admin: Đang bật</span>
-        </div>
-        
-        <div className="chart-area">
-          <TradingChart />
-        </div>
-        
-        <div className="logs-area">
-          <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>Terminal Logs:</div>
-          <div style={{ color: 'var(--text-primary)' }}>[SYSTEM] Bot started successfully.</div>
-          <div style={{ color: 'var(--up-color)' }}>[TRADE] Found Order Block at 4260.00</div>
-          <div style={{ color: 'var(--text-primary)' }}>[SYSTEM] Waiting for signals...</div>
-        </div>
+    <div className="flex flex-col items-center justify-center h-full">
+      <h1 className="text-4xl font-bold mb-4">Welcome to TLS1 Trading OS</h1>
+      <p className="text-text-secondary mb-8 max-w-lg text-center">
+        The ultimate trading platform combining a lightning-fast Desktop Engine with a premium Web Control Center.
+      </p>
+      <div className="flex gap-4">
+        <Link href="/trade" className="bg-accent-blue text-white px-6 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition-all">
+          Open Workspace
+        </Link>
+        <Link href="/desktop" className="bg-dark-surface border border-border text-white px-6 py-2 rounded-lg font-semibold hover:bg-border transition-all">
+          Desktop Overview
+        </Link>
       </div>
     </div>
   );

@@ -6,18 +6,20 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    uid = Column(String, unique=True, index=True)
-    username = Column(String, index=True)
-    api_key = Column(String)
-    api_secret = Column(String)
-    api_passphrase = Column(String)
+    username = Column(String(50), unique=True, index=True)
+    hashed_password = Column(String(255))
+    okx_api_key = Column(String(255), nullable=True)
+    okx_secret_key = Column(String(255), nullable=True)
+    okx_passphrase = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class GlobalSettings(Base):
-    __tablename__ = "global_settings"
-    
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
     id = Column(Integer, primary_key=True, index=True)
-    setting_key = Column(String, unique=True, index=True)
-    setting_value = Column(String) # Stored as JSON string
+    key = Column(String(50), unique=True, index=True)
+    value = Column(String(500))
+    description = Column(String(255), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
