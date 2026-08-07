@@ -967,7 +967,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
     if not is_enabled:
         # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
         # nhưng vẫn giữ vị thế Market đang mở và cho chạy tiếp các vòng lặp dưới để Bot quản lý dời SL/TP tự động
-        from z_bot_sub1.bot_orders import clean_limit_orders
         clean_limit_orders(client, swap_id, "cross")
         is_limit_setup_cycle = False
         tracker.placed_entry_px_long_by_tf = {}
