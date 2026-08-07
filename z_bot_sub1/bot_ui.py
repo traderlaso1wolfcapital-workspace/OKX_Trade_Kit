@@ -138,10 +138,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
 
     # Calculate Uptime
     bot_start_time = system_config.get("BOT_START_TIME", time.time())
-    uptime_sec = int(time.time() - bot_start_time)
-    h, r = divmod(uptime_sec, 3600)
-    m, s = divmod(r, 60)
-    r2_c1 = f"   Up: {h:02d}:{m:02d}:{s:02d}      "
+    
+    r2_c1 = ""
     
     r2_c2 = f" PNL: {pnl_str:>8} U "
     r2_c3 = f" Vol : {vol_str_top:>8} U "

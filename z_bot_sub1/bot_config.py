@@ -108,7 +108,7 @@ AI_CONFIDENCE_SCORE = Decimal("0")
 # asset_class: "crypto" = tiền mã hóa (neo theo BTC nếu ALTCOIN_FOLLOW_BTC_EMA=ON)
 #              "forex"  = kim loại, cổ phiếu, cặp tiền tệ (giao dịch độc lập, không neo BTC)
 COIN_PORTFOLIO = [
-    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.0"), "asset_class": "forex"},
+    {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0"), "asset_class": "forex"},
     {"coin": "BTC", "swap": "BTC-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0"), "asset_class": "crypto"},
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.3"), "asset_class": "crypto"},
 ]

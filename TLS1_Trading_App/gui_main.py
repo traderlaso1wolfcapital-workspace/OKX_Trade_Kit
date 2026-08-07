@@ -773,9 +773,20 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.api_files = env_files
         self.worker = None
         self.show_chart_pos_lines = True
+        
+        self.uptime_sec = 0
+        self.uptime_timer = QtCore.QTimer(self)
+        self.uptime_timer.timeout.connect(self.update_uptime)
+        
         self.init_ui()
         self.load_current_settings()
         self.apply_current_api_to_worker()
+
+    def update_uptime(self):
+        self.uptime_sec += 1
+        h, r = divmod(self.uptime_sec, 3600)
+        m, s = divmod(r, 60)
+        self.lbl_uptime.setText(f"{h:02d}:{m:02d}:{s:02d}")
 
     def set_welcome_name(self, name):
         if hasattr(self, 'webview_chat_fallback'):
@@ -1062,15 +1073,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         btn_logout_in_settings.clicked.connect(_do_logout_from_settings)
         btn_row.addWidget(btn_logout_in_settings)
         btn_row.addStretch(1)
-        btn_close = QtWidgets.QPushButton("✅ Hoàn Tất & Đóng Cài Đặt")
-        btn_close.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
-        btn_close.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_close.setStyleSheet("""
-            QPushButton { background-color: #2E7D32; color: #ffffff; min-height: 34px; padding: 6px 20px; border-radius: 4px; border: none; outline: none; font-weight: bold; }
-            QPushButton:hover { background-color: #388E3C; }
-        """)
-        btn_close.clicked.connect(dlg.accept)
-        btn_row.addWidget(btn_close)
         dlg_layout.addLayout(btn_row)
         
         dlg.exec()
@@ -1194,7 +1196,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_open_community.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_open_community.setStyleSheet("""
                 QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
-                QPushButton:hover { background-color: #00e5ff; color: #000000; font-weight: bold; border-color: #00e5ff; }
+                QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
             """)
             self.btn_open_community_hover = ButtonHoverSoundFilter(self.btn_open_community)
             self.btn_open_community.installEventFilter(self.btn_open_community_hover)
@@ -1226,7 +1228,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         console_layout.setSpacing(4)
         
         log_header = QtWidgets.QHBoxLayout()
-        log_header.addWidget(QtWidgets.QLabel("Terminal Logs:"))
+        lbl_term = QtWidgets.QLabel("Terminal Logs:")
+        log_header.addWidget(lbl_term)
+        
+        self.lbl_uptime = QtWidgets.QLabel("00:00:00")
+        self.lbl_uptime.setStyleSheet("color: #aaaaaa; font-weight: normal; margin-left: 5px; font-size: 13px;")
+        log_header.addWidget(self.lbl_uptime)
+        
         log_header.addStretch(1)
         
         btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
@@ -1354,9 +1362,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.pos_table.setStyleSheet(
-            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 14px; selection-background-color: #162e3b; selection-color: #ffffff; }"
+            "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 15px; selection-background-color: #162e3b; selection-color: #ffffff; }"
             "QTableWidget::item:selected { background-color: #162e3b; color: #ffffff; border: 1px solid #20687a; }"
-            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 14px; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 15px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -1586,7 +1594,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 instId_text = instId
 
             lbl_sym = QtWidgets.QLabel(instId_text)
-            lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 14px;")
+            lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 15px;")
 
             w0 = QtWidgets.QWidget()
             l0 = QtWidgets.QHBoxLayout(w0)
@@ -1632,9 +1640,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
             color_str = "#26a69a" if upl >= 0 else "#ef5350"
             pnl_label = QtWidgets.QLabel()
             pnl_label.setText(
-                f"<span style='font-size: 16px; font-weight: normal; color: {color_str};'>{upl:+.2f}</span> "
-                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>USDT</span>&nbsp;&nbsp;&nbsp;"
-                f"<span style='font-size: 14px; font-weight: normal; color: {color_str};'>({upl_ratio:+.2f}%)</span>"
+                f"<span style='font-size: 17px; font-weight: normal; color: {color_str};'>{upl:+.2f}</span> "
+                f"<span style='font-size: 15px; font-weight: normal; color: {color_str};'>USDT</span>&nbsp;&nbsp;&nbsp;"
+                f"<span style='font-size: 15px; font-weight: normal; color: {color_str};'>({upl_ratio:+.2f}%)</span>"
             )
             pnl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             pnl_label.setStyleSheet("background: transparent;")
@@ -1716,9 +1724,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             tpsl_label = QtWidgets.QLabel()
             tpsl_label.setText(
-                f"<span style='font-size: 14px; font-weight: normal; color: {tp_color};'>{tp_pnl_str}</span> "
-                f"<span style='font-size: 14px; font-weight: normal; color: #555555;'>|</span> "
-                f"<span style='font-size: 14px; font-weight: normal; color: {sl_color};'>{sl_pnl_str}</span>"
+                f"<span style='font-size: 15px; font-weight: normal; color: {tp_color};'>{tp_pnl_str}</span> "
+                f"<span style='font-size: 15px; font-weight: normal; color: #555555;'>|</span> "
+                f"<span style='font-size: 15px; font-weight: normal; color: {sl_color};'>{sl_pnl_str}</span>"
             )
             tpsl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             tpsl_label.setStyleSheet("background: transparent;")
@@ -1910,7 +1918,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         main_layout.addWidget(scroll)
         
         self.btn_save_api = HoverSoundButton("💾 LƯU CẤU HÌNH API KEY")
-        self.btn_save_api.setStyleSheet("background-color: #ff9900; color: #000000; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
+        self.btn_save_api.setStyleSheet("""
+            QPushButton { background-color: #2E7D32; color: #ffffff; min-height: 34px; padding: 6px 20px; border-radius: 4px; border: none; outline: none; font-weight: bold; }
+            QPushButton:hover { background-color: #388E3C; }
+        """)
         self.btn_save_api.clicked.connect(self.save_api_settings)
         main_layout.addWidget(self.btn_save_api)
 
@@ -2929,7 +2940,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "POSITION_VOLUME_HIGH_CONFIDENCE": str(round(self.input_pos_vol.value(), 2)),
                 "EVOLUTION_CYCLE_SECONDS": self.input_evo_cycle.value(),
                 "LEVERAGES": {
-                    "XAU": getattr(self, 'input_xau_lever', None).value() if hasattr(self, 'input_xau_lever') else 50,
+                    "XAU": getattr(self, 'input_xau_lever', None).value() if hasattr(self, 'input_xau_lever') else 100,
                     "BTC": self.input_btc_lever.value(),
                     "ETH": self.input_eth_lever.value()
                 },
@@ -3020,6 +3031,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def start_bot(self):
         self.play_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.7)
+        self.uptime_sec = 0
+        self.lbl_uptime.setText("00:00:00")
+        self.uptime_timer.start(1000)
         env_file = self.get_selected_env()
         if not env_file: return
         
@@ -3629,7 +3643,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "TP_TARGET_OPTIMAL": "0.01200",
             "SL_TARGET_OPTIMAL": "0.01200",
             "EVOLUTION_CYCLE_SECONDS": 3600,
-            "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+            "LEVERAGES": {"XAU": 100, "BTC": 100, "ETH": 100},
             "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
         }
 
@@ -3773,7 +3787,7 @@ class MainWindow(QtWidgets.QMainWindow):
             btn_com.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
             btn_com.setStyleSheet("""
                 QPushButton { background-color: #333333; color: #ffffff; border-radius: 4px; padding: 5px 15px; font-size: 13px; font-weight: bold; margin-right: 10px; }
-                QPushButton:hover { background-color: #00b8d4; color: #000000; }
+                QPushButton:hover { background-color: #ff9900; color: #000000; }
             """)
             self._header_layout.addWidget(btn_com)
         
@@ -4016,19 +4030,24 @@ del /f /q "%~f0"
         # Tạm thời fake số lượng online từ 56 đến 58 để không nhảy quá nhiều (thực tế cắm dài hạn)
         fake_count = random.choice([56, 57, 58])
         max_slots = 100
-        self.lbl_online_count.setText(f"🟢 {fake_count}/{max_slots}")
-        # Đổi màu theo mức độ đông: xanh → vàng → đỏ
-        if count >= 80:
-            color = "#ff5555"
-        elif count >= 50:
+        
+        # Color logic: < 80: green, >= 80 and < 100: yellow, == 100: red
+        if fake_count >= 100:
+            color = "#ff3333"
+        elif fake_count >= 80:
             color = "#ffaa00"
         else:
             color = "#4caf50"
-        self.lbl_online_count.setStyleSheet(f"""
-            color: {color}; 
-            font-size: 12px; 
-            font-weight: bold; 
-            font-family: 'Segoe UI Emoji', 'Segoe UI', 'Arial', sans-serif;
+
+        active_segments = min(5, fake_count // 20 + (1 if fake_count % 20 > 0 else 0))
+        bars = ""
+        for i in range(5):
+            c = color if i < active_segments else "#444444"
+            bars += f"<span style='color: {c}; font-size: 14px; margin-right: 2px;'>▮</span>"
+            
+        html_content = f"<span style='color: #cccccc; font-weight: 500; font-family: Segoe UI, sans-serif;'>Slot: </span><span style='color: {color}; font-weight: 500; font-family: Segoe UI, sans-serif;'>{fake_count}/{max_slots}</span>  {bars}"
+        self.lbl_online_count.setText(html_content)
+        self.lbl_online_count.setStyleSheet("""
             background: transparent;
             border: none;
             padding: 3px 10px;
@@ -4166,10 +4185,10 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             }
             QTabWidget#InnerTabs > QTabBar::tab:selected { 
                 background-color: #1e1e1e; 
-                color: #00ccff; 
+                color: #FF9900; 
                 font-weight: bold; 
                 border: 1px solid #3d3d3d; 
-                border-top: 2px solid #00ccff; 
+                border-top: 2px solid #FF9900; 
                 border-bottom: 2px solid #1e1e1e; 
             }
             QTabWidget#InnerTabs > QTabBar::tab:hover { 
