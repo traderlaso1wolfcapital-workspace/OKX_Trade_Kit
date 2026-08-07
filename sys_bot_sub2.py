@@ -127,7 +127,7 @@ def main():
         print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 2' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!")
         sys.exit(1)
         
-    acc_name = os.path.basename(env_file).replace(".api_sub2", "").replace(".api", "").replace("_", "")
+    acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")
     if acc_name == "": acc_name = "main"
 
     # Tải API keys
