@@ -452,7 +452,7 @@ def main():
             # 4. CẬP NHẬT GIAO DIỆN TERMINAL (20 giây)
             if now - last_dashboard_update >= 20.0:
                 last_dashboard_update = now
-                bot_ui.print_dashboard(state_matrix, env_paths)
+                bot_ui.print_dashboard(state_matrix, env_paths, system_config)
 
             time.sleep(0.1)
 

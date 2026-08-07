@@ -215,6 +215,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[08/08/2026]** - Sửa lỗi `NameError: name 'system_config' is not defined` tại `bot_ui.py` (Bot SMC Sub2):
+  - **Nguyên nhân:** Lỗi hiển thị Uptime (thời gian chạy bot) ở dòng 133 do hàm `print_dashboard` chưa được truyền biến cấu hình toàn cục `system_config`.
+  - **Cập nhật:** Đã bổ sung tham số `system_config` vào hàm `print_dashboard` của [z_bot_sub2/bot_ui.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub2/bot_ui.py), đồng thời cập nhật lời gọi hàm tại dòng 455 trong [sys_bot_sub2.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/sys_bot_sub2.py) để đẩy data cấu hình xuống UI một cách chính xác.
+
 - **[04/08/2026]** - Lỗi UI/UX: Padding các nút quá lớn, font chữ bảng quá nhỏ, Light Mode bị lỗi trùng màu đen trắng cho Terminal Logs & Table, nút Cộng Đồng thiếu text. Đã fix: Điều chỉnh lại `apply_theme` CSS rules cho QTableWidget, QPushButton, QComboBox; thêm explicit colors cho Light Mode và bổ sung text cho nút Discord/Telegram. (Mã patch: `z247`)
 
 - **[04/08/2026]** - Lỗi v1.0.242 Vùng OB (Order Block) bị ẩn/không hiển thị trên chart. Đã fix: Sửa cơ chế binding HTML overlay vào đúng thẻ cha (wrapper) thay vì thẻ div container sai lệch; Bổ sung vòng lặp retry chờ chart render xong (priceToCoordinate = null fallback); Tích hợp thêm đường chỉ Entry ngang (dashed line) kéo dài từ nến OB qua phía phải giống hệt OKX UI (Mã patch: `z243`, `z244`).

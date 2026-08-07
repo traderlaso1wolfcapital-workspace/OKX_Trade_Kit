@@ -965,28 +965,16 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         tracker.long_pos_vol, tracker.short_pos_vol = old_long_vol, old_short_vol
 
     if not is_enabled:
-        # Coin bị tắt (unticked) -> Đóng toàn bộ vị thế Market, huỷ toàn bộ Limit/Algo và dừng chạy
+        # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
+        # Kệ xác lệnh Market và lệnh TP/SL đã đặt trên sàn -> Bot ngưng phân tích (Return)
         clean_limit_orders(client, swap_id, "cross")
-        if tracker.has_long and tracker.long_pos_vol > 0:
-            clean_algo_orders(client, swap_id, "cross", "long")
-            close_position_market(client, swap_id, "long", str(tracker.long_pos_vol), "Disabled_Coin", "cross")
-            tracker.closure_reason_long = "Disabled_Coin"
-            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
-            bot_models.record_trade_marker(coin_name, "LONG", 0, "closed")
-            
-        if tracker.has_short and tracker.short_pos_vol > 0:
-            clean_algo_orders(client, swap_id, "cross", "short")
-            close_position_market(client, swap_id, "short", str(tracker.short_pos_vol), "Disabled_Coin", "cross")
-            tracker.closure_reason_short = "Disabled_Coin"
-            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
-            bot_models.record_trade_marker(coin_name, "SHORT", 0, "closed")
-            
+              
         tracker.placed_entry_px_long_by_tf = {}
         tracker.placed_entry_px_short_by_tf = {}
         tracker.placed_entry_px_long = "---"
         tracker.placed_entry_px_short = "---"
         
-        return  # DỪNG CHU KỲ Ở ĐÂY!
+        return  # DỪNG CHU KỲ Ở ĐÂY, NGẮT KẾT NỐI VỚI COIN NÀY!
 
     try:
         if tracker.has_long:

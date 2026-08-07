@@ -462,22 +462,10 @@ def run_strategy_cycle(
 
         if not is_enabled:
             # Coin bị tắt -> Huỷ lệnh chờ, xóa setups
+            # Kệ xác lệnh Market và lệnh TP/SL đã đặt trên sàn -> Bot ngưng phân tích (Return)
             clean_ob_orders(client, swap_id, CL_ORD_PREFIX)
             tracker.trade_setups = []
-            
-            # Đóng vị thế Market nếu đang có
-            if tracker.has_long and cross_long_amt > 0:
-                clean_algo_orders(client, swap_id, "cross", "long")
-                close_position_market(client, swap_id, "long", str(cross_long_amt), "Disabled_Coin", "cross")
-                tracker.closure_reason_long = "Disabled_Coin"
-                print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
-                
-            if tracker.has_short and cross_short_amt > 0:
-                clean_algo_orders(client, swap_id, "cross", "short")
-                close_position_market(client, swap_id, "short", str(cross_short_amt), "Disabled_Coin", "cross")
-                tracker.closure_reason_short = "Disabled_Coin"
-                print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
-                
+                  
             return
 
         # ---------------------------------------------------------------

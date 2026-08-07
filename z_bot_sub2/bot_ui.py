@@ -54,8 +54,9 @@ def format_with_commas(value, decimals=2):
     except:
         return "0.00"
 
-def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
+def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict, system_config: dict = None):
     """Hiển thị Dashboard UI cho Bot Sub2 theo format chuẩn mực của Sub1"""
+    if system_config is None: system_config = {}
 
     sync_time = datetime.now().strftime('%H:%M:%S')
     
