@@ -599,19 +599,3 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     for line in table_lines:
         print(line)
     print("=" * 78 + "\n")
-
-# z1951 | Áp dụng tỷ lệ Co giãn Động (Dynamic ATR Elasticity Ratio) vào hiển thị Entry Limit Offset
-# z1952 | Fix NameError by adding globals_ref. to MAX_CYCLE_FAILURES and REQUIRED_ACCUMULATION_CANDLES
-# z2419 | Hiển thị tất cả các TF đã khớp trong "cụm DCA" trên Dashboard thay vì chỉ hiển thị active_pos_tf
-# z2420 | Cập nhật format hiển thị trạng thái vị thế và chờ lệnh limit trên Dashboard
-# z2421 | Căn lề dòng hiển thị chờ DCA thụt vào thêm 2 spaces để thẳng cột dưới tên coin trên Dashboard
-# z2423 | Căn chỉnh thẳng hàng phần đuôi (Entry - SL) của các dòng vị thế bằng format <44 width
-# z2424 | Chỉnh sửa padding prefix thành 42 và giữ nguyên padding >8 của Entry để dóng thẳng hàng dấu thập phân
-# z2425 | Giữ nguyên format >8 cho SL_px và bổ sung dòng trống phân cách giữa tất cả các vị thế trên Dashboard
-
-# z1949 | Fix Partial Fills using Fills API, RAM structure order list(), Disk I/O Memory Cache, Time-based Caching for Rate Limit
-# z2500 | Bỏ hiển thị SL trong dòng "Đã khớp LONG/SHORT" trên Dashboard để giao diện gọn hơn
-# z3350 | Clean up: Xoá các imports (time) và các biến (von_goc, date_part, active_pos_count, sl_px_str, has_both, tf_tol) không sử dụng để tối ưu code.
-# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
-
-# z1951 | Padding cứng 18 ký tự cho chuỗi TF DCA để thẳng hàng dấu hai chấm (:) trên UI bot_ui.py. Đổi nhãn TỔNG VỐN thành TÀI KHOẢN, TÀI KHOẢN thành LỢI NHUẬN

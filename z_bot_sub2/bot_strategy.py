@@ -868,11 +868,6 @@ def run_strategy_cycle(
         print(f"Exception in run_strategy_cycle: {e}")
         traceback.print_exc()
 
-# z1949 | fix: add missing import os | fix: detect_structure_break false trigger on zero-init Pivot (OB COUNT=0 bug) | fix: add swing_leg/internal_leg to AssetTracker | fix: register_trade_setup pass all_obs for NEAREST_OB TP mode | MAJOR REWRITE: port 100% TLS1-SMC OB Auto v2 - leg() pivot detection, confluence filter, OB mitigation modes (Close/HL), nearestOppOBTP tách internal/swing, FALLBACK_RR mode, direction filter, Int/Swing OB count riêng biệt, keep previous setups, EQH/EQL, FVG, Premium/Discount Zones, Trailing Extremes
-# z7712 | Remove redundant JSON chart_data print inside run_strategy_cycle to prevent console flooding
-# z7713 | Logic mới: Chỉ dùng Swing OB, 1 OB -> 2 Setup (LONG @ bottom + SHORT @ top) M15 RR 1:1, hủy lệnh ngược chiều khi 1 bên khớp
-# z7716 | Quay về logic gốc PineScript: 1 OB -> 1 setup theo bias. RR linh hoạt theo trend: thuận trend 1:5, ngược trend 1:1. Bỏ logic hủy lệnh ngược chiều.
-
 
 def sync_config_to_json(env_paths: dict, globals_ref):
     """Đồng bộ cấu hình từ bot_config.py → JSON (Two-Way Sync Chiều 1: Code → JSON) cho Sub2 SMC"""
@@ -961,8 +956,3 @@ def _sync_save_mtf_states_sub2(swap_id: str, data: dict, mtf_file: str):
             json.dump(saved_data, f, indent=4)
         os.replace(temp, mtf_file)
     except: pass
-
-# z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge) để tránh bị rối trên chart
-# z1950 | Update: Truyền tham số opens, closes vào find_order_block để sửa lỗi tính sai vùng OB theo SMC
-
-# z246 | Update: Fixed is_enabled checking to fully disable coins when unchecked

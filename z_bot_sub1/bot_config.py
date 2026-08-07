@@ -150,9 +150,3 @@ VÍ DỤ H4 LONG thực tế:
   sau đó cộng thêm một lớp đệm an toàn riêng theo TF (base_buffer).
   → Chạy song song tuyệt đối với BTC, không bao giờ nằm sát giá Live!
 '''
-
-# z2416 | Sửa logic lọc khoảng cách DCA (gap_threshold): Áp dụng hệ số tăng dần theo TF_VOLUME_MULTIPLIERS (M5 1x, H4 2x) và chỉnh DCA_GAP_THRESHOLD_PCT lên 0.5%.
-# z2417 | Thay đổi công thức tính Entry Offset mẫu trong chú thích theo yêu cầu của User (Cộng/trừ có dấu khoảng cách ETH, và nhân hệ số co giãn cho cả cụm tổng khoảng cách BTC + ETH). Đồng thời đảo ngược chiều LONG thành (ETH - BTC) để tránh lỗi văng giá.
-# z5331 | Sửa lỗi docstring: thêm abs() cho dist_to_tf(ETH) trong công thức SHORT Ngược pha & LONG Thuận pha; xóa ghi chú cũ dư thừa
-# z5333 | Refactoring: Dọn dẹp hoàn toàn logic Altcoin cũ, xoá hơn 100 dòng code thừa trong trailing limit và biến ELASTICITY_MULT.
-# z5334 | Xóa bỏ toàn bộ biến cấu hình của chiến thuật PING-PONG để tập trung vào cơ chế phòng thủ Squeeze.

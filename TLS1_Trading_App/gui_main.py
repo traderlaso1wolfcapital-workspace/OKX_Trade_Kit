@@ -5315,26 +5315,3 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         main()
-
-# z3 | Dọn dẹp UI: Xóa 8 cấu hình đã bị loại bỏ khỏi code bot (Ping-Pong, Dynamic Risk, Squeeze Tol, Alt Diff). Đổi tên nhóm "Cấu Hình Ping-Pong & Lượng Tử" → "Lượng Tử & Tiến Hóa".
-# z2 | Thêm hệ thống Presence Online: PresenceManager (QThread) ghi heartbeat 60s lên Firebase RTDB, hiển thị 🟢 XX/100 trên header (đổi màu xanh/vàng/đỏ theo mức tải), tự dọn zombie > 10p, cleanup khi đóng app/đăng xuất.
-# z1 | Đẩy các nút social sang góc phải và thay icon logo 256 nét hơn cho app/taskbar
-
-
-# z4 | Chart Fix & Marker: Sửa lỗi QtWebEngineProcess trên Windows PyInstaller, đồng bộ combo_coin với LiveChartWorker và tích hợp tính năng vẽ tag B/S.
-# z5 | Firebase Chat + UI Fix: Chuyển tab Cộng Đồng sang Native PyQt Chat kết nối Firebase RTDB (botvip-e5772), xóa QWebEngineView cũ (Cbox/tlk.io). Fix checkbox XAU/BTC/ETH trên Dashboard thành interactive + auto-save. Fix dropdown chọn tài khoản bị trùng màu (chữ đen trên nền đen).
-
-# z6 | UI/Config Fix: Đổi chỗ TÀI KHOẢN/LỢI NHUẬN trên bot_ui.py; Padding cứng 'khoảng thở' DCA 6 TF để dấu hai chấm thẳng hàng. Cập nhật gui_main.py lưu auto-save ENABLED_COINS vào đúng file global_config.json
-# z240 | Update: Vẽ chart OB xanh đỏ dạng hộp (box) giống TradingView, hiển thị Tag B/S sáng/chìm cho Setup, Ẩn log [SYNC] trên UI
-# z241 | Update: Sửa lỗi JS "reading 'series'" do truy cập đối tượng chart chưa fully loaded (thêm optional checks) và giảm opacity vùng OB xuống 10%
-# z242 | Update: Thêm cấu hình bật tắt 6 Timeframe rải lệnh, di chuyển logo Social (Discord, Tele) vào chat popup
-# z243 | Update: Thu hẹp kích thước (width) của dropdown chọn Timeframe trên thanh công cụ Chart.
-# z244 | Update: Sửa hiển thị OB (tăng opacity lên 35%), thêm vẽ đường kẻ Entry, TP, SL lên chart.
-# z245 | Update: Giảm OB opacity 10%, TP/SL lineWidth 1px, grid mờ 30%. Thêm nút Đóng lệnh OKX (Market). Bỏ cột Kích thước, bỏ prefix TP:/SL:. Thêm fallback tính TP/SL từ RR setting. Fix wmic macOS, utcnow deprecated, DEBUG spam. Font 13px. Xóa 60+ file test rác. Fix closeEvent QThread.
-# z291 | Bỏ nút chọn Demo trên GUI, ép chạy duy nhất trên tài khoản Thực (Live Trading).
-# z292 | Hỗ trợ tự động nhận diện và chuyển đổi tên miền OKX theo khu vực (như eea.okx.com cho châu Âu).
-
-
-# z246 | Update: Fixed empty coin list config saving & Added API POST for HWID Auth
-# z247 | Update: Hỗ trợ tên miền động (okx_domain) cho việc load biểu đồ nến (LiveChartWorker).
-# z248 | Update: Tắt log rác hiển thị trên console từ Chromium và FFmpeg.

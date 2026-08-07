@@ -318,5 +318,3 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
         print("✅ [SMC STARTUP CLEANUP]: Hoàn tất dọn dẹp lệnh. Sẵn sàng chạy chiến lược.")
     except Exception as e:
         print(f"⚠️ [SMC STARTUP CLEANUP LỖI]: {e}")
-
-# z7717 | Đồng nhất tdMode và lever (POSITION_MODE, LEVERAGE) cho mọi OB để tránh lỗi Margin mode mismatch trên OKX.

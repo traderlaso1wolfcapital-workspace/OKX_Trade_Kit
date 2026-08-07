@@ -302,7 +302,4 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict):
     if not has_closed:
         print("  · Chưa có lệnh nào được đóng trong phiên này.")
     print("=" * 78 + "\n")
-# z7713 | Thiết kế lại bảng COIN: OB ZONE, LONG @, SHORT @, STATUS
-# z7716 | Dashboard mới: OB ZONE LONG / OB ZONE SHORT với hiển thị RR. Bỏ cột LONG @ / SHORT @.
-# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
 

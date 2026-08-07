@@ -663,6 +663,3 @@ def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
         if len(ob_list) > 100:
             ob_list.pop()
         return False
-
-# z1949 | Update: Gom các OB trùng đè lên nhau (add_ob_and_merge), sửa TP H1 RR 1:5, H2 RR 1:1
-# z1950 | Update: Sửa lại logic find_order_block dùng chuẩn SMC (tìm nến ngược màu cuối cùng)

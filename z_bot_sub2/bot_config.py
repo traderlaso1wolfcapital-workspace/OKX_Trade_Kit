@@ -142,6 +142,3 @@ COIN_PORTFOLIO = [
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "vol_mult": "0.8"},
 ]
 ENABLED_COINS = ["XAU", "BTC", "ETH"]
-# z7713 | Chuyển M15, RR 1:1, OB_SOURCE="SWING"
-# z7716 | Tách RR thành OB_RR_RATIO_TREND (1:5) và OB_RR_RATIO_COUNTER (1:1)
-# z1949 | Chuyển TIMEFRAME_BASE = "1H", TIMEFRAME_HEDGE = "2H"

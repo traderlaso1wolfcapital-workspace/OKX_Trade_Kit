@@ -496,12 +496,3 @@ def main():
 
 if __name__ == "__main__": 
     main()
-
-# z1953 | Change default acc_name to sub1
-# z6796 | pos_cycle_filled_tfs + pos_cycle_closed_tfs anti-spam M5 | dca_tfs in record_exit | SYSTEM EMA 200 rename | Thêm mode_icon vào record_exit
-# z2499 | Fixed env_file path resolution to always use z_bot_sub1 directory.
-# z2403 | Clean up stale flags (*.flag) for this account at startup to prevent immediate termination if an old stop flag was left over. Resolve flag names dynamically via acc_name instead of hardcoded _main.flag.
-# z1949 | Đổi tên bot main thành bot_sub1 (EMA200)
-# z7711 | Giảm chu kỳ đặt lệnh Limit xuống 3s, tần suất realtime quét xuống 1s để giảm khoảng trống lệnh, tối ưu AMEND-FIRST.
-# z1949 | Fix Partial Fills using Fills API, RAM structure order list(), Disk I/O Memory Cache, Time-based Caching for Rate Limit
-# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn

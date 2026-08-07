@@ -166,6 +166,3 @@ class AssetTracker:
 
 # ==============================================================================
 # 🌐 GIAO TIẾP OKX API (Đóng gói tĩnh ở main để giữ Connection Pool)
-# z1950 | Fix missing time module import
-
-# z1949 | Fix Partial Fills using Fills API, RAM structure order list(), Disk I/O Memory Cache, Time-based Caching for Rate Limit
