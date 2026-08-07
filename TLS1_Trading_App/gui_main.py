@@ -1231,6 +1231,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
         btn_clear_log.setStyleSheet("max-width: 100px; padding: 5px;")
+        btn_clear_log.hide()
         
         self.log_display = QtWidgets.QPlainTextEdit()
         self.log_display.setReadOnly(True)
