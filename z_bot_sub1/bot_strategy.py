@@ -86,7 +86,8 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
                 with open(config_path, "r", encoding="utf-8") as _f:
                     existing_cfg = json.load(_f)
             except: pass
-        cfg = {
+        
+        existing_cfg.update({
             "AI_CONFIDENCE_SCORE": str(globals_ref.AI_CONFIDENCE_SCORE),
             "TP_TARGET_OPTIMAL": str(globals_ref.SCALPING_TP_PCT),
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
@@ -112,10 +113,11 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "EVOLUTION_CYCLE_SECONDS": int(globals_ref.EVOLUTION_CYCLE_SECONDS),
             "VOL_MULTIPLIERS": {c["coin"]: str(c["vol_mult"]) for c in globals_ref.COIN_PORTFOLIO},
             "LEVERAGES": {c["coin"]: c["leverage"] for c in globals_ref.COIN_PORTFOLIO},
-        }
+        })
+        
         temp_file = config_path + ".tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
+            json.dump(existing_cfg, f, indent=2, ensure_ascii=False)
         os.replace(temp_file, config_path)
         print("🔄 [TWO-WAY SYNC]: Đã đồng bộ cấu hình từ bot_config.py sang JSON!")
     except Exception as e:

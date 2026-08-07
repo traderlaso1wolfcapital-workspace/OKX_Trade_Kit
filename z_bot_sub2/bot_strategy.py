@@ -863,7 +863,18 @@ def sync_config_to_json(env_paths: dict, globals_ref):
         import importlib
         import z_bot_sub2.bot_config as cfg_ref
         importlib.reload(cfg_ref)
-        cfg = {
+        config_path = env_paths.get("FILE_GLOBAL_CONFIG", "")
+        if not config_path:
+            return
+            
+        existing_cfg = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as _f:
+                    existing_cfg = json.load(_f)
+            except: pass
+            
+        existing_cfg.update({
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(cfg_ref.POSITION_VOLUME_HIGH_CONFIDENCE),
             "LEVERAGE": int(cfg_ref.LEVERAGE),
             "SWING_VOLUME_USDT": str(cfg_ref.SWING_VOLUME_USDT),
@@ -876,13 +887,11 @@ def sync_config_to_json(env_paths: dict, globals_ref):
             "OB_DIRECTION": cfg_ref.OB_DIRECTION,
             "OB_MAX_ACTIVE_SETUPS": int(cfg_ref.OB_MAX_ACTIVE_SETUPS),
             "ENABLE_STRATEGY_SMC": bool(cfg_ref.ENABLE_STRATEGY_SMC),
-        }
-        config_path = env_paths.get("FILE_GLOBAL_CONFIG", "")
-        if not config_path:
-            return
+        })
+        
         temp_file = config_path + ".tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
+            json.dump(existing_cfg, f, indent=2, ensure_ascii=False)
         os.replace(temp_file, config_path)
         print("🔄 [TWO-WAY SYNC]: Đã đồng bộ cấu hình từ bot_config.py sang JSON (Sub2 SMC)!")
     except Exception as e:
