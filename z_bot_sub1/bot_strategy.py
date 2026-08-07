@@ -964,6 +964,28 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         tracker.active_avg_px_long, tracker.active_avg_px_short = old_avg_px_l, old_avg_px_s
         tracker.long_pos_vol, tracker.short_pos_vol = old_long_vol, old_short_vol
 
+    if not is_enabled:
+        # Coin bị tắt -> Huỷ lệnh chờ, xóa setups
+        from z_bot_sub1.bot_orders import clean_algo_orders, clean_limit_orders, close_position_market
+        clean_limit_orders(client, swap_id, "cross")
+        
+        # Đóng vị thế Market nếu đang có
+        if tracker.has_long and cross_long_amt > 0:
+            clean_algo_orders(client, swap_id, "cross", "long")
+            close_position_market(client, swap_id, "long", str(cross_long_amt), "Disabled_Coin", "cross")
+            tracker.last_closed_reason = "Disabled_Coin"
+            print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
+            tracker.has_long = False
+            
+        if tracker.has_short and cross_short_amt > 0:
+            clean_algo_orders(client, swap_id, "cross", "short")
+            close_position_market(client, swap_id, "short", str(cross_short_amt), "Disabled_Coin", "cross")
+            tracker.last_closed_reason = "Disabled_Coin"
+            print(f"🚨 {cfg['coin']}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
+            tracker.has_short = False
+            
+        return
+
     try:
         if tracker.has_long:
             if not old_has_l:
@@ -1971,6 +1993,23 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             tracker.placed_entry_px_short_by_tf = {}
             tracker.placed_entry_px_long = "---"
             tracker.placed_entry_px_short = "---"
+            
+        # 2. Break-Even Squeeze (Đóng hòa/lời nhẹ vị thế)
+        if tracker.has_long and cross_long_amt > 0:
+            avg_px_l = tracker.active_avg_px_long
+            current_roi_long = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
+            if current_roi_long >= Decimal("0.1"):
+                clean_algo_orders(client, swap_id, "cross", "long")
+                close_position_market(client, swap_id, "long", str(cross_long_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross")
+                tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
+                
+        if tracker.has_short and cross_short_amt > 0:
+            avg_px_s = tracker.active_avg_px_short
+            current_roi_short = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
+            if current_roi_short >= Decimal("0.1"):
+                clean_algo_orders(client, swap_id, "cross", "short")
+                close_position_market(client, swap_id, "short", str(cross_short_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross")
+                tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
 
 
     if is_limit_setup_cycle and (is_btc_approved or xl_found) and (is_macro_approved or xl_found):

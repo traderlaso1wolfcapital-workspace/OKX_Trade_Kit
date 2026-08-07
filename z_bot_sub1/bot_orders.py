@@ -201,6 +201,17 @@ def close_position_market(client, inst_id: str, pos_side: str, size: str, log_re
         })
         print(f"🚨 [LIMIT ENGINE]: Market {inst_id} ({pos_side.upper()} - {td_mode.upper()}) closed: {log_reason}")
     except Exception as e:
+        err_str = str(e)
+        if "posSide" in err_str or "51000" in err_str:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if side == "buy" else "short")
+            try:
+                client.request("POST", "/api/v5/trade/order", body={
+                    "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": fallback_pos_side, "ordType": "market", "sz": abs_size
+                })
+                print(f"🚨 [LIMIT ENGINE]: Market {inst_id} ({fallback_pos_side.upper()} - {td_mode.upper()}) closed [FALLBACK]: {log_reason}")
+                return
+            except Exception:
+                pass
         hft_logger.error(f"Lỗi close_position_market: {e}", exc_info=True)
 
 def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
@@ -246,26 +257,45 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
         print(f"🚀 [MARKET FALLBACK 51006] Đã khớp Market {inst_id} ({side.upper()} {pos_side.upper()}) size={size}: {resp}")
         return resp
     except Exception as e:
-        hft_logger.error(f"Lỗi place_market_entry: {e}", exc_info=True)
-        print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {e}")
+        err_str = str(e)
+        if "posSide" in err_str or "51000" in err_str:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if side == "buy" else "short")
+            try:
+                resp = client.request("POST", "/api/v5/trade/order", body={
+                    "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": fallback_pos_side, "ordType": "market", "sz": size
+                })
+                print(f"🚀 [MARKET FALLBACK 51006] Đã khớp Market {inst_id} ({side.upper()} {fallback_pos_side.upper()}) [FALLBACK posSide]: {resp}")
+                return resp
+            except Exception as e2:
+                err_str = f"{err_str} | Fallback failed: {e2}"
+        hft_logger.error(f"Lỗi place_market_entry: {err_str}", exc_info=True)
+        print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
 def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross"):
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     try:
         resp = client.request("POST", "/api/v5/trade/order", body=body)
         if resp and resp.get("code") != "0":
-            err_msg = str(resp.get('msg', 'Unknown'))
-            err_code = str(resp.get('code', ''))
-            print(f"🚨 [LIMIT] OKX từ chối: {err_msg} | {inst_id} {side}@{price}")
-            if err_code == "51006" or "51006" in err_msg or "Order price is not within the price limit" in err_msg:
-                print(f"💡 [FALLBACK 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá hiện tại ngon hơn giá Limit! Tự động vào Market!")
-                return place_market_entry(client, inst_id, side, pos_side, size, td_mode)
-            raise Exception(err_msg)
+            raise Exception(str(resp.get('msg', 'Unknown')))
     except Exception as e:
         err_str = str(e)
+        
+        # Fallback posSide (51000)
+        if "posSide" in err_str or "51000" in err_str:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if side == "buy" else "short")
+            body["posSide"] = fallback_pos_side
+            try:
+                resp = client.request("POST", "/api/v5/trade/order", body=body)
+                if resp and resp.get("code") != "0":
+                    raise Exception(str(resp.get('msg', 'Unknown')))
+                return resp
+            except Exception as e2:
+                err_str = str(e2)
+
         if "51006" in err_str or "Order price is not within the price limit" in err_str:
             print(f"💡 [FALLBACK 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá hiện tại ngon hơn giá Limit! Tự động vào Market!")
             return place_market_entry(client, inst_id, side, pos_side, size, td_mode)
+            
         print(f"🚨 [LIMIT] Lỗi kết nối: {err_str} | {inst_id} {side}@{price}")
         if "51008" in err_str:
             print("💡 [HƯỚNG DẪN] OKX báo lỗi 51008 (Insufficient USDT margin).")
@@ -284,9 +314,22 @@ def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, t
     try:
         resp = client.request("POST", "/api/v5/trade/order-algo", body=body)
         if resp and resp.get("code") != "0":
-            print(f"🚨 [ALGO {tp_or_sl}] OKX từ chối: {resp.get('msg', 'Unknown')} | instId={inst_id} px={trigger_px}")
+            raise Exception(str(resp.get('msg', 'Unknown')))
     except Exception as e:
         err_str = str(e)
+        
+        # Fallback posSide (51000)
+        if "posSide" in err_str or "51000" in err_str:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if side == "buy" else "short")
+            body["posSide"] = fallback_pos_side
+            try:
+                resp = client.request("POST", "/api/v5/trade/order-algo", body=body)
+                if resp and resp.get("code") != "0":
+                    raise Exception(str(resp.get('msg', 'Unknown')))
+                return
+            except Exception as e2:
+                err_str = str(e2)
+
         hft_logger.error(f"Lỗi place_algo_tpsl: {err_str}", exc_info=True)
         print(f"🚨 [ALGO {tp_or_sl}] Lỗi kết nối OKX: {err_str} | instId={inst_id} px={trigger_px}")
         
