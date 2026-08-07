@@ -1041,31 +1041,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     btc_sync_tf_changed = True
                     # print(f"🔄 [SYNC] {coin_name} SHORT active_pos_tf: {old_tf} → {btc_pos_tf} (theo BTC)")
 
-    if not is_enabled:
-        is_limit_setup_cycle = False
-        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
-            clean_limit_orders(client, swap_id, "cross")
-            tracker.placed_entry_px_long_by_tf = {}
-            tracker.placed_entry_px_short_by_tf = {}
-            tracker.placed_entry_px_long = "---"
-            tracker.placed_entry_px_short = "---"
-            
-        # Đóng toàn bộ lệnh Market nếu có vì coin bị tắt
-        if tracker.has_long and active_long_pos:
-            pos_l = active_long_pos[0]
-            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], "Disabled_Coin", "cross")
-            tracker.closure_reason_long = "Disabled_Coin"
-            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh LONG.")
-            
-        if tracker.has_short and active_short_pos:
-            pos_s = active_short_pos[0]
-            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], "Disabled_Coin", "cross")
-            tracker.closure_reason_short = "Disabled_Coin"
-            print(f"🚨 {coin_name}: Coin bị tắt, đã đóng toàn bộ lệnh SHORT.")
-            
-        return
+
 
     # ==============================================================================
     # ⚔️ QUẢN TRỊ VỊ THẾ & PHANH BẢO VỆ LIMIT CROSS
