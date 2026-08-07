@@ -436,7 +436,7 @@ def main():
                 if cfg_mtime > last_config_mtime:
                     bot_sub1.run_ai_self_evolution(env_paths, bot_sub1)
                     last_config_mtime = cfg_mtime
-                    print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới từ file JSON!")
+                    print("\n♻️ [HỆ THỐNG]: Đã tự động đồng bộ cấu hình mới!")
 
             # ⚙️ AI EVOLUTION CHU KỲ
             if current_now - system_config["LAST_EVOLUTION_TIMESTAMP"] >= bot_sub1.EVOLUTION_CYCLE_SECONDS:
