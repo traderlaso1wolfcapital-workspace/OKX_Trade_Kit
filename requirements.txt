@@ -7,3 +7,5 @@ pandas
 python-dotenv
 PyQt6-WebEngine
 psutil
+python-socketio[client]
+websocket-client
