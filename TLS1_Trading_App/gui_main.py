@@ -1271,10 +1271,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
         self.chk_show_ob.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
+        self.chk_show_ob.hide()
         
         self.chk_show_positions = QtWidgets.QCheckBox("Vị thế")
         self.chk_show_positions.setChecked(True)
         self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
+        self.chk_show_positions.hide()
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
         
         # Control layout widgets (combo_coin, combo_tf, chk_show_ob, chk_show_positions, status_led)
@@ -1412,8 +1414,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         rc_layout.addWidget(self.combo_coin)
         rc_layout.addWidget(self.combo_tf)
-        rc_layout.addWidget(self.chk_show_ob)
-        rc_layout.addWidget(self.chk_show_positions)
         rc_layout.addWidget(self.combo_layout_mode)
         
         if hasattr(self, 'btn_open_settings'):
