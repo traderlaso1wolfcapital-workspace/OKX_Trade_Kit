@@ -2163,6 +2163,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins.addWidget(self.chk_cfg_btc)
         l_active_coins.addWidget(self.chk_cfg_eth)
         layout.addWidget(grp_active_coins)
+        grp_active_coins.hide()
 
                 # 0.2. KHUNG THỜI GIAN GIAO DỊCH
         grp_tfs = QtWidgets.QGroupBox("Khung Thời Gian Giao Dịch")
@@ -2392,6 +2393,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_active_coins.addWidget(self.smc_chk_cfg_btc)
         l_active_coins.addWidget(self.smc_chk_cfg_eth)
         layout.addWidget(grp_active_coins)
+        grp_active_coins.hide()
 
         # 1. DANH MỤC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Danh Mục Chiến Thuật SMC")
@@ -2685,10 +2687,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if os.path.exists(config_path):
                 with open(config_path, "r", encoding="utf-8") as f:
                     cfg = json.load(f)
-            enabled = []
-            if getattr(self, 'dash_chk_xau', None) and self.dash_chk_xau.isChecked(): enabled.append("XAU")
-            if getattr(self, 'dash_chk_btc', None) and self.dash_chk_btc.isChecked(): enabled.append("BTC")
-            if getattr(self, 'dash_chk_eth', None) and self.dash_chk_eth.isChecked(): enabled.append("ETH")
+            
+            enabled = cfg.get("ENABLED_COINS", ["XAU", "BTC", "ETH"])
+            coin_upper = coin.upper()
+            if checked and coin_upper not in enabled:
+                enabled.append(coin_upper)
+            elif not checked and coin_upper in enabled:
+                enabled.remove(coin_upper)
+                
             cfg["ENABLED_COINS"] = enabled
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(cfg, f, indent=4)
