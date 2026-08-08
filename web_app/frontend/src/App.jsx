@@ -494,7 +494,7 @@ function App() {
                           <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
                           <td style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
                             <span className={upl >= 0 ? "text-green" : "text-red"}>
-                              {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({upl >= 0 ? "+" : ""}{pos.roi || "0.00"}%)
+                              {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({parseFloat(pos.roi || 0) > 0 ? "+" : ""}{parseFloat(pos.roi || 0).toFixed(2)}%)
                             </span>
                           </td>
                           <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>
