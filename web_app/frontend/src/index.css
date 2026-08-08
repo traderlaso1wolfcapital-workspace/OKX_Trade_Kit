@@ -754,8 +754,14 @@ body {
   /* Log font nho hon tren mobile */
   .logs-terminal { font-size: 11px; }
 
-  /* Positions table scroll ngang */
-  .positions-table-wrapper { overflow-x: auto; }
+  /* Positions table scroll ngang CHỈ, không 2D */
+  .positions-table-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;  /* chặn kéo dọc trên mobile */
+    position: relative;   /* giữ cố định vị trí trong layout */
+  }
   .positions-table { min-width: 600px; }
 
   /* Modal full screen tren mobile */

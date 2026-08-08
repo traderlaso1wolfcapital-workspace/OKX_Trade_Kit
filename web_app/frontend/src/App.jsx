@@ -40,11 +40,14 @@ function ToggleSwitch({ checked, onChange, labelOn = "BẬT", labelOff = "TẮT"
 }
 
 function App() {
-  // Auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginUid, setLoginUid] = useState("");
+  // Auth state — restore from localStorage
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem("tls1_auth") === "true";
+  });
+  const [loginUid, setLoginUid] = useState(() => localStorage.getItem("tls1_uid") || "");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [lockMessage, setLockMessage] = useState("");
 
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activePairs, setActivePairs] = useState(["BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
@@ -74,6 +77,7 @@ function App() {
     dynamicPingpongTp: false, altcoinFollowBtc: true,
     sidewaySafe: true, squeezeEscape: false, safeguardEntry: true,
     trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
+    timeframeBase: "1H",
   });
   // Risk settings
   const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80 });
@@ -98,6 +102,7 @@ function App() {
         dynamicPingpongTp: false, altcoinFollowBtc: false,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
+        timeframeBase: "1H",
       });
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
     }
@@ -109,10 +114,12 @@ function App() {
   const emaSeriesRef = useRef(null);
   const logEndRef = useRef(null);
   const wsRef = useRef(null);
+  const audioRef = useRef(null); // Reference for click sound
 
-  // Login handler
+  // Login handler — lưu vào localStorage
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (audioRef.current) audioRef.current.play().catch(e => console.log(e));
     setIsLoggingIn(true);
     setLoginError("");
     try {
@@ -120,6 +127,10 @@ function App() {
       const data = await res.json();
       if (data.status === "success") {
         setIsAuthenticated(true);
+        localStorage.setItem("tls1_auth", "true");
+        localStorage.setItem("tls1_uid", loginUid);
+      } else if (data.status === "locked" || data.status === "pending") {
+        setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
       } else {
         setLoginError(data.message || "Đăng nhập thất bại");
       }
@@ -128,6 +139,29 @@ function App() {
     }
     setIsLoggingIn(false);
   };
+
+  // Poll trạng thái lock/pending mỗi 30s — giống Desktop App
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const uid = localStorage.getItem("tls1_uid") || loginUid;
+    if (!uid) return;
+    const checkLock = async () => {
+      try {
+        const res = await fetch(`http://${window.location.hostname}:8080/api/auth/verify?uid=${uid}`);
+        const data = await res.json();
+        if (data.status === "locked") {
+          setLockMessage(data.message || "⛔ Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Admin.");
+        } else if (data.status === "pending") {
+          setLockMessage(data.message || "⏳ Tài khoản đang chờ duyệt.");
+        } else {
+          setLockMessage("");
+        }
+      } catch {}
+    };
+    checkLock();
+    const timer = setInterval(checkLock, 30000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated, loginUid]);
 
   // WebSocket
   useEffect(() => {
@@ -285,26 +319,66 @@ function App() {
   if (!isAuthenticated) {
     return (
       <div className="app-container" style={{ justifyContent: "center", alignItems: "center" }}>
-        <div className="login-box" style={{ background: "#252526", padding: "30px", borderRadius: "8px", border: "1px solid #444", width: "350px", textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
-          <h2 style={{ color: "#ff9900", marginBottom: "5px" }}>TRADER LÀ SỐ 1</h2>
-          <p style={{ color: "#888", marginBottom: "20px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px" }}>Bản quyền phần mềm thuộc TLS1</p>
-          <form onSubmit={handleLogin}>
-            <input 
-              type="text" 
-              placeholder="Nhập UID của bạn (VD: 12345678)..." 
-              value={loginUid} 
-              onChange={e => setLoginUid(e.target.value)} 
-              style={{ width: "100%", padding: "12px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", fontFamily: "Consolas, monospace" }} 
-            />
-            {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "left", fontWeight: "bold" }}>{loginError}</div>}
-            <button 
-              type="submit" 
-              disabled={isLoggingIn || !loginUid} 
-              style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "14px", transition: "0.2s" }}
-            >
-              {isLoggingIn ? "Đang kiểm tra..." : "VÀO ỨNG DỤNG"}
-            </button>
-          </form>
+        {/* Audio element cho âm thanh nút click */}
+        <audio ref={audioRef} src="/media/ribhavagrawal-hit-by-a-wood-230542.mp3" preload="auto"></audio>
+
+        <div className="login-box" style={{ background: "#262626", padding: "0 0 20px 0", borderRadius: "8px", border: "1px solid #444", width: "400px", textAlign: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.5)", overflow: "hidden" }}>
+          {/* Banner */}
+          <div style={{ background: "#000", padding: "10px", borderBottom: "1px solid #444", marginBottom: "20px" }}>
+             <img src="/media/banner.png" alt="TLS1 TRADING SYSTEM" style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          </div>
+
+          <div style={{ padding: "0 20px" }}>
+            <h3 style={{ color: "#e0e0e0", marginBottom: "15px", fontSize: "16px" }}>Nhập OKX UID của bạn:</h3>
+            <form onSubmit={handleLogin}>
+              <input 
+                type="text" 
+                placeholder="Ví dụ: 12345678" 
+                value={loginUid} 
+                onChange={e => setLoginUid(e.target.value)} 
+                style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }} 
+              />
+              {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
+              <button 
+                type="submit" 
+                disabled={isLoggingIn || !loginUid} 
+                style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
+              >
+                {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
+              </button>
+            </form>
+
+            <div style={{ marginTop: "20px", textAlign: "left", fontSize: "12px", color: "#aaaaaa", lineHeight: "1.6" }}>
+              <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 5px 0", fontSize: "13px" }}>✅ ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:</p>
+              <p style={{ margin: "0 0 5px 0" }}>1. Đăng ký tài khoản OKX dưới Link Ref của cộng đồng TLS1, mã ref: <strong style={{ color: "#00ffff", cursor: "pointer" }} onClick={() => { navigator.clipboard.writeText("HoanPhiTLS1"); alert("✅ Đã Copy Mã Ref!"); }}>HoanPhiTLS1</strong></p>
+              <p style={{ margin: "0 0 15px 0" }}>2. Hoặc thực hiện chuyển Ref về TLS1 nếu đã có sẵn tài khoản OKX.</p>
+              
+              <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+                <button 
+                  onClick={() => window.open("https://www.okx.com/join/HoanPhiTLS1", "_blank")}
+                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}
+                >
+                  Đăng ký OKX (VIP)
+                </button>
+                <button 
+                  onClick={() => window.open("https://t.me/traderlaso1/6758", "_blank")}
+                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}
+                >
+                  Hướng dẫn chuyển Ref
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px", border: "1px solid #444", borderRadius: "6px", background: "#262626" }}>
+                <span style={{ fontSize: "12px", fontWeight: "bold" }}>Liên hệ Admin:</span>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <img src="/media/Telegram.png" alt="Telegram" style={{ width: "24px", height: "24px", cursor: "pointer" }} onClick={() => window.open("https://t.me/baotran_tls1", "_blank")} />
+                  <img src="/media/Messenger.png" alt="Messenger" style={{ width: "24px", height: "24px", cursor: "pointer" }} onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")} />
+                  <img src="/media/zalo.png" alt="Zalo" style={{ width: "24px", height: "24px", cursor: "pointer" }} onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")} />
+                  <img src="/media/Discord.png" alt="Discord" style={{ width: "24px", height: "24px", cursor: "pointer" }} onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -312,6 +386,12 @@ function App() {
 
   return (
     <div className="app-container" style={{ flexDirection: "column" }}>
+      {/* BANNER KHÓA / CHỜ DUYỆT — giống Desktop App */}
+      {lockMessage && (
+        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "13px", fontWeight: "bold", textAlign: "center", zIndex: 9999 }}>
+          {lockMessage}
+        </div>
+      )}
       {/* TAB BAR CÁC BOT (TÀI KHOẢN) */}
       <div style={{ display: "flex", background: "#1a1a1a", borderBottom: "1px solid #333", width: "100%", paddingLeft: "10px" }}>
         {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"]].map(([sub, label]) => (
@@ -362,7 +442,7 @@ function App() {
                 <div ref={logEndRef} />
               </div>
             ) : (
-              <div className="positions-table-wrapper">
+              <div className="positions-table-wrapper" style={{ overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
                 <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                   <thead>
                     <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
@@ -586,78 +666,129 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Công Tắc Chiến Thuật */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Công Tắc Chiến Thuật</div>
-                    <div className="toggle-grid">
-                      <div className="toggle-row">
-                        <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({...s, main: v}))} />
-                        <span className="toggle-name">Bật MAIN</span>
-                        <span className="toggle-desc">Chiến thuật Đa Khung EMA200</span>
-                      </div>
-                      <div className="toggle-row">
-                        <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({...s, xole: v}))} />
-                        <span className="toggle-name">Bật XOLE</span>
-                        <span className="toggle-desc">Chiến thuật Bắt Bẻ Xole</span>
-                      </div>
-                      <div className="toggle-row">
-                        <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({...s, dynamicEma200Tp: v}))} />
-                        <span className="toggle-name">TP động EMA200</span>
-                        <span className="toggle-desc">Chốt lời động bám theo EMA200</span>
-                      </div>
-                      <div className="toggle-row">
-                        <ToggleSwitch checked={strat.dynamicPingpongTp} onChange={v => setStrat(s => ({...s, dynamicPingpongTp: v}))} />
-                        <span className="toggle-name">TP Ping-Pong</span>
-                        <span className="toggle-desc">Chốt lời ngắn hạn sóng Ping-Pong</span>
-                      </div>
-                      <div className="toggle-row">
-                        <ToggleSwitch checked={strat.altcoinFollowBtc} onChange={v => setStrat(s => ({...s, altcoinFollowBtc: v}))} />
-                        <span className="toggle-name">Altcoin neo BTC</span>
-                        <span className="toggle-desc">Altcoin tính Limit bằng EMA200 BTC</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Lớp Bảo Vệ Cục Bộ */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Lớp Bảo Vệ Cục Bộ</div>
-                    <div className="toggle-grid">
-                      {[
-                        ["sidewaySafe", "Chốt Sideway an toàn", "Chốt chủ động khi Sideway + ROI ≥ 20%"],
-                        ["squeezeEscape", "Thoát nén Squeeze", "Thoát sớm khi khung bị nén tam giác"],
-                        ["safeguardEntry", "Bảo vệ Entry", "Thoát hòa khi lỗ sâu >70% SL rồi hồi"],
-                        ["trailingSl", "Trailing SL", "Trailing SL động — khóa lợi nhuận"],
-                        ["maxRoi", "Chốt Max ROI", "Chốt lời khi ROI ≥ 120%"],
-                        ["sidewayVap", "Cắt hòa Vấp EMA", "Cắt hòa khi Vấp EMA200 ≥ 2 lần"],
-                        ["h4Flip", "Đóng H4 đảo chiều", "Đóng vị thế ngược khi H4 đảo chiều"],
-                      ].map(([key, name, desc]) => (
-                        <div className="toggle-row" key={key}>
-                          <ToggleSwitch checked={strat[key]} onChange={v => setStrat(s => ({...s, [key]: v}))} />
-                          <span className="toggle-name">{name}</span>
-                          <span className="toggle-desc">{desc}</span>
+                  {selectedAccount === "sub1" ? (
+                    <>
+                      {/* Công Tắc Chiến Thuật EMA200 */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Công Tắc Chiến Thuật</div>
+                        <div className="toggle-grid">
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({...s, main: v}))} />
+                            <span className="toggle-name">Bật MAIN</span>
+                            <span className="toggle-desc">Chiến thuật Đa Khung EMA200</span>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({...s, xole: v}))} />
+                            <span className="toggle-name">Bật XOLE</span>
+                            <span className="toggle-desc">Chiến thuật Bắt Bẻ Xole</span>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({...s, dynamicEma200Tp: v}))} />
+                            <span className="toggle-name">TP động EMA200</span>
+                            <span className="toggle-desc">Chốt lời động bám theo EMA200</span>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.dynamicPingpongTp} onChange={v => setStrat(s => ({...s, dynamicPingpongTp: v}))} />
+                            <span className="toggle-name">TP Ping-Pong</span>
+                            <span className="toggle-desc">Chốt lời ngắn hạn sóng Ping-Pong</span>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.altcoinFollowBtc} onChange={v => setStrat(s => ({...s, altcoinFollowBtc: v}))} />
+                            <span className="toggle-name">Altcoin neo BTC</span>
+                            <span className="toggle-desc">Altcoin tính Limit bằng EMA200 BTC</span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
 
-                  {/* Quản Lý Vốn & Rủi Ro */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
-                    <div className="risk-grid">
-                      <div className="risk-row">
-                        <label>Volume Limit cố định (USDT):</label>
-                        <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min="1" step="10" />
+                      {/* Lớp Bảo Vệ Cục Bộ EMA200 */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Lớp Bảo Vệ Cục Bộ</div>
+                        <div className="toggle-grid">
+                          {[
+                            ["sidewaySafe", "Chốt Sideway an toàn", "Chốt chủ động khi Sideway + ROI ≥ 20%"],
+                            ["squeezeEscape", "Thoát nén Squeeze", "Thoát sớm khi khung bị nén tam giác"],
+                            ["safeguardEntry", "Bảo vệ Entry", "Thoát hòa khi lỗ sâu >70% SL rồi hồi"],
+                            ["trailingSl", "Trailing SL", "Trailing SL động — khóa lợi nhuận"],
+                            ["maxRoi", "Chốt Max ROI", "Chốt lời khi ROI ≥ 120%"],
+                            ["sidewayVap", "Cắt hòa Vấp EMA", "Cắt hòa khi Vấp EMA200 ≥ 2 lần"],
+                            ["h4Flip", "Đóng H4 đảo chiều", "Đóng vị thế ngược khi H4 đảo chiều"],
+                          ].map(([key, name, desc]) => (
+                            <div className="toggle-row" key={key}>
+                              <ToggleSwitch checked={strat[key]} onChange={v => setStrat(s => ({...s, [key]: v}))} />
+                              <span className="toggle-name">{name}</span>
+                              <span className="toggle-desc">{desc}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="risk-row">
-                        <label>Chốt lời cơ sở M5 (%):</label>
-                        <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.05" />
+
+                      {/* Quản Lý Vốn & Rủi Ro EMA200 */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
+                        <div className="risk-grid">
+                          <div className="risk-row">
+                            <label>Volume Limit cố định (USDT):</label>
+                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min="1" step="10" />
+                          </div>
+                          <div className="risk-row">
+                            <label>Chốt lời cơ sở M5 (%):</label>
+                            <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.05" />
+                          </div>
+                          <div className="risk-row">
+                            <label>Dừng lỗ cơ sở M5 (%):</label>
+                            <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.05" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="risk-row">
-                        <label>Dừng lỗ cơ sở M5 (%):</label>
-                        <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.05" />
+                    </>
+                  ) : (
+                    <>
+                      {/* Chiến Thuật SMC */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Danh Mục Chiến Thuật SMC</div>
+                        <div className="toggle-grid">
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({...s, main: v}))} />
+                            <span className="toggle-name">Bật Chiến thuật SMC Order Block</span>
+                            <span className="toggle-desc">Chiến thuật theo cấu trúc thị trường</span>
+                          </div>
+                          <div className="toggle-row" style={{ marginTop: "10px" }}>
+                            <span className="toggle-name" style={{ flex: 1, color: "#e0e0e0", fontSize: "12px" }}>Timeframe base:</span>
+                            <select 
+                              className="styled-select" 
+                              value={strat.timeframeBase} 
+                              onChange={e => setStrat(s => ({...s, timeframeBase: e.target.value}))}
+                              style={{ width: "100px", background: "#1e1e1e", color: "#fff", border: "1px solid #555", borderRadius: "4px", padding: "4px" }}
+                            >
+                              <option value="15M">15M</option>
+                              <option value="30M">30M</option>
+                              <option value="1H">1H</option>
+                              <option value="4H">4H</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+
+                      {/* Quản Lý Vốn & Rủi Ro SMC */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
+                        <div className="risk-grid">
+                          <div className="risk-row">
+                            <label>Volume Limit cố định (USDT):</label>
+                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min="1" step="10" />
+                          </div>
+                          <div className="risk-row">
+                            <label>Tỷ lệ Risk:Reward thuận trend:</label>
+                            <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.5" />
+                          </div>
+                          <div className="risk-row">
+                            <label>Tỷ lệ Risk:Reward ngược trend:</label>
+                            <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
