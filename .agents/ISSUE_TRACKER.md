@@ -210,10 +210,90 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 
-
----
-
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[09/08/2026]** - Bổ sung khung thời gian "2H" vào menu chọn nến chart (combo_tf):
+  - **Nguyên nhân:** Thiếu khung thời gian `2H` trong menu dropdown chọn hiển thị biểu đồ nến chính của Dashboard, làm giảm trải nghiệm phân tích kỹ thuật của người dùng.
+  - **Cập nhật:** Bổ sung `"2H"` vào list items của `self.combo_tf` và tăng chiều rộng cố định lên `50px` để hiển thị vừa vặn, hỗ trợ xem nến 2h trực tiếp đồng bộ với backend.
+
+- **[09/08/2026]** - Sửa đổi tiêu đề Header chính của App:
+  - **Cập nhật:** Sửa đổi tiêu đề chính của giao diện, loại bỏ phần chữ rườm rà `"Phát hành bởi cộng đồng: "` và chỉ giữ lại tên thương hiệu gọn gàng, sắc nét: `"TRADER LÀ SỐ 1 - VIỆT NAM"`.
+
+- **[09/08/2026]** - Bổ sung khung thời gian "30m" vào menu chọn nến chart (combo_tf):
+  - **Nguyên nhân:** Thiếu khung thời gian `30m` trong menu dropdown chọn hiển thị biểu đồ nến chính của Dashboard, ảnh hưởng đến việc phân tích của người dùng.
+  - **Cập nhật:** Bổ sung `"30m"` vào list items của `self.combo_tf` và tăng chiều rộng cố định lên `48px` để hiển thị vừa vặn, hỗ trợ xem nến m30 trực tiếp đồng bộ với backend.
+
+- **[09/08/2026]** - Thay đổi text và icon nút Dừng hoạt động thành "■ DỪNG CHẠY BOT":
+  - **Cập nhật:** Sửa text hiển thị của nút dừng từ `🛑 DỪNG HOẠT ĐỘNG` thành `■ DỪNG CHẠY BOT`, sử dụng ký tự dừng ô vuông đen `■` thay thế cho vòng tròn đỏ `🛑` nhằm tạo sự đồng bộ hoàn hảo với ký tự tam giác chạy `▶` ở nút Bắt đầu chạy bot.
+
+- **[09/08/2026]** - Thiết kế lại viền checkbox bao toàn bộ cả dấu tích và nhãn text theo phong cách Đen-Trắng:
+  - **Cập nhật:** Sửa `cb_style` để chuyển border từ selector `QCheckBox::indicator` sang selector `QCheckBox`, cho phép viền bao quanh toàn bộ checkbox. Thiết lập hiệu ứng chuyển màu: khi `:checked` thì viền sáng nhẹ (`#666666`), chữ màu trắng xám nhẹ (`#cccccc`) và nền tối màu `#161616`; khi `:hover` thì viền sáng `#666666`, màu nền `#222222`.
+
+- **[09/08/2026]** - Tinh chỉnh tỷ lệ spacing các cụm chức năng ở Header góc phải:
+  - **Cập nhật:**
+    1. Giảm spacing của `rc_layout` (các cụm chính) từ `18px` xuống `14px`.
+    2. Tăng spacing bên trong cụm checkbox `l_tfs` từ `6px` lên `8px` giúp các checkbox giãn nhẹ tự nhiên hơn.
+
+- **[09/08/2026]** - Giãn rộng khoảng cách giữa 6 checkbox Khung thời gian:
+  - **Cập nhật:** Tăng thuộc tính spacing của layout `l_tfs` từ `6px` lên `10px` giúp các checkbox M5...H4 cách đều và thoáng mắt hơn, tăng tính mỹ thuật và giảm thiểu việc click nhầm.
+
+- **[09/08/2026]** - Di chuyển ô chọn chế độ layout xuống cùng dòng với Terminal Logs ở góc phải và khôi phục tên đầy đủ:
+  - **Nguyên nhân:** Đặt ô chọn chế độ ở Header góc phải gây loãng giao diện; sau khi chuyển xuống cạnh Terminal Logs, do có nhiều diện tích nên người dùng muốn khôi phục lại tên đầy đủ.
+  - **Cập nhật:** Đặt `self.combo_layout_mode` vào trong `log_header` của `self.tab_logs`, khôi phục các mục lựa chọn thành `"Chế độ dọc"` / `"Chế độ ngang"` như cũ và mở rộng kích thước rộng cố định thành `110px`.
+
+- **[09/08/2026]** - Đặt tỷ lệ mặc định chia đôi 50/50 giữa biểu đồ nến và Terminal Logs ở chế độ dọc:
+  - **Nguyên nhân:** Mặc định trước đây biểu đồ nến chiếm 85% diện tích và Logs chỉ chiếm 15%, khiến giao diện Logs quá nhỏ khó theo dõi khi khởi chạy app.
+  - **Cập nhật:** Đặt lại kích thước ban đầu thành `[500, 500]` và set stretch factor thành `(1, 1)` cho cả 2 widget con của splitter, bảo đảm chia đôi tỷ lệ 50/50 hoàn hảo khi khởi động app và tự động co giãn đều nhau khi thay đổi kích thước cửa sổ.
+
+- **[09/08/2026]** - Đưa 6 checkbox Khung thời gian lên Header, thu gọn dropdown Dọc/Ngang thành 50px và đảo nó về cuối cạnh nút Cài đặt:
+  - **Nguyên nhân:** Khung thời gian giao dịch trước đây chiếm dụng diện tích phía trên bảng vị thế; đồng thời ô dropdown "Dọc"/"Ngang" cũ vẫn còn khá dài và nằm xen giữa các dropdown nến chart, gây mất cân đối thị giác.
+  - **Cập nhật:**
+    1. Di chuyển 6 checkbox M5...H4 vào container `self.dash_tfs_container` và chèn trực tiếp vào TopRightCorner của Tab Live View.
+    2. Rút gọn combo box chế độ layout thành "Dọc"/"Ngang", ép kích thước cố định bằng CSS min-width/max-width đè cứng xuống `50px`.
+    3. Đảo thứ tự add widget trong `rc_layout` để đưa ô Dọc/Ngang này ra phía sau thanh checkbox Khung thời gian, nằm gọn gàng ở vị trí cuối cùng, ngay sát cạnh nút Cài đặt ⚙️.
+
+- **[09/08/2026]** - Tối giản nhóm Khung thời gian giao dịch trên Dashboard thành dạng thanh phẳng (Flat Bar) không viền:
+  - **Nguyên nhân:** Khung viền và tiêu đề của QGroupBox chiếm diện tích thừa thãi trên màn hình chính.
+  - **Cập nhật:** Đổi `QGroupBox` thành `QWidget` không viền với màu nền transparent, hạ chiều cao cố định xuống `30px` (từ `50px`) giúp 6 checkbox M5...H4 hiển thị gọn gàng, tinh tế và tiết kiệm tối đa không gian hiển thị của Dashboard chính.
+
+- **[09/08/2026]** - Di chuyển `sys_bot_sub1.py` và `sys_bot_sub2.py` vào các thư mục con tương ứng `z_bot_sub1` và `z_bot_sub2`:
+  - **Nguyên nhân:** Người dùng không còn chạy các file bot tĩnh này trực tiếp từ terminal nữa mà chạy thông qua xGui_main.py, do đó muốn chuyển các file này vào các thư mục con của từng bot để thư mục gốc dự án gọn gàng và sạch sẽ hơn.
+  - **Cập nhật:**
+    1. Di chuyển `sys_bot_sub1.py` vào [z_bot_sub1/sys_bot_sub1.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub1/sys_bot_sub1.py).
+    2. Di chuyển `sys_bot_sub2.py` vào [z_bot_sub2/sys_bot_sub2.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub2/sys_bot_sub2.py).
+    3. Cập nhật mã nguồn của cả 2 file để tự động phát hiện nếu đang nằm trong thư mục con, tự động bổ sung thư mục cha vào `sys.path` (để hỗ trợ import chéo module) và điều chỉnh lại `CURRENT_DIR` chỉ trỏ tới thư mục gốc dự án, bảo đảm tính tương thích ngược 100% với hot-reload và cơ chế gọi bot của GUI chính.
+
+- **[09/08/2026]** - Di chuyển Khung thời gian giao dịch ra giao diện chính Dashboard (dưới bảng Vị thế) và tự động lưu cấu hình ngầm:
+  - **Nguyên nhân:** Khung thời gian giao dịch trước đây nằm sâu trong popup cài đặt (Tab Cấu hình chiến thuật), làm giảm tốc độ thao tác của người dùng khi cần bật/tắt nhanh các khung thời gian giao dịch khi thị trường biến động.
+  - **Cập nhật:**
+    1. Di chuyển toàn bộ GroupBox "Khung Thời Gian Giao Dịch" (6 checkbox: M5, M15, M30, H1, H2, H4) từ [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py) trong hàm `setup_tab_strategy()` ra ngoài giao diện chính Dashboard trong hàm `setup_tab_dashboard()`, đặt ngay dưới bảng vị thế `self.tab_positions`. Groupbox này sẽ tự động ẩn đi đối với SMC (sub2).
+    2. Sửa đổi `save_strategy_settings()` hỗ trợ chế độ `silent=True` (lưu ngầm không phát âm thanh, không hiện popup) và kết nối tín hiệu check/uncheck của các checkbox trên Dashboard trực tiếp với hàm lưu ngầm này. Cập nhật `load_current_settings()` để sử dụng cờ chặn `self._is_loading_settings` tránh lặp vòng lặp lưu cấu hình khi load dữ liệu.
+
+- **[09/08/2026]** - Sửa lỗi bot vẫn rải limit ở M5 cho cả BTC và Altcoin dù đã bỏ tích chọn M5, M15, M30:
+  - **Nguyên nhân:** Có hai lỗ hổng logic lớn trong [bot_strategy.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub1/bot_strategy.py):
+    1. Hàm `get_aligned_tfs` có fallback `if trigger_tf not in TFS: return [trigger_tf]`. Vì `start_tf` mặc định là `"M5"`, khi `"M5"` không có trong `TFS` (bị bỏ tích), hàm vẫn trả về `["M5"]` làm cho bot rải limit ở M5.
+    2. Logic `Altcoin Fallback` khi BTC có tín hiệu nhưng Altcoin chưa aligned sẽ ép lấy `best_tf` làm fallback. Khi thị trường đi ngang, `best_tf` mặc định là `"M5"`, dẫn đến ép rải limit ở M5 bất kể có được tích chọn hay không.
+  - **Cập nhật:**
+    1. Sửa `get_aligned_tfs` trong [bot_strategy.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub1/bot_strategy.py) để nếu `trigger_tf` không nằm trong `TFS`, nó sẽ tự động tìm kiếm và bắt đầu từ khung thời gian lớn hơn tiếp theo được tích chọn trong `TFS`, loại bỏ hoàn toàn các khung thời gian bị tắt khỏi danh sách aligned.
+    2. Sửa logic `Altcoin Fallback` để kiểm tra nếu `best_tf` không có trong `TFS` thì tự động chuyển sang lấy khung thời gian lớn nhất có trong `TFS` (ví dụ `"H4"`) làm fallback, bảo đảm không bao giờ rải limit ở các khung bị tắt.
+
+- **[09/08/2026]** - Thêm tính năng tự động dọn dẹp các tiến trình bot chạy ngầm (zombie) cũ của phiên trước khi mở GUI:
+  - **Nguyên nhân:** Khi người dùng tắt app GUI chính, các tiến trình bot chạy ngầm (`--run-bot`) từ phiên cũ có thể không được đóng triệt để (hoặc bị kẹt lại). Các tiến trình cũ này vẫn tiếp tục chạy ngầm trong Windows, tự động rải lệnh limit đầy đủ 6 TF lên sàn OKX. Khi người dùng mở app mới lên, bot chạy ngầm cũ vẫn hoạt động gây hiểu lầm là app tự động chạy bot và rải limit khi chưa đăng nhập.
+  - **Cập nhật:** Đã bổ sung hàm `kill_zombie_bots()` trong [xGui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/xGui_main.py) tự động quét hệ thống thông qua PowerShell/pkill để kết thúc bắt buộc mọi tiến trình con đang chạy ngầm có tham số `--run-bot` của các phiên cũ trước khi mở giao diện chính. Bảo đảm hệ thống sạch sẽ tuyệt đối, không còn tình trạng lệnh cũ tự động rải trên sàn.
+
+- **[09/08/2026]** - Sửa lỗi khởi chạy xGui_main.py mở 2 cửa sổ GUI song song và lỗi bot không chạy thực tế (không hủy được lệnh limit cũ của các TF đã tắt):
+  - **Nguyên nhân:** Khi chạy app qua script `xGui_main.py` trong môi trường dev, tên file script chính `sys.argv[0]` là `xGui_main.py`. Khi nhấn nút khởi động bot, `BotSubprocessWorker` gọi tiến trình con chạy `python xGui_main.py --run-bot ...`. Tuy nhiên, `xGui_main.py` thiếu kiểm tra cờ `--run-bot` nên nó chỉ tiếp tục import và khởi chạy GUI chính lần thứ hai (gây hiện tượng mở 2 cửa sổ), đồng thời kẹt ở event loop GUI khiến bot thực tế hoàn toàn không được chạy và các lệnh limit cũ của các TF đã tắt (M5, M15, M30) trên sàn OKX không được dọn dẹp.
+  - **Cập nhật:** Đã cập nhật hàm `main()` của [xGui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/xGui_main.py) để kiểm tra đối số `--run-bot`. Nếu phát hiện chạy chế độ bot con, script sẽ ngay lập tức nạp và thực thi trực tiếp module `sys_bot_sub1` hoặc `sys_bot_sub2` mà không khởi chạy GUI phụ, giúp bot con hoạt động thực tế chính xác và tự động dọn sạch các lệnh limit cũ của các TF vừa tắt.
+
+- **[09/08/2026]** - Đổi nhãn text từ "Main" thành "Sub 1" và sửa lỗi bot vẫn rải lệnh DCA ở các khung thời gian (TFs) đã bỏ tích:
+  - **Nguyên nhân 1 (Nhãn text):** file `gui_main.py` khởi tạo `panel_main` truyền tên `"Thợ săn EMA200 (Main)"` trong khi bot chạy thực tế trên `.api_sub1` là của Sub 1.
+  - **Nguyên nhân 2 (DCA ở TFs đã bỏ tích):** 
+    1. Hàm `run_ai_self_evolution` và `sync_config_to_json` trong `bot_strategy.py` thiếu đồng bộ biến `ENABLED_TFS` giữa JSON và python memory. Đồng thời, cấu hình chỉ được lưu vào module `bot_sub1` mà không cập nhật sang `bot_config` và module `bot_strategy`, dẫn đến lệch bộ nhớ biến immutable và bot vẫn chạy theo config mặc định.
+    2. Vòng lặp hủy lệnh limit không mục tiêu chỉ quét qua `TFS_ALL` (danh sách TF đã kích hoạt) thay vì quét qua toàn bộ 6 khung thời gian. Do đó, các TF vừa bị bỏ tích trên GUI sẽ bị bỏ qua và các lệnh limit cũ của chúng vẫn được treo trên sàn OKX.
+  - **Cập nhật:**
+    1. Đổi `"Thợ săn EMA200 (Main)"` thành `"Thợ săn EMA200 (Sub 1)"` trong [gui_main.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/TLS1_Trading_App/gui_main.py).
+    2. Bổ sung Two-Way Sync cho biến `ENABLED_TFS` trong `sync_config_to_json` và `run_ai_self_evolution`. Cho phép đồng bộ đồng thời cấu hình cho cả 3 module (`bot_sub1`, `bot_config`, `bot_strategy`) để tránh lệch bộ nhớ.
+    3. Đổi vòng lặp dọn dẹp lệnh limit không mục tiêu trong [bot_strategy.py](file:///d:/4. Trade Coin - TLS1/4. Cursor - IDE/TLS1_Company/zProjects/OKX_Trade_Kit/z_bot_sub1/bot_strategy.py) quét qua toàn bộ 6 khung thời gian `["M5", "M15", "M30", "H1", "H2", "H4"]` để tự động dọn dẹp triệt để tất cả lệnh limit cũ trên sàn khi người dùng bỏ tích trên giao diện.
 
 - **[08/08/2026]** - Sửa lỗi `NameError: name 'system_config' is not defined` tại `bot_ui.py` (Bot SMC Sub2):
   - **Nguyên nhân:** Lỗi hiển thị Uptime (thời gian chạy bot) ở dòng 133 do hàm `print_dashboard` chưa được truyền biến cấu hình toàn cục `system_config`.

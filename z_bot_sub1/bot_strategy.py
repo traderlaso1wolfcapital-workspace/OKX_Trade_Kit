@@ -88,6 +88,7 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             except: pass
         
         existing_cfg.update({
+            "ENABLED_TFS": getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"]),
             "AI_CONFIDENCE_SCORE": str(globals_ref.AI_CONFIDENCE_SCORE),
             "TP_TARGET_OPTIMAL": str(globals_ref.SCALPING_TP_PCT),
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
@@ -128,57 +129,85 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
         if os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
             with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-                globals_ref.AI_CONFIDENCE_SCORE = Decimal(str(cfg.get("AI_CONFIDENCE_SCORE", "0")))
-                globals_ref.SCALPING_TP_PCT = Decimal(str(cfg.get("TP_TARGET_OPTIMAL", "0.01500")))
-                globals_ref.SCALPING_SL_PCT = Decimal(str(cfg.get("SL_TARGET_OPTIMAL", "0.01500")))
                 
-
-
+                import sys
+                import z_bot_sub1.bot_config as target_config
+                strategy_mod = sys.modules[__name__]
+                targets = [globals_ref, target_config, strategy_mod]
+                
+                def set_val(name, val):
+                    for t in targets:
+                        if t is not None:
+                            setattr(t, name, val)
+                
+                # Đồng bộ danh sách khung thời gian giao dịch được chọn
+                if "ENABLED_TFS" in cfg:
+                    set_val("ENABLED_TFS", cfg["ENABLED_TFS"])
+                
+                # Đồng bộ thông số quản lý vốn và hiệu suất
+                set_val("AI_CONFIDENCE_SCORE", Decimal(str(cfg.get("AI_CONFIDENCE_SCORE", "0"))))
+                set_val("SCALPING_TP_PCT", Decimal(str(cfg.get("TP_TARGET_OPTIMAL", "0.01500"))))
+                set_val("SCALPING_SL_PCT", Decimal(str(cfg.get("SL_TARGET_OPTIMAL", "0.01500"))))
+                
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg:
-                    globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                    set_val("POSITION_VOLUME_HIGH_CONFIDENCE", Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"])))
                     
                 # Các cờ chiến thuật
-                if "ENABLE_STRATEGY_MAIN" in cfg: globals_ref.ENABLE_STRATEGY_MAIN = bool(cfg["ENABLE_STRATEGY_MAIN"])
-                if "ENABLE_STRATEGY_XOLE" in cfg: globals_ref.ENABLE_STRATEGY_XOLE = bool(cfg["ENABLE_STRATEGY_XOLE"])
-                if "ENABLE_DYNAMIC_EMA200_TP" in cfg: globals_ref.ENABLE_DYNAMIC_EMA200_TP = bool(cfg["ENABLE_DYNAMIC_EMA200_TP"])
-                if "ENABLE_DYNAMIC_PINGPONG_TP" in cfg: globals_ref.ENABLE_DYNAMIC_PINGPONG_TP = bool(cfg["ENABLE_DYNAMIC_PINGPONG_TP"])
-                if "ALTCOIN_FOLLOW_BTC_EMA" in cfg: globals_ref.ALTCOIN_FOLLOW_BTC_EMA = bool(cfg["ALTCOIN_FOLLOW_BTC_EMA"])
+                if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
+                if "ENABLE_STRATEGY_XOLE" in cfg: set_val("ENABLE_STRATEGY_XOLE", bool(cfg["ENABLE_STRATEGY_XOLE"]))
+                if "ENABLE_DYNAMIC_EMA200_TP" in cfg: set_val("ENABLE_DYNAMIC_EMA200_TP", bool(cfg["ENABLE_DYNAMIC_EMA200_TP"]))
+                if "ENABLE_DYNAMIC_PINGPONG_TP" in cfg: set_val("ENABLE_DYNAMIC_PINGPONG_TP", bool(cfg["ENABLE_DYNAMIC_PINGPONG_TP"]))
+                if "ALTCOIN_FOLLOW_BTC_EMA" in cfg: set_val("ALTCOIN_FOLLOW_BTC_EMA", bool(cfg["ALTCOIN_FOLLOW_BTC_EMA"]))
 
                 # Lớp bảo vệ cục bộ
-                if "ENABLE_SIDEWAY_SAFE_EXIT" in cfg: globals_ref.ENABLE_SIDEWAY_SAFE_EXIT = bool(cfg["ENABLE_SIDEWAY_SAFE_EXIT"])
-                if "ENABLE_SQUEEZE_ESCAPE_EXIT" in cfg: globals_ref.ENABLE_SQUEEZE_ESCAPE_EXIT = bool(cfg["ENABLE_SQUEEZE_ESCAPE_EXIT"])
-                if "ENABLE_SAFEGUARD_ENTRY_EXIT" in cfg: globals_ref.ENABLE_SAFEGUARD_ENTRY_EXIT = bool(cfg["ENABLE_SAFEGUARD_ENTRY_EXIT"])
-                if "ENABLE_TRAILING_SL" in cfg: globals_ref.ENABLE_TRAILING_SL = bool(cfg["ENABLE_TRAILING_SL"])
-                if "ENABLE_MAX_ROI_EXIT" in cfg: globals_ref.ENABLE_MAX_ROI_EXIT = bool(cfg["ENABLE_MAX_ROI_EXIT"])
-                if "ENABLE_SIDEWAY_VAP_EXIT" in cfg: globals_ref.ENABLE_SIDEWAY_VAP_EXIT = bool(cfg["ENABLE_SIDEWAY_VAP_EXIT"])
-                if "ENABLE_H4_FLIP_CLOSE" in cfg: globals_ref.ENABLE_H4_FLIP_CLOSE = bool(cfg["ENABLE_H4_FLIP_CLOSE"])
+                if "ENABLE_SIDEWAY_SAFE_EXIT" in cfg: set_val("ENABLE_SIDEWAY_SAFE_EXIT", bool(cfg["ENABLE_SIDEWAY_SAFE_EXIT"]))
+                if "ENABLE_SQUEEZE_ESCAPE_EXIT" in cfg: set_val("ENABLE_SQUEEZE_ESCAPE_EXIT", bool(cfg["ENABLE_SQUEEZE_ESCAPE_EXIT"]))
+                if "ENABLE_SAFEGUARD_ENTRY_EXIT" in cfg: set_val("ENABLE_SAFEGUARD_ENTRY_EXIT", bool(cfg["ENABLE_SAFEGUARD_ENTRY_EXIT"]))
+                if "ENABLE_TRAILING_SL" in cfg: set_val("ENABLE_TRAILING_SL", bool(cfg["ENABLE_TRAILING_SL"]))
+                if "ENABLE_MAX_ROI_EXIT" in cfg: set_val("ENABLE_MAX_ROI_EXIT", bool(cfg["ENABLE_MAX_ROI_EXIT"]))
+                if "ENABLE_SIDEWAY_VAP_EXIT" in cfg: set_val("ENABLE_SIDEWAY_VAP_EXIT", bool(cfg["ENABLE_SIDEWAY_VAP_EXIT"]))
+                if "ENABLE_H4_FLIP_CLOSE" in cfg: set_val("ENABLE_H4_FLIP_CLOSE", bool(cfg["ENABLE_H4_FLIP_CLOSE"]))
 
                 # Thông số kỹ thuật & dung sai
                 if "DCA_GAP_THRESHOLD_PCT" in cfg:
-                    globals_ref.DCA_GAP_THRESHOLD_PCT = Decimal(str(cfg["DCA_GAP_THRESHOLD_PCT"]))
+                    set_val("DCA_GAP_THRESHOLD_PCT", Decimal(str(cfg["DCA_GAP_THRESHOLD_PCT"])))
                 if "EMA_CONFLUENCE_TOLERANCE_PCT" in cfg:
-                    globals_ref.EMA_CONFLUENCE_TOLERANCE_PCT = Decimal(str(cfg["EMA_CONFLUENCE_TOLERANCE_PCT"]))
+                    set_val("EMA_CONFLUENCE_TOLERANCE_PCT", Decimal(str(cfg["EMA_CONFLUENCE_TOLERANCE_PCT"])))
                 if "BASE_ENTRY_OFFSET_PCT" in cfg:
-                    globals_ref.BASE_ENTRY_OFFSET_PCT = Decimal(str(cfg["BASE_ENTRY_OFFSET_PCT"]))
-                    # Tự động tính toán lại 2 bảng tĩnh nếu BASE_ENTRY_OFFSET_PCT bị ghi đè
-                    globals_ref.TF_ENTRY_OFFSETS = {k: globals_ref.BASE_ENTRY_OFFSET_PCT * v for k, v in globals_ref.TF_MULTIPLIERS.items()}
-                    globals_ref.XOLE_TF_ENTRY_OFFSETS = {k: globals_ref.BASE_ENTRY_OFFSET_PCT * v for k, v in globals_ref.XOLE_TF_MULTIPLIERS.items()}
+                    set_val("BASE_ENTRY_OFFSET_PCT", Decimal(str(cfg["BASE_ENTRY_OFFSET_PCT"])))
+                    # Tự động tính toán lại bảng offsets nếu BASE_ENTRY_OFFSET_PCT bị thay đổi
+                    for t in targets:
+                        if t is not None:
+                            tf_mults = getattr(t, "TF_MULTIPLIERS", {})
+                            base_offset = getattr(t, "BASE_ENTRY_OFFSET_PCT", Decimal("0"))
+                            if tf_mults and base_offset > 0:
+                                setattr(t, "TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in tf_mults.items()})
+                            
+                            xole_tf_mults = getattr(t, "XOLE_TF_MULTIPLIERS", {})
+                            if xole_tf_mults and base_offset > 0:
+                                setattr(t, "XOLE_TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in xole_tf_mults.items()})
+                                
                 if "REQUIRED_ACCUMULATION_CANDLES" in cfg:
-                    globals_ref.REQUIRED_ACCUMULATION_CANDLES = int(cfg["REQUIRED_ACCUMULATION_CANDLES"])
+                    set_val("REQUIRED_ACCUMULATION_CANDLES", int(cfg["REQUIRED_ACCUMULATION_CANDLES"]))
 
                 # Cấu hình Lượng tử
-                if "QUANTUM_BUFFER_CANDLES" in cfg: globals_ref.QUANTUM_BUFFER_CANDLES = int(cfg["QUANTUM_BUFFER_CANDLES"])
-                if "QUANTUM_FORTH_CANDLES" in cfg: globals_ref.QUANTUM_FORTH_CANDLES = int(cfg["QUANTUM_FORTH_CANDLES"])
-                if "EVOLUTION_CYCLE_SECONDS" in cfg: globals_ref.EVOLUTION_CYCLE_SECONDS = int(cfg["EVOLUTION_CYCLE_SECONDS"])
+                if "QUANTUM_BUFFER_CANDLES" in cfg: set_val("QUANTUM_BUFFER_CANDLES", int(cfg["QUANTUM_BUFFER_CANDLES"]))
+                if "QUANTUM_FORTH_CANDLES" in cfg: set_val("QUANTUM_FORTH_CANDLES", int(cfg["QUANTUM_FORTH_CANDLES"]))
+                if "EVOLUTION_CYCLE_SECONDS" in cfg: set_val("EVOLUTION_CYCLE_SECONDS", int(cfg["EVOLUTION_CYCLE_SECONDS"]))
+                
+                # Đồng bộ COIN_PORTFOLIO
                 vol_mults = cfg.get("VOL_MULTIPLIERS", {})
                 leverages = cfg.get("LEVERAGES", {})
-                for item in globals_ref.COIN_PORTFOLIO:
-                    cname = item["coin"]
-                    if cname in vol_mults:
-                        item["vol_mult"] = Decimal(str(vol_mults[cname]))
-                    if cname in leverages:
-                        item["leverage"] = int(leverages[cname])
-    except: pass
+                for t in targets:
+                    if t is not None and hasattr(t, "COIN_PORTFOLIO"):
+                        for item in t.COIN_PORTFOLIO:
+                            cname = item["coin"]
+                            if cname in vol_mults:
+                                item["vol_mult"] = Decimal(str(vol_mults[cname]))
+                            if cname in leverages:
+                                item["leverage"] = int(leverages[cname])
+    except Exception as e:
+        print(f"⚠️ [RUN_EVOLUTION LỖI]: {e}")
 
     pass
 
@@ -1622,11 +1651,20 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
         if not trigger_tf:
             return []
         
-
         TFS = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
-        if trigger_tf not in TFS:
-            return [trigger_tf]
-        idx = TFS.index(trigger_tf)
+        if not TFS:
+            return []
+            
+        start_idx = -1
+        for candidate_tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
+            if tf_weight(candidate_tf) >= tf_weight(trigger_tf) and candidate_tf in TFS:
+                start_idx = TFS.index(candidate_tf)
+                break
+                
+        if start_idx == -1:
+            return []
+            
+        idx = start_idx
         target_side = "above" if direction == "UPTREND" else "under"
         # ⚡ ALTCOIN SYNC: Khi neo theo BTC, dùng aligned TFs của BTC thay vì tự tính từ EMA Altcoin
         if _is_alt_synced:
@@ -2217,6 +2255,23 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
+            # ⚡ ALTCOIN FALLBACK: Khi BTC có tín hiệu (allowed_short/long=True)
+            # nhưng Altcoin chưa có TF nào aligned → force đặt limit theo BTC direction
+            # Phải đảm bảo fallback_tf nằm trong TFS (khung thời gian được tích chọn)
+            if coin_name != "BTC" and not tracker.has_long and not tracker.has_short:
+                fallback_tf = None
+                TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+                if best_tf in TFS:
+                    fallback_tf = best_tf
+                elif TFS:
+                    fallback_tf = max(TFS, key=tf_weight)
+                
+                if fallback_tf and fallback_tf not in _blocked_tfs:
+                    if allowed_long and not target_long_tfs:
+                        target_long_tfs = [fallback_tf]
+                    if allowed_short and not target_short_tfs:
+                        target_short_tfs = [fallback_tf]
+
             aligned_short_tfs = get_aligned_tfs(start_tf, "DOWNTREND") if allowed_short else []
             _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
             target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
@@ -2251,17 +2306,7 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                     if _xl_tf_ema200 > 0 and tracker.live_price < _xl_tf_ema200:
                         target_short_tfs.append(_cur_xl_tf)
 
-            # ⚡ ALTCOIN FALLBACK: Khi BTC có tín hiệu (allowed_short/long=True)
-            # nhưng Altcoin chưa có TF nào aligned → force đặt limit theo BTC direction
-            if coin_name != "BTC" and not tracker.has_long and not tracker.has_short:
-                if allowed_long and not target_long_tfs:
-                    fallback_tf = best_tf if best_tf not in _blocked_tfs else "H4"
-                    if fallback_tf not in _blocked_tfs:
-                        target_long_tfs = [fallback_tf]
-                if allowed_short and not target_short_tfs:
-                    fallback_tf = best_tf if best_tf not in _blocked_tfs else "H4"
-                    if fallback_tf not in _blocked_tfs:
-                        target_short_tfs = [fallback_tf]
+
 
 
             # ⚡ Dedup target TFs (phòng thủ — tránh trùng lặp TF gây cancel/replace vô ích)
@@ -2298,20 +2343,19 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
             # --- XỬ LÝ LONG ---
             # 1. Hủy lệnh LONG cho các TF không còn nằm trong mục tiêu
-            for tf in TFS_ALL:
+            for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                 if tf not in target_long_tfs:
-                    if tracker.placed_entry_px_long_by_tf.get(tf, "---") != "---":
-                        try:
-                            long_orders_tf = [o for o in actual_pending
-                                              if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
-                                              and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "buy"]
-                            if long_orders_tf:
-                                client.request("POST", "/api/v5/trade/cancel-batch-orders",
-                                               body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
-                        except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
-                        tracker.placed_entry_px_long_by_tf[tf] = "---"
+                    try:
+                        long_orders_tf = [o for o in actual_pending
+                                          if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
+                                          and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "buy"]
+                        if long_orders_tf:
+                            client.request("POST", "/api/v5/trade/cancel-batch-orders",
+                                           body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                    tracker.placed_entry_px_long_by_tf[tf] = "---"
 
-                for tf in TFS_ALL:
+                for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                     try:
                         iso_orders = [o for o in actual_pending
                                       if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
@@ -2482,20 +2526,19 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 
             # --- XỬ LÝ SHORT ---
             # 1. Hủy lệnh SHORT cho các TF không còn nằm trong mục tiêu
-            for tf in TFS_ALL:
+            for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                 if tf not in target_short_tfs:
-                    if tracker.placed_entry_px_short_by_tf.get(tf, "---") != "---":
-                        try:
-                            short_orders_tf = [o for o in actual_pending
-                                               if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")
-                                               and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "sell"]
-                            if short_orders_tf:
-                                client.request("POST", "/api/v5/trade/cancel-batch-orders",
-                                               body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
-                        except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
-                        tracker.placed_entry_px_short_by_tf[tf] = "---"
+                    try:
+                        short_orders_tf = [o for o in actual_pending
+                                           if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")
+                                           and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "sell"]
+                        if short_orders_tf:
+                            client.request("POST", "/api/v5/trade/cancel-batch-orders",
+                                           body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
+                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                    tracker.placed_entry_px_short_by_tf[tf] = "---"
 
-                for tf in TFS_ALL:
+                for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                     try:
                         iso_orders = [o for o in actual_pending
                                       if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")

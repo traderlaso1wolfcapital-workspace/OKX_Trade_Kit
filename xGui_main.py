@@ -9,9 +9,48 @@ def setup_env():
         sys.path.insert(0, current_dir)
     os.environ['PYTHONUNBUFFERED'] = '1'
 
+def kill_zombie_bots():
+    """Tự động dọn dẹp các tiến trình bot chạy ngầm cũ của phiên trước"""
+    try:
+        import subprocess
+        if sys.platform == 'win32':
+            # Chỉ kill các tiến trình python đang chạy có đối số '--run-bot'
+            cmd = 'powershell -Command "Get-CimInstance Win32_Process -Filter \\"CommandLine like \'%--run-bot%\'\\" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"'
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.run("pkill -f -- '--run-bot'", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except:
+        pass
+
 def main():
     try:
         setup_env()
+        
+        # Nếu chạy chế độ bot con từ Popen trong môi trường dev
+        if len(sys.argv) >= 4 and sys.argv[1] == '--run-bot':
+            strategy = sys.argv[2]
+            env_file = sys.argv[3]
+            
+            # Thiết lập path tương thích
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            app_dir_app = os.path.join(current_dir, "TLS1_Trading_App")
+            if app_dir_app not in sys.path:
+                sys.path.insert(0, app_dir_app)
+                
+            sys.argv = [f"sys_bot_{strategy}.py", env_file]
+            import importlib
+            module_name = f"sys_bot_{strategy}"
+            try:
+                module = importlib.import_module(module_name)
+            except ImportError:
+                fallback_folder = f"z_bot_{strategy}"
+                module = importlib.import_module(f"{fallback_folder}.{module_name}")
+            sys.modules[module_name] = module
+            module.main()
+            return
+            
+        # Dọn sạch các tiến trình bot chạy ngầm cũ trước khi mở app chính
+        kill_zombie_bots()
         
         print("Đang khởi động TLS1 Trading App...")
         

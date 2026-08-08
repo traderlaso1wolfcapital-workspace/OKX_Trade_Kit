@@ -1131,7 +1131,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_start.installEventFilter(self.btn_start_hover)
         self.btn_start.clicked.connect(self.start_bot)
 
-        self.btn_stop = QtWidgets.QPushButton("🛑 DỪNG HOẠT ĐỘNG")
+        self.btn_stop = QtWidgets.QPushButton("■ DỪNG CHẠY BOT")
         self.btn_stop.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
         self.btn_stop.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.btn_stop.setStyleSheet("""
@@ -1159,7 +1159,36 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if not os.path.exists(svg_path):
             with open(svg_path, "w", encoding="utf-8") as f:
                 f.write(svg_content)
-        cb_style = f"QCheckBox {{ font-size: 11px; }} QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        cb_style = f"""
+            QCheckBox {{
+                font-size: 11px;
+                font-weight: bold;
+                color: #aaaaaa;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+                padding: 1px 4px 1px 2px;
+                background-color: #161616;
+            }}
+            QCheckBox:hover {{
+                border-color: #666666;
+                background-color: #222222;
+                color: #ffffff;
+            }}
+            QCheckBox:checked {{
+                border-color: #666666;
+                background-color: #161616;
+                color: #cccccc;
+            }}
+            QCheckBox::indicator {{
+                width: 11px;
+                height: 11px;
+                border: none;
+                background-color: transparent;
+            }}
+            QCheckBox::indicator:checked {{
+                image: url({svg_path});
+            }}
+        """
         
         self.dash_chk_xau = QtWidgets.QCheckBox("XAU")
         self.dash_chk_xau.setStyleSheet(cb_style)
@@ -1221,6 +1250,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
             QTabBar::tab:hover { background: #333333; color: #ffffff; }
         """)
 
+        # Khởi tạo ô chế độ layout Chế độ dọc/ngang trước để chèn vào log_header
+        self.combo_layout_mode = QtWidgets.QComboBox()
+        self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"])
+        self.combo_layout_mode.setCurrentText("Chế độ dọc")
+        self.combo_layout_mode.setStyleSheet("QComboBox { padding: 2px 5px; font-weight: bold; font-size: 11px; min-width: 100px; }")
+        self.combo_layout_mode.setFixedWidth(110)
+
         # Tab 1: Logs
         self.tab_logs = QtWidgets.QWidget()
         console_layout = QtWidgets.QVBoxLayout(self.tab_logs)
@@ -1236,6 +1272,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         log_header.addWidget(self.lbl_uptime)
         
         log_header.addStretch(1)
+        log_header.addWidget(self.combo_layout_mode) # Đặt ô Dọc/Ngang ở bên phải cùng hàng Terminal Logs
         
         btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
         btn_clear_log.setStyleSheet("max-width: 100px; padding: 5px;")
@@ -1272,8 +1309,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.combo_coin.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
         
         self.combo_tf = QtWidgets.QComboBox()
-        self.combo_tf.setFixedWidth(45)
-        self.combo_tf.addItems(["1m", "5m", "15m", "1H", "4H", "1D"])
+        self.combo_tf.setFixedWidth(50)
+        self.combo_tf.addItems(["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"])
         self.combo_tf.setCurrentText("4H")
         self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px; min-width: 0px;")
         
@@ -1382,20 +1419,43 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.tab_positions.setFixedHeight(148)
         chart_layout.addWidget(self.tab_positions)
 
+        # Khởi tạo Khung thời gian giao dịch ở Dashboard dưới dạng container để nhét vào TopRightCorner
+        self.dash_tfs_container = QtWidgets.QWidget()
+        self.dash_tfs_container.setStyleSheet("background-color: transparent;")
+        l_tfs = QtWidgets.QHBoxLayout(self.dash_tfs_container)
+        l_tfs.setContentsMargins(5, 0, 5, 0)
+        l_tfs.setSpacing(8)
+        
+        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style); self.chk_tf_m5.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style); self.chk_tf_m15.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style); self.chk_tf_m30.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style); self.chk_tf_h1.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style); self.chk_tf_h2.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style); self.chk_tf_h4.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        
+        l_tfs.addWidget(self.chk_tf_m5)
+        l_tfs.addWidget(self.chk_tf_m15)
+        l_tfs.addWidget(self.chk_tf_m30)
+        l_tfs.addWidget(self.chk_tf_h1)
+        l_tfs.addWidget(self.chk_tf_h2)
+        l_tfs.addWidget(self.chk_tf_h4)
+        
+        # Kết nối sự kiện lưu ngầm khi check/uncheck
+        for chk in [self.chk_tf_m5, self.chk_tf_m15, self.chk_tf_m30, self.chk_tf_h1, self.chk_tf_h2, self.chk_tf_h4]:
+            chk.stateChanged.connect(self._on_dash_tf_changed)
+            
+        if self.strategy_id == "sub2":
+            self.dash_tfs_container.hide()
+
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
         self.split_view.addWidget(self.tab_logs)
-        self.split_view.setSizes([850, 150])
+        self.split_view.setSizes([500, 500])
         self.split_view.setStretchFactor(0, 1)
-        self.split_view.setStretchFactor(1, 0)
+        self.split_view.setStretchFactor(1, 1)
 
         self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
-        self.combo_layout_mode = QtWidgets.QComboBox()
-        self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"])
-        self.combo_layout_mode.setCurrentText("Chế độ dọc")
-        self.combo_layout_mode.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
-        
         def on_layout_mode_changed(text):
             if not hasattr(self, 'split_view') or self.split_view is None:
                 return
@@ -1405,7 +1465,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.split_view.setSizes([600, 400])
             else:
                 self.split_view.setOrientation(QtCore.Qt.Orientation.Vertical)
-                self.split_view.setSizes([850, 150])
+                self.split_view.setSizes([500, 500])
                 
             if hasattr(self, 'chk_show_positions'):
                 self.tab_positions.setVisible(self.chk_show_positions.isChecked())
@@ -1419,12 +1479,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         right_corner = QtWidgets.QWidget()
         rc_layout = QtWidgets.QHBoxLayout(right_corner)
         rc_layout.setContentsMargins(0, 0, 8, 2)
-        rc_layout.setSpacing(8)
+        rc_layout.setSpacing(14)
         
         rc_layout.addWidget(self.combo_coin)
         rc_layout.addWidget(self.combo_tf)
-        rc_layout.addWidget(self.combo_layout_mode)
         
+        # Nhét thanh checkbox Khung thời gian vào trước
+        if hasattr(self, 'dash_tfs_container'):
+            rc_layout.addWidget(self.dash_tfs_container)
+            
         if hasattr(self, 'btn_open_settings'):
             self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
             self.btn_open_settings.setStyleSheet("""
@@ -2177,25 +2240,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addWidget(grp_active_coins)
         grp_active_coins.hide()
 
-                # 0.2. KHUNG THỜI GIAN GIAO DỊCH
-        grp_tfs = QtWidgets.QGroupBox("Khung Thời Gian Giao Dịch")
-        grp_tfs.setStyleSheet("QGroupBox { border: 1px solid #555555; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; top: -7px; left: 10px; padding: 0 5px; color: #aaaaaa; font-weight: bold; }")
-        l_tfs = QtWidgets.QHBoxLayout(grp_tfs)
-        
-        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style)
-        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style)
-        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style)
-        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style)
-        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style)
-        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style)
-        
-        l_tfs.addWidget(self.chk_tf_m5)
-        l_tfs.addWidget(self.chk_tf_m15)
-        l_tfs.addWidget(self.chk_tf_m30)
-        l_tfs.addWidget(self.chk_tf_h1)
-        l_tfs.addWidget(self.chk_tf_h2)
-        l_tfs.addWidget(self.chk_tf_h4)
-        layout.addWidget(grp_tfs)
+
 
         # 1. CÔNG TẮC CHIẾN THUẬT
         grp_toggles = QtWidgets.QGroupBox("Công Tắc Chiến Thuật")
@@ -2501,6 +2546,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
     def load_current_settings(self):
         if self.strategy_id in ["trinhsat", "quansu"]:
             return
+        self._is_loading_settings = True
         env_file = self.get_selected_env()
         acc_name = self.get_acc_name()
 
@@ -2614,6 +2660,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     self.smc_input_ob_max.setValue(int(cfg.get("OB_MAX_COUNT", getattr(bot_config, "OB_MAX_COUNT", 20))))
                 except AttributeError:
                     pass
+                self._is_loading_settings = False
                 return
 
             
@@ -2675,6 +2722,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.dash_chk_xau.setChecked("XAU" in enabled_coins)
         except Exception as e: 
             print('Error setting defaults:', e)
+        self._is_loading_settings = False
 
     def _on_dash_coin_toggled(self, coin, state):
         """Đồng bộ checkbox trên Dashboard xuống Cấu Hình (cả Sub 1 & Sub 2) và lưu tự động."""
@@ -2713,6 +2761,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 json.dump(cfg, f, indent=4)
         except Exception as e:
             print("Lỗi auto-save ENABLED_COINS:", e)
+
+    def _on_dash_tf_changed(self):
+        if getattr(self, '_is_loading_settings', False):
+            return
+        self.save_strategy_settings(silent=True)
 
     def play_sound(self, sound_file, volume=0.5):
         try:
@@ -2864,15 +2917,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
             msg.setText(f"🔑 Đã xác thực và lưu API Key thành công cho [{bot_label}] ({env_file})!")
         msg.exec()
 
-    def save_strategy_settings(self):
-        self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
+    def save_strategy_settings(self, silent=False):
+        if not silent:
+            self.play_sound("universfield-cinematic-impact-hit-352702.mp3", 0.6)
         env_file = self.get_selected_env()
         if not env_file:
-            msg = QtWidgets.QMessageBox(self)
-            msg.setIcon(QtWidgets.QMessageBox.Warning)
-            msg.setWindowTitle("Lỗi")
-            msg.setText("Vui lòng chọn Tài khoản (API Key) ở góc trái màn hình trước khi Lưu cấu hình!")
-            msg.exec()
+            if not silent:
+                msg = QtWidgets.QMessageBox(self)
+                msg.setIcon(QtWidgets.QMessageBox.Warning)
+                msg.setWindowTitle("Lỗi")
+                msg.setText("Vui lòng chọn Tài khoản (API Key) ở góc trái màn hình trước khi Lưu cấu hình!")
+                msg.exec()
             return
         acc_name = self.get_acc_name()
         json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
@@ -2972,10 +3027,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 if hasattr(self, 'chk_cfg_xau'): self.dash_chk_xau.setChecked(self.chk_cfg_xau.isChecked())
             
         bot_label = "Bot Sub 2 (SMC)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
-        msg = QtWidgets.QMessageBox(self)
-        msg.setWindowTitle("Thành Công")
-        msg.setText(f"⚙️ Đã lưu Cấu Hình Chiến Thuật cho [{bot_label}] ({env_file}) thành công!\n\nFile lưu: {os.path.basename(config_path)}")
-        msg.exec()
+        if not silent:
+            msg = QtWidgets.QMessageBox(self)
+            msg.setWindowTitle("Thành Công")
+            msg.setText(f"⚙️ Đã lưu Cấu Hình Chiến Thuật cho [{bot_label}] ({env_file}) thành công!\n\nFile lưu: {os.path.basename(config_path)}")
+            msg.exec()
 
     def _verify_env_security(self, env_path):
         global CURRENT_UID
@@ -3716,7 +3772,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("<span style='color: white;'>Phát hành bởi cộng đồng: TRADER LÀ SỐ 1 - VIỆT NAM</span>")
+        title = QtWidgets.QLabel("<span style='color: white;'>TRADER LÀ SỐ 1 - VIỆT NAM</span>")
         title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
         header_layout.addWidget(title)
         
@@ -3774,7 +3830,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.bot_tabs.setCornerWidget(self.lbl_main_welcome, QtCore.Qt.Corner.TopRightCorner)
         main_layout.addWidget(self.bot_tabs)
 
-        self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Main)", self.api_files)
+        self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Sub 1)", self.api_files)
         self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.api_files)
         self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC (Sub 2)", self.api_files)
         # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)

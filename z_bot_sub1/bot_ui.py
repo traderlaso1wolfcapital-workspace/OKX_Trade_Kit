@@ -556,50 +556,51 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         is_first = False
         for line in lines:
             print(line)  # Dùng print thay smart_print để không bị wrap ╭─/╰─
-    print("\n☯ Lịch sử lệnh vừa đóng:")
-    has_closed_history = False
-    for cfg in COIN_PORTFOLIO:
-        sid = cfg["swap"]
-        coin_name = cfg["coin"]
-        if sid not in state_matrix: continue
-        tk = state_matrix[sid]
-        closed_list = getattr(tk, "closed_history", [])
-        if closed_list:
-            has_closed_history = True
-            recent = closed_list[-1:]
-            for entry in reversed(recent):
-                pnl_color = "+" if entry["roi"] > 0 else ""
-                roi_str = f"{pnl_color}{entry['roi']:.1f}%"
-                raw_dca = entry.get('dca_tfs', '')
-                if raw_dca:
-                    clean_dca = " ".join([fmt_tf(t) for t in raw_dca.replace(" + ", " ").split()])
-                    dca_str = f" cụm DCA [{clean_dca}]"
-                else:
-                    dca_str = ""
-                mode_icon = entry.get("mode_icon", "")
-                icon_str = f" {mode_icon}" if mode_icon else ""
-                
-                clean_reason = str(entry.get('reason', ''))
-                if "[Exchange_TP_Hit]" in clean_reason or "[Exchange_SL_Hit]" in clean_reason:
-                    clean_reason = clean_reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
+    if False: # Tạm thời ẩn Lịch sử lệnh vừa đóng theo yêu cầu CEO
+        print("\n☯ Lịch sử lệnh vừa đóng:")
+        has_closed_history = False
+        for cfg in COIN_PORTFOLIO:
+            sid = cfg["swap"]
+            coin_name = cfg["coin"]
+            if sid not in state_matrix: continue
+            tk = state_matrix[sid]
+            closed_list = getattr(tk, "closed_history", [])
+            if closed_list:
+                has_closed_history = True
+                recent = closed_list[-1:]
+                for entry in reversed(recent):
+                    pnl_color = "+" if entry["roi"] > 0 else ""
+                    roi_str = f"{pnl_color}{entry['roi']:.1f}%"
+                    raw_dca = entry.get('dca_tfs', '')
+                    if raw_dca:
+                        clean_dca = " ".join([fmt_tf(t) for t in raw_dca.replace(" + ", " ").split()])
+                        dca_str = f" cụm DCA [{clean_dca}]"
+                    else:
+                        dca_str = ""
+                    mode_icon = entry.get("mode_icon", "")
+                    icon_str = f" {mode_icon}" if mode_icon else ""
+                    
+                    clean_reason = str(entry.get('reason', ''))
+                    if "[Exchange_TP_Hit]" in clean_reason or "[Exchange_SL_Hit]" in clean_reason:
+                        clean_reason = clean_reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
+                        reason_disp = f"→ {clean_reason}" if clean_reason else ""
+                    else:
+                        reason_disp = f"→ Lý do: {clean_reason}"
+                    
+                    smart_print(f"  ✧{icon_str} [{coin_name}]: Đã đóng {entry['side']} ({roi_str}){dca_str} {reason_disp}")
+            elif getattr(tk, "last_closed_side", ""):
+                has_closed_history = True
+                pnl_color = "+" if tk.last_closed_roi > 0 else ""
+                roi_str = f"{pnl_color}{tk.last_closed_roi:.1f}%"
+                reason = getattr(tk, "last_closed_reason", "Không rõ")
+                if "[Exchange_TP_Hit]" in reason or "[Exchange_SL_Hit]" in reason:
+                    clean_reason = reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
                     reason_disp = f"→ {clean_reason}" if clean_reason else ""
                 else:
-                    reason_disp = f"→ Lý do: {clean_reason}"
-                
-                smart_print(f"  ✧{icon_str} [{coin_name}]: Đã đóng {entry['side']} ({roi_str}){dca_str} {reason_disp}")
-        elif getattr(tk, "last_closed_side", ""):
-            has_closed_history = True
-            pnl_color = "+" if tk.last_closed_roi > 0 else ""
-            roi_str = f"{pnl_color}{tk.last_closed_roi:.1f}%"
-            reason = getattr(tk, "last_closed_reason", "Không rõ")
-            if "[Exchange_TP_Hit]" in reason or "[Exchange_SL_Hit]" in reason:
-                clean_reason = reason.replace("[Exchange_TP_Hit]", "").replace("[Exchange_SL_Hit]", "").strip()
-                reason_disp = f"→ {clean_reason}" if clean_reason else ""
-            else:
-                reason_disp = f"→ Lý do: {reason}"
-            smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) {reason_disp}")
-    if not has_closed_history:
-        smart_print("  · Chưa có lệnh nào được đóng trong phiên này.")
+                    reason_disp = f"→ Lý do: {reason}"
+                smart_print(f"  ✧ [{coin_name}]: Đã đóng {tk.last_closed_side} ({roi_str}) {reason_disp}")
+        if not has_closed_history:
+            smart_print("  · Chưa có lệnh nào được đóng trong phiên này.")
     print("")
     for line in table_lines:
         print(line)

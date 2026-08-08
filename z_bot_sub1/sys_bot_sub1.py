@@ -36,6 +36,12 @@ except ModuleNotFoundError:
     print("⚠️ [CẢNH BÁO]: Thiếu psutil. Single Instance Lock bị vô hiệu hóa.")
 
 # ==============================================================================
+# Tự động thêm thư mục gốc dự án vào sys.path để hỗ trợ import z_bot_sub1 khi di chuyển file
+_file_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(_file_dir) in ["z_bot_sub1", "z_bot_sub2"]:
+    _parent_dir = os.path.dirname(_file_dir)
+    if _parent_dir not in sys.path:
+        sys.path.insert(0, _parent_dir)
 
 # ==============================================================================
 from z_bot_sub1.bot_models import AssetTracker
@@ -99,6 +105,8 @@ def main():
         CURRENT_DIR = os.path.dirname(sys.executable)
     else:
         CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+        if os.path.basename(CURRENT_DIR) in ["z_bot_sub1", "z_bot_sub2"]:
+            CURRENT_DIR = os.path.dirname(CURRENT_DIR)
 
     env_arg = sys.argv[1] if len(sys.argv) > 1 else ".api_sub1"
     env_basename = os.path.basename(env_arg)

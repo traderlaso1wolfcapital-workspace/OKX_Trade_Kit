@@ -290,22 +290,23 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict, system_c
             print(l)
     
     # 5. ☯ LỊCH SỬ LỆNH VỪA ĐÓNG:
-    print("\n☯ Lịch sử lệnh vừa đóng:")
-    has_closed = False
-    for symbol, tracker in sorted_trackers.items():
-        coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
-        closed_list = getattr(tracker, "closed_history", [])
-        if closed_list:
-            has_closed = True
-            for entry in reversed(closed_list[-3:]):
-                pnl_val = entry.get("pnl", 0.0)
-                roi_val = entry.get("roi", 0.0)
-                pnl_str = f"Lời +{pnl_val:.2f}$" if pnl_val >= 0 else f"Lỗ {pnl_val:.2f}$"
-                side = entry.get("side", "LONG")
-                dca_str = f" cụm DCA [{entry['dca']}]" if entry.get("dca") else ""
-                print(f"  ✧ · [{coin}]: Đã đóng {side} ({roi_val:+.1f}%){dca_str} → {pnl_str}")
-    
-    if not has_closed:
-        print("  · Chưa có lệnh nào được đóng trong phiên này.")
+    if False: # Tạm thời ẩn Lịch sử lệnh vừa đóng theo yêu cầu CEO
+        print("\n☯ Lịch sử lệnh vừa đóng:")
+        has_closed = False
+        for symbol, tracker in sorted_trackers.items():
+            coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
+            closed_list = getattr(tracker, "closed_history", [])
+            if closed_list:
+                has_closed = True
+                for entry in reversed(closed_list[-3:]):
+                    pnl_val = entry.get("pnl", 0.0)
+                    roi_val = entry.get("roi", 0.0)
+                    pnl_str = f"Lời +{pnl_val:.2f}$" if pnl_val >= 0 else f"Lỗ {pnl_val:.2f}$"
+                    side = entry.get("side", "LONG")
+                    dca_str = f" cụm DCA [{entry['dca']}]" if entry.get("dca") else ""
+                    print(f"  ✧ · [{coin}]: Đã đóng {side} ({roi_val:+.1f}%){dca_str} → {pnl_str}")
+        
+        if not has_closed:
+            print("  · Chưa có lệnh nào được đóng trong phiên này.")
     print("=" * 78 + "\n")
 
