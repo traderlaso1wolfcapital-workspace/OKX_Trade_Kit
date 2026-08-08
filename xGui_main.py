@@ -33,7 +33,7 @@ def main():
             
             # Thiết lập path tương thích
             current_dir = os.path.dirname(os.path.abspath(__file__))
-            app_dir_app = os.path.join(current_dir, "TLS1_Trading_App")
+            app_dir_app = os.path.join(current_dir, "desktop_app")
             if app_dir_app not in sys.path:
                 sys.path.insert(0, app_dir_app)
                 
@@ -41,10 +41,14 @@ def main():
             import importlib
             module_name = f"sys_bot_{strategy}"
             try:
-                module = importlib.import_module(module_name)
+                # Cấu trúc mới
+                module = importlib.import_module(f"bots.{strategy}.{module_name}")
             except ImportError:
-                fallback_folder = f"z_bot_{strategy}"
-                module = importlib.import_module(f"{fallback_folder}.{module_name}")
+                try:
+                    module = importlib.import_module(module_name)
+                except ImportError:
+                    fallback_folder = f"z_bot_{strategy}"
+                    module = importlib.import_module(f"{fallback_folder}.{module_name}")
             sys.modules[module_name] = module
             module.main()
             return
@@ -55,7 +59,7 @@ def main():
         print("Đang khởi động TLS1 Trading App...")
         
         # Import và chạy giao diện chính
-        from TLS1_Trading_App import gui_main
+        from desktop_app import gui_main
         gui_main.main()
         
         pass

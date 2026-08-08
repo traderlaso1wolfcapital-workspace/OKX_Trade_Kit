@@ -1,0 +1,776 @@
+/* ============================================
+   TLS1 TRADING WEB - GLOBAL STYLESHEET
+   Clone y hệt Desktop App (PyQt6 gui_main.py)
+   ============================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  overflow: hidden;
+  height: 100vh;
+  font-size: 13px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #666; }
+
+/* ============= LAYOUT ============= */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #1a1a1a;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.content-wrapper {
+  display: flex;
+  flex: 1;
+  width: 100vw;
+  overflow: hidden;
+  flex-direction: row;
+}
+
+/* ============= SIDEBAR TRÁI ============= */
+.sidebar-left {
+  width: 280px;
+  min-width: 280px;
+  background-color: #252526;
+  border-right: 1px solid #3d3d3d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 14px 15px 12px;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #3d3d3d;
+  text-align: center;
+}
+.app-title {
+  color: #ff9900;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.app-subtitle {
+  color: #888;
+  font-size: 10px;
+  margin-top: 2px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.sidebar-content {
+  flex: 1;
+  padding: 12px 12px 8px;
+  overflow-y: auto;
+}
+
+/* ============= GROUP BOX ============= */
+.group-box {
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 18px 10px 10px 10px;
+  margin-bottom: 14px;
+  position: relative;
+  background-color: #2a2a2a;
+}
+.group-box-title {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  background-color: #252526;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ============= STYLED SELECT ============= */
+.styled-select {
+  background-color: #2d2d2d;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-family: "Segoe UI", sans-serif;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.styled-select:hover { border-color: #ffb74d; }
+.styled-select option {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+}
+
+/* ============= TF BADGE BUTTONS ============= */
+.tf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.tf-badge-btn {
+  font-size: 11px;
+  font-weight: bold;
+  color: #aaaaaa;
+  border: 1px solid #3d3d3d;
+  border-radius: 3px;
+  padding: 4px 2px;
+  background-color: #161616;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  font-family: "Segoe UI", sans-serif;
+}
+.tf-badge-btn:hover {
+  border-color: #666;
+  background-color: #222;
+  color: #fff;
+}
+.tf-badge-btn.checked {
+  border-color: #666;
+  background-color: #1a3a1a;
+  color: #4CAF50;
+}
+
+/* ============= STATUS ROW ============= */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-led {
+  font-size: 14px;
+  color: #FF3333;
+}
+.status-led.running { color: #4CAF50; }
+.status-text {
+  font-size: 12px;
+  font-weight: bold;
+  color: #ccc;
+  font-family: "Consolas", monospace;
+}
+
+/* ============= SIDEBAR FOOTER (Buttons) ============= */
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid #3d3d3d;
+  background-color: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-control {
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 7px 10px;
+  min-height: 30px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: "Segoe UI", sans-serif;
+  width: 100%;
+  text-align: center;
+}
+.btn-start {
+  background-color: #2E7D32;
+}
+.btn-start:hover:not(:disabled) {
+  background-color: #388E3C;
+  border-color: #ffaa00;
+}
+.btn-start:disabled {
+  background-color: #555;
+  color: #888;
+  border-color: #444;
+  cursor: not-allowed;
+}
+.btn-stop {
+  background-color: #C62828;
+}
+.btn-stop:hover:not(:disabled) {
+  background-color: #D32F2F;
+  border-color: #ffaa00;
+}
+.btn-stop:disabled {
+  background-color: #555;
+  color: #888;
+  border-color: #444;
+  cursor: not-allowed;
+}
+.btn-settings {
+  background-color: #2d2d2d;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 5px 10px;
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn-settings:hover {
+  background-color: #ff9900;
+  color: #000;
+  border-color: #ff9900;
+}
+
+/* ============= WORKSPACE PHẢI ============= */
+.main-workspace {
+  display: flex;
+  flex: 1;
+  height: 100vh;
+  overflow: hidden;
+}
+.main-workspace.vertical { flex-direction: column; }
+.main-workspace.horizontal { flex-direction: row; }
+
+/* ============= PANE CHART ============= */
+.pane-chart {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #131722;
+}
+.main-workspace.vertical .pane-chart {
+  height: 60%;
+  border-bottom: 1px solid #333;
+}
+.main-workspace.horizontal .pane-chart {
+  width: 60%;
+  border-right: 1px solid #333;
+}
+
+.pane-titlebar {
+  height: 26px;
+  background-color: #1a1a2e;
+  border-bottom: 1px solid #333;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: #8e8e93;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.chart-wrapper {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 26px);
+  overflow: hidden;
+}
+
+/* ============= PANE TABS (Logs + Positions) ============= */
+.pane-tabs {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #1e1e1e;
+}
+.main-workspace.vertical .pane-tabs {
+  height: 40%;
+}
+.main-workspace.horizontal .pane-tabs {
+  width: 40%;
+}
+
+.tab-bar-header {
+  height: 30px;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.tab-buttons { display: flex; height: 100%; }
+.tab-btn {
+  background: #1a1a1a;
+  border: none;
+  border-right: 1px solid #333;
+  color: #a0a0a0;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  padding: 0 16px;
+  cursor: pointer;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.tab-btn:hover {
+  background-color: #333;
+  color: #fff;
+}
+.tab-btn.active {
+  background-color: #2d2d2d;
+  color: #FF9900;
+  border-bottom: 2px solid #FF9900;
+}
+
+/* Status Badge */
+.status-badge {
+  font-size: 11px;
+  font-weight: bold;
+  font-family: "Consolas", monospace;
+  padding: 2px 8px;
+}
+.status-badge.stopped { color: #FF3333; }
+.status-badge.running { color: #4CAF50; }
+
+/* ============= LOG TERMINAL ============= */
+.tab-content {
+  flex: 1;
+  overflow: hidden;
+}
+.logs-terminal {
+  background-color: #0d0d0d;
+  color: #c8c8c8;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  height: 100%;
+}
+.log-line {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-bottom: 1px solid #111;
+  padding: 1px 0;
+}
+
+/* ============= POSITIONS TABLE ============= */
+.positions-table-wrapper {
+  background-color: #1a1a1a;
+  overflow-y: auto;
+  height: 100%;
+}
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.positions-table th {
+  background-color: #2b2b2b;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 6px 10px;
+  border: 1px solid #333;
+  font-size: 13px;
+  position: sticky;
+  top: 0;
+}
+.positions-table td {
+  padding: 7px 10px;
+  border: 1px solid #333;
+  color: #ffffff;
+  background-color: #1a1a1a;
+}
+.positions-table tr:hover td {
+  background-color: #162e3b;
+}
+
+/* ============= UTILITIES ============= */
+.flex { display: flex; }
+.align-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.text-green { color: #4CAF50 !important; }
+.text-red { color: #ef5350 !important; }
+.font-bold { font-weight: bold; }
+.text-center { text-align: center; }
+
+/* ============= SETTINGS MODAL ============= */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background-color: #1e1e1e;
+  border: 1px solid #555;
+  border-radius: 6px;
+  width: 420px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.15s ease-out;
+}
+.modal-header {
+  background-color: #252526;
+  border-bottom: 1px solid #333;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h3 { font-size: 13px; font-weight: bold; color: #fff; }
+.close-btn {
+  background: transparent; border: none;
+  color: #888; font-size: 20px; cursor: pointer; line-height: 1;
+}
+.close-btn:hover { color: #fff; }
+.modal-body { padding: 16px; }
+.form-group { margin-bottom: 12px; }
+.form-group label {
+  display: block; font-size: 11px; color: #888; margin-bottom: 4px;
+}
+.styled-input {
+  background-color: #2d2d2d; color: #e0e0e0;
+  border: 1px solid #555; border-radius: 4px;
+  padding: 6px 10px; font-size: 12px; outline: none; width: 100%;
+  font-family: "Consolas", monospace;
+}
+.modal-footer {
+  background-color: #1a1a1a;
+  border-top: 1px solid #333;
+  padding: 10px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn-primary {
+  background-color: #ff9900; color: #000;
+  font-weight: bold; border: none; border-radius: 4px;
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+}
+.btn-primary:hover { background-color: #e08800; }
+.btn-secondary {
+  background-color: #2d2d2d; color: #e0e0e0;
+  border: 1px solid #555; border-radius: 4px;
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+}
+.btn-secondary:hover { background-color: #333; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ============= CẤU HÌNH CHIẾN THUẬT & API (SETTINGS) ============= */
+.settings-modal {
+  width: 650px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.settings-tab-bar {
+  display: flex;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+.settings-tab-btn {
+  flex: 1;
+  background: transparent;
+  color: #a0a0a0;
+  border: none;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.settings-tab-btn:hover { background-color: #252526; color: #fff; }
+.settings-tab-btn.active { color: #ff9900; border-bottom: 2px solid #ff9900; }
+
+.settings-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px;
+  background-color: #1e1e1e;
+}
+
+.settings-group {
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 18px 12px 12px 12px;
+  margin-bottom: 16px;
+  position: relative;
+  background-color: #252526;
+}
+.settings-group-title {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  background-color: #1e1e1e;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.btn-add-acc, .btn-del-acc {
+  width: 32px;
+  height: 30px;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-add-acc { background-color: #28a745; }
+.btn-del-acc { background-color: #dc3545; }
+
+.btn-audit {
+  background-color: #2d2d2d;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.btn-audit:hover { background-color: #444; }
+
+.hwid-value {
+  color: #00ffff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Toggle Switch Clone */
+.toggle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 20px;
+  margin-right: 6px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #555;
+  transition: .2s;
+  border-radius: 10px;
+}
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px; width: 16px;
+  left: 2px; bottom: 2px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+.toggle-switch input:checked + .toggle-slider { background-color: #4CAF50; }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(30px); }
+.toggle-label {
+  position: absolute;
+  right: 6px;
+  top: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  color: white;
+  pointer-events: none;
+}
+.toggle-switch input:checked ~ .toggle-label {
+  left: 6px;
+  right: auto;
+}
+.toggle-name { font-weight: bold; color: #e0e0e0; font-size: 12px;}
+.toggle-desc { display: none; }
+
+/* Risk Grid */
+.risk-grid {
+  display: grid;
+  gap: 10px;
+}
+.risk-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.risk-row label { color: #e0e0e0; font-size: 12px; }
+.risk-row input { width: 100px; text-align: right; }
+
+/* ============= MOBILE RESPONSIVE ============= */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .content-wrapper {
+    flex-direction: column !important;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Chart workspace luôn hiện trước (order: 1) */
+  .main-workspace {
+    width: 100% !important;
+    order: 1;
+    flex-direction: column !important;
+    height: auto !important;
+    flex-shrink: 0;
+  }
+
+  .main-workspace .pane-chart {
+    width: 100% !important;
+    height: 340px !important;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+
+  .main-workspace .pane-tabs {
+    width: 100% !important;
+    height: 220px !important;
+    flex-shrink: 0;
+  }
+
+  /* Sidebar controls xuống dưới (order: 2) */
+  .sidebar-left {
+    width: 100% !important;
+    min-width: unset;
+    border-right: none;
+    border-top: 1px solid #333;
+    height: auto;
+    order: 2;
+    flex-shrink: 0;
+  }
+  
+  .sidebar-header {
+    display: none;
+  }
+
+  .sidebar-content {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: visible;
+  }
+
+  .group-box {
+    margin-bottom: 0;
+  }
+
+  .sidebar-footer {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 10px;
+    border-top: 1px solid #3d3d3d;
+  }
+
+  .sidebar-footer .btn-start {
+    flex: 2;
+    margin: 0;
+    font-size: 11px;
+    padding: 8px 4px;
+    white-space: nowrap;
+  }
+
+  .sidebar-footer .btn-stop {
+    flex: 1.5;
+    margin: 0;
+    font-size: 11px;
+    padding: 8px 4px;
+    white-space: nowrap;
+  }
+
+  .sidebar-footer .btn-settings {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 11px;
+    width: auto;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+
+  /* Select lon hon tren mobile de de bam */
+  .styled-select {
+    font-size: 14px;
+    padding: 6px 8px;
+  }
+
+  /* TF grid 3 cot giu nguyen nhung lon hon */
+  .tf-badge-btn {
+    font-size: 12px;
+    padding: 6px 2px;
+  }
+
+  /* Status compact */
+  .status-text { font-size: 11px; }
+
+  /* Log font nho hon tren mobile */
+  .logs-terminal { font-size: 11px; }
+
+  /* Positions table scroll ngang */
+  .positions-table-wrapper { overflow-x: auto; }
+  .positions-table { min-width: 600px; }
+
+  /* Modal full screen tren mobile */
+  .modal-content {
+    width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Pane titlebar nho hon */
+  .pane-titlebar { font-size: 10px; }
+
+  /* Tab text nho hon */
+  .tab-btn { font-size: 11px; padding: 0 10px; }
+  
+  /* Modal setting tren mobile -> 1 cot toggle cho de nhin */
+  .toggle-grid { grid-template-columns: 1fr; gap: 8px; }
+}

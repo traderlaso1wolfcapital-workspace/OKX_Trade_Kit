@@ -212,6 +212,9 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[09/08/2026]** - Tạo script launcher zRun_Web.bat hỗ trợ chạy giao diện Web:
+  - **Cập nhật:** Tạo file `zRun_Web.bat` ở gốc dự án, tự động kiểm tra/cài đặt `node_modules` cho frontend Next.js, và chạy song song FastAPI backend (port 8000) cùng Next.js frontend (port 3000) để phục vụ việc xem và kiểm thử giao diện Web.
+
 - **[09/08/2026]** - Bổ sung khung thời gian "2H" vào menu chọn nến chart (combo_tf):
   - **Nguyên nhân:** Thiếu khung thời gian `2H` trong menu dropdown chọn hiển thị biểu đồ nến chính của Dashboard, làm giảm trải nghiệm phân tích kỹ thuật của người dùng.
   - **Cập nhật:** Bổ sung `"2H"` vào list items của `self.combo_tf` và tăng chiều rộng cố định lên `50px` để hiển thị vừa vặn, hỗ trợ xem nến 2h trực tiếp đồng bộ với backend.
