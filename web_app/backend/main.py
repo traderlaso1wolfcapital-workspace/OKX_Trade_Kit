@@ -81,7 +81,8 @@ async def log_reader_task(stream, strategy):
     queue = bot_log_queues[strategy]
     try:
         while True:
-            line = await stream.readline()
+            # stream from subprocess.Popen is blocking, so use to_thread
+            line = await asyncio.to_thread(stream.readline)
             if not line:
                 break
             line_str = line.decode("utf-8", errors="replace").rstrip("\n")

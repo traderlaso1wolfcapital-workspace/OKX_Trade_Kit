@@ -650,22 +650,6 @@ function App() {
               {settingsTab === "strategy" && (
                 <div>
                   
-                  {/* Danh Mục Giao Dịch */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Danh Mục Giao Dịch</div>
-                    <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
-                      <label style={{ color: "#fff", display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "bold" }}>
-                        <input type="checkbox" checked={activeCoinsCfg.xau} onChange={e => setActiveCoinsCfg({...activeCoinsCfg, xau: e.target.checked})} style={{ width: "16px", height: "16px" }} /> XAU-USDT-SWAP
-                      </label>
-                      <label style={{ color: "#fff", display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "bold" }}>
-                        <input type="checkbox" checked={activeCoinsCfg.btc} onChange={e => setActiveCoinsCfg({...activeCoinsCfg, btc: e.target.checked})} style={{ width: "16px", height: "16px" }} /> BTC-USDT-SWAP
-                      </label>
-                      <label style={{ color: "#fff", display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "bold" }}>
-                        <input type="checkbox" checked={activeCoinsCfg.eth} onChange={e => setActiveCoinsCfg({...activeCoinsCfg, eth: e.target.checked})} style={{ width: "16px", height: "16px" }} /> ETH-USDT-SWAP
-                      </label>
-                    </div>
-                  </div>
-
                   {selectedAccount === "sub1" ? (
                     <>
                       {/* Công Tắc Chiến Thuật EMA200 */}
