@@ -761,6 +761,11 @@ body {
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;  /* chặn kéo dọc trên mobile */
     position: relative;   /* giữ cố định vị trí trong layout */
+    scrollbar-width: none; /* Ẩn scrollbar Firefox */
+    -ms-overflow-style: none; /* Ẩn scrollbar IE/Edge */
+  }
+  .positions-table-wrapper::-webkit-scrollbar {
+    display: none; /* Ẩn scrollbar Chrome/Safari/Webkit */
   }
   .positions-table { min-width: 600px; }
 

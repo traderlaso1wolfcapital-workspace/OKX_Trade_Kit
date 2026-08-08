@@ -3,9 +3,9 @@ import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
 import "./App.css";
 
 const COIN_LIST = [
+  { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
   { label: "BTC-USDT", value: "BTC-USDT-SWAP" },
   { label: "ETH-USDT", value: "ETH-USDT-SWAP" },
-  { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
   { label: "SOL-USDT", value: "SOL-USDT-SWAP" },
   { label: "XRP-USDT", value: "XRP-USDT-SWAP" },
 ];
