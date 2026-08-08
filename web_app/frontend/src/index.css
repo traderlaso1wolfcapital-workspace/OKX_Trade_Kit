@@ -663,7 +663,7 @@ body {
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: 340px !important;
+    height: 380px !important; /* Tăng thêm diện tích cho chart nến */
     border-right: none;
     border-bottom: 1px solid #333;
     flex-shrink: 0;
@@ -671,7 +671,7 @@ body {
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    height: 220px !important;
+    height: 280px !important; /* Mở rộng để không cắt dòng cuối */
     flex-shrink: 0;
   }
 

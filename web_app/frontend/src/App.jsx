@@ -446,12 +446,12 @@ function App() {
                 <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                   <thead>
                     <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                      <th style={{ textAlign: "left", padding: "12px 10px", fontSize: "14px" }}>Cặp giao dịch</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px" }}>Giá vào lệnh</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px" }}>Ký quỹ</th>
-                      <th style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px" }}>PNL thả nổi</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px" }}>TP | SL</th>
-                      <th style={{ textAlign: "center", padding: "12px 10px", fontSize: "14px" }}>Cắt lệnh</th>
+                      <th style={{ textAlign: "left", padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
+                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
+                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                      <th style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>PNL thả nổi</th>
+                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th>
+                      <th style={{ textAlign: "center", padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
                     </tr>
                   </thead>
                   <tbody>
