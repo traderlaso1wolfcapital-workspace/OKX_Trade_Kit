@@ -26,11 +26,10 @@ jobs:
 
       - name: Run Windows Build Script
         run: |
-
-          cd TLS1_Trading_App
+          cd desktop_app
           python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
           set /p CHART_JS_DIR=<chart_dir.txt
-          python -m PyInstaller --noconfirm --onefile --windowed --icon "media\logo.ico" --name "TLS1_Trading_Setup" --paths .. --add-data "version.json;." --add-data "media;media" --add-data "%CHART_JS_DIR%;lightweight_charts/js" --hidden-import "z_bot_sub1.bot_config" --hidden-import "z_bot_sub1.bot_strategy" --hidden-import "z_bot_sub1.bot_api" --hidden-import "z_bot_sub1.bot_indicators" --hidden-import "z_bot_sub1.bot_orders" --hidden-import "z_bot_sub1.bot_ui" --hidden-import "z_bot_sub1.bot_sub1" --hidden-import "z_bot_sub2.bot_config" --hidden-import "z_bot_sub2.bot_strategy" --hidden-import "z_bot_sub2.bot_api" --hidden-import "z_bot_sub2.bot_indicators" --hidden-import "z_bot_sub2.bot_orders" --hidden-import "z_bot_sub2.bot_ui" --hidden-import "z_bot_sub2.bot_sub2" --hidden-import "sys_bot_sub1" --hidden-import "sys_bot_sub2" --hidden-import "PyQt6.QtWebEngineCore" --hidden-import "PyQt6.QtWebEngineWidgets" --collect-all "z_bot_sub1" --collect-all "z_bot_sub2" --collect-all "PyQt6" --collect-all "lightweight_charts" --collect-all "pandas" gui_main.py
+          pyinstaller --noconfirm TLS1_Trading_Setup.spec
         shell: cmd
 
       - name: Upload Windows Artifacts
@@ -38,8 +37,8 @@ jobs:
         with:
           name: Windows-Release
           path: |
-            TLS1_Trading_App/dist/TLS1_Trading_Setup.exe
-            TLS1_Trading_App/version.json
+            desktop_app/dist/TLS1_Trading_Setup.exe
+            desktop_app/version.json
 
   build-mac:
     runs-on: macos-latest
@@ -58,36 +57,34 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-
       - name: Build Mac App with PyInstaller
         run: |
-          cd TLS1_Trading_App
+          cd desktop_app
           CHART_JS_DIR=$(python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))")
           pyinstaller --noconfirm --onedir --windowed --name "TLS1 Trading" \
             --paths .. \
             --add-data "version.json:." \
             --add-data "media:media" \
             --add-data "$CHART_JS_DIR:lightweight_charts/js" \
-            --hidden-import "z_bot_sub1.bot_config" \
-            --hidden-import "z_bot_sub1.bot_strategy" \
-            --hidden-import "z_bot_sub1.bot_api" \
-            --hidden-import "z_bot_sub1.bot_indicators" \
-            --hidden-import "z_bot_sub1.bot_orders" \
-            --hidden-import "z_bot_sub1.bot_ui" \
-            --hidden-import "z_bot_sub1.bot_sub1" \
-            --hidden-import "z_bot_sub2.bot_config" \
-            --hidden-import "z_bot_sub2.bot_strategy" \
-            --hidden-import "z_bot_sub2.bot_api" \
-            --hidden-import "z_bot_sub2.bot_indicators" \
-            --hidden-import "z_bot_sub2.bot_orders" \
-            --hidden-import "z_bot_sub2.bot_ui" \
-            --hidden-import "z_bot_sub2.bot_sub2" \
-            --hidden-import "sys_bot_sub1" \
-            --hidden-import "sys_bot_sub2" \
+            --hidden-import "bots.sub1.bot_config" \
+            --hidden-import "bots.sub1.bot_strategy" \
+            --hidden-import "bots.sub1.bot_api" \
+            --hidden-import "bots.sub1.bot_indicators" \
+            --hidden-import "bots.sub1.bot_orders" \
+            --hidden-import "bots.sub1.bot_ui" \
+            --hidden-import "bots.sub1.bot_sub1" \
+            --hidden-import "bots.sub2.bot_config" \
+            --hidden-import "bots.sub2.bot_strategy" \
+            --hidden-import "bots.sub2.bot_api" \
+            --hidden-import "bots.sub2.bot_indicators" \
+            --hidden-import "bots.sub2.bot_orders" \
+            --hidden-import "bots.sub2.bot_ui" \
+            --hidden-import "bots.sub2.bot_sub2" \
+            --hidden-import "bots.sub1.sys_bot_sub1" \
+            --hidden-import "bots.sub2.sys_bot_sub2" \
             --hidden-import "PyQt6.QtWebEngineCore" \
             --hidden-import "PyQt6.QtWebEngineWidgets" \
-            --collect-all "z_bot_sub1" \
-            --collect-all "z_bot_sub2" \
+            --collect-all "bots" \
             --collect-all "PyQt6" \
             --collect-all "lightweight_charts" \
             --collect-all "pandas" \
@@ -95,7 +92,7 @@ jobs:
 
       - name: Create DMG
         run: |
-          cd TLS1_Trading_App/dist
+          cd desktop_app/dist
           DMG_NAME="TLS1_Trading_Mac_AppleSilicon.dmg"
           hdiutil create -volname "TLS1 Trading" -srcfolder "TLS1 Trading.app" -ov -format UDZO "$DMG_NAME"
 
@@ -104,7 +101,7 @@ jobs:
         with:
           name: Mac-Release
           path: |
-            TLS1_Trading_App/dist/*.dmg
+            desktop_app/dist/*.dmg
 
   release:
     needs: [build-windows, build-mac]
