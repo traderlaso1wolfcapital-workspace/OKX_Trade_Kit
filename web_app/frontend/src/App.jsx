@@ -64,6 +64,8 @@ function App() {
 
   const [selectedAccount, setSelectedAccount] = useState("sub1");
   const [selectedBotType, setSelectedBotType] = useState("ema200");
+  const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
+  const MAX_SLOTS = 100;
 
   // Settings state — clone từ Desktop App
   const [apiKey, setApiKey] = useState("");
@@ -393,7 +395,7 @@ function App() {
         </div>
       )}
       {/* TAB BAR CÁC BOT (TÀI KHOẢN) */}
-      <div style={{ display: "flex", background: "#1a1a1a", borderBottom: "1px solid #333", width: "100%", paddingLeft: "10px" }}>
+      <div style={{ display: "flex", background: "#1a1a1a", borderBottom: "1px solid #333", width: "100%", paddingLeft: "10px", alignItems: "center" }}>
         {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"]].map(([sub, label]) => (
           <button 
             key={sub}
@@ -408,6 +410,21 @@ function App() {
             {label}
           </button>
         ))}
+        {/* Slot indicator - góc phải cùng hàng */}
+        <div style={{ marginLeft: "auto", paddingRight: "12px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
+          <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
+          <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
+            {slotCount}/{MAX_SLOTS}
+          </span>
+          <span style={{ display: "flex", gap: "2px" }}>
+            {Array.from({ length: 5 }).map((_, i) => {
+              const threshold = (i + 1) * 20;
+              const active = slotCount >= threshold - 19;
+              const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
+              return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "13px" }}>▮</span>;
+            })}
+          </span>
+        </div>
       </div>
 
       <div className="content-wrapper">
