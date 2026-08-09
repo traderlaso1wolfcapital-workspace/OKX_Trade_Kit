@@ -114,7 +114,7 @@ async def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 300):
         return {"code": "-1", "msg": str(e), "data": []}
 
 def get_running_pid(strategy: str) -> int:
-    pid_file = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data", f"{strategy}.pid")
+    pid_file = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"{strategy}.pid")
     if os.path.exists(pid_file):
         try:
             with open(pid_file, "r") as f:
@@ -163,7 +163,7 @@ async def start_bot(strategy: str = "sub1", env_file: str = ".api_sub1"):
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, env_file]
     
     try:
-        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data")
+        flag_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag_path = os.path.join(flag_dir, f"stop_{strategy}.flag")
         if os.path.exists(flag_path):
@@ -194,7 +194,7 @@ async def start_bot(strategy: str = "sub1", env_file: str = ".api_sub1"):
 async def stop_bot(strategy: str = "sub1"):
     proc = bot_processes.get(strategy)
     
-    flag_path = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data", f"stop_{strategy}.flag")
+    flag_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"stop_{strategy}.flag")
     try:
         os.makedirs(os.path.dirname(flag_path), exist_ok=True)
         with open(flag_path, "w") as f:
@@ -235,7 +235,7 @@ async def stop_bot(strategy: str = "sub1"):
 @app.get("/api/bot/config")
 async def get_bot_config(strategy: str = "sub1"):
     # Đọc cấu hình JSON
-    config_path = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data", f"{strategy}_global_config.json")
+    config_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
         # Mặc định cấu hình nếu chưa tồn tại
         return {
@@ -251,7 +251,7 @@ async def get_bot_config(strategy: str = "sub1"):
 
 @app.post("/api/bot/config")
 async def update_bot_config(update_data: ConfigUpdate, strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data")
+    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
     
@@ -274,7 +274,7 @@ async def update_bot_config(update_data: ConfigUpdate, strategy: str = "sub1"):
 
 @app.get("/api/bot/credentials")
 async def get_bot_credentials(strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}")
+    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
     
@@ -295,7 +295,7 @@ async def get_bot_credentials(strategy: str = "sub1"):
 
 @app.post("/api/bot/credentials")
 async def update_bot_credentials(creds: CredentialsUpdate, strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}")
+    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
     os.makedirs(config_dir, exist_ok=True)
     env_path = os.path.join(config_dir, f".api_{strategy}")
     
@@ -342,7 +342,7 @@ async def get_bot_positions(strategy: str = "sub1"):
     passphrase = ""
     is_demo = False
     
-    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}")
+    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
     
@@ -455,7 +455,7 @@ async def get_bot_positions(strategy: str = "sub1"):
             pass
 
     # 3. Fallback: Đọc các vị thế từ trade_markers.json
-    positions_path = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data", "trade_markers.json")
+    positions_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", "trade_markers.json")
     if not os.path.exists(positions_path):
         return []
     try:

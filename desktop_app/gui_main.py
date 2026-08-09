@@ -423,7 +423,7 @@ class BotSubprocessWorker(QtCore.QThread):
         if self.process:
             self.log_signal.emit("\n🛑 Đang gửi tín hiệu dừng tiến trình...")
             try:
-                flag_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy}", "json_data", f"stop_{self.strategy}.flag")
+                flag_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy}", "json_data", f"stop_{self.strategy}.flag")
                 os.makedirs(os.path.dirname(flag_path), exist_ok=True)
                 with open(flag_path, "w") as f: f.write("stop")
                 
@@ -809,7 +809,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
     def reload_accounts(self):
         self.api_files = []
-        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        json_data_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
         
         default_sub1_cfg = {
@@ -851,10 +851,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         }
 
         if os.path.exists(PROJECT_DIR):
-            proj_bot_dir = os.path.join(PROJECT_DIR, f"z_bot_{self.strategy_id}")
+            proj_bot_dir = os.path.join(PROJECT_DIR, f"bots/{self.strategy_id}")
             if os.path.exists(proj_bot_dir):
                 self.api_files.extend([f for f in os.listdir(proj_bot_dir) if f.startswith('.api') and not f.endswith('.bak')])
-        bot_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}")
+        bot_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}")
         os.makedirs(bot_dir, exist_ok=True)
         # Tự động tạo 5 tài khoản phụ rỗng mặc định & các file JSON cấu hình mặc định nếu chưa có
         for i in range(1, 6):
@@ -909,7 +909,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             text = text.strip()
             if not text: return
             env_name = f".api_{text}"
-            bot_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}")
+            bot_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}")
             os.makedirs(bot_dir, exist_ok=True)
             env_path = os.path.join(bot_dir, env_name)
             if not os.path.exists(env_path):
@@ -950,9 +950,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
             deleted_any = False
             for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
                 if not os.path.exists(root_dir): continue
-                for d in os.listdir(root_dir):
-                    if d.startswith("z_bot_") and os.path.isdir(os.path.join(root_dir, d)):
-                        env_path = os.path.join(root_dir, d, env_name)
+                bots_dir = os.path.join(root_dir, "bots")
+                if os.path.isdir(bots_dir):
+                    for sub in os.listdir(bots_dir):
+                        env_path = os.path.join(bots_dir, sub, env_name)
                         if os.path.exists(env_path):
                             try:
                                 os.remove(env_path)
@@ -1623,7 +1624,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         enabled_coins = ["BTC", "ETH", "XAU"]
         try:
             acc_name = self.get_acc_name()
-            json_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data", f"{acc_name}_global_config.json")
+            json_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data", f"{acc_name}_global_config.json")
             if os.path.exists(json_path):
                 with open(json_path, "r", encoding="utf-8") as f:
                     cfg_data = json.load(f)
@@ -1720,7 +1721,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 try:
                     acc_name = self.get_acc_name()
                     base_coin = instId.replace("-USDT", "")
-                    json_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data", f"{acc_name}_{base_coin}_chart.json")
+                    json_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data", f"{acc_name}_{base_coin}_chart.json")
                     if os.path.exists(json_path):
                         with open(json_path, "r", encoding="utf-8") as f:
                             c_data = json.load(f)
@@ -1827,7 +1828,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_file = self.get_selected_env()
         if not env_file: return
         
-        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+        env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
         if os.path.exists(env_path):
             api_key, secret_key, passphrase, demo_mode = "", "", "", False
             okx_domain = "www.okx.com"
@@ -2551,7 +2552,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         acc_name = self.get_acc_name()
 
         if env_file:
-            env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+            env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
             if os.path.exists(env_path):
                 with open(env_path, "r", encoding="utf-8") as f:
                     for line in f:
@@ -2564,7 +2565,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                             elif k == "OKX_IS_DEMO": self.chk_demo_mode.setChecked(False)
 
         import importlib.util
-        bot_dir = f"z_bot_{self.strategy_id}"
+        bot_dir = f"bots/{self.strategy_id}"
         bot_config_path = os.path.join(USER_DATA_DIR, bot_dir, "bot_config.py")
         
         try:
@@ -2577,7 +2578,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 import importlib
                 bot_config = importlib.import_module(f"{bot_dir}.bot_config")
         except ModuleNotFoundError:
-            # Nếu chưa có thư mục bot (ví dụ z_bot_sub3), bỏ qua không báo lỗi
+            # Nếu chưa có thư mục bot (ví dụ bots/sub3), bỏ qua không báo lỗi
             class DummyConfig:
                 def __getattr__(self, name):
                     if name == "COIN_PORTFOLIO": return []
@@ -2593,7 +2594,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     return 0
             bot_config = DummyConfig()
         cfg = {}
-        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        json_data_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
         config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         if os.path.exists(config_path):
@@ -2741,7 +2742,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Auto-save ENABLED_COINS vào file config
         try:
             acc_name = self.get_acc_name()
-            json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+            json_data_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
             os.makedirs(json_data_dir, exist_ok=True)
             config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
             cfg = {}
@@ -2898,7 +2899,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # -------------------------------
         
         bot_label = "Bot Sub 2 (SMC)" if self.strategy_id == "sub2" else "Bot Sub 1 (Thợ Săn EMA200)"
-        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+        env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         with open(env_path, "w", encoding="utf-8") as f:
             f.write(f"OKX_IS_DEMO=\"{is_demo}\"\n")
@@ -2930,7 +2931,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 msg.exec()
             return
         acc_name = self.get_acc_name()
-        json_data_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        json_data_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(json_data_dir, exist_ok=True)
         config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         
@@ -3093,13 +3094,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         env_file = self.get_selected_env()
         if not env_file: return
         
-        env_path = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", env_file)
+        env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
         if not self._verify_env_security(env_path):
             self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
             QtWidgets.QMessageBox.critical(self, "Khóa Bảo Mật", f"LỖI BẢO MẬT: API Key trong cấu hình {env_file} không hợp lệ hoặc KHÔNG thuộc quyền sở hữu của UID {CURRENT_UID}.\n\nHệ thống đã khóa lệnh chạy Bot để bảo vệ an toàn!")
             return
         
-        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag_path = os.path.join(flag_dir, f"stop_{self.strategy_id}.flag")
         if os.path.exists(flag_path):
@@ -3128,7 +3129,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def reset_wallet(self):
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag = os.path.join(flag_dir, f"reset_wallet_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
@@ -3137,7 +3138,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def reset_nen(self):
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-        flag_dir = os.path.join(USER_DATA_DIR, f"z_bot_{self.strategy_id}", "json_data")
+        flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag = os.path.join(flag_dir, f"reset_nen_{self.strategy_id}.flag")
         with open(flag, "w") as f: f.write("1")
@@ -3733,7 +3734,7 @@ class MainWindow(QtWidgets.QMainWindow):
                             f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
                     except: pass
                 
-                # Pre-create default JSON configs inside z_bot_sub*/json_data
+                # Pre-create default JSON configs inside bots/sub*/json_data
                 cfg_names = [f"sub{i}_global_config.json"]
                 if i == 1:
                     cfg_names.append("sub1_global_config.json" if b_name == "bots/sub1" else "sub2_global_config.json")
@@ -3748,10 +3749,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Tiếp tục quét như bình thường
         for root_dir in [PROJECT_DIR, USER_DATA_DIR]:
             if not os.path.exists(root_dir): continue
-            for d in os.listdir(root_dir):
-                if d.startswith("z_bot_") and os.path.isdir(os.path.join(root_dir, d)):
+            bots_dir = os.path.join(root_dir, "bots")
+            if os.path.isdir(bots_dir):
+                for sub in os.listdir(bots_dir):
                     try:
-                        for f in os.listdir(os.path.join(root_dir, d)):
+                        for f in os.listdir(os.path.join(bots_dir, sub)):
                             if f.startswith(".api") and not f.endswith(".example"):
                                 env_files.add(f)
                     except Exception:
