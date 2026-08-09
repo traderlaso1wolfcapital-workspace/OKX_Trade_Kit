@@ -43,10 +43,10 @@ body {
 
 /* ============= SIDEBAR TRÁI ============= */
 .sidebar-left {
-  width: 280px;
-  min-width: 280px;
+  width: 340px;
+  min-width: 340px;
   background-color: #252526;
-  border-right: 1px solid #3d3d3d;
+  border-left: 1px solid #3d3d3d;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -74,8 +74,11 @@ body {
 
 .sidebar-content {
   flex: 1;
-  padding: 12px 12px 8px;
+  padding: 16px 12px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ============= GROUP BOX ============= */
@@ -639,8 +642,16 @@ body {
 .risk-row label { color: #e0e0e0; font-size: 12px; }
 .risk-row input { width: 100px; text-align: right; }
 
+/* ============= TABLET/IPAD LANDSCAPE ============= */
+@media (min-width: 1001px) and (max-width: 1200px) {
+  .sidebar-left {
+    width: 280px !important;
+    min-width: 280px !important;
+  }
+}
+
 /* ============= MOBILE RESPONSIVE ============= */
-@media (max-width: 768px) {
+@media (max-width: 1000px) {
   .app-container {
     flex-direction: column;
     height: 100dvh;

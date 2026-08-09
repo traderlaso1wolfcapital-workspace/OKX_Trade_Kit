@@ -58,18 +58,34 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Vi tri moi: nam trong OKX_Trade_Kit/TLS1_Trading_Web/backend
 OKX_TRADE_KIT_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
 XGUI_MAIN_PATH = os.path.join(OKX_TRADE_KIT_DIR, "xGui_main.py")
+sys.path.append(OKX_TRADE_KIT_DIR)
+
 
 # AppData path của TLS1_Trading
 LOCAL_APP_DATA = os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local"))
-USER_DATA_DIR = os.path.join(LOCAL_APP_DATA, "TLS1_Trading")
 
-# Trạng thái tiến trình bot (hỗ trợ nhiều tab/sub)
+def get_user_data_dir(uid: str) -> str:
+    safe_uid = "".join(c for c in uid if c.isalnum() or c in ('_', '-'))
+    if not safe_uid: safe_uid = "default"
+    return os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users", safe_uid)
+
+# Trạng thái tiến trình bot (hỗ trợ multi-tenant)
+# Nested dictionaries: dict[uid][strategy]
 bot_processes = {}
 bot_start_times = {}
-bot_log_queues = {} # strategy -> Queue
+bot_log_queues = {}
+active_connections = {}
 
-# WebSockets clients per strategy
-active_connections = {} # strategy -> List[WebSocket]
+def get_nested(d: dict, k1: str, k2: str, default=None):
+    return d.get(k1, {}).get(k2, default)
+
+def set_nested(d: dict, k1: str, k2: str, val):
+    if k1 not in d: d[k1] = {}
+    d[k1][k2] = val
+
+def del_nested(d: dict, k1: str, k2: str):
+    if k1 in d and k2 in d[k1]:
+        del d[k1][k2]
 
 class ConfigUpdate(BaseModel):
     enabled_tfs: List[str]
@@ -79,27 +95,21 @@ class CredentialsUpdate(BaseModel):
     secret_key: str
     passphrase: str
 
-async def log_reader_task(stream, strategy):
+async def log_reader_task(stream, uid, strategy):
     """Đọc stdout/stderr của tiến trình bot và đẩy vào Queue"""
-    if strategy not in bot_log_queues:
-        bot_log_queues[strategy] = asyncio.Queue()
-    queue = bot_log_queues[strategy]
+    if uid not in bot_log_queues: bot_log_queues[uid] = {}
+    if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = asyncio.Queue()
+    queue = bot_log_queues[uid][strategy]
     try:
         while True:
-            # stream from subprocess.Popen is blocking, so use to_thread
             line = await asyncio.to_thread(stream.readline)
-            if not line:
-                break
+            if not line: break
             line_str = line.decode("utf-8", errors="replace").rstrip("\n")
             await queue.put(line_str)
-            
-            # Gửi cho các WS đang active của strategy này
-            if strategy in active_connections:
-                for connection in active_connections[strategy]:
-                    try:
-                        await connection.send_text(line_str)
-                    except Exception:
-                        pass
+            if uid in active_connections and strategy in active_connections[uid]:
+                for connection in active_connections[uid][strategy]:
+                    try: await connection.send_text(line_str)
+                    except: pass
     except Exception as e:
         await queue.put(f"[SYSTEM ERROR] Log reader task failed: {e}")
 
@@ -107,14 +117,89 @@ async def log_reader_task(stream, strategy):
 async def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 300):
     """Proxy OKX candle API để tránh CORS trên mobile browser."""
     try:
-        url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={limit}"
+        limit = int(limit)
+        # Fetch first batch from market/candles (max 300)
+        first_limit = min(limit, 300)
+        url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={first_limit}"
         resp = requests.get(url, timeout=10)
-        return resp.json()
+        data = resp.json()
+        
+        all_candles = []
+        if data.get("code") == "0" and data.get("data"):
+            all_candles.extend(data["data"])
+            
+            # If we need more, fetch from history-candles
+            while len(all_candles) < limit:
+                remain = limit - len(all_candles)
+                fetch_count = min(remain, 100) # history-candles max is 100
+                last_ts = all_candles[-1][0]
+                h_url = f"https://www.okx.com/api/v5/market/history-candles?instId={instId}&bar={bar}&limit={fetch_count}&after={last_ts}"
+                h_resp = requests.get(h_url, timeout=10)
+                h_data = h_resp.json()
+                if h_data.get("code") == "0" and h_data.get("data"):
+                    all_candles.extend(h_data["data"])
+                else:
+                    break
+        
+        data["data"] = all_candles
+        
+        ob_boxes = []
+        if data.get("code") == "0" and all_candles:
+            candles = all_candles.copy()
+            candles.reverse()  # Newest to oldest -> oldest to newest
+            try:
+                import bots.sub2.bot_strategy as sub2_strat
+                from bots.sub2.bot_models import AssetTracker
+                from decimal import Decimal
+                tk = AssetTracker()
+                times = [int(c[0]) for c in candles]
+                opens = [Decimal(c[1]) for c in candles]
+                highs = [Decimal(c[2]) for c in candles]
+                lows = [Decimal(c[3]) for c in candles]
+                closes = [Decimal(c[4]) for c in candles]
+                vol = sub2_strat.get_volatility_measure(closes, highs, lows)
+                sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
+                
+                raw_obs = []
+                for ob in (tk.swing_obs + tk.internal_obs):
+                    if not ob.crossed:
+                        raw_obs.append({
+                            "high": float(ob.bar_high),
+                            "low": float(ob.bar_low),
+                            "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
+                            "bias": int(ob.bias),
+                            "source": str(ob.source)
+                        })
+                
+                for bias in [1, -1]:
+                    b_obs = [o for o in raw_obs if o["bias"] == bias]
+                    if not b_obs: continue
+                    b_obs.sort(key=lambda x: x["low"])
+                    merged = []
+                    for o in b_obs:
+                        if not merged:
+                            merged.append(o)
+                        else:
+                            last = merged[-1]
+                            if last["high"] >= o["low"]:
+                                last["high"] = max(last["high"], o["high"])
+                                if o["time"] > 0 and last["time"] > 0:
+                                    last["time"] = min(last["time"], o["time"])
+                                elif o["time"] > 0:
+                                    last["time"] = o["time"]
+                            else:
+                                merged.append(o)
+                    ob_boxes.extend(merged)
+            except Exception as e:
+                print(f"Error computing OBs: {e}")
+        
+        data['ob_boxes'] = ob_boxes
+        return data
     except Exception as e:
         return {"code": "-1", "msg": str(e), "data": []}
 
-def get_running_pid(strategy: str) -> int:
-    pid_file = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"{strategy}.pid")
+def get_running_pid(uid: str, strategy: str) -> int:
+    pid_file = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}.pid")
     if os.path.exists(pid_file):
         try:
             with open(pid_file, "r") as f:
@@ -128,22 +213,20 @@ def get_running_pid(strategy: str) -> int:
     return 0
 
 @app.get("/api/bot/status")
-async def get_bot_status(strategy: str = "sub1"):
-    proc = bot_processes.get(strategy)
+async def get_bot_status(uid: str, strategy: str = "sub1"):
+    proc = get_nested(bot_processes, uid, strategy)
     is_running = False
     uptime = 0
     
-    pid = get_running_pid(strategy)
+    pid = get_running_pid(uid, strategy)
     if pid > 0:
         is_running = True
-        # Nếu process ngầm vẫn sống mà bot_processes không có thì set uptime mặc định hoặc estimate
-        uptime = int(time.time() - bot_start_times.get(strategy, time.time()))
+        uptime = int(time.time() - get_nested(bot_start_times, uid, strategy, time.time()))
     elif proc and proc.poll() is None:
         is_running = True
-        uptime = int(time.time() - bot_start_times.get(strategy, time.time()))
+        uptime = int(time.time() - get_nested(bot_start_times, uid, strategy, time.time()))
     else:
-        if strategy in bot_processes:
-            del bot_processes[strategy]
+        del_nested(bot_processes, uid, strategy)
             
     return {
         "status": "RUNNING" if is_running else "STOPPED",
@@ -152,49 +235,54 @@ async def get_bot_status(strategy: str = "sub1"):
     }
 
 @app.post("/api/bot/start")
-async def start_bot(strategy: str = "sub1", env_file: str = ".api_sub1"):
-    if get_running_pid(strategy) > 0:
+async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1"):
+    if not uid: raise HTTPException(status_code=400, detail="uid is required")
+    if get_running_pid(uid, strategy) > 0:
         raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running in background.")
 
-    proc = bot_processes.get(strategy)
+    proc = get_nested(bot_processes, uid, strategy)
     if proc and proc.poll() is None:
         raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running.")
         
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, env_file]
     
     try:
-        flag_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data")
+        flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag_path = os.path.join(flag_dir, f"stop_{strategy}.flag")
         if os.path.exists(flag_path):
             os.remove(flag_path)
+            
+        custom_env = os.environ.copy()
+        custom_env["LOCALAPPDATA"] = get_user_data_dir(uid)
             
         new_proc = subprocess.Popen(
             cmd,
             cwd=OKX_TRADE_KIT_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            env=custom_env,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         )
         
-        bot_processes[strategy] = new_proc
-        bot_start_times[strategy] = time.time()
+        set_nested(bot_processes, uid, strategy, new_proc)
+        set_nested(bot_start_times, uid, strategy, time.time())
         
-        # Reset queue log
-        bot_log_queues[strategy] = asyncio.Queue()
+        if uid not in bot_log_queues: bot_log_queues[uid] = {}
+        bot_log_queues[uid][strategy] = asyncio.Queue()
         
         loop = asyncio.get_event_loop()
-        loop.create_task(log_reader_task(new_proc.stdout, strategy))
+        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
         
         return {"message": f"Bot {strategy} started successfully.", "status": "RUNNING"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start bot: {e}")
 
 @app.post("/api/bot/stop")
-async def stop_bot(strategy: str = "sub1"):
-    proc = bot_processes.get(strategy)
+async def stop_bot(uid: str, strategy: str = "sub1"):
+    proc = get_nested(bot_processes, uid, strategy)
     
-    flag_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"stop_{strategy}.flag")
+    flag_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"stop_{strategy}.flag")
     try:
         os.makedirs(os.path.dirname(flag_path), exist_ok=True)
         with open(flag_path, "w") as f:
@@ -202,7 +290,7 @@ async def stop_bot(strategy: str = "sub1"):
     except Exception:
         pass
         
-    pid = get_running_pid(strategy)
+    pid = get_running_pid(uid, strategy)
     if pid > 0 and not proc:
         try:
             p = psutil.Process(pid)
@@ -229,13 +317,13 @@ async def stop_bot(strategy: str = "sub1"):
             pass
             
     if strategy in bot_processes:
-        del bot_processes[strategy]
+        del_nested(bot_processes, uid, strategy)
     return {"message": f"Bot {strategy} stopped successfully.", "status": "STOPPED"}
 
 @app.get("/api/bot/config")
-async def get_bot_config(strategy: str = "sub1"):
+async def get_bot_config(uid: str, strategy: str = "sub1"):
     # Đọc cấu hình JSON
-    config_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", f"{strategy}_global_config.json")
+    config_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
         # Mặc định cấu hình nếu chưa tồn tại
         return {
@@ -250,8 +338,8 @@ async def get_bot_config(strategy: str = "sub1"):
         raise HTTPException(status_code=500, detail=f"Failed to read config: {e}")
 
 @app.post("/api/bot/config")
-async def update_bot_config(update_data: ConfigUpdate, strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data")
+async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1"):
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
     
@@ -273,8 +361,8 @@ async def update_bot_config(update_data: ConfigUpdate, strategy: str = "sub1"):
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
 
 @app.get("/api/bot/credentials")
-async def get_bot_credentials(strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
+async def get_bot_credentials(uid: str, strategy: str = "sub1"):
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
     
@@ -294,8 +382,8 @@ async def get_bot_credentials(strategy: str = "sub1"):
     return creds
 
 @app.post("/api/bot/credentials")
-async def update_bot_credentials(creds: CredentialsUpdate, strategy: str = "sub1"):
-    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
+async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: str = "sub1"):
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     os.makedirs(config_dir, exist_ok=True)
     env_path = os.path.join(config_dir, f".api_{strategy}")
     
@@ -335,14 +423,14 @@ async def update_bot_credentials(creds: CredentialsUpdate, strategy: str = "sub1
         raise HTTPException(status_code=500, detail=f"Failed to write credentials: {e}")
 
 @app.get("/api/bot/positions")
-async def get_bot_positions(strategy: str = "sub1"):
+async def get_bot_positions(uid: str, strategy: str = "sub1"):
     # 1. Thử đọc Credentials từ file cấu hình .env (.api_sub1, .api_sub2...)
     api_key = ""
     secret_key = ""
     passphrase = ""
     is_demo = False
     
-    config_dir = os.path.join(USER_DATA_DIR, f"bots/{strategy}")
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
     
@@ -455,7 +543,7 @@ async def get_bot_positions(strategy: str = "sub1"):
             pass
 
     # 3. Fallback: Đọc các vị thế từ trade_markers.json
-    positions_path = os.path.join(USER_DATA_DIR, f"bots/{strategy}", "json_data", "trade_markers.json")
+    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
     if not os.path.exists(positions_path):
         return []
     try:
@@ -482,26 +570,24 @@ async def get_bot_positions(strategy: str = "sub1"):
     except Exception:
         return []
 
-@app.websocket("/ws/logs/{strategy}")
-async def websocket_logs(websocket: WebSocket, strategy: str):
+@app.websocket("/ws/logs/{uid}/{strategy}")
+async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     await websocket.accept()
-    if strategy not in active_connections:
-        active_connections[strategy] = []
-    active_connections[strategy].append(websocket)
+    if uid not in active_connections: active_connections[uid] = {}
+    if strategy not in active_connections[uid]: active_connections[uid][strategy] = []
+    active_connections[uid][strategy].append(websocket)
     
-    # Gửi thông điệp chào mừng
-    await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy})...")
+    await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy}) cho user {uid}...")
     
-    # Đọc tối đa 100 dòng từ hàng đợi log_queue để hiển thị cho client vừa kết nối
     temp_list = []
-    if strategy in bot_log_queues:
-        q = bot_log_queues[strategy]
+    if uid in bot_log_queues and strategy in bot_log_queues[uid]:
+        q = bot_log_queues[uid][strategy]
         size = min(q.qsize(), 100)
         for _ in range(size):
             try:
                 val = q.get_nowait()
                 temp_list.append(val)
-                q.put_nowait(val) # Bỏ lại
+                q.put_nowait(val)
             except Exception:
                 break
                 
@@ -510,14 +596,12 @@ async def websocket_logs(websocket: WebSocket, strategy: str):
         
     try:
         while True:
-            # Giữ kết nối mở, client gửi ping/pong
             await websocket.receive_text()
-    except WebSocketDisconnect:
-        if strategy in active_connections and websocket in active_connections[strategy]:
-            active_connections[strategy].remove(websocket)
     except Exception:
-        if strategy in active_connections and websocket in active_connections[strategy]:
-            active_connections[strategy].remove(websocket)
+        pass
+    finally:
+        if uid in active_connections and strategy in active_connections[uid] and websocket in active_connections[uid][strategy]:
+            active_connections[uid][strategy].remove(websocket)
 
 if __name__ == "__main__":
     import uvicorn

@@ -175,7 +175,7 @@ function App() {
 
     const connectWS = () => {
       if (!isMounted) return;
-      ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/logs/${selectedAccount}`);
+      ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${selectedAccount}`);
       wsRef.current = ws;
       ws.onmessage = (e) => {
         setLogs(prev => { const n = [...prev, e.data]; return n.length > 500 ? n.slice(-500) : n; });
@@ -215,19 +215,19 @@ function App() {
     if (!isAuthenticated) return;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/status?strategy=${selectedAccount}`);
+        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/status?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { const d = await r.json(); setBotStatus(d.status); setUptime(d.uptime); }
       } catch {}
     };
     const fetchConfig = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}`);
+        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { const d = await r.json(); if (Array.isArray(d.ENABLED_TFS)) setEnabledTfs(d.ENABLED_TFS); }
       } catch {}
     };
     const fetchCreds = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}`);
+        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
           setApiKey(d.api_key || "");
@@ -238,7 +238,7 @@ function App() {
     };
     const fetchPositions = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/positions?strategy=${selectedAccount}`);
+        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) setPositions(await r.json());
       } catch {}
     };
@@ -260,13 +260,13 @@ function App() {
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
     });
-    const cs = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350",
-      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
-    });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, crosshairMarkerVisible: false,
+    });
+    const cs = chart.addSeries(CandlestickSeries, {
+      upColor: "#26a69a", downColor: "#ef5350",
+      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
     });
     chartRef.current = chart;
     candleSeriesRef.current = cs;
@@ -300,7 +300,7 @@ function App() {
       try {
         const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
         const bar = tfMap[selectedTf] || selectedTf;
-        const url = `http://${window.location.hostname}:8080/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=300`;
+        const url = `http://${window.location.hostname}:8080/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=1500`;
         const res = await fetch(url);
         if (!res.ok) return;
         const rd = await res.json();
@@ -316,11 +316,99 @@ function App() {
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i-1].time);
         candleSeriesRef.current.setData(unique);
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
+        
+        if (rd.ob_boxes) {
+          window._active_smc_obs = rd.ob_boxes;
+          
+          let overlay = document.getElementById('smc_ob_shaded_overlay');
+          if (!overlay && chartContainerRef.current) {
+            overlay = document.createElement('div');
+            overlay.id = 'smc_ob_shaded_overlay';
+            overlay.style.position = 'absolute';
+            overlay.style.top = '0';
+            overlay.style.left = '0';
+            overlay.style.width = '100%';
+            overlay.style.height = '100%';
+            overlay.style.pointerEvents = 'none';
+            overlay.style.zIndex = '4';
+            overlay.style.overflow = 'hidden';
+            if (chartContainerRef.current.style) chartContainerRef.current.style.position = 'relative';
+            chartContainerRef.current.appendChild(overlay);
+          }
+
+          const drawObShadedBands = () => {
+            const obs = window._active_smc_obs;
+            const chart = chartRef.current;
+            const series = candleSeriesRef.current;
+            const container = chartContainerRef.current;
+            if (!obs || !chart || !series || !overlay || !container) return;
+            
+            overlay.innerHTML = '';
+            const w = overlay.clientWidth || container.clientWidth;
+            const maxRightX = w - 70; // 70px price scale approx
+
+            obs.forEach(ob => {
+              const y1 = series.priceToCoordinate(ob.high);
+              const y2 = series.priceToCoordinate(ob.low);
+              if (y1 === null || y2 === null) return;
+              const topY = Math.min(y1, y2);
+              const botY = Math.max(y1, y2);
+              const h = Math.max(botY - topY, 4);
+              const isBull = ob.bias === 1;
+
+              let startX = null;
+              if (ob.time && ob.time > 0) {
+                try {
+                  const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+                  const xCoord = chart.timeScale().timeToCoordinate(secTime);
+                  if (xCoord !== null) startX = Math.floor(xCoord);
+                } catch (e) {}
+              }
+
+              if (startX === null) startX = 0;
+              if (startX < -2000) startX = -2000;
+              if (startX >= maxRightX) return;
+
+              const boxWidth = maxRightX - startX;
+              if (boxWidth <= 0) return;
+
+              const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+              const box = document.createElement('div');
+              box.style.position = 'absolute';
+              box.style.top = topY + 'px';
+              box.style.left = startX + 'px';
+              box.style.width = boxWidth + 'px';
+              box.style.height = h + 'px';
+              box.style.backgroundColor = bg;
+              box.style.border = 'none';
+              box.style.boxSizing = 'border-box';
+              box.style.pointerEvents = 'none';
+              overlay.appendChild(box);
+            });
+          };
+
+          window._drawObShadedBands = drawObShadedBands;
+          
+          if (!window._smc_ob_subscribed && chartRef.current) {
+            window._smc_ob_subscribed = true;
+            chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(() => {
+              if (window._drawObShadedBands) window._drawObShadedBands();
+            });
+          }
+          
+          // Use setTimeout to ensure the chart is fully rendered before drawing
+          setTimeout(() => {
+            if (window._drawObShadedBands) window._drawObShadedBands();
+          }, 100);
+        }
+
         if (isInitialFit) {
           chartRef.current?.timeScale().fitContent(); // Fit duy nhất 1 lần khi mới load
           isInitialFit = false;
         }
-      } catch {}
+      } catch (err) {
+        console.error("Error fetching candles:", err);
+      }
     };
     fetchCandles();
     const iv = setInterval(fetchCandles, 15000);
@@ -329,13 +417,13 @@ function App() {
 
   const handleStartBot = async () => {
     try {
-      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/start?strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
+      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi khởi động bot!"); }
   };
   const handleStopBot = async () => {
     try {
-      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/stop?strategy=${selectedAccount}`, { method: "POST" });
+      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/stop?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
   };
@@ -344,7 +432,7 @@ function App() {
     const updated = safe.includes(tf) ? safe.filter(t => t !== tf) : [...safe, tf];
     setEnabledTfs(updated);
     try {
-      await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}`, {
+      await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tfs: updated }),
       });
@@ -657,7 +745,7 @@ function App() {
           </div>
 
           {/* Sidebar chỉ còn Biểu Đồ + Khung TG Bot */}
-          <div className="sidebar-content" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", padding: "10px" }}>
+          <div className="sidebar-content">
 
             {/* Khung Thời Gian Bot — hiện trước */}
             <div className="group-box">
@@ -909,7 +997,7 @@ function App() {
               <button className="btn-primary" onClick={async () => {
                 if (settingsTab === "api") {
                   try {
-                    await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}`, {
+                    await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
                       method: "POST", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                     });
