@@ -9,3 +9,7 @@ PyQt6-WebEngine
 psutil
 python-socketio[client]
 websocket-client
+
+fastapi
+uvicorn
+pydantic
