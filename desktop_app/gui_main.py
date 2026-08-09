@@ -2565,24 +2565,27 @@ class BotInstanceWidget(QtWidgets.QWidget):
                             elif k == "OKX_IS_DEMO": self.chk_demo_mode.setChecked(False)
 
         import importlib.util
-        bot_dir = f"bots/{self.strategy_id}"
-        bot_config_path = os.path.join(USER_DATA_DIR, bot_dir, "bot_config.py")
+        bot_dir_rel = f"bots/{self.strategy_id}"
+        bot_config_path = os.path.join(USER_DATA_DIR, bot_dir_rel, "bot_config.py")
+        if not os.path.exists(bot_config_path):
+            bot_config_path = os.path.join(PROJECT_DIR, bot_dir_rel, "bot_config.py")
         
+        bot_mod_name = f"bots.{self.strategy_id}.bot_config"
         try:
             if os.path.exists(bot_config_path):
-                spec = importlib.util.spec_from_file_location(f"{bot_dir}.bot_config", bot_config_path)
+                spec = importlib.util.spec_from_file_location(bot_mod_name, bot_config_path)
                 bot_config = importlib.util.module_from_spec(spec)
-                sys.modules[f"{bot_dir}.bot_config"] = bot_config
+                sys.modules[bot_mod_name] = bot_config
                 spec.loader.exec_module(bot_config)
             else:
                 import importlib
-                bot_config = importlib.import_module(f"{bot_dir}.bot_config")
+                bot_config = importlib.import_module(bot_mod_name)
         except ModuleNotFoundError:
             # Nếu chưa có thư mục bot (ví dụ bots/sub3), bỏ qua không báo lỗi
             class DummyConfig:
                 def __getattr__(self, name):
                     if name == "COIN_PORTFOLIO": return []
-                    return 0
+                    raise AttributeError(name)
             bot_config = DummyConfig()
         except Exception as e:
             with open("config_load_error.txt", "w") as err_f:
@@ -2591,7 +2594,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             class DummyConfig:
                 def __getattr__(self, name):
                     if name == "COIN_PORTFOLIO": return []
-                    return 0
+                    raise AttributeError(name)
             bot_config = DummyConfig()
         cfg = {}
         json_data_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
@@ -2724,6 +2727,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         except Exception as e: 
             print('Error setting defaults:', e)
         self._is_loading_settings = False
+        if not os.path.exists(config_path):
+            self.save_strategy_settings(silent=True)
 
     def _on_dash_coin_toggled(self, coin, state):
         """Đồng bộ checkbox trên Dashboard xuống Cấu Hình (cả Sub 1 & Sub 2) và lưu tự động."""
