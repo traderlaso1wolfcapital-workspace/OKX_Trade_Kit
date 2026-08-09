@@ -127,7 +127,7 @@ function App() {
     setIsLoggingIn(true);
     setLoginError("");
     try {
-      const res = await fetch(`http://${window.location.hostname}:8080/api/auth/verify?uid=${loginUid}`);
+      const res = await fetch(`/api/auth/verify?uid=${loginUid}`);
       const data = await res.json();
       if (data.status === "success") {
         setIsAuthenticated(true);
@@ -151,7 +151,7 @@ function App() {
     if (!uid) return;
     const checkLock = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:8080/api/auth/verify?uid=${uid}`);
+        const res = await fetch(`/api/auth/verify?uid=${uid}`);
         const data = await res.json();
         if (data.status === "locked") {
           setLockMessage(data.message || "⛔ Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Admin.");
@@ -175,7 +175,7 @@ function App() {
 
     const connectWS = () => {
       if (!isMounted) return;
-      ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${selectedAccount}`);
+      ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${selectedAccount}`);
       wsRef.current = ws;
       ws.onmessage = (e) => {
         setLogs(prev => { const n = [...prev, e.data]; return n.length > 500 ? n.slice(-500) : n; });
@@ -215,19 +215,19 @@ function App() {
     if (!isAuthenticated) return;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/status?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/status?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { const d = await r.json(); setBotStatus(d.status); setUptime(d.uptime); }
       } catch {}
     };
     const fetchConfig = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { const d = await r.json(); if (Array.isArray(d.ENABLED_TFS)) setEnabledTfs(d.ENABLED_TFS); }
       } catch {}
     };
     const fetchCreds = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
           setApiKey(d.api_key || "");
@@ -238,7 +238,7 @@ function App() {
     };
     const fetchPositions = async () => {
       try {
-        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) setPositions(await r.json());
       } catch {}
     };
@@ -300,7 +300,7 @@ function App() {
       try {
         const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
         const bar = tfMap[selectedTf] || selectedTf;
-        const url = `http://${window.location.hostname}:8080/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=1500`;
+        const url = `/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=1500`;
         const res = await fetch(url);
         if (!res.ok) return;
         const rd = await res.json();
@@ -417,13 +417,13 @@ function App() {
 
   const handleStartBot = async () => {
     try {
-      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
+      const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi khởi động bot!"); }
   };
   const handleStopBot = async () => {
     try {
-      const r = await fetch(`http://${window.location.hostname}:8080/api/bot/stop?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, { method: "POST" });
+      const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
   };
@@ -432,7 +432,7 @@ function App() {
     const updated = safe.includes(tf) ? safe.filter(t => t !== tf) : [...safe, tf];
     setEnabledTfs(updated);
     try {
-      await fetch(`http://${window.location.hostname}:8080/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+      await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tfs: updated }),
       });
@@ -997,7 +997,7 @@ function App() {
               <button className="btn-primary" onClick={async () => {
                 if (settingsTab === "api") {
                   try {
-                    await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+                    await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
                       method: "POST", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                     });

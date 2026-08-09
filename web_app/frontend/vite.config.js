@@ -7,5 +7,15 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',   // Expose ra toan bo mang LAN (de dien thoai truy cap)
     port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://127.0.0.1:8080',
+        ws: true,
+      }
+    }
   },
 })
