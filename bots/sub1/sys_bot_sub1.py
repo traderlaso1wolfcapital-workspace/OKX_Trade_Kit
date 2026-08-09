@@ -113,6 +113,7 @@ def main():
     
     # Tìm file ở nhiều đường dẫn khả thi (ưu tiên user_data_dir trước)
     possible_paths = [
+        os.path.join(user_data_dir, "z_bot_sub1", env_basename),
         os.path.join(user_data_dir, "bots/sub1", env_basename),
         os.path.join(user_data_dir, "bots", "sub1", env_basename),
         os.path.join(user_data_dir, env_basename),
@@ -167,6 +168,7 @@ def main():
 
     if not api_key or not secret_key or not passphrase:
         fallback_files = [
+            os.path.join(user_data_dir, "z_bot_sub1", ".api_sub1"),
             os.path.join(os.path.dirname(env_file), ".api_sub1"),
             os.path.join(user_data_dir, "bots/sub1", ".api_sub1"),
             os.path.join(user_data_dir, "bots", "sub2", ".api_sub1")

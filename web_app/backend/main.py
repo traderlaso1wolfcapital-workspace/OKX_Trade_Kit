@@ -74,6 +74,11 @@ active_connections = {} # strategy -> List[WebSocket]
 class ConfigUpdate(BaseModel):
     enabled_tfs: List[str]
 
+class CredentialsUpdate(BaseModel):
+    api_key: str
+    secret_key: str
+    passphrase: str
+
 async def log_reader_task(stream, strategy):
     """Đọc stdout/stderr của tiến trình bot và đẩy vào Queue"""
     if strategy not in bot_log_queues:
@@ -98,13 +103,42 @@ async def log_reader_task(stream, strategy):
     except Exception as e:
         await queue.put(f"[SYSTEM ERROR] Log reader task failed: {e}")
 
+@app.get("/api/market/candles")
+async def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 300):
+    """Proxy OKX candle API để tránh CORS trên mobile browser."""
+    try:
+        url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={limit}"
+        resp = requests.get(url, timeout=10)
+        return resp.json()
+    except Exception as e:
+        return {"code": "-1", "msg": str(e), "data": []}
+
+def get_running_pid(strategy: str) -> int:
+    pid_file = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}", "json_data", f"{strategy}.pid")
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, "r") as f:
+                pid = int(f.read().strip())
+            if psutil.pid_exists(pid):
+                p = psutil.Process(pid)
+                if "python" in p.name().lower():
+                    return pid
+        except:
+            pass
+    return 0
+
 @app.get("/api/bot/status")
 async def get_bot_status(strategy: str = "sub1"):
     proc = bot_processes.get(strategy)
     is_running = False
     uptime = 0
     
-    if proc and proc.poll() is None:
+    pid = get_running_pid(strategy)
+    if pid > 0:
+        is_running = True
+        # Nếu process ngầm vẫn sống mà bot_processes không có thì set uptime mặc định hoặc estimate
+        uptime = int(time.time() - bot_start_times.get(strategy, time.time()))
+    elif proc and proc.poll() is None:
         is_running = True
         uptime = int(time.time() - bot_start_times.get(strategy, time.time()))
     else:
@@ -119,6 +153,9 @@ async def get_bot_status(strategy: str = "sub1"):
 
 @app.post("/api/bot/start")
 async def start_bot(strategy: str = "sub1", env_file: str = ".api_sub1"):
+    if get_running_pid(strategy) > 0:
+        raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running in background.")
+
     proc = bot_processes.get(strategy)
     if proc and proc.poll() is None:
         raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running.")
@@ -165,27 +202,35 @@ async def stop_bot(strategy: str = "sub1"):
     except Exception:
         pass
         
-    if not proc or proc.poll() is not None:
-        if strategy in bot_processes:
-            del bot_processes[strategy]
-        return {"message": "Bot is not running.", "status": "STOPPED"}
-        
-    try:
-        for _ in range(15):
-            if proc.poll() is not None:
-                break
-            await asyncio.sleep(0.2)
+    pid = get_running_pid(strategy)
+    if pid > 0 and not proc:
+        try:
+            p = psutil.Process(pid)
+            p.terminate()
+            p.wait(timeout=2.0)
+        except psutil.TimeoutExpired:
+            p.kill()
+        except Exception:
+            pass
             
-        if proc.poll() is None:
-            proc.terminate()
-            await asyncio.sleep(1.0)
-            if proc.poll() is None:
-                proc.kill()
+    if proc and proc.poll() is None:
+        try:
+            for _ in range(15):
+                if proc.poll() is not None:
+                    break
+                await asyncio.sleep(0.2)
                 
+            if proc.poll() is None:
+                proc.terminate()
+                await asyncio.sleep(1.0)
+                if proc.poll() is None:
+                    proc.kill()
+        except Exception:
+            pass
+            
+    if strategy in bot_processes:
         del bot_processes[strategy]
-        return {"message": f"Bot {strategy} stopped successfully.", "status": "STOPPED"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to stop bot: {e}")
+    return {"message": f"Bot {strategy} stopped successfully.", "status": "STOPPED"}
 
 @app.get("/api/bot/config")
 async def get_bot_config(strategy: str = "sub1"):
@@ -226,6 +271,68 @@ async def update_bot_config(update_data: ConfigUpdate, strategy: str = "sub1"):
         return {"message": "Config updated successfully.", "config": cfg}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
+
+@app.get("/api/bot/credentials")
+async def get_bot_credentials(strategy: str = "sub1"):
+    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}")
+    env_file = f".api_{strategy}"
+    env_path = os.path.join(config_dir, env_file)
+    
+    creds = {"api_key": "", "secret_key": "", "passphrase": ""}
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
+                        v = v.strip("\"'")
+                        if k == "OKX_API_KEY": creds["api_key"] = v
+                        elif k == "OKX_SECRET_KEY": creds["secret_key"] = v
+                        elif k == "OKX_PASSPHRASE": creds["passphrase"] = v
+        except Exception:
+            pass
+    return creds
+
+@app.post("/api/bot/credentials")
+async def update_bot_credentials(creds: CredentialsUpdate, strategy: str = "sub1"):
+    config_dir = os.path.join(USER_DATA_DIR, f"z_bot_{strategy}")
+    os.makedirs(config_dir, exist_ok=True)
+    env_path = os.path.join(config_dir, f".api_{strategy}")
+    
+    lines = []
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            
+    # Modify or add keys
+    keys = {
+        "OKX_API_KEY": creds.api_key,
+        "OKX_SECRET_KEY": creds.secret_key,
+        "OKX_PASSPHRASE": creds.passphrase,
+    }
+    
+    new_lines = []
+    found_keys = set()
+    for line in lines:
+        stripped = line.strip()
+        if "=" in stripped:
+            k, _ = stripped.split("=", 1)
+            if k in keys:
+                new_lines.append(f"{k}={keys[k]}\n")
+                found_keys.add(k)
+                continue
+        new_lines.append(line)
+        
+    for k, v in keys.items():
+        if k not in found_keys:
+            new_lines.append(f"{k}={v}\n")
+            
+    try:
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        return {"message": "Credentials updated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write credentials: {e}")
 
 @app.get("/api/bot/positions")
 async def get_bot_positions(strategy: str = "sub1"):
@@ -311,20 +418,25 @@ async def get_bot_positions(strategy: str = "sub1"):
                                 if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
                                 if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
                                 
-                        # Tính ROI %
                         avg_px = float(pos.get("avgPx", 0))
                         last_px = float(pos.get("last", avg_px)) if pos.get("last") else avg_px
-                        upl = float(pos.get("upl", 0))
                         pos_side = pos.get("posSide", "long")
+                        upl = float(pos.get("upl", 0))
                         
-                        roi = "0.00"
-                        if avg_px > 0:
-                            leverage = float(pos.get("lever", 1))
-                            if pos_side == "long":
-                                roi = f"{((last_px - avg_px) / avg_px) * 100 * leverage:.2f}"
-                            else:
-                                roi = f"{((avg_px - last_px) / avg_px) * 100 * leverage:.2f}"
-                                
+                        # Dùng uplRatio từ OKX API — chính xác hơn tự tính
+                        upl_ratio = pos.get("uplRatio", "")
+                        if upl_ratio and upl_ratio not in ("", "0", None):
+                            roi = f"{float(upl_ratio) * 100:.2f}"
+                        else:
+                            # Fallback tính tay nếu OKX không trả uplRatio
+                            roi = "0.00"
+                            if avg_px > 0:
+                                leverage = float(pos.get("lever", 1))
+                                if pos_side == "long":
+                                    roi = f"{((last_px - avg_px) / avg_px) * 100 * leverage:.2f}"
+                                else:
+                                    roi = f"{((avg_px - last_px) / avg_px) * 100 * leverage:.2f}"
+                                    
                         formatted_positions.append({
                             "instId": inst,
                             "posSide": pos_side,
@@ -335,7 +447,8 @@ async def get_bot_positions(strategy: str = "sub1"):
                             "roi": roi,
                             "upl": pos.get("upl"),
                             "tp": tp_px,
-                            "sl": sl_px
+                            "sl": sl_px,
+                            "lever": pos.get("lever", "100"),
                         })
                     return formatted_positions
         except Exception:

@@ -66,6 +66,8 @@ function App() {
   const [selectedBotType, setSelectedBotType] = useState("ema200");
   const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
   const MAX_SLOTS = 100;
+  const [isLogScale, setIsLogScale] = useState(false);
+  const [isAutoFit, setIsAutoFit] = useState(true);
 
   // Settings state — clone từ Desktop App
   const [apiKey, setApiKey] = useState("");
@@ -114,7 +116,7 @@ function App() {
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
   const emaSeriesRef = useRef(null);
-  const logEndRef = useRef(null);
+  const terminalRef = useRef(null);
   const wsRef = useRef(null);
   const audioRef = useRef(null); // Reference for click sound
 
@@ -168,24 +170,44 @@ function App() {
   // WebSocket
   useEffect(() => {
     if (!isAuthenticated) return;
+    let isMounted = true;
+    let ws = null;
+
     const connectWS = () => {
-      wsRef.current = new WebSocket(`ws://${window.location.hostname}:8080/ws/logs/${selectedAccount}`);
-      wsRef.current.onmessage = (e) => {
+      if (!isMounted) return;
+      ws = new WebSocket(`ws://${window.location.hostname}:8080/ws/logs/${selectedAccount}`);
+      wsRef.current = ws;
+      ws.onmessage = (e) => {
         setLogs(prev => { const n = [...prev, e.data]; return n.length > 500 ? n.slice(-500) : n; });
       };
-      wsRef.current.onclose = () => setTimeout(connectWS, 3000);
+      ws.onclose = () => {
+        if (isMounted && wsRef.current === ws) {
+          setTimeout(connectWS, 3000);
+        }
+      };
     };
     
     // Đổi tab => clear log cũ, nối lại WS mới
     setLogs([]);
-    if (wsRef.current) wsRef.current.close();
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+    }
     connectWS();
     
-    return () => { if (wsRef.current) wsRef.current.close(); };
+    return () => { 
+      isMounted = false;
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
   }, [isAuthenticated, selectedAccount]);
 
   useEffect(() => {
-    if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
   }, [logs]);
 
   // Periodic polling
@@ -203,13 +225,24 @@ function App() {
         if (r.ok) { const d = await r.json(); if (Array.isArray(d.ENABLED_TFS)) setEnabledTfs(d.ENABLED_TFS); }
       } catch {}
     };
+    const fetchCreds = async () => {
+      try {
+        const r = await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}`);
+        if (r.ok) {
+          const d = await r.json();
+          setApiKey(d.api_key || "");
+          setSecretKey(d.secret_key || "");
+          setPassphrase(d.passphrase || "");
+        }
+      } catch {}
+    };
     const fetchPositions = async () => {
       try {
         const r = await fetch(`http://${window.location.hostname}:8080/api/bot/positions?strategy=${selectedAccount}`);
         if (r.ok) setPositions(await r.json());
       } catch {}
     };
-    fetchStatus(); fetchConfig(); fetchPositions();
+    fetchStatus(); fetchConfig(); fetchCreds(); fetchPositions();
     const s = setInterval(fetchStatus, 2000);
     const p = setInterval(fetchPositions, 5000);
     return () => { clearInterval(s); clearInterval(p); };
@@ -250,30 +283,43 @@ function App() {
     return () => { window.removeEventListener("resize", handleResize); chart.remove(); };
   }, [isAuthenticated, layoutMode]); // Re-init on layout change
 
-  // Fetch candles
+  // Fetch candles — dùng backend proxy để tránh CORS trên mobile
   useEffect(() => {
     if (!isAuthenticated) return;
+    let isInitialFit = true;
+    // Xóa data cũ ngay khi đổi coin/TF để không bị lag hiển thị cũ
+    if (candleSeriesRef.current) {
+      try { candleSeriesRef.current.setData([]); } catch {}
+    }
+    if (emaSeriesRef.current) {
+      try { emaSeriesRef.current.setData([]); } catch {}
+    }
+
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
       try {
-        const url = `https://www.okx.com/api/v5/market/candles?instId=${selectedCoin}&bar=${selectedTf}&limit=300`;
+        const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
+        const bar = tfMap[selectedTf] || selectedTf;
+        const url = `http://${window.location.hostname}:8080/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=300`;
         const res = await fetch(url);
         if (!res.ok) return;
         const rd = await res.json();
-        if (rd.code !== "0" || !rd.data) return;
-        let lastTime = 0;
+        if (rd.code !== "0" || !rd.data || rd.data.length === 0) return;
         const candles = [];
         for (let i = rd.data.length - 1; i >= 0; i--) {
           const c = rd.data[i];
           const t = Math.floor(parseInt(c[0]) / 1000);
-          if (t > lastTime) {
-            candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) });
-            lastTime = t;
-          }
+          candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) });
         }
-        candleSeriesRef.current.setData(candles);
-        emaSeriesRef.current?.setData(calculateEMA(candles, 200));
-        chartRef.current?.timeScale().fitContent();
+        // Sắp xếp tăng dần theo time, không trùng
+        candles.sort((a, b) => a.time - b.time);
+        const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i-1].time);
+        candleSeriesRef.current.setData(unique);
+        emaSeriesRef.current?.setData(calculateEMA(unique, 200));
+        if (isInitialFit) {
+          chartRef.current?.timeScale().fitContent(); // Fit duy nhất 1 lần khi mới load
+          isInitialFit = false;
+        }
       } catch {}
     };
     fetchCandles();
@@ -430,11 +476,56 @@ function App() {
       <div className="content-wrapper">
         {/* WORKSPACE PHẢI - hiện trước trên mobile */}
         <main className={`main-workspace ${layoutMode}`}>
-          <section className="pane-chart">
+          <section className="pane-chart" style={{ position: "relative" }}>
             <div className="pane-titlebar">
               📈 BIỂU ĐỒ TRỰC TUYẾN: {selectedCoin.replace("-SWAP", "")} ({selectedTf})
             </div>
-            <div className="chart-wrapper" ref={chartContainerRef} />
+            <div className="chart-wrapper" ref={chartContainerRef}
+                 onWheel={() => setIsAutoFit(false)}
+                 onTouchStart={() => setIsAutoFit(false)}
+                 onMouseDown={() => setIsAutoFit(false)} />
+            {/* Nút A và L overlay — clone TradingView */}
+            <div style={{
+              position: "absolute", bottom: "8px", right: "52px",
+              display: "flex", gap: "4px", zIndex: 10
+            }}>
+              <button
+                title="Auto (fits data to screen)"
+                onClick={() => {
+                  const next = !isAutoFit;
+                  setIsAutoFit(next);
+                  if (next) chartRef.current?.timeScale().fitContent();
+                }}
+                style={{
+                  width: "24px", height: "24px",
+                  background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                  color: isAutoFit ? "#fff" : "#d1d4dc",
+                  border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
+                  borderRadius: "3px",
+                  fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  lineHeight: 1
+                }}
+              >A</button>
+              <button
+                title="Log scale"
+                onClick={() => {
+                  const next = !isLogScale;
+                  setIsLogScale(next);
+                  chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+                }}
+                style={{
+                  width: "24px", height: "24px",
+                  background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                  color: isLogScale ? "#fff" : "#d1d4dc",
+                  border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
+                  borderRadius: "3px",
+                  fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  lineHeight: 1
+                }}
+              >L</button>
+            </div>
         </section>
         <section className="pane-tabs">
           <div className="tab-bar-header">
@@ -454,9 +545,8 @@ function App() {
           </div>
           <div className="tab-content">
             {activeTab === "logs" ? (
-              <div className="logs-terminal">
+              <div className="logs-terminal" ref={terminalRef}>
                 {logs.map((l, i) => <div key={i} className="log-line">{l}</div>)}
-                <div ref={logEndRef} />
               </div>
             ) : (
               <div className="positions-table-wrapper" style={{ overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
@@ -480,10 +570,16 @@ function App() {
                         return (
                           <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
                             <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
-                              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", margin: 0 }}>
-                                <input type="checkbox" checked={isChecked} onChange={() => togglePair(coin.value)} style={{ cursor: "pointer", width: "16px", height: "16px" }} />
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePair(coin.value)}
+                                  onClick={e => e.stopPropagation()}
+                                  style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
+                                />
                                 <span style={{ color: "#aaa", fontSize: "14px" }}>{coin.label.replace("-SWAP", "")}</span>
-                              </label>
+                              </div>
                             </td>
                             <td></td><td></td><td></td><td></td><td></td>
                           </tr>
@@ -497,22 +593,35 @@ function App() {
                       return (
                         <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
                           <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
-                            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", margin: 0 }}>
-                              <input type="checkbox" checked={isChecked} onChange={() => togglePair(coin.value)} style={{ cursor: "pointer", width: "16px", height: "16px" }} />
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => togglePair(coin.value)}
+                                onClick={e => e.stopPropagation()}
+                                style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
+                              />
                               <span style={{ fontSize: "14px" }}>
                                 <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
                                 <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
                                   ({isLong ? "Long" : "Short"} {pos.leverage || "100"}x)
                                 </span>
                               </span>
-                            </label>
+                            </div>
                           </td>
                           <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
                           <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
                           <td style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
-                            <span className={upl >= 0 ? "text-green" : "text-red"}>
-                              {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({parseFloat(pos.roi || 0) > 0 ? "+" : ""}{parseFloat(pos.roi || 0).toFixed(2)}%)
-                            </span>
+                            {(() => {
+                              const roi = parseFloat(pos.roi || 0);
+                              // Màu theo ROI% — dương là xanh, âm là đỏ
+                              const color = roi >= 0 ? "#26a69a" : "#ef5350";
+                              return (
+                                <span style={{ color }}>
+                                  {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>
                             <span style={{ color: "#26a69a" }}>{pos.tp || "+0.00"}</span> <span style={{ color: "#555", margin: "0 4px" }}>|</span> <span style={{ color: "#ef5350" }}>{pos.sl || "-0.00"}</span>
@@ -550,20 +659,7 @@ function App() {
           {/* Sidebar chỉ còn Biểu Đồ + Khung TG Bot */}
           <div className="sidebar-content" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", padding: "10px" }}>
 
-            {/* Biểu Đồ */}
-            <div className="group-box">
-              <span className="group-box-title">Biểu Đồ</span>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <select className="styled-select" style={{ flex: 1, minWidth: 0 }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-                <select className="styled-select" style={{ width: "52px", flexShrink: 0 }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Khung Thời Gian Bot */}
+            {/* Khung Thời Gian Bot — hiện trước */}
             <div className="group-box">
               <span className="group-box-title">Khung Thời Gian Bot</span>
               <div className="tf-grid">
@@ -575,6 +671,19 @@ function App() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Biểu Đồ — xuống sau */}
+            <div className="group-box">
+              <span className="group-box-title">Biểu Đồ</span>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <select className="styled-select" style={{ flex: 1, minWidth: 0, fontSize: "11px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+                <select className="styled-select" style={{ width: "62px", flexShrink: 0, fontSize: "13px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                </select>
               </div>
             </div>
 
@@ -797,8 +906,18 @@ function App() {
             {/* Footer */}
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>Đóng</button>
-              <button className="btn-primary" onClick={() => {
-                alert(settingsTab === "api" ? "💾 Đã lưu cấu hình API Key!" : "💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
+              <button className="btn-primary" onClick={async () => {
+                if (settingsTab === "api") {
+                  try {
+                    await fetch(`http://${window.location.hostname}:8080/api/bot/credentials?strategy=${selectedAccount}`, {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
+                    });
+                    alert("💾 Đã lưu cấu hình API Key!");
+                  } catch { alert("Lỗi khi lưu API Key"); }
+                } else {
+                  alert("💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
+                }
                 setShowSettings(false);
               }}>
                 {settingsTab === "api" ? "💾 LƯU CẤU HÌNH API KEY" : "💾 LƯU CẤU HÌNH CHIẾN THUẬT"}

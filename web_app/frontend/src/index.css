@@ -361,12 +361,14 @@ body {
   font-size: 12px;
   padding: 8px 12px;
   overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
   height: 100%;
 }
 .log-line {
   line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
   border-bottom: 1px solid #111;
   padding: 1px 0;
 }
