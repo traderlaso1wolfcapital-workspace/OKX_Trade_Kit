@@ -741,7 +741,6 @@ function App() {
           <div className="sidebar-header">
             <div className="app-title">TRADER LÀ SỐ 1</div>
             <div className="app-subtitle">VIỆT NAM</div>
-            <div style={{ marginTop: "6px", color: "#4CAF50", fontSize: "11px", fontWeight: "bold" }}>Slot: 75/100 ▮▮▮▮▯</div>
           </div>
 
           {/* Sidebar chỉ còn Biểu Đồ + Khung TG Bot */}
