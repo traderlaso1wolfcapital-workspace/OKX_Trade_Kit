@@ -4124,31 +4124,49 @@ del /f /q "%~f0"
             self.presence_manager.unregister()
             self.presence_manager.stop()
             self.presence_manager.wait(2000)
-        # Bước 1: Gửi tín hiệu stop cho tất cả các worker trước để chúng đóng song song
+
+        # Bước 1: Gửi tín hiệu stop (tự động tạo stop_subx.flag) cho tất cả các bot đang chạy
         for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
             panel = getattr(self, attr, None)
-            if panel and hasattr(panel, 'worker'):
-                try:
-                    if hasattr(panel, 'pos_worker') and panel.pos_worker:
-                        panel.pos_worker.stop()
-                        panel.pos_worker.wait(1000)
-                    if hasattr(panel, 'live_chart_worker') and panel.live_chart_worker:
-                        panel.live_chart_worker.stop()
-                        panel.live_chart_worker.wait(1000)
-                    if hasattr(panel, 'worker') and panel.worker:
-                        panel.worker.stop()
-                except:
-                    pass
+            if panel:
+                strategy_id = getattr(panel, 'strategy_id', None) or getattr(panel, 'strategy', None)
+                if strategy_id:
+                    try:
+                        flag_path = os.path.join(USER_DATA_DIR, f"bots/{strategy_id}", "json_data", f"stop_{strategy_id}.flag")
+                        os.makedirs(os.path.dirname(flag_path), exist_ok=True)
+                        with open(flag_path, "w") as f: f.write("stop")
+                    except: pass
+
+                if hasattr(panel, 'worker'):
+                    try:
+                        if hasattr(panel, 'pos_worker') and panel.pos_worker:
+                            panel.pos_worker.stop()
+                            panel.pos_worker.wait(1000)
+                        if hasattr(panel, 'live_chart_worker') and panel.live_chart_worker:
+                            panel.live_chart_worker.stop()
+                            panel.live_chart_worker.wait(1000)
+                        if hasattr(panel, 'worker') and panel.worker:
+                            panel.worker.stop()
+                    except:
+                        pass
                     
-        # Bước 2: Chờ và ép buộc đóng (terminate) nếu quá hạn
+        # Bước 2: Chờ và ép buộc đóng (terminate/kill) tiến trình bot ngầm và xoá PID lock rác
         for attr in ['panel_main', 'panel_sub1', 'panel_sub2', 'panel_sub3']:
             panel = getattr(self, attr, None)
+            strategy_id = getattr(panel, 'strategy_id', None) or getattr(panel, 'strategy', None) if panel else None
             if panel and hasattr(panel, 'worker') and getattr(panel.worker, 'process', None):
                 try:
                     panel.worker.process.kill()
                     panel.worker.process.wait(timeout=2.0)
                 except:
                     pass
+            if strategy_id:
+                try:
+                    pid_file = os.path.join(USER_DATA_DIR, f"bots/{strategy_id}", "json_data", f"{strategy_id}.pid")
+                    if os.path.exists(pid_file):
+                        os.remove(pid_file)
+                except: pass
+
             if panel and hasattr(panel, 'worker'):
                 try:
                     panel.worker.quit()
