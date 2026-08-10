@@ -193,6 +193,7 @@ def main():
 
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
+    # =========================================================================
     sub1_dir = os.path.join(user_data_dir, "bots/sub1")
     JSON_DATA_DIR = os.path.join(sub1_dir, "json_data")
     os.makedirs(JSON_DATA_DIR, exist_ok=True)
@@ -203,22 +204,25 @@ def main():
             try:
                 with open(lock_file, "r") as f:
                     old_pid = int(f.read().strip())
-                if psutil.pid_exists(old_pid):
-                    old_proc = psutil.Process(old_pid)
-                    old_name = old_proc.name()
-                    print(f"\n{'='*80}")
-                    print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
-                    print(f"   PID: {old_pid} | Tên: {old_name}")
-                    print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
-                    print(f"   File lock: {lock_file}")
-                    print(f"{'='*80}\n")
-                    sys.exit(1)
-                else:
-                    print(f"🧹 [LOCK] PID {old_pid} không còn tồn tại. Dọn dẹp lock cũ...")
+                if psutil.pid_exists(old_pid) and old_pid != os.getpid():
+                    try:
+                        old_proc = psutil.Process(old_pid)
+                        if "python" in old_proc.name().lower():
+                            print(f"\n{'='*80}")
+                            print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
+                            print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
+                            print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
+                            print(f"   File lock: {lock_file}")
+                            print(f"{'='*80}\n")
+                            sys.exit(1)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                if os.path.exists(lock_file):
                     os.remove(lock_file)
-            except (ValueError, psutil.NoSuchProcess):
-                print("🧹 [LOCK] File lock cũ không hợp lệ. Dọn dẹp...")
-                os.remove(lock_file)
+            except (ValueError, psutil.NoSuchProcess, Exception):
+                if os.path.exists(lock_file):
+                    try: os.remove(lock_file)
+                    except Exception: pass
         
         current_pid = os.getpid()
         with open(lock_file, "w") as f:
