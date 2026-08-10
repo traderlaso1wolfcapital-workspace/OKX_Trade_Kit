@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Đang dừng các tiến trình..."
+echo "Đang dừng các tiến trình Web Server..."
 pkill -f "python3 main.py"
 pkill -f "vite"
 echo "✅ Đã dừng hệ thống Web Server!"
