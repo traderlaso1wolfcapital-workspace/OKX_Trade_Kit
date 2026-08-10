@@ -2255,6 +2255,11 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
             target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
+            aligned_short_tfs = get_aligned_tfs(start_tf, "DOWNTREND") if allowed_short else []
+            _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
+            target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+            target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
+
             # ⚡ ALTCOIN FALLBACK: Khi BTC có tín hiệu (allowed_short/long=True)
             # nhưng Altcoin chưa có TF nào aligned → force đặt limit theo BTC direction
             # Phải đảm bảo fallback_tf nằm trong TFS (khung thời gian được tích chọn)
@@ -2271,11 +2276,6 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
                         target_long_tfs = [fallback_tf]
                     if allowed_short and not target_short_tfs:
                         target_short_tfs = [fallback_tf]
-
-            aligned_short_tfs = get_aligned_tfs(start_tf, "DOWNTREND") if allowed_short else []
-            _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
-            target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
-            target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
 
             if not getattr(globals_ref, "ENABLE_STRATEGY_MAIN", True):
                 target_long_tfs = []
@@ -2721,3 +2721,4 @@ def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_pa
 # 🗺️ BẢN ĐỒ GIẢI PHẪU THUẬT TOÁN — CRITICAL STRATEGY MAP (PURE LIMIT CROSS PP0)
 # =========================================================================================
 # z306 | Fixed disabled coin logic in sub1 to properly close positions and cancel all limits
+# z307 | Fix local variable 'target_short_tfs' referenced before assignment during ALTCOIN FALLBACK logic
