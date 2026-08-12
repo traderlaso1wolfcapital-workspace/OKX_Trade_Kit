@@ -124,6 +124,8 @@ function App() {
   const terminalRef = useRef(null);
   const wsRef = useRef(null);
   const audioRef = useRef(null); // Reference for click sound
+  const lastLogTimeRef = useRef(0);
+  const logBlockIdRef = useRef(0);
 
   const [authStep, setAuthStep] = useState("uid"); // "uid", "require_password", "require_new_password"
   const [level2Password, setLevel2Password] = useState("");
@@ -194,7 +196,22 @@ function App() {
       ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${selectedAccount}`);
       wsRef.current = ws;
       ws.onmessage = (e) => {
-        setLogs(prev => { const n = [...prev, e.data]; return n.length > 500 ? n.slice(-500) : n; });
+        const now = Date.now();
+        setLogs(prev => {
+          let newBlocks = [...prev];
+          // Nếu mảng rỗng, hoặc log cách nhau > 1500ms, tạo block mới và ĐẨY LÊN ĐẦU
+          if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
+            logBlockIdRef.current += 1;
+            newBlocks.unshift({ id: logBlockIdRef.current, lines: [e.data] });
+          } else {
+            // Log đến liên tục => gộp vào block đầu tiên (đang in dở)
+            newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
+          }
+          // Giữ tối đa 20 blocks gần nhất để không lag
+          if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
+          return newBlocks;
+        });
+        lastLogTimeRef.current = now;
       };
       ws.onclose = () => {
         if (isMounted && wsRef.current === ws) {
@@ -205,6 +222,8 @@ function App() {
     
     // Đổi tab => clear log cũ, nối lại WS mới
     setLogs([]);
+    lastLogTimeRef.current = 0;
+    logBlockIdRef.current = 0;
     if (wsRef.current) {
       wsRef.current.onclose = null;
       wsRef.current.close();
@@ -222,7 +241,11 @@ function App() {
 
   useEffect(() => {
     if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+      const { scrollTop } = terminalRef.current;
+      // Nếu đang ở gần trên cùng (cách top <= 50px), tự động cuộn lên sát mép trên để xem log mới nhất
+      if (scrollTop <= 50) {
+        terminalRef.current.scrollTop = 0;
+      }
     }
   }, [logs]);
 
@@ -681,10 +704,14 @@ function App() {
           <div className="tab-content">
             {activeTab === "logs" ? (
               <div className="logs-terminal" ref={terminalRef}>
-                {logs.map((l, i) => <div key={i} className="log-line">{l}</div>)}
+                {logs.map((block) => (
+                  <div key={block.id} className="log-block" style={{ marginBottom: "20px" }}>
+                    {block.lines.map((l, i) => <div key={i} className="log-line">{l}</div>)}
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="positions-table-wrapper" style={{ overflowX: "auto", overflowY: "hidden", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}>
+              <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                   <thead>
                     <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
@@ -699,10 +726,10 @@ function App() {
                   </thead>
                   <tbody>
                     {COIN_LIST.slice(0, 3).map((coin, i) => {
-                      const pos = safePos.find(p => p.instId === coin.value);
+                      const posList = safePos.filter(p => p.instId === coin.value);
                       const isChecked = activePairs.includes(coin.value);
                       
-                      if (!pos) {
+                      if (posList.length === 0) {
                         return (
                           <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
                             <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
@@ -747,83 +774,107 @@ function App() {
                         );
                       }
 
-                      const isLong = pos.posSide === "long";
-                      const upl = parseFloat(pos.upl || "0");
-                      const margin = parseFloat(pos.margin || "0");
-                      
-                      return (
-                        <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                          <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => togglePair(coin.value)}
-                                onClick={e => e.stopPropagation()}
-                                style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
-                              />
-                              <span style={{ fontSize: "14px" }}>
-                                <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
-                                <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
-                                  ({isLong ? "Long" : "Short"} {pos.leverage || "100"}x)
+                      return posList.map((pos, ticketIndex) => {
+                        const isLong = pos.posSide === "long";
+                        const upl = parseFloat(pos.upl || "0");
+                        const margin = parseFloat(pos.margin || "0");
+                        
+                        return (
+                          <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: "1px solid #333" }}>
+                            <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                                {ticketIndex === 0 ? (
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => togglePair(coin.value)}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
+                                  />
+                                ) : (
+                                  <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
+                                )}
+                                <span style={{ fontSize: "14px" }}>
+                                  <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                  <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
+                                    ({isLong ? "Long" : "Short"} {pos.lever || "100"}x)
+                                  </span>
+                                  {pos.ticket_id && <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{pos.ticket_id}</span>}
                                 </span>
-                              </span>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
-                          <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
-                          <td style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
-                            {(() => {
-                              const roi = parseFloat(pos.roi || 0);
-                              // Màu theo ROI% — dương là xanh, âm là đỏ
-                              const color = roi >= 0 ? "#26a69a" : "#ef5350";
-                              return (
-                                <span style={{ color }}>
-                                  {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
-                                </span>
-                              );
-                            })()}
-                          </td>
-                          {/* <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>
-                            <span style={{ color: "#26a69a" }}>{pos.tp || "+0.00"}</span> <span style={{ color: "#555", margin: "0 4px" }}>|</span> <span style={{ color: "#ef5350" }}>{pos.sl || "-0.00"}</span>
-                          </td> */}
-                          <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
-                            <div style={{ display: "flex", gap: "6px" }}>
-                              {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
-                                const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
-                                const isOn = coinTfs.includes(tf);
-                                const label = tf.replace("M", "");
+                              </div>
+                            </td>
+                            <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
+                            <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                            <td style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
+                              {(() => {
+                                const roi = parseFloat(pos.roi || 0);
+                                const color = roi >= 0 ? "#26a69a" : "#ef5350";
                                 return (
-                                  <span
-                                    key={tf}
-                                    onClick={() => handleTfToggle(coin.value, tf)}
-                                    style={{
-                                      cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
-                                      fontSize: "12px", fontWeight: "bold",
-                                      background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
-                                      border: isOn ? "1px solid #26a69a" : "1px solid #444",
-                                      minWidth: "28px", textAlign: "center"
-                                    }}
-                                  >
-                                    {label}
+                                  <span style={{ color }}>
+                                    {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
                                   </span>
                                 );
-                              })}
-                            </div>
-                          </td>
-                          <td style={{ textAlign: "center", padding: "12px 10px" }}>
-                            <button 
-                              onClick={() => alert("Chức năng Cắt Lệnh đang được phát triển.")}
-                              style={{ 
-                                background: "#c62828", color: "white", border: "none", 
-                                borderRadius: "4px", padding: "6px 16px", cursor: "pointer", 
-                                fontSize: "13px", fontWeight: "bold" 
-                              }}>
-                              Đóng
-                            </button>
-                          </td>
-                        </tr>
-                      );
+                              })()}
+                            </td>
+                            <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                              {ticketIndex === 0 && (
+                                <div style={{ display: "flex", gap: "6px" }}>
+                                  {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
+                                    const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
+                                    const isOn = coinTfs.includes(tf);
+                                    const label = tf.replace("M", "");
+                                    return (
+                                      <span
+                                        key={tf}
+                                        onClick={() => handleTfToggle(coin.value, tf)}
+                                        style={{
+                                          cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
+                                          fontSize: "12px", fontWeight: "bold",
+                                          background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
+                                          border: isOn ? "1px solid #26a69a" : "1px solid #444",
+                                          minWidth: "28px", textAlign: "center"
+                                        }}
+                                      >
+                                        {label}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ textAlign: "center", padding: "12px 10px" }}>
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm(`Bạn có chắc muốn đóng lệnh ${pos.ticket_id || ''}?`)) {
+                                    try {
+                                      const u = localStorage.getItem('tls1_uid') || loginUid;
+                                      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/bot/positions/close_ticket?uid=${u}`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          ticket_id: pos.ticket_id,
+                                          instId: pos.instId,
+                                          posSide: pos.posSide,
+                                          pos: pos.pos
+                                        })
+                                      });
+                                      alert("Đã gửi lệnh đóng thành công!");
+                                    } catch (e) {
+                                      alert("Lỗi khi đóng lệnh: " + e.message);
+                                    }
+                                  }
+                                }}
+                                style={{ 
+                                  background: "#c62828", color: "white", border: "none", 
+                                  borderRadius: "4px", padding: "6px 16px", cursor: "pointer", 
+                                  fontSize: "13px", fontWeight: "bold" 
+                                }}>
+                                Đóng
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      });
                     })}
                   </tbody>
                 </table>

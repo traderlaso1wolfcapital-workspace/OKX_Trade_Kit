@@ -3,7 +3,7 @@ from decimal import Decimal
 import time
 
 
-def record_trade_marker(coin: str, side: str, price: float, status: str = "active"):
+def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active"):
     try:
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
@@ -26,10 +26,14 @@ def record_trade_marker(coin: str, side: str, price: float, status: str = "activ
                 if m["side"] == side and m["status"] == "active":
                     m["status"] = "closed"
         else:
+            if not ticket_id:
+                ticket_id = f"#{int(time.time() * 1000)}"
             markers[coin].append({
+                "ticket_id": ticket_id,
                 "time": int(time.time() * 1000),
                 "side": side,
                 "price": float(price),
+                "volume": float(volume),
                 "status": "active"
             })
             

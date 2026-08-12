@@ -64,10 +64,13 @@ sys.path.append(OKX_TRADE_KIT_DIR)
 # AppData path của TLS1_Trading
 LOCAL_APP_DATA = os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local"))
 
-def get_user_data_dir(uid: str) -> str:
+def get_user_base_dir(uid: str) -> str:
     safe_uid = "".join(c for c in uid if c.isalnum() or c in ('_', '-'))
     if not safe_uid: safe_uid = "default"
     return os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users", safe_uid)
+
+def get_user_data_dir(uid: str) -> str:
+    return os.path.join(get_user_base_dir(uid), "TLS1_Trading")
 
 # Trạng thái tiến trình bot (hỗ trợ multi-tenant)
 # Nested dictionaries: dict[uid][strategy]
@@ -98,6 +101,12 @@ class CredentialsUpdate(BaseModel):
 class LoginRequest(BaseModel):
     uid: str
     password: str = None
+    
+class CloseTicketRequest(BaseModel):
+    ticket_id: str
+    instId: str
+    posSide: str
+    pos: str
 
 @app.post("/api/auth/login")
 async def login_with_password(req: LoginRequest):
@@ -316,7 +325,10 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1
             os.remove(flag_path)
             
         custom_env = os.environ.copy()
-        custom_env["LOCALAPPDATA"] = get_user_data_dir(uid)
+        custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
+        custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+        custom_env["PYTHONUNBUFFERED"] = "1"
+        custom_env["PYTHONIOENCODING"] = "utf-8"
             
         new_proc = subprocess.Popen(
             cmd,
@@ -559,50 +571,117 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             algo_data = res_algo.get("data", [])
                             
                     formatted_positions = []
+                    
+                    # Read trade_markers for virtual tickets
+                    markers = {}
+                    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+                    if os.path.exists(positions_path):
+                        try:
+                            with open(positions_path, "r", encoding="utf-8") as f:
+                                markers = json.load(f)
+                        except Exception: pass
+
+                    # Create a map of OKX positions by instId
+                    okx_pos_map = {}
                     for pos in raw_positions:
-                        inst = pos.get("instId")
-                        tp_px = "---"
-                        sl_px = "---"
-                        for o in algo_data:
-                            if o.get("instId") == inst:
-                                if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
-                                if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
-                                
-                        avg_px = float(pos.get("avgPx", 0))
-                        last_px = float(pos.get("last", avg_px)) if pos.get("last") else avg_px
-                        pos_side = pos.get("posSide", "long")
-                        upl = float(pos.get("upl", 0))
+                        okx_pos_map[pos.get("instId")] = pos
+
+                    # Sync and build tickets
+                    dirty_markers = False
+                    for coin, items in markers.items():
+                        inst_id = f"{coin}-USDT-SWAP"
+                        okx_pos = okx_pos_map.get(inst_id)
                         
-                        # Dùng uplRatio từ OKX API — chính xác hơn tự tính
-                        upl_ratio = pos.get("uplRatio", "")
-                        if upl_ratio and upl_ratio not in ("", "0", None):
-                            roi = f"{float(upl_ratio) * 100:.2f}"
-                        else:
-                            # Fallback tính tay nếu OKX không trả uplRatio
-                            roi = "0.00"
-                            if avg_px > 0:
-                                leverage = float(pos.get("lever", 1))
-                                if pos_side == "long":
-                                    roi = f"{((last_px - avg_px) / avg_px) * 100 * leverage:.2f}"
-                                else:
-                                    roi = f"{((avg_px - last_px) / avg_px) * 100 * leverage:.2f}"
+                        has_active = any(i.get("status") == "active" for i in items)
+                        if has_active and not okx_pos:
+                            # Auto-sync: OKX closed but local still active
+                            for item in items:
+                                if item.get("status") == "active":
+                                    item["status"] = "closed"
+                            dirty_markers = True
+                        elif has_active and okx_pos:
+                            # Split into virtual tickets
+                            tp_px = "---"
+                            sl_px = "---"
+                            for o in algo_data:
+                                if o.get("instId") == inst_id:
+                                    if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
+                                    if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
+                            
+                            total_pos = abs(float(okx_pos.get("pos", 1)))
+                            m_str = okx_pos.get("margin", "")
+                            if not m_str or float(m_str) == 0:
+                                m_str = okx_pos.get("imr", "0")
+                            total_margin = float(m_str)
+                            avg_px = float(okx_pos.get("avgPx", 0))
+                            last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
+                            leverage = float(okx_pos.get("lever", 1))
+                            pos_side = okx_pos.get("posSide", "long").lower()
+                            
+                            for item in items:
+                                if item.get("status") == "active" and item.get("side", "").lower() == pos_side:
+                                    t_vol = abs(float(item.get("volume", 0)))
+                                    if t_vol == 0: t_vol = total_pos # fallback
                                     
-                        formatted_positions.append({
-                            "instId": inst,
-                            "posSide": pos_side,
-                            "pos": pos.get("pos"),
-                            "margin": pos.get("margin") or pos.get("imr") or "0",
-                            "avgPx": pos.get("avgPx"),
-                            "lastPx": str(last_px),
-                            "roi": roi,
-                            "upl": pos.get("upl"),
-                            "tp": tp_px,
-                            "sl": sl_px,
-                            "lever": pos.get("lever", "100"),
-                        })
+                                    ratio = t_vol / total_pos if total_pos > 0 else 1
+                                    t_margin = total_margin * ratio
+                                    
+                                    t_entry = float(item.get("price", avg_px))
+                                    
+                                    # Calculate ROI for this specific ticket
+                                    if pos_side == "long":
+                                        roi_val = ((last_px - t_entry) / t_entry) * 100 * leverage
+                                    else:
+                                        roi_val = ((t_entry - last_px) / t_entry) * 100 * leverage
+                                        
+                                    upl_val = t_margin * (roi_val / 100)
+                                    
+                                    formatted_positions.append({
+                                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
+                                        "instId": inst_id,
+                                        "posSide": pos_side,
+                                        "pos": str(t_vol),
+                                        "margin": f"{t_margin:.2f}",
+                                        "avgPx": str(t_entry),
+                                        "lastPx": str(last_px),
+                                        "roi": f"{roi_val:.2f}",
+                                        "upl": f"{upl_val:.4f}",
+                                        "tp": tp_px,
+                                        "sl": sl_px,
+                                        "lever": str(int(leverage)),
+                                    })
+                                    
+                    # If any markers were auto-closed, save to file
+                    if dirty_markers:
+                        try:
+                            with open(positions_path, "w", encoding="utf-8") as f:
+                                json.dump(markers, f)
+                        except Exception: pass
+                        
+                    # If we don't have any markers but have OKX positions (e.g. manual trades), show them as 1 ticket
+                    for inst_id, okx_pos in okx_pos_map.items():
+                        coin = inst_id.split("-")[0]
+                        if coin not in markers or not any(i.get("status") == "active" for i in markers[coin]):
+                            avg_px = float(okx_pos.get("avgPx", 0))
+                            last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
+                            formatted_positions.append({
+                                "ticket_id": "#MANUAL",
+                                "instId": inst_id,
+                                "posSide": okx_pos.get("posSide", "long").lower(),
+                                "pos": okx_pos.get("pos"),
+                                "margin": okx_pos.get("margin") or okx_pos.get("imr") or "0",
+                                "avgPx": str(avg_px),
+                                "lastPx": str(last_px),
+                                "roi": okx_pos.get("uplRatio", "0.00"),
+                                "upl": okx_pos.get("upl", "0.00"),
+                                "tp": "---",
+                                "sl": "---",
+                                "lever": okx_pos.get("lever", "100"),
+                            })
+
                     return formatted_positions
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error fetching OKX positions: {e}")
 
     # 3. Fallback: Đọc các vị thế từ trade_markers.json
     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
@@ -617,20 +696,117 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
             for item in items:
                 if item.get("status") == "active":
                     mock_positions.append({
+                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
                         "instId": f"{coin}-USDT-SWAP",
                         "posSide": item.get("side", "long").lower(),
-                        "pos": "1.0 (MOCK)",
-                        "margin": "100.00",
+                        "pos": str(item.get("volume", "1.0")),
+                        "margin": "0.00",
                         "avgPx": str(item.get("price")),
                         "lastPx": str(item.get("price")),
                         "roi": "0.00",
                         "upl": "0.00",
                         "tp": "---",
-                        "sl": "---"
+                        "sl": "---",
+                        "lever": "100"
                     })
         return mock_positions
     except Exception:
         return []
+
+@app.post("/api/bot/positions/close_ticket")
+async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
+    # 1. Update trade_markers.json to mark as closed
+    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+    coin = req.instId.split("-")[0]
+    ticket_closed = False
+    
+    if os.path.exists(positions_path):
+        try:
+            with open(positions_path, "r", encoding="utf-8") as f:
+                markers = json.load(f)
+                
+            if coin in markers:
+                for item in markers[coin]:
+                    if item.get("ticket_id") == req.ticket_id and item.get("status") == "active":
+                        item["status"] = "closed"
+                        ticket_closed = True
+                        break
+                        
+            if ticket_closed:
+                with open(positions_path, "w", encoding="utf-8") as f:
+                    json.dump(markers, f)
+        except Exception as e:
+            print(f"Error updating markers: {e}")
+            
+    # 2. Call OKX API to execute partial close
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
+    env_file = f".api_{strategy}"
+    env_path = os.path.join(config_dir, env_file)
+    
+    api_key, secret_key, passphrase = "", "", ""
+    is_demo = False
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
+                        v = v.strip("\"'")
+                        if k == "OKX_API_KEY": api_key = v
+                        elif k == "OKX_SECRET_KEY": secret_key = v
+                        elif k == "OKX_PASSPHRASE": passphrase = v
+                        elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
+        except Exception: pass
+
+    if api_key and secret_key and passphrase and req.ticket_id != "#MANUAL":
+        try:
+            domain = "www.okx.com"
+            base_url = f"https://{domain}"
+            path_order = "/api/v5/trade/order"
+            
+            # Determine order side for partial close
+            order_side = "sell" if req.posSide == "long" else "buy"
+            order_pos_side = "long" if req.posSide == "long" else "short" # For Net mode, OKX usually ignores this, but we pass long/short
+            
+            payload = {
+                "instId": req.instId,
+                "tdMode": "cross",
+                "side": order_side,
+                "ordType": "market",
+                "sz": req.pos,
+                "posSide": order_pos_side
+            }
+            body_str = json.dumps(payload)
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            message = ts + "POST" + path_order + body_str
+            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+            signature = base64.b64encode(mac.digest()).decode('utf-8')
+            
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": ts,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "x-simulated-trading": "1" if is_demo else "0",
+                "Content-Type": "application/json"
+            }
+            
+            resp = requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
+            res_json = resp.json()
+            if res_json.get("code") != "0":
+                # Net mode okx uses 'net' instead of long/short sometimes
+                if "posSide" in res_json.get("msg", ""):
+                    payload["posSide"] = "net"
+                    body_str = json.dumps(payload)
+                    message = ts + "POST" + path_order + body_str
+                    mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+                    headers["OK-ACCESS-SIGN"] = base64.b64encode(mac.digest()).decode('utf-8')
+                    requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
+
+        except Exception as e:
+            print(f"Error placing partial close: {e}")
+
+    return {"message": "Closed ticket successfully"}
 
 @app.websocket("/ws/logs/{uid}/{strategy}")
 async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):

@@ -251,25 +251,22 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         "WAIT": []
     }
     
+    target_vol = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+    try:
+        cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
+        if cfg_path and os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as _f:
+                _cfg = json.load(_f)
+                if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                    target_vol = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+    except: pass
+    
     def fmt_tf_state(st):
         arrow = '▲' if st["side"] == 'above' else ('▼' if st["side"] == 'under' else ('◆' if st["side"] == 'touch' else '■'))
         return f"{arrow} {st['accum']:3}-{st['fail']}"
         
     def _get_vol_str(tk_obj, tf_name):
-        target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
-        try:
-            cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
-            if cfg_path and os.path.exists(cfg_path):
-                with open(cfg_path, "r", encoding="utf-8") as _f:
-                    _cfg = json.load(_f)
-                    if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
-                        target_usdt = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
-            elif os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "global_config.json")):
-                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "global_config.json"), "r", encoding="utf-8") as _f:
-                    _cfg = json.load(_f)
-                    if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
-                        target_usdt = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
-        except: pass
+        target_usdt = target_vol
         _is_xl = getattr(tk_obj, "xole_tf", None)
         if _is_xl:
             v_mult = getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))

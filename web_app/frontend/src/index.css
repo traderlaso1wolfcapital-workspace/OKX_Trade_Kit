@@ -670,8 +670,8 @@ body {
     width: 100% !important;
     order: 1;
     flex-direction: column !important;
-    height: auto !important;
-    flex-shrink: 0;
+    flex: 1 !important;
+    height: 0 !important; /* Let flex control height */
   }
 
   .main-workspace .pane-chart {
@@ -684,7 +684,9 @@ body {
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    height: 280px !important; /* Mở rộng để không cắt dòng cuối */
+    flex: 1 !important;
+    height: auto !important;
+    min-height: 200px;
     flex-shrink: 0;
   }
 
@@ -767,12 +769,12 @@ body {
   /* Log font nho hon tren mobile */
   .logs-terminal { font-size: 11px; }
 
-  /* Positions table scroll ngang CHỈ, không 2D */
+  /* Positions table scroll ngang và dọc trên mobile */
   .positions-table-wrapper {
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;  /* chặn kéo dọc trên mobile */
+    touch-action: auto;  /* cho phép kéo dọc/ngang */
     position: relative;   /* giữ cố định vị trí trong layout */
     scrollbar-width: none; /* Ẩn scrollbar Firefox */
     -ms-overflow-style: none; /* Ẩn scrollbar IE/Edge */

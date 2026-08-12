@@ -127,9 +127,13 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
 def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
     try:
         if os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
-            with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
-                cfg = json.load(f)
+            try:
+                with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except json.JSONDecodeError:
+                cfg = {}
                 
+            if cfg:
                 import sys
                 import bots.sub1.bot_config as target_config
                 strategy_mod = sys.modules[__name__]
@@ -207,7 +211,8 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                             if cname in leverages:
                                 item["leverage"] = int(leverages[cname])
     except Exception as e:
-        print(f"⚠️ [RUN_EVOLUTION LỖI]: {e}")
+        if not isinstance(e, json.JSONDecodeError):
+            print(f"⚠️ [RUN_EVOLUTION LỖI]: {e}")
 
     pass
 
@@ -1038,11 +1043,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.open_reason_long = f"Xu hướng Tăng tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
+                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
+                vol_dca = tracker.last_long_pos_amt
+                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active")
                 
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
-                bot_models.record_trade_marker(coin_name, "LONG", float(tracker.active_avg_px_long), "active")
+                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
+                vol_dca = tracker.last_long_pos_amt - old_pos_amt_l
+                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active")
                 _tf = getattr(tracker, "active_pos_tf", "M5")
                 tracker.open_reason_long = f"DCA Khung Lớn Tăng tại [{_tf}]: Cập nhật trung bình giá"
 
@@ -1058,11 +1067,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.open_reason_short = f"Xu hướng Giảm tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
+                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
+                vol_dca = tracker.last_short_pos_amt
+                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active")
                 
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
-                bot_models.record_trade_marker(coin_name, "SHORT", float(tracker.active_avg_px_short), "active")
+                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
+                vol_dca = tracker.last_short_pos_amt - old_pos_amt_s
+                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active")
                 _tf = getattr(tracker, "active_pos_tf", "M5")
                 tracker.open_reason_short = f"DCA Khung Lớn Giảm tại [{_tf}]: Cập nhật trung bình giá"
     except Exception:
