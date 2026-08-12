@@ -14,7 +14,7 @@ from typing import Any
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
 ENABLE_STRATEGY_XOLE = True       # ❷ CHIẾN THUẬT BẮT BẺ (XOLE)
 
-ENABLE_DYNAMIC_EMA200_TP = False   # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO)
+ENABLE_DYNAMIC_EMA200_TP = True   # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO)
 ENABLE_DYNAMIC_PINGPONG_TP = False # CHỐT LỜI ĐỘNG TẠM THỜI (PING-PONG)
 
 ALTCOIN_FOLLOW_BTC_EMA = True     # 🔄 ON: Altcoin neo limit theo BTC | LOCK: Altcoin dùng EMA200 của chính nó
@@ -91,7 +91,7 @@ XOLE_TF_VOLUME_MULTIPLIERS = {
 # ==============================================================================
 ENABLE_SIDEWAY_SAFE_EXIT    = False  # Chốt lời chủ động khi Sideway strict + ROI >= 20%
 ENABLE_SQUEEZE_ESCAPE_EXIT  = True   # Phòng thủ SL Dương khi xuất hiện Nén tam giác (Squeeze)
-ENABLE_SAFEGUARD_ENTRY_EXIT = False  # Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry
+ENABLE_SAFEGUARD_ENTRY_EXIT = True  # Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry
 ENABLE_TRAILING_SL          = False  # Trailing SL động — khóa lợi nhuận khi ROI tăng dần
 ENABLE_MAX_ROI_EXIT         = False  # Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng)
 ENABLE_SIDEWAY_VAP_EXIT     = False  # Cắt hòa/dương khi Vấp EMA200 >= 2 lần liên tiếp

@@ -816,12 +816,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLED_COINS": ["XAU", "BTC", "ETH"],
             "ENABLE_STRATEGY_MAIN": True,
             "ENABLE_STRATEGY_XOLE": True,
-            "ENABLE_DYNAMIC_EMA200_TP": False,
+            "ENABLE_DYNAMIC_EMA200_TP": True,
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
             "ALTCOIN_FOLLOW_BTC_EMA": True,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
             "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
-            "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+            "ENABLE_SAFEGUARD_ENTRY_EXIT": True,
             "ENABLE_TRAILING_SL": False,
             "ENABLE_MAX_ROI_EXIT": False,
             "ENABLE_SIDEWAY_VAP_EXIT": False,
@@ -1301,7 +1301,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.log_display = QtWidgets.QPlainTextEdit()
         self.log_display.setReadOnly(True)
-        self.log_display.setMaximumBlockCount(100)
+        self.log_display.setMaximumBlockCount(0)
         self.log_display.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         self.log_display.setFont(QtGui.QFont("Consolas", 12))
         self.log_display.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
@@ -1309,7 +1309,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "background-color: #111111; color: #D69E2E; font-family: 'Consolas', 'Cascadia Code', monospace; font-size: 17px; padding: 5px; border-radius: 4px; border: 1px solid #333;"
         )
         
-        btn_clear_log.clicked.connect(self.log_display.clear)
+        btn_clear_log.clicked.connect(self.clear_logs)
         log_header.addWidget(btn_clear_log)
         console_layout.addLayout(log_header)
         console_layout.addWidget(self.log_display, 1)
@@ -2563,7 +2563,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         return fallback if acc_name == "" else acc_name
 
     def on_account_changed(self, index=None):
-        self.log_display.appendPlainText(f"🔌 Đã chuyển sang tài khoản: {self.get_selected_env()}")
+        self.append_log_system(f"🔌 Đã chuyển sang tài khoản: {self.get_selected_env()}")
         self.load_current_settings()
         self.apply_current_api_to_worker()
 
@@ -2766,6 +2766,23 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
                 if hasattr(self, 'sp_fixed_sl'): self.sp_fixed_sl.setValue(float(cfg.get("FIXED_SL_PCT", getattr(bot_config, "FIXED_SL_PCT", 1.0))))
                 if hasattr(self, 'sp_fixed_tp'): self.sp_fixed_tp.setValue(float(cfg.get("FIXED_TP_PCT", getattr(bot_config, "FIXED_TP_PCT", 2.0))))
+
+            elif self.strategy_id == "sub1":
+                if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
+                if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
+                if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
+                if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
+                if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(bool(cfg.get("ALTCOIN_FOLLOW_BTC_EMA", getattr(bot_config, "ALTCOIN_FOLLOW_BTC_EMA", False))))
+                if hasattr(self, 'chk_sideway_safe'): self.chk_sideway_safe.setChecked(bool(cfg.get("ENABLE_SIDEWAY_SAFE_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_SAFE_EXIT", False))))
+                if hasattr(self, 'chk_squeeze_escape'): self.chk_squeeze_escape.setChecked(bool(cfg.get("ENABLE_SQUEEZE_ESCAPE_EXIT", getattr(bot_config, "ENABLE_SQUEEZE_ESCAPE_EXIT", False))))
+                if hasattr(self, 'chk_safeguard_entry'): self.chk_safeguard_entry.setChecked(bool(cfg.get("ENABLE_SAFEGUARD_ENTRY_EXIT", getattr(bot_config, "ENABLE_SAFEGUARD_ENTRY_EXIT", False))))
+                if hasattr(self, 'chk_trailing_sl'): self.chk_trailing_sl.setChecked(bool(cfg.get("ENABLE_TRAILING_SL", getattr(bot_config, "ENABLE_TRAILING_SL", False))))
+                if hasattr(self, 'chk_max_roi'): self.chk_max_roi.setChecked(bool(cfg.get("ENABLE_MAX_ROI_EXIT", getattr(bot_config, "ENABLE_MAX_ROI_EXIT", False))))
+                if hasattr(self, 'chk_sideway_vap'): self.chk_sideway_vap.setChecked(bool(cfg.get("ENABLE_SIDEWAY_VAP_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_VAP_EXIT", False))))
+                if hasattr(self, 'chk_h4_flip'): self.chk_h4_flip.setChecked(bool(cfg.get("ENABLE_H4_FLIP_CLOSE", getattr(bot_config, "ENABLE_H4_FLIP_CLOSE", False))))
+                if hasattr(self, 'input_pos_vol'): self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 100.0))))
+                if hasattr(self, 'input_tp_pct'): self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", getattr(bot_config, "TP_TARGET_OPTIMAL", 0.008))) * 100)
+                if hasattr(self, 'input_sl_pct'): self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", getattr(bot_config, "SL_TARGET_OPTIMAL", 0.008))) * 100)
 
             elif self.strategy_id == "sub2":
                 self.smc_chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_SMC", getattr(bot_config, "ENABLE_STRATEGY_SMC", True))))
@@ -3262,7 +3279,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             except: pass
             
         # self.log_display.clear()
-        self.log_display.appendPlainText(f"\n=======================================================\n🔄 Đang khởi động Bot [{self.strategy_name}] trên {env_file}...")
+        self.append_log_system(f"\n=======================================================\n🔄 Đang khởi động Bot [{self.strategy_name}] trên {env_file}...")
         
         self.worker = BotSubprocessWorker(env_file, self.strategy_id)
         self.worker.log_signal.connect(self.append_log)
@@ -3301,7 +3318,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def on_bot_finished(self):
         play_ui_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
-        self.log_display.appendPlainText("\n🛑 Bot đã dừng hoàn toàn.")
+        self.append_log_system("\n🛑 Bot đã dừng hoàn toàn.")
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
         self.account_dropdown.setEnabled(True)
@@ -3573,6 +3590,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                             
                                             const positions = {json.dumps(chart_positions)};
                                             positions.forEach(p => {{
+                                                /* TẠM ẨN THEO YÊU CẦU USER
                                                 if (p.entry) {{
                                                     window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#FFFFFF', lineStyle: 2, lineWidth: 1, title: p.title || 'ENTRY' }}));
                                                 }}
@@ -3582,6 +3600,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                                                 p.sl_list.forEach(sl => {{
                                                     window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 1, title: 'SL' }}));
                                                 }});
+                                                */
                                             }});
                                         }} catch(err) {{}}
                                     }})();
@@ -3595,6 +3614,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 traceback.print_exc()
                 print(f"Chart error: {e}")
 
+    def clear_logs(self):
+        self._log_blocks = []
+        self.log_display.clear()
+
+    def append_log_system(self, text):
+        import time
+        if not hasattr(self, '_log_blocks'): self._log_blocks = []
+        self._log_blocks.insert(0, [text])
+        self._last_log_time = time.time()
+        self._render_log_blocks()
+
     def append_log(self, text):
         try:
             if text.strip().startswith('{"type": "chart_data"'):
@@ -3604,13 +3634,48 @@ class BotInstanceWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
-        cursor = self.log_display.textCursor()
-        cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
-        self.log_display.setTextCursor(cursor)
-        self.log_display.insertPlainText(text + "\n")
-        if self.log_display.document().lineCount() > 1500:
-            self.log_display.clear()
-            self.log_display.appendPlainText("🧹 Đã dọn bớt log cũ (Giữ giới hạn 50 chu kỳ)...\n")
+        import time
+        now = time.time()
+        
+        if not hasattr(self, '_log_blocks'):
+            self._log_blocks = []
+            self._last_log_time = 0
+            
+        if not self._log_blocks or (now - self._last_log_time) > 1.5:
+            self._log_blocks.insert(0, [text])
+        else:
+            self._log_blocks[0].append(text)
+            
+        self._last_log_time = now
+        self._render_log_blocks()
+
+    def _render_log_blocks(self):
+        if not hasattr(self, '_log_render_timer'):
+            from PyQt6 import QtCore
+            self._log_render_timer = QtCore.QTimer()
+            self._log_render_timer.setSingleShot(True)
+            self._log_render_timer.timeout.connect(self._do_render_log_blocks)
+        self._log_render_timer.start(50)
+
+    def _do_render_log_blocks(self):
+        if not hasattr(self, '_log_blocks'): return
+        if len(self._log_blocks) > 30:
+            self._log_blocks = self._log_blocks[:30]
+            
+        full_text = ""
+        for block in self._log_blocks:
+            full_text += "\n".join(block) + "\n\n"
+            
+        v_bar = self.log_display.verticalScrollBar()
+        current_scroll = v_bar.value()
+        is_at_top = current_scroll <= 10
+        
+        self.log_display.setPlainText(full_text.strip())
+        
+        if is_at_top:
+            v_bar.setValue(0)
+        else:
+            v_bar.setValue(current_scroll)
 
 class MainWindow(QtWidgets.QMainWindow):
     def show_help(self, title, text):
@@ -3840,12 +3905,12 @@ class MainWindow(QtWidgets.QMainWindow):
             "ENABLED_COINS": ["XAU", "BTC", "ETH"],
             "ENABLE_STRATEGY_MAIN": True,
             "ENABLE_STRATEGY_XOLE": True,
-            "ENABLE_DYNAMIC_EMA200_TP": False,
+            "ENABLE_DYNAMIC_EMA200_TP": True,
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
             "ALTCOIN_FOLLOW_BTC_EMA": True,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
             "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
-            "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+            "ENABLE_SAFEGUARD_ENTRY_EXIT": True,
             "ENABLE_TRAILING_SL": False,
             "ENABLE_MAX_ROI_EXIT": False,
             "ENABLE_SIDEWAY_VAP_EXIT": False,
