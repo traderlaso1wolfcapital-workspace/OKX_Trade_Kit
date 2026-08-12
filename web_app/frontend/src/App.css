@@ -1,1 +1,8 @@
 /* App.css rỗng để nhường chỗ cho index.css */
+.tab-fade {
+  animation: tabFadeIn 0.3s ease-out;
+}
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

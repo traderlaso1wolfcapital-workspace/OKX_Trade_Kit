@@ -126,7 +126,7 @@ async def login_with_password(req: LoginRequest):
         if not is_valid:
             return {"status": "error", "message": "UID không tồn tại hoặc chưa đăng ký!"}
             
-        if user_status != "ACTIVE":
+        if user_status not in ["ACTIVE", "ON"]:
             return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
             
         import json

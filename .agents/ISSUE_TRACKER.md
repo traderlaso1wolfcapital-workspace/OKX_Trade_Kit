@@ -19,6 +19,20 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[10/08/2026]** - Hoàn thành xây dựng cấu trúc nền tảng và lõi chiến thuật cho Bot Sub3:
+  - **Cập nhật:** Đã tạo thư mục `bots/sub3` chứa các file: `sys_bot_sub3.py` (vòng lặp chính, xử lý PID, kế thừa API Core), `sys_liquid_strategy.py` (state machine 4 giai đoạn theo CRT & Liquidation Sweep), và `utils_ob.py` (thuật toán tính ATR và phát hiện Order Block). Hệ thống đã được kiểm thử chạy luồng giả lập thành công, nhận diện được file PID và không gây crash. (Mã patch: `z3501`)
+
+- **[10/08/2026]** - Sửa lỗi giao diện chìm chữ ở bảng Cài đặt Sub3:
+  - **Nguyên nhân:** Danh sách dropdown của QComboBox (chứa khung thời gian, entry mode) có nền màu trắng mặc định của Windows làm chìm chữ màu trắng. Vi phạm quy tắc UI Design Rule #4.
+  - **Cập nhật:** Đã setView thành QListView và cấu hình stylesheet CSS đồng bộ với Theme chung của ứng dụng: nền xám đậm (`#1e1e1e`), chữ trắng (`#ffffff`), hover màu xanh (`#0e639c`). Đã đẩy bản cập nhật tức thời (hotfix) vào mã nguồn.
+
+- **[10/08/2026]** - Sửa lỗi crash khi khởi động do UI chưa khởi tạo:
+  - **Nguyên nhân:** Khi khởi động (hàm `reload_accounts`), biến `sp_fixed_sl` chưa được tạo (do `setup_tab_strategy` chưa chạy) nhưng hàm `load_current_settings` cố tình gọi `setValue()`.
+  - **Cập nhật:** Bọc toàn bộ các lời gọi gán dữ liệu vào UI của Sub3 trong hàm `load_current_settings` bằng lệnh `hasattr(self, '...')` để bảo vệ chống crash. Lỗi đã được khắc phục hoàn toàn.
+
+- **[10/08/2026]** - Sửa lỗi cắt chữ (truncate) ở ComboBox "Chọn tài khoản":
+  - **Nguyên nhân:** Bề ngang tối đa mặc định của QComboBox bị giới hạn bởi Layout nên không tự dàn trang (scale) vừa với các đoạn text dài như "Tài khoản phụ...".
+  - **Cập nhật:** Đã thêm chính sách kích thước `setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)` cho `account_dropdown` của cả 3 Bot. Hệ thống sẽ tự động đo lường độ dài của item dài nhất để kéo dãn menu xổ xuống không bị mất chữ.
 - **[07/08/2026]** - Sửa lỗi GitHub Actions Runner timeout (Job not acquired):
   - **Nguyên nhân:** Lỗi "The job was not acquired by Runner of type hosted" xảy ra do máy chủ cấp phát (Runner pool) của GitHub bị quá tải không thể khởi tạo máy ảo, hoặc lỗi giới hạn hàng đợi. Hoàn toàn không phải do lỗi code logic ở `gui_main.py`.
   - **Cập nhật:** Đã chỉnh sửa cấu hình file `.github/workflows/build-release.yml`, đổi hệ điều hành từ `windows-latest` sang bản fix cứng `windows-2022` và `macos-latest` sang `macos-13`. Việc ép version cụ thể giúp bypass lỗi kẹt hàng đợi của pool "latest" và mồi lại GitHub Actions chạy thành công. (Mã patch: `z249`)

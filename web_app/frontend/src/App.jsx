@@ -63,6 +63,7 @@ function App() {
   const [settingsTab, setSettingsTab] = useState("api");
 
   const [selectedAccount, setSelectedAccount] = useState("sub1");
+  const [fadeClass, setFadeClass] = useState("tab-fade");
   const [selectedBotType, setSelectedBotType] = useState("ema200");
   const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
   const MAX_SLOTS = 100;
@@ -88,6 +89,9 @@ function App() {
 
   // Sync defaults from Desktop App when switching Bots
   useEffect(() => {
+    setFadeClass("");
+    setTimeout(() => setFadeClass("tab-fade"), 10);
+    
     if (selectedAccount === "sub1") {
       // Defaults for Bot EMA200
       setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80 });
@@ -588,7 +592,7 @@ function App() {
         </div>
       </div>
 
-      <div className="content-wrapper">
+      <div className={`content-wrapper ${fadeClass}`}>
         {/* WORKSPACE PHẢI - hiện trước trên mobile */}
         <main className={`main-workspace ${layoutMode}`}>
           <section className="pane-chart" style={{ position: "relative" }}>

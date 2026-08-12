@@ -850,6 +850,20 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "OB_TP_MODE": "RR"
         }
 
+        default_sub3_cfg = {
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+            "TIMEFRAME_HTF": "1H",
+            "TIMEFRAME_LTF": "5m",
+            "ENTRY_MODE": "Only OB",
+            "REQUIRE_RETRACEMENT": True,
+            "BULKY_ATR_MULT": 2.1,
+            "TPSL_METHOD": "Dynamic",
+            "SL_ATR_MULT": 1.5,
+            "DYNAMIC_RR": 2.0,
+            "FIXED_SL_PCT": 1.0,
+            "FIXED_TP_PCT": 2.0
+        }
+
         if os.path.exists(PROJECT_DIR):
             proj_bot_dir = os.path.join(PROJECT_DIR, f"bots/{self.strategy_id}")
             if os.path.exists(proj_bot_dir):
@@ -865,7 +879,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
                         f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
                 except: pass
 
-            if self.strategy_id == "sub2":
+            if self.strategy_id == "sub3":
+                c_name = f"sub3_sub{i}_global_config.json"
+                m_name = "sub3_global_config.json"
+                cur_cfg = default_sub3_cfg
+            elif self.strategy_id == "sub2":
                 c_name = f"sub2_sub{i}_global_config.json"
                 m_name = "sub2_global_config.json"
                 cur_cfg = default_sub2_cfg
@@ -979,13 +997,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         # Khởi tạo dropdown (sẽ được add vào tab API)
         self.account_dropdown = QtWidgets.QComboBox()
         self.account_dropdown.setView(QtWidgets.QListView())
-        self.account_dropdown.setMinimumWidth(300)
+        self.account_dropdown.view().setMinimumWidth(350)
+        self.account_dropdown.setMinimumWidth(250)
+        self.account_dropdown.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.account_dropdown.setStyleSheet("""
             QComboBox { background-color: #2d2d2d; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; padding: 5px 10px; font-size: 13px; }
             QComboBox:hover { border-color: #ffb74d; }
             QComboBox::drop-down { border: none; }
             QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #aaa; margin-right: 8px; }
-            QComboBox QAbstractItemView { background-color: #1e1e1e; color: #e0e0e0; selection-background-color: #0e639c; selection-color: white; border: 1px solid #555; padding: 4px; outline: none; }
+            QComboBox QAbstractItemView { background-color: #1e1e1e; color: #e0e0e0; selection-background-color: #0e639c; selection-color: white; border: 1px solid #555; padding: 4px; outline: none; min-width: 350px; }
             QComboBox QAbstractItemView::item { padding: 6px 10px; min-height: 24px; }
             QComboBox QAbstractItemView::item:hover { background-color: #333; }
         """)
@@ -2152,6 +2172,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         threading.Thread(target=post_msg, daemon=True).start()
 
     def setup_tab_strategy(self):
+        if self.strategy_id == "sub3":
+            self.setup_tab_strategy_liquidation()
+            return
         if self.strategy_id == "sub2":
             self.setup_tab_strategy_smc()
             return
@@ -2544,6 +2567,121 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.load_current_settings()
         self.apply_current_api_to_worker()
 
+    def setup_tab_strategy_liquidation(self):
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+
+        container = QtWidgets.QWidget()
+        container.setStyleSheet("background-color: transparent;")
+        scroll.setStyleSheet("background-color: transparent;")
+        layout = QtWidgets.QVBoxLayout(container)
+        layout.setSpacing(15)
+
+        def add_field(layout_obj, row, label_text, widget, tooltip_text):
+            lbl = QtWidgets.QLabel(label_text)
+            lbl.setStyleSheet("color: #e0e0e0;")
+            btn_help = HelpButton(tooltip_text)
+            h_lbl = QtWidgets.QHBoxLayout()
+            h_lbl.addWidget(lbl)
+            h_lbl.addWidget(btn_help)
+            h_lbl.addStretch()
+            layout_obj.addLayout(h_lbl, row, 0)
+            layout_obj.addWidget(widget, row, 1)
+
+        def create_group(title):
+            group = QtWidgets.QGroupBox(title)
+            group.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
+            group.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 6px; margin-top: 10px; padding-top: 15px; color: #ffb74d; } QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 3px 0 3px; }")
+            g_layout = QtWidgets.QGridLayout(group)
+            g_layout.setVerticalSpacing(12)
+            g_layout.setHorizontalSpacing(15)
+            g_layout.setColumnStretch(1, 1)
+            return group, g_layout
+
+        # Nhóm 1: Khung thời gian (Timeframes)
+        g_tf, l_tf = create_group("🕒 Khung Thời Gian (Timeframes)")
+        
+        self.cb_htf = QtWidgets.QComboBox()
+        self.cb_htf.addItems(["1H", "2H", "4H", "1D"])
+        add_field(l_tf, 0, "HTF (Tìm Nến Bulky):", self.cb_htf, "Khung thời gian lớn để xác định nến Bulky phá vỡ cấu trúc.")
+        
+        self.cb_ltf = QtWidgets.QComboBox()
+        self.cb_ltf.addItems(["5m", "15m", "30m", "1H"])
+        add_field(l_tf, 1, "LTF (Quét Thanh Lý):", self.cb_ltf, "Khung thời gian nhỏ để theo dõi nến quét thanh lý (Liquidation Sweep).")
+        
+        layout.addWidget(g_tf)
+
+        # Nhóm 2: Cài đặt Tín Hiệu (Signal Settings)
+        g_sig, l_sig = create_group("⚡ Tín Hiệu Vào Lệnh")
+        
+        self.cb_entry_mode = QtWidgets.QComboBox()
+        self.cb_entry_mode.addItems(["Only OB", "Only FVG", "OB & FVG"])
+        add_field(l_sig, 0, "Chế độ (Entry Mode):", self.cb_entry_mode, "Chỉ dùng Order Block, Chỉ dùng FVG, hoặc dùng cả hai.")
+        
+        self.chk_retracement = QtWidgets.QCheckBox("Bắt buộc hồi giá (Retracement)")
+        self.chk_retracement.setStyleSheet("color: #e0e0e0;")
+        add_field(l_sig, 1, "Chờ Hồi Giá:", self.chk_retracement, "Chờ giá quay lại chạm vào vùng OB/FVG mới kích hoạt lệnh.")
+        
+        layout.addWidget(g_sig)
+
+        # Nhóm 3: Thông số Quản lý Rủi ro
+        g_risk, l_risk = create_group("🛡️ Thông Số Quản Lý Rủi Ro")
+        
+        self.sp_bulky_atr = QtWidgets.QDoubleSpinBox()
+        self.sp_bulky_atr.setRange(1.0, 5.0)
+        self.sp_bulky_atr.setSingleStep(0.1)
+        add_field(l_risk, 0, "Hệ số nến Bulky (ATR):", self.sp_bulky_atr, "Nến Bulky phải có độ dài lớn hơn X lần ATR của khung HTF.")
+        
+        self.cb_tpsl_method = QtWidgets.QComboBox()
+        self.cb_tpsl_method.addItems(["Dynamic", "Fixed"])
+        add_field(l_risk, 1, "Phương pháp TP/SL:", self.cb_tpsl_method, "Sử dụng TP/SL theo động lượng ATR (Dynamic) hoặc % giá (Fixed).")
+        
+        self.sp_sl_atr = QtWidgets.QDoubleSpinBox()
+        self.sp_sl_atr.setRange(0.5, 5.0)
+        self.sp_sl_atr.setSingleStep(0.1)
+        add_field(l_risk, 2, "Hệ số Cắt Lỗ (SL ATR):", self.sp_sl_atr, "Khoảng cách SL tính bằng X lần ATR của khung nhỏ (LTF).")
+        
+        self.sp_dynamic_rr = QtWidgets.QDoubleSpinBox()
+        self.sp_dynamic_rr.setRange(1.0, 10.0)
+        self.sp_dynamic_rr.setSingleStep(0.1)
+        add_field(l_risk, 3, "Tỉ lệ Risk:Reward:", self.sp_dynamic_rr, "Lợi nhuận mong đợi so với rủi ro (VD: 2.0 = Lãi gấp 2 Lỗ).")
+        
+        layout.addWidget(g_risk)
+
+        # Common inputs styling
+        for w in container.findChildren((QtWidgets.QComboBox, QtWidgets.QDoubleSpinBox)):
+            w.setMinimumHeight(30)
+            if isinstance(w, QtWidgets.QComboBox):
+                w.setView(QtWidgets.QListView()) # Required to apply QAbstractItemView styling
+                w.setStyleSheet("""
+                    QComboBox { background-color: #2d2d2d; color: #ffffff; border: 1px solid #555; border-radius: 4px; padding: 2px 10px; }
+                    QComboBox:hover { border-color: #ffb74d; }
+                    QComboBox::drop-down { border: none; }
+                    QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #aaa; margin-right: 8px; }
+                    QComboBox QAbstractItemView { background-color: #1e1e1e; color: #ffffff; selection-background-color: #0e639c; selection-color: white; border: 1px solid #555; outline: none; }
+                    QComboBox QAbstractItemView::item { padding: 6px 10px; min-height: 24px; }
+                    QComboBox QAbstractItemView::item:hover { background-color: #333; }
+                """)
+            else:
+                w.setStyleSheet("QDoubleSpinBox { background-color: #2d2d2d; color: #ffffff; border: 1px solid #555; border-radius: 4px; padding: 2px 10px; }")
+
+        # Nút Lưu
+        btn_save = QtWidgets.QPushButton("💾 Lưu Cấu Hình")
+        btn_save.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
+        btn_save.setMinimumHeight(40)
+        btn_save.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        btn_save.setStyleSheet("QPushButton { background-color: #2e7d32; color: white; border-radius: 4px; } QPushButton:hover { background-color: #1b5e20; }")
+        btn_save.clicked.connect(self.save_strategy_settings)
+        layout.addWidget(btn_save)
+
+        layout.addStretch()
+        scroll.setWidget(container)
+        
+        main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(scroll)
+
     def load_current_settings(self):
         if self.strategy_id in ["trinhsat", "quansu"]:
             return
@@ -2602,7 +2740,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
         if os.path.exists(config_path):
             try:
-                with open(config_path, "r", encoding="utf-8") as f: cfg = json.load(f)
+                with open(config_path, "r", encoding="utf-8-sig") as f: cfg = json.load(f)
                 if not cfg.get("RESET_CONFIG_V23", False):
                     cfg = {}
                     try: os.remove(config_path)
@@ -2610,7 +2748,26 @@ class BotInstanceWidget(QtWidgets.QWidget):
             except: pass
 
         try:
-            if self.strategy_id == "sub2":
+            if self.strategy_id == "sub3":
+                if hasattr(self, 'cb_htf'): self.cb_htf.setCurrentText(cfg.get("TIMEFRAME_HTF", getattr(bot_config, "TIMEFRAME_HTF", "1H")))
+                if hasattr(self, 'cb_ltf'): self.cb_ltf.setCurrentText(cfg.get("TIMEFRAME_LTF", getattr(bot_config, "TIMEFRAME_LTF", "5m")))
+                if hasattr(self, 'cb_entry_mode'): self.cb_entry_mode.setCurrentText(cfg.get("ENTRY_MODE", getattr(bot_config, "ENTRY_MODE", "Only OB")))
+                if hasattr(self, 'chk_retracement'): self.chk_retracement.setChecked(bool(cfg.get("REQUIRE_RETRACEMENT", getattr(bot_config, "REQUIRE_RETRACEMENT", True))))
+                if hasattr(self, 'sp_bulky_atr'): self.sp_bulky_atr.setValue(float(cfg.get("BULKY_ATR_MULT", getattr(bot_config, "BULKY_ATR_MULT", 2.1))))
+                
+                # Cập nhật TPSL
+                tpsl_method = cfg.get("TPSL_METHOD", getattr(bot_config, "TPSL_METHOD", "Dynamic"))
+                if hasattr(self, 'cb_tpsl_method'):
+                    self.cb_tpsl_method.setCurrentText(tpsl_method)
+                    self.cb_tpsl_method.currentTextChanged.emit(tpsl_method)
+                
+                if hasattr(self, 'sp_sl_atr'): self.sp_sl_atr.setValue(float(cfg.get("SL_ATR_MULT", getattr(bot_config, "SL_ATR_MULT", 1.5))))
+                if hasattr(self, 'sp_dynamic_rr'): self.sp_dynamic_rr.setValue(float(cfg.get("DYNAMIC_RR", getattr(bot_config, "DYNAMIC_RR", 2.0))))
+                
+                if hasattr(self, 'sp_fixed_sl'): self.sp_fixed_sl.setValue(float(cfg.get("FIXED_SL_PCT", getattr(bot_config, "FIXED_SL_PCT", 1.0))))
+                if hasattr(self, 'sp_fixed_tp'): self.sp_fixed_tp.setValue(float(cfg.get("FIXED_TP_PCT", getattr(bot_config, "FIXED_TP_PCT", 2.0))))
+
+            elif self.strategy_id == "sub2":
                 self.smc_chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_SMC", getattr(bot_config, "ENABLE_STRATEGY_SMC", True))))
                 self.smc_chk_dynamic_risk.setChecked(bool(cfg.get("USE_DYNAMIC_RISK", getattr(bot_config, "USE_DYNAMIC_RISK", False))))
                 self.smc_input_risk_pct.setValue(float(cfg.get("RISK_PER_TRADE_PCT", getattr(bot_config, "RISK_PER_TRADE_PCT", 0.01))) * 100)
@@ -2676,28 +2833,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if hasattr(self, 'chk_tf_h2'): self.chk_tf_h2.setChecked("H2" in enabled_tfs)
             if hasattr(self, 'chk_tf_h4'): self.chk_tf_h4.setChecked("H4" in enabled_tfs)
             
-            self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
-            self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
-            self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
-            self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
-            self.chk_altcoin_follow_btc_ema.setChecked(bool(cfg.get("ALTCOIN_FOLLOW_BTC_EMA", getattr(bot_config, "ALTCOIN_FOLLOW_BTC_EMA", True))))
-            
-            self.chk_sideway_safe.setChecked(bool(cfg.get("ENABLE_SIDEWAY_SAFE_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_SAFE_EXIT", False))))
-            self.chk_squeeze_escape.setChecked(bool(cfg.get("ENABLE_SQUEEZE_ESCAPE_EXIT", getattr(bot_config, "ENABLE_SQUEEZE_ESCAPE_EXIT", False))))
-            self.chk_safeguard_entry.setChecked(bool(cfg.get("ENABLE_SAFEGUARD_ENTRY_EXIT", getattr(bot_config, "ENABLE_SAFEGUARD_ENTRY_EXIT", False))))
-            self.chk_trailing_sl.setChecked(bool(cfg.get("ENABLE_TRAILING_SL", getattr(bot_config, "ENABLE_TRAILING_SL", False))))
-            self.chk_max_roi.setChecked(bool(cfg.get("ENABLE_MAX_ROI_EXIT", getattr(bot_config, "ENABLE_MAX_ROI_EXIT", False))))
-            self.chk_sideway_vap.setChecked(bool(cfg.get("ENABLE_SIDEWAY_VAP_EXIT", getattr(bot_config, "ENABLE_SIDEWAY_VAP_EXIT", False))))
-            self.chk_h4_flip.setChecked(bool(cfg.get("ENABLE_H4_FLIP_CLOSE", getattr(bot_config, "ENABLE_H4_FLIP_CLOSE", False))))
-            
-            self.input_tp_pct.setValue(float(cfg.get("TP_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_TP_PCT", 0.008)))) * 100)
-            self.input_sl_pct.setValue(float(cfg.get("SL_TARGET_OPTIMAL", float(getattr(bot_config, "SCALPING_SL_PCT", 0.008)))) * 100)
-            self.input_pos_vol.setValue(float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", float(getattr(bot_config, "POSITION_VOLUME_HIGH_CONFIDENCE", 100.0)))))
-            
-            self.input_dca_gap_pct.setValue(float(cfg.get("DCA_GAP_THRESHOLD_PCT", float(getattr(bot_config, "DCA_GAP_THRESHOLD_PCT", 0.01)))) * 100)
-            self.input_confluence_pct.setValue(float(cfg.get("EMA_CONFLUENCE_TOLERANCE_PCT", float(getattr(bot_config, "EMA_CONFLUENCE_TOLERANCE_PCT", 0.01)))) * 100)
-            self.input_entry_offset.setValue(float(cfg.get("BASE_ENTRY_OFFSET_PCT", float(getattr(bot_config, "BASE_ENTRY_OFFSET_PCT", 0.01)))) * 100)
-            self.input_accum_candles.setValue(int(cfg.get("REQUIRED_ACCUMULATION_CANDLES", getattr(bot_config, "REQUIRED_ACCUMULATION_CANDLES", 3))))
             
             self.input_q_buffer.setValue(int(cfg.get("QUANTUM_BUFFER_CANDLES", getattr(bot_config, "QUANTUM_BUFFER_CANDLES", 10))))
             self.input_q_forth.setValue(int(cfg.get("QUANTUM_FORTH_CANDLES", getattr(bot_config, "QUANTUM_FORTH_CANDLES", 5))))
@@ -2752,7 +2887,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             config_path = os.path.join(json_data_dir, f"{acc_name}_global_config.json")
             cfg = {}
             if os.path.exists(config_path):
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, "r", encoding="utf-8-sig") as f:
                     cfg = json.load(f)
             
             enabled = cfg.get("ENABLED_COINS", ["XAU", "BTC", "ETH"])
@@ -2943,10 +3078,24 @@ class BotInstanceWidget(QtWidgets.QWidget):
         cfg = {}
         if os.path.exists(config_path):
             try:
-                with open(config_path, "r", encoding="utf-8") as f: cfg = json.load(f)
+                with open(config_path, "r", encoding="utf-8-sig") as f: cfg = json.load(f)
             except: pass
 
-        if self.strategy_id == "sub2":
+        if self.strategy_id == "sub3":
+            cfg.update({
+                "TIMEFRAME_HTF": self.cb_htf.currentText() if hasattr(self, 'cb_htf') else "1H",
+                "TIMEFRAME_LTF": self.cb_ltf.currentText() if hasattr(self, 'cb_ltf') else "5m",
+                "ENTRY_MODE": self.cb_entry_mode.currentText() if hasattr(self, 'cb_entry_mode') else "Only OB",
+                "REQUIRE_RETRACEMENT": self.chk_retracement.isChecked() if hasattr(self, 'chk_retracement') else True,
+                "BULKY_ATR_MULT": self.sp_bulky_atr.value() if hasattr(self, 'sp_bulky_atr') else 2.1,
+                "TPSL_METHOD": self.cb_tpsl_method.currentText() if hasattr(self, 'cb_tpsl_method') else "Dynamic",
+                "SL_ATR_MULT": self.sp_sl_atr.value() if hasattr(self, 'sp_sl_atr') else 1.5,
+                "DYNAMIC_RR": self.sp_dynamic_rr.value() if hasattr(self, 'sp_dynamic_rr') else 2.0,
+                "FIXED_SL_PCT": self.sp_fixed_sl.value() if hasattr(self, 'sp_fixed_sl') else 1.0,
+                "FIXED_TP_PCT": self.sp_fixed_tp.value() if hasattr(self, 'sp_fixed_tp') else 2.0
+            })
+
+        elif self.strategy_id == "sub2":
             smc_enabled = []
             if getattr(self, 'smc_chk_cfg_xau', None) and self.smc_chk_cfg_xau.isChecked(): smc_enabled.append("XAU")
             if getattr(self, 'smc_chk_cfg_btc', None) and self.smc_chk_cfg_btc.isChecked(): smc_enabled.append("BTC")
@@ -3840,7 +3989,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.panel_main = BotInstanceWidget("sub1", "Thợ săn EMA200 (Sub 1)", self.api_files)
         self.panel_sub1 = BotInstanceWidget("sub1", "Bot Phụ 1 Sniper (Sub 1)", self.api_files)
         self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC (Sub 2)", self.api_files)
-        # self.panel_sub3 = BotInstanceWidget("sub3", "Bot SUB 3", self.api_files)
+        self.panel_sub3 = BotInstanceWidget("sub3", "Bot Liquidation (Sub 3)", self.api_files)
         
         self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")
         
@@ -3858,6 +4007,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update_tab_icons(0)
         # self.bot_tabs.addTab(self.panel_sub1, "🔵 Bot SUB 1")
         self.bot_tabs.addTab(self.panel_sub2, "Bot SMC")
+        self.bot_tabs.addTab(self.panel_sub3, "Bot Liquidation")
 
     def check_for_updates(self):
         # Không tự động check liên tục nữa để tránh đơ máy
@@ -5412,6 +5562,8 @@ if __name__ == "__main__":
                 load_and_run("sys_bot_sub1", "sys_bot_sub1.py", env_file)
             elif strategy == "sub2":
                 load_and_run("sys_bot_sub2", "sys_bot_sub2.py", env_file)
+            elif strategy == "sub3":
+                load_and_run("sys_bot_sub3", "sys_bot_sub3.py", env_file)
 
         except SystemExit as e:
             sys.exit(e.code)
