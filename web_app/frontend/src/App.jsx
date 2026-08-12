@@ -48,14 +48,15 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activePairs, setActivePairs] = useState(["BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
   const [selectedTf, setSelectedTf] = useState("4H");
-  const [enabledTfs, setEnabledTfs] = useState(["M5", "M15", "M30", "H1", "H2", "H4"]);
+  const [enabledTfs, setEnabledTfs] = useState({});
   const [botStatus, setBotStatus] = useState("STOPPED");
   const [uptime, setUptime] = useState(0);
-  const [activeTab, setActiveTab] = useState("logs");
+  const [activeTab, setActiveTab] = useState("positions");
   const [layoutMode, setLayoutMode] = useState("vertical");
   const [logs, setLogs] = useState(["Đã kết nối với TLS1 Trading Web Terminal Server..."]);
   const [positions, setPositions] = useState([]);
@@ -85,7 +86,7 @@ function App() {
     timeframeBase: "1H",
   });
   // Risk settings
-  const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80 });
+  const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
 
   // Sync defaults from Desktop App when switching Bots
   useEffect(() => {
@@ -94,7 +95,7 @@ function App() {
     
     if (selectedAccount === "sub1") {
       // Defaults for Bot EMA200
-      setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80 });
+      setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: true,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -104,7 +105,7 @@ function App() {
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
     } else if (selectedAccount === "sub2") {
       // Defaults for Bot SMC
-      setRisk({ posVol: 100, tpPct: 5.00, slPct: 1.00 });
+      setRisk({ posVol: 500, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: false,
@@ -237,7 +238,7 @@ function App() {
     const fetchConfig = async () => {
       try {
         const r = await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r.ok) { const d = await r.json(); if (Array.isArray(d.ENABLED_TFS)) setEnabledTfs(d.ENABLED_TFS); }
+        if (r.ok) { const d = await r.json(); if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS); }
       } catch {}
     };
     const fetchCreds = async () => {
@@ -442,14 +443,23 @@ function App() {
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
   };
-  const handleTfToggle = async (tf) => {
-    const safe = Array.isArray(enabledTfs) ? enabledTfs : [];
-    const updated = safe.includes(tf) ? safe.filter(t => t !== tf) : [...safe, tf];
-    setEnabledTfs(updated);
+  const handleTfToggle = async (coin, tf) => {
+    const isOldFormat = Array.isArray(enabledTfs);
+    const safeDict = isOldFormat ? {} : { ...enabledTfs };
+    
+    if (!safeDict[coin]) {
+      safeDict[coin] = isOldFormat ? [...enabledTfs] : ["M5", "M15", "M30", "H1", "H2", "H4"];
+    }
+
+    const currentTfs = safeDict[coin];
+    const updatedCoinTfs = currentTfs.includes(tf) ? currentTfs.filter(t => t !== tf) : [...currentTfs, tf];
+    
+    const updatedTfs = { ...safeDict, [coin]: updatedCoinTfs };
+    setEnabledTfs(updatedTfs);
     try {
       await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled_tfs: updated }),
+        body: JSON.stringify({ enabled_tfs: updatedTfs }),
       });
     } catch {}
   };
@@ -596,8 +606,14 @@ function App() {
         {/* WORKSPACE PHẢI - hiện trước trên mobile */}
         <main className={`main-workspace ${layoutMode}`}>
           <section className="pane-chart" style={{ position: "relative" }}>
-            <div className="pane-titlebar">
-              📈 BIỂU ĐỒ TRỰC TUYẾN: {selectedCoin.replace("-SWAP", "")} ({selectedTf})
+            <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
+              <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
+              <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+              </select>
+              <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+              </select>
             </div>
             <div className="chart-wrapper" ref={chartContainerRef}
                  onWheel={() => setIsAutoFit(false)}
@@ -649,11 +665,11 @@ function App() {
         <section className="pane-tabs">
           <div className="tab-bar-header">
             <div className="tab-buttons">
-              <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
-                🖥 Terminal Logs
-              </button>
               <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
                 📊 Bảng Vị Thế ({safePos.length})
+              </button>
+              <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
+                🖥 Terminal Logs
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px" }}>
@@ -676,7 +692,8 @@ function App() {
                       <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
                       <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
                       <th style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>PNL thả nổi</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th>
+                      {/* <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th> */}
+                      <th style={{ padding: "12px 10px", textAlign: "left", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
                       <th style={{ textAlign: "center", padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
                     </tr>
                   </thead>
@@ -700,7 +717,32 @@ function App() {
                                 <span style={{ color: "#aaa", fontSize: "14px" }}>{coin.label.replace("-SWAP", "")}</span>
                               </div>
                             </td>
-                            <td></td><td></td><td></td><td></td><td></td>
+                            <td></td><td></td><td></td>
+                            <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
+                                  const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
+                                  const isOn = coinTfs.includes(tf);
+                                  const label = tf.replace("M", "");
+                                  return (
+                                    <span
+                                      key={tf}
+                                      onClick={() => handleTfToggle(coin.value, tf)}
+                                      style={{
+                                        cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
+                                        fontSize: "12px", fontWeight: "bold",
+                                        background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
+                                        border: isOn ? "1px solid #26a69a" : "1px solid #444",
+                                        minWidth: "28px", textAlign: "center"
+                                      }}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td></td>
                           </tr>
                         );
                       }
@@ -742,8 +784,32 @@ function App() {
                               );
                             })()}
                           </td>
-                          <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>
+                          {/* <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>
                             <span style={{ color: "#26a69a" }}>{pos.tp || "+0.00"}</span> <span style={{ color: "#555", margin: "0 4px" }}>|</span> <span style={{ color: "#ef5350" }}>{pos.sl || "-0.00"}</span>
+                          </td> */}
+                          <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                              {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
+                                const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
+                                const isOn = coinTfs.includes(tf);
+                                const label = tf.replace("M", "");
+                                return (
+                                  <span
+                                    key={tf}
+                                    onClick={() => handleTfToggle(coin.value, tf)}
+                                    style={{
+                                      cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
+                                      fontSize: "12px", fontWeight: "bold",
+                                      background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
+                                      border: isOn ? "1px solid #26a69a" : "1px solid #444",
+                                      minWidth: "28px", textAlign: "center"
+                                    }}
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </td>
                           <td style={{ textAlign: "center", padding: "12px 10px" }}>
                             <button 
@@ -777,33 +843,7 @@ function App() {
           {/* Sidebar chỉ còn Biểu Đồ + Khung TG Bot */}
           <div className="sidebar-content">
 
-            {/* Khung Thời Gian Bot — hiện trước */}
-            <div className="group-box">
-              <span className="group-box-title">Khung Thời Gian Bot</span>
-              <div className="tf-grid">
-                {BOT_TFS.map(tf => {
-                  const on = safeEnabledTfs.includes(tf);
-                  return (
-                    <button key={tf} onClick={() => handleTfToggle(tf)} className={`tf-badge-btn ${on ? "checked" : ""}`}>
-                      {on ? "✓ " : ""}{tf}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Biểu Đồ — xuống sau */}
-            <div className="group-box">
-              <span className="group-box-title">Biểu Đồ</span>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <select className="styled-select" style={{ flex: 1, minWidth: 0, fontSize: "11px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-                <select className="styled-select" style={{ width: "62px", flexShrink: 0, fontSize: "13px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
-              </div>
-            </div>
 
           </div>
 
@@ -875,7 +915,6 @@ function App() {
                     <div className="settings-group-title">Lệnh Can Thiệp Nhanh (Audit Hệ Thống)</div>
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                       <button className="btn-audit">♻️ Reset Vốn Gốc (Audit)</button>
-                      <button className="btn-audit">♻️ Reset Đếm Nến</button>
                     </div>
                   </div>
 
@@ -953,10 +992,20 @@ function App() {
                       {/* Quản Lý Vốn & Rủi Ro EMA200 */}
                       <div className="settings-group">
                         <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
+                        <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#1e1e1e", padding: "0 5px" }}>
+                          <button 
+                            onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                          >USDT</button>
+                          <button 
+                            onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
+                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                          >LOT</button>
+                        </div>
                         <div className="risk-grid">
                           <div className="risk-row">
-                            <label>Volume Limit cố định (USDT):</label>
-                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min="1" step="10" />
+                            <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
                           </div>
                           <div className="risk-row">
                             <label>Chốt lời cơ sở M5 (%):</label>
@@ -1000,10 +1049,20 @@ function App() {
                       {/* Quản Lý Vốn & Rủi Ro SMC */}
                       <div className="settings-group">
                         <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
+                        <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#1e1e1e", padding: "0 5px" }}>
+                          <button 
+                            onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                          >USDT</button>
+                          <button 
+                            onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
+                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                          >LOT</button>
+                        </div>
                         <div className="risk-grid">
                           <div className="risk-row">
-                            <label>Volume Limit cố định (USDT):</label>
-                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min="1" step="10" />
+                            <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
                           </div>
                           <div className="risk-row">
                             <label>Tỷ lệ Risk:Reward thuận trend:</label>
@@ -1024,7 +1083,8 @@ function App() {
             {/* Footer */}
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>Đóng</button>
-              <button className="btn-primary" onClick={async () => {
+              <button className="btn-primary" disabled={isSavingConfig} onClick={async () => {
+                setIsSavingConfig(true);
                 if (settingsTab === "api") {
                   try {
                     await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
@@ -1034,11 +1094,17 @@ function App() {
                     alert("💾 Đã lưu cấu hình API Key!");
                   } catch { alert("Lỗi khi lưu API Key"); }
                 } else {
+                  await new Promise(resolve => setTimeout(resolve, 800)); // Hiệu ứng delay giả lập lưu cấu hình
                   alert("💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
                 }
+                setIsSavingConfig(false);
                 setShowSettings(false);
               }}>
-                {settingsTab === "api" ? "💾 LƯU CẤU HÌNH API KEY" : "💾 LƯU CẤU HÌNH CHIẾN THUẬT"}
+                {isSavingConfig ? (
+                  <><span className="spinner"></span> ĐANG LƯU...</>
+                ) : (
+                  settingsTab === "api" ? "💾 LƯU CẤU HÌNH API KEY" : "💾 LƯU CẤU HÌNH CHIẾN THUẬT"
+                )}
               </button>
             </div>
           </div>

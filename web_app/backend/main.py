@@ -11,7 +11,7 @@ import base64
 import requests
 import csv
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -88,7 +88,7 @@ def del_nested(d: dict, k1: str, k2: str):
         del d[k1][k2]
 
 class ConfigUpdate(BaseModel):
-    enabled_tfs: List[str]
+    enabled_tfs: Union[List[str], Dict[str, List[str]]]
 
 class CredentialsUpdate(BaseModel):
     api_key: str

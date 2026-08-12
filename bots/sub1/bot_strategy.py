@@ -378,7 +378,25 @@ def get_nearest_opposite_ema200(tracker, side, pos_tf):
             if e34 > e200 and e89 > e200: return e200
     return Decimal("0")
 
-def run_strategy_cycle(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool, is_enabled: bool = True): # pyright: ignore[reportGeneralTypeIssues]
+def run_strategy_cycle(*args, **kwargs):
+    import sys; globals_ref = sys.modules[__name__]
+    cfg = args[1] if len(args) > 1 else kwargs.get("cfg", {})
+    swap_id = cfg.get("swap", "")
+    
+    original_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+    
+    if isinstance(original_enabled_tfs, dict):
+        current_coin_tfs = original_enabled_tfs.get(swap_id, ["M5", "M15", "M30", "H1", "H2", "H4"])
+    else:
+        current_coin_tfs = original_enabled_tfs
+        
+    globals_ref.ENABLED_TFS = current_coin_tfs
+    try:
+        return _run_strategy_cycle_impl(*args, **kwargs)
+    finally:
+        globals_ref.ENABLED_TFS = original_enabled_tfs
+
+def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool, is_enabled: bool = True): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
 
     swap_id = cfg["swap"]
