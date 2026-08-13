@@ -54,7 +54,17 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
                 "tf": tf
             })
             
-        markers[coin] = markers[coin][-50:] # Giữ 50 marker gần nhất
+        current_time_ms = int(time.time() * 1000)
+        THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+        
+        for c in list(markers.keys()):
+            filtered_markers = []
+            for m in markers[c]:
+                marker_time = m.get("close_time") if m.get("status") == "closed" and m.get("close_time") else m.get("time", current_time_ms)
+                if current_time_ms - marker_time <= THIRTY_DAYS_MS:
+                    filtered_markers.append(m)
+            markers[c] = filtered_markers[-50:] # Giữ 50 marker gần nhất trong 30 ngày
+            
         with open(marker_file, "w", encoding="utf-8") as f:
             json.dump(markers, f)
     except Exception as e:
@@ -101,7 +111,15 @@ def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: fl
             dirty = True
             
         if dirty:
-            markers[coin] = markers[coin][-50:]
+            current_time_ms = int(time.time() * 1000)
+            THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+            for c in list(markers.keys()):
+                filtered_markers = []
+                for m in markers[c]:
+                    marker_time = m.get("close_time") if m.get("status") == "closed" and m.get("close_time") else m.get("time", current_time_ms)
+                    if current_time_ms - marker_time <= THIRTY_DAYS_MS:
+                        filtered_markers.append(m)
+                markers[c] = filtered_markers[-50:]
             with open(marker_file, "w", encoding="utf-8") as f:
                 json.dump(markers, f)
     except Exception as e:
