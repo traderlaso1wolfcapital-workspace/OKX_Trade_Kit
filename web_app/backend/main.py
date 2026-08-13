@@ -775,20 +775,40 @@ async def get_closed_positions(uid: str, strategy: str = "sub1"):
             data = json.load(f)
             
         closed_positions = []
-        for coin, items in data.items():
+        current_time_ms = int(time.time() * 1000)
+        thirty_days_ms = 30 * 24 * 60 * 60 * 1000
+        dirty = False
+        
+        for coin in list(data.keys()):
+            items = data[coin]
+            valid_items = []
             for item in items:
-                if item.get("status") == "closed":
-                    closed_positions.append({
-                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
-                        "instId": f"{coin}-USDT",
-                        "posSide": item.get("side", "long").lower(),
-                        "pos": str(item.get("volume", "0")),
-                        "entryPx": str(item.get("price", "0")),
-                        "exitPx": str(item.get("exit_price", "0")),
-                        "pnl": str(item.get("pnl", "0")),
-                        "closeTime": item.get("close_time", item.get("time", 0)),
-                        "tf": item.get("tf", "")
-                    })
+                marker_time = item.get("close_time") if item.get("status") == "closed" and item.get("close_time") else item.get("time", current_time_ms)
+                if current_time_ms - marker_time <= thirty_days_ms:
+                    valid_items.append(item)
+                    if item.get("status") == "closed":
+                        closed_positions.append({
+                            "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
+                            "instId": f"{coin}-USDT",
+                            "posSide": item.get("side", "long").lower(),
+                            "pos": str(item.get("volume", "0")),
+                            "entryPx": str(item.get("price", "0")),
+                            "exitPx": str(item.get("exit_price", "0")),
+                            "pnl": str(item.get("pnl", "0")),
+                            "closeTime": item.get("close_time", item.get("time", 0)),
+                            "tf": item.get("tf", "")
+                        })
+                else:
+                    dirty = True
+            if len(valid_items) != len(items):
+                data[coin] = valid_items
+                
+        if dirty:
+            try:
+                with open(positions_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+            except Exception: pass
+            
         # Sắp xếp mới nhất lên trên
         closed_positions.sort(key=lambda x: x["closeTime"], reverse=True)
         return closed_positions
@@ -966,3 +986,5 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
+
+# z20260813 | Added auto-delete for trade history older than 30 days to free up memory
