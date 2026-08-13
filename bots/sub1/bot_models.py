@@ -3,7 +3,7 @@ from decimal import Decimal
 import time
 
 
-def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = ""):
+def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = "", pnl: float = 0.0, exit_price: float = 0.0):
     try:
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
@@ -21,10 +21,26 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
             markers[coin] = []
             
         if status == "closed":
-            # Mark all active ones for this side as closed
-            for m in markers[coin]:
-                if m["side"] == side and m["status"] == "active":
-                    m["status"] = "closed"
+            active_markers = [m for m in markers[coin] if m["side"] == side and m["status"] == "active"]
+            total_weight = 0.0
+            for m in active_markers:
+                ep = float(m.get("price", 1.0))
+                vol = float(m.get("volume", 0.0))
+                if side == "LONG":
+                    m["_weight"] = vol * (float(exit_price) - ep) / ep if ep > 0 else 0
+                else:
+                    m["_weight"] = vol * (ep - float(exit_price)) / ep if ep > 0 else 0
+                total_weight += m["_weight"]
+            
+            for m in active_markers:
+                m["status"] = "closed"
+                m["exit_price"] = float(exit_price)
+                m["close_time"] = int(time.time() * 1000)
+                if total_weight != 0:
+                    m["pnl"] = float(pnl) * (m["_weight"] / total_weight)
+                else:
+                    m["pnl"] = 0.0
+                if "_weight" in m: del m["_weight"]
         else:
             if not ticket_id:
                 ticket_id = f"#{int(time.time() * 1000)}"

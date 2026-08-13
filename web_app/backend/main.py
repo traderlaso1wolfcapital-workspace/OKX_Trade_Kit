@@ -108,6 +108,8 @@ class CloseTicketRequest(BaseModel):
     instId: str
     posSide: str
     pos: str
+    upl: Optional[str] = None
+    exitPx: Optional[str] = None
 
 @app.post("/api/auth/login")
 async def login_with_password(req: LoginRequest):
@@ -763,6 +765,36 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
     except Exception:
         return []
 
+@app.get("/api/bot/closed_positions")
+async def get_closed_positions(uid: str, strategy: str = "sub1"):
+    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+    if not os.path.exists(positions_path):
+        return []
+    try:
+        with open(positions_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        closed_positions = []
+        for coin, items in data.items():
+            for item in items:
+                if item.get("status") == "closed":
+                    closed_positions.append({
+                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
+                        "instId": f"{coin}-USDT",
+                        "posSide": item.get("side", "long").lower(),
+                        "pos": str(item.get("volume", "0")),
+                        "entryPx": str(item.get("price", "0")),
+                        "exitPx": str(item.get("exit_price", "0")),
+                        "pnl": str(item.get("pnl", "0")),
+                        "closeTime": item.get("close_time", item.get("time", 0)),
+                        "tf": item.get("tf", "")
+                    })
+        # Sắp xếp mới nhất lên trên
+        closed_positions.sort(key=lambda x: x["closeTime"], reverse=True)
+        return closed_positions
+    except Exception:
+        return []
+
 @app.post("/api/bot/positions/close_ticket")
 async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
     # 1. Update trade_markers.json to mark as closed
@@ -779,6 +811,32 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 for item in markers[coin]:
                     if item.get("ticket_id") == req.ticket_id and item.get("status") == "active":
                         item["status"] = "closed"
+                        import time
+                        item["close_time"] = int(time.time() * 1000)
+                        
+                        # Use provided UI values if available, otherwise fetch ticker
+                        if req.exitPx and req.upl:
+                            try:
+                                item["exit_price"] = float(req.exitPx)
+                                item["pnl"] = float(req.upl)
+                            except Exception: pass
+                        
+                        if "exit_price" not in item or item["exit_price"] == 0:
+                            try:
+                                import requests
+                                res = requests.get(f"https://www.okx.com/api/v5/market/ticker?instId={coin}-USDT-SWAP", timeout=3).json()
+                                if res.get("code") == "0" and res.get("data"):
+                                    exit_px = float(res["data"][0]["last"])
+                                    item["exit_price"] = exit_px
+                                    ep = float(item.get("price", exit_px))
+                                    side = item.get("side", "long").lower()
+                                    if side == "long":
+                                        item["pnl"] = (exit_px - ep) / ep * 100.0
+                                    else:
+                                        item["pnl"] = (ep - exit_px) / ep * 100.0
+                            except Exception:
+                                item["exit_price"] = 0
+                                item["pnl"] = 0
                         ticket_closed = True
                         break
                         

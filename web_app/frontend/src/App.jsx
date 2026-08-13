@@ -57,10 +57,49 @@ function App() {
   const [enabledTfs, setEnabledTfs] = useState({});
   const [botStatus, setBotStatus] = useState("STOPPED");
   const [uptime, setUptime] = useState(0);
+  const [chartRatio, setChartRatio] = useState(50);
+
+  const startResizing = (e) => {
+    e.preventDefault();
+    const isVertical = layoutMode === "vertical";
+    
+    // Add is-resizing to body to prevent iframe capturing mouse events
+    document.body.classList.add("is-resizing");
+    if (isVertical) {
+      document.body.classList.add("is-resizing-vertical");
+    }
+
+    const doDrag = (dragEvent) => {
+      const workspace = document.querySelector(".main-workspace");
+      if (!workspace) return;
+      const rect = workspace.getBoundingClientRect();
+      if (isVertical) {
+        let newRatio = ((dragEvent.clientY - rect.top) / rect.height) * 100;
+        if (newRatio < 25) newRatio = 25;
+        if (newRatio > 75) newRatio = 75;
+        setChartRatio(newRatio);
+      } else {
+        let newRatio = ((dragEvent.clientX - rect.left) / rect.width) * 100;
+        if (newRatio < 25) newRatio = 25;
+        if (newRatio > 75) newRatio = 75;
+        setChartRatio(newRatio);
+      }
+    };
+    const stopDrag = () => {
+      document.body.classList.remove("is-resizing");
+      document.body.classList.remove("is-resizing-vertical");
+      document.removeEventListener("mousemove", doDrag);
+      document.removeEventListener("mouseup", stopDrag);
+    };
+    document.addEventListener("mousemove", doDrag);
+    document.addEventListener("mouseup", stopDrag);
+  };
+
   const [activeTab, setActiveTab] = useState("positions");
   const [layoutMode, setLayoutMode] = useState("vertical");
   const [logs, setLogs] = useState(["Đã kết nối với TLS1 Trading Web Terminal Server..."]);
   const [positions, setPositions] = useState([]);
+  const [closedPositions, setClosedPositions] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("api");
 
@@ -284,6 +323,9 @@ function App() {
       try {
         const r = await fetch(`/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) setPositions(await r.json());
+        
+        const r2 = await fetch(`/api/bot/closed_positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        if (r2.ok) setClosedPositions(await r2.json());
       } catch {}
     };
     fetchStatus(); fetchConfig(); fetchCreds(); fetchPositions();
@@ -315,16 +357,18 @@ function App() {
     chartRef.current = chart;
     candleSeriesRef.current = cs;
     emaSeriesRef.current = es;
-    const handleResize = () => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        });
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (chartRef.current && entries.length > 0) {
+        const { width, height } = entries[0].contentRect;
+        chartRef.current.applyOptions({ width, height });
       }
+    });
+    resizeObserver.observe(chartContainerRef.current);
+
+    return () => { 
+      resizeObserver.disconnect();
+      chart.remove(); 
     };
-    window.addEventListener("resize", handleResize);
-    return () => { window.removeEventListener("resize", handleResize); chart.remove(); };
   }, [isAuthenticated, layoutMode]); // Re-init on layout change
 
   // Fetch candles — dùng backend proxy để tránh CORS trên mobile
@@ -643,7 +687,7 @@ function App() {
 
       <div className={`content-wrapper ${fadeClass}`}>
         {/* WORKSPACE PHẢI - hiện trước trên mobile */}
-        <main className={`main-workspace ${layoutMode}`}>
+        <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
           <section className="pane-chart" style={{ position: "relative" }}>
             <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
@@ -701,14 +745,24 @@ function App() {
               >L</button>
             </div>
         </section>
+        
+        {/* Resizer */}
+        <div 
+          className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
+          onMouseDown={startResizing}
+        />
+
         <section className="pane-tabs">
           <div className="tab-bar-header">
             <div className="tab-buttons">
               <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
                 📊 Bảng Vị Thế ({safePos.length})
               </button>
+              <button className={`tab-btn ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
+                📜 Lịch Sử Lệnh ({closedPositions.length})
+              </button>
               <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
-                🖥 Terminal Logs
+                🖥 Logs
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px" }}>
@@ -725,6 +779,46 @@ function App() {
                     {block.lines.map((l, i) => <div key={i} className="log-line">{l}</div>)}
                   </div>
                 ))}
+              </div>
+            ) : activeTab === "history" ? (
+              <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+                <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
+                  <thead>
+                    <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
+                      <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Thời gian đóng</th>
+                      <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch (TF)</th>
+                      <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào</th>
+                      <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá đóng</th>
+                      <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                      <th style={{ padding: "6px 15px", textAlign: "right", fontSize: "15px", whiteSpace: "nowrap", minWidth: "120px" }}>PNL (USDT)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {closedPositions.map((pos) => (
+                      <tr key={pos.ticket_id} style={{ borderBottom: "1px solid #333" }}>
+                        <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "13px", color: "#aaa" }}>
+                          {new Date(pos.closeTime).toLocaleString('vi-VN')}
+                        </td>
+                        <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", fontWeight: "bold", color: pos.posSide === "long" ? "#4caf50" : "#ff5252" }}>
+                          {pos.instId.replace("-SWAP", "")} ({pos.tf})
+                        </td>
+                        <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.entryPx).toFixed(4)}</td>
+                        <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.exitPx).toFixed(4)}</td>
+                        <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.pos).toFixed(2)}</td>
+                        <td style={{ padding: "6px 15px", fontSize: "15px", fontWeight: "bold", color: parseFloat(pos.pnl) >= 0 ? "#4caf50" : "#ff5252" }}>
+                          {parseFloat(pos.pnl) >= 0 ? "+" : ""}{parseFloat(pos.pnl).toFixed(4)} $
+                        </td>
+                      </tr>
+                    ))}
+                    {closedPositions.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ textAlign: "center", padding: "20px", color: "#888" }}>
+                          Chưa có dữ liệu lịch sử đóng lệnh.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
@@ -870,7 +964,9 @@ function App() {
                                         ticket_id: pos.ticket_id,
                                         instId: pos.instId,
                                         posSide: pos.posSide,
-                                        pos: pos.pos
+                                        pos: pos.pos,
+                                        upl: pos.upl,
+                                        exitPx: pos.lastPx
                                       })
                                     });
                                   } catch (e) {

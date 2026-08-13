@@ -260,12 +260,58 @@ body {
   background-color: #131722;
 }
 .main-workspace.vertical .pane-chart {
-  height: 60%;
+  height: var(--chart-ratio, 50%);
   border-bottom: 1px solid #333;
 }
 .main-workspace.horizontal .pane-chart {
-  width: 60%;
+  width: var(--chart-ratio, 50%);
   border-right: 1px solid #333;
+}
+
+.resizer {
+  background-color: #2a2a2a;
+  position: relative;
+  z-index: 10;
+}
+.resizer.horizontal-resizer {
+  height: 10px;
+  cursor: row-resize;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.resizer.horizontal-resizer::after {
+  content: "";
+  width: 60px;
+  height: 4px;
+  background-color: #777; /* Bright grey so it stands out */
+  border-radius: 2px;
+}
+.resizer.horizontal-resizer:hover, .resizer.horizontal-resizer:active {
+  background-color: #3a3a3a;
+}
+.resizer.horizontal-resizer:hover::after, .resizer.horizontal-resizer:active::after {
+  background-color: #ef5350; /* Bright red when interacted with */
+}
+.resizer.vertical-resizer {
+  width: 10px;
+  cursor: col-resize;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.resizer.vertical-resizer::after {
+  content: "";
+  height: 60px;
+  width: 4px;
+  background-color: #777;
+  border-radius: 2px;
+}
+.resizer.vertical-resizer:hover, .resizer.vertical-resizer:active {
+  background-color: #3a3a3a;
+}
+.resizer.vertical-resizer:hover::after, .resizer.vertical-resizer:active::after {
+  background-color: #ef5350;
 }
 
 .pane-titlebar {
@@ -286,8 +332,10 @@ body {
 .chart-wrapper {
   flex: 1;
   width: 100%;
-  height: calc(100% - 26px);
+  height: 0;
+  min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 /* ============= PANE TABS (Logs + Positions) ============= */
@@ -298,10 +346,10 @@ body {
   background-color: #1e1e1e;
 }
 .main-workspace.vertical .pane-tabs {
-  height: 40%;
+  height: calc(100% - var(--chart-ratio, 50%) - 10px); /* 10px is resizer height */
 }
 .main-workspace.horizontal .pane-tabs {
-  width: 40%;
+  width: calc(100% - var(--chart-ratio, 50%) - 10px);
 }
 
 .tab-bar-header {
@@ -676,7 +724,7 @@ body {
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: 380px !important; /* Tăng thêm diện tích cho chart nến */
+    height: var(--chart-ratio, 50%) !important;
     border-right: none;
     border-bottom: 1px solid #333;
     flex-shrink: 0;
@@ -685,7 +733,7 @@ body {
   .main-workspace .pane-tabs {
     width: 100% !important;
     flex: 1 !important;
-    height: auto !important;
+    height: calc(100% - var(--chart-ratio, 50%) - 10px) !important;
     min-height: 200px;
     flex-shrink: 0;
   }
@@ -799,4 +847,17 @@ body {
   
   /* Modal setting tren mobile -> 1 cot toggle cho de nhin */
   .toggle-grid { grid-template-columns: 1fr; gap: 8px; }
+}
+
+body.is-resizing * {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+body.is-resizing {
+  cursor: col-resize !important;
+}
+
+body.is-resizing-vertical {
+  cursor: row-resize !important;
 }
