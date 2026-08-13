@@ -986,3 +986,5 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
+
+# z20260813 | Added auto-delete for trade history older than 30 days to free up memory

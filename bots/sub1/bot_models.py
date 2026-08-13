@@ -253,3 +253,5 @@ class AssetTracker:
 
 # ==============================================================================
 # 🌐 GIAO TIẾP OKX API (Đóng gói tĩnh ở main để giữ Connection Pool)
+
+# z20260813 | Added auto-delete for trade history older than 30 days to free up memory

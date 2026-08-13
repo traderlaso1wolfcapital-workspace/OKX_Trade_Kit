@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',   // Expose ra toan bo mang LAN (de dien thoai truy cap)
+    allowedHosts: true, // Cho phép Cloudflare truy cập không bị block
     port: 5173,
     proxy: {
       '/api': {
