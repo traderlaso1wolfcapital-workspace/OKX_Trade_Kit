@@ -52,7 +52,7 @@ function App() {
   const [isStoppingBot, setIsStoppingBot] = useState(false);
 
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
-  const [activePairs, setActivePairs] = useState(["BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
+  const [activePairs, setActivePairs] = useState([]);
   const [selectedTf, setSelectedTf] = useState("4H");
   const [enabledTfs, setEnabledTfs] = useState({});
   const [botStatus, setBotStatus] = useState("STOPPED");
@@ -101,7 +101,7 @@ function App() {
   const [positions, setPositions] = useState([]);
   const [closedPositions, setClosedPositions] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("api");
+  const [settingsTab, setSettingsTab] = useState("strategy");
 
   const [selectedAccount, setSelectedAccount] = useState("sub1");
   const [fadeClass, setFadeClass] = useState("tab-fade");
@@ -127,6 +127,27 @@ function App() {
   });
   // Risk settings
   const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+
+  // Cấu hình Điểm vào lệnh (Entry Config - EMA200)
+  const [entryCfg, setEntryCfg] = useState({
+    entryOffset: "0.05",
+    dcaGapPct: "0.20",
+    confluencePct: "0.23",
+    accumCandles: 60,
+    altcoinFollowBtc: true,
+    ethVolMult: "1.30",
+  });
+
+  // Cấu hình Điểm vào lệnh SMC (Entry Config - SMC)
+  const [smcEntryCfg, setSmcEntryCfg] = useState({
+    source: "ALL",
+    dir: "BOTH",
+    obVol: 2.0,
+    swingLength: 50,
+    internalLength: 5,
+    forceMarket: true,
+    maxSlippage: 0.8,
+  });
 
   // Sync defaults from Desktop App when switching Bots
   useEffect(() => {
@@ -504,6 +525,30 @@ function App() {
   }, [selectedCoin, selectedTf, isAuthenticated]);
 
   const handleStartBot = async () => {
+    // 1. Kiểm tra cấu hình API Key
+    if (!apiKey || !secretKey || !passphrase) {
+      alert("⚠️ Vui lòng cấu hình API Key OKX trước khi bắt đầu chạy bot!");
+      setShowSettings(true);
+      setSettingsTab("api");
+      return;
+    }
+
+    // 2. Kiểm tra Cặp giao dịch & TF trade
+    if (activePairs.length === 0) {
+      alert("⚠️ Vui lòng chọn ít nhất 1 Cặp giao dịch và cấu hình TF trade!");
+      return;
+    }
+
+    const hasAnyTfSelected = activePairs.some(pair => {
+      const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[pair] || []);
+      return coinTfs.length > 0;
+    });
+
+    if (!hasAnyTfSelected) {
+      alert("⚠️ Vui lòng cấu hình ít nhất 1 TF trade cho các Cặp giao dịch đã chọn!");
+      return;
+    }
+
     try {
       const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
@@ -522,7 +567,7 @@ function App() {
     const safeDict = isOldFormat ? {} : { ...enabledTfs };
     
     if (!safeDict[coin]) {
-      safeDict[coin] = isOldFormat ? [...enabledTfs] : ["M5", "M15", "M30", "H1", "H2", "H4"];
+      safeDict[coin] = isOldFormat ? [...enabledTfs] : [];
     }
 
     const currentTfs = safeDict[coin];
@@ -645,49 +690,129 @@ function App() {
   }
 
   return (
-    <div className="app-container" style={{ flexDirection: "column" }}>
+    <div className="app-container">
       {/* BANNER KHÓA / CHỜ DUYỆT — giống Desktop App */}
       {lockMessage && (
-        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "13px", fontWeight: "bold", textAlign: "center", zIndex: 9999 }}>
+        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "13px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
           {lockMessage}
         </div>
       )}
-      {/* TAB BAR CÁC BOT (TÀI KHOẢN) */}
-      <div style={{ display: "flex", background: "#1a1a1a", borderBottom: "1px solid #333", width: "100%", paddingLeft: "10px", alignItems: "center" }}>
-        {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"]].map(([sub, label]) => (
-          <button 
-            key={sub}
-            onClick={() => setSelectedAccount(sub)}
-            style={{
-              background: selectedAccount === sub ? "#2d2d2d" : "transparent",
-              color: selectedAccount === sub ? "#ff9900" : "#a0a0a0",
-              border: "none", borderRight: "1px solid #333", borderBottom: selectedAccount === sub ? "2px solid #ff9900" : "2px solid transparent",
-              padding: "10px 20px", fontSize: "13px", fontWeight: "bold", cursor: "pointer", transition: "0.2s"
-            }}
-          >
-            {label}
-          </button>
-        ))}
-        {/* Slot indicator - góc phải cùng hàng */}
-        <div style={{ marginLeft: "auto", paddingRight: "12px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
-          <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
-          <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
-            {slotCount}/{MAX_SLOTS}
-          </span>
-          <span style={{ display: "flex", gap: "2px" }}>
-            {Array.from({ length: 5 }).map((_, i) => {
-              const threshold = (i + 1) * 20;
-              const active = slotCount >= threshold - 19;
-              const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
-              return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "13px" }}>▮</span>;
-            })}
-          </span>
-        </div>
-      </div>
 
       <div className={`content-wrapper ${fadeClass}`}>
-        {/* WORKSPACE PHẢI - hiện trước trên mobile */}
-        <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
+        {/* SIDEBAR - Nằm trọn vẹn bên trái từ mép trên cùng xuống */}
+        <aside className="sidebar-left">
+          <div className="sidebar-header">
+            <div className="app-title">TRADER LÀ SỐ 1</div>
+            <div className="app-subtitle">VIỆT NAM</div>
+          </div>
+
+          {/* Sidebar content - QUẢN LÝ VỐN & RỦI RO */}
+          <div className="sidebar-content">
+            {selectedAccount === "sub1" ? (
+              <div className="group-box" style={{ position: "relative" }}>
+                <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
+                <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
+                  <button 
+                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >USDT</button>
+                  <button 
+                    onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >LOT</button>
+                </div>
+                <div className="risk-grid">
+                  <div className="risk-row">
+                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                    <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                  </div>
+                  <div className="risk-row">
+                    <label>Mức chốt lời gốc M5 (%):</label>
+                    <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.05" />
+                  </div>
+                  <div className="risk-row">
+                    <label>Mức cắt lỗ gốc M5 (%):</label>
+                    <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.05" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="group-box" style={{ position: "relative" }}>
+                <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
+                <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
+                  <button 
+                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >USDT</button>
+                  <button 
+                    onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >LOT</button>
+                </div>
+                <div className="risk-grid">
+                  <div className="risk-row">
+                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                    <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                  </div>
+                  <div className="risk-row">
+                    <label>Tỷ lệ chốt lời Thuận Trend (R:R):</label>
+                    <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.5" />
+                  </div>
+                  <div className="risk-row">
+                    <label>Tỷ lệ chốt lời Ngược Trend (R:R):</label>
+                    <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="sidebar-footer">
+            <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
+            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
+              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
+            </button>
+            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
+          </div>
+        </aside>
+
+        {/* PHÂN VÙNG BÊN PHẢI (CHỨA TAB BOT + CHART NẾN + BẢNG VỊ THẾ) */}
+        <div className="main-section">
+          {/* TAB BAR CÁC BOT (TÀI KHOẢN) */}
+          <div className="bot-tabs-bar">
+            {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"]].map(([sub, label]) => (
+              <button 
+                key={sub}
+                onClick={() => setSelectedAccount(sub)}
+                style={{
+                  background: selectedAccount === sub ? "#2d2d2d" : "transparent",
+                  color: selectedAccount === sub ? "#ff9900" : "#a0a0a0",
+                  border: "none", borderRight: "1px solid #333", borderBottom: selectedAccount === sub ? "2px solid #ff9900" : "2px solid transparent",
+                  padding: "10px 20px", fontSize: "13px", fontWeight: "bold", cursor: "pointer", transition: "0.2s"
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            {/* Slot indicator - góc phải cùng hàng */}
+            <div style={{ marginLeft: "auto", paddingRight: "12px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
+              <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
+              <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
+                {slotCount}/{MAX_SLOTS}
+              </span>
+              <span style={{ display: "flex", gap: "2px" }}>
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const threshold = (i + 1) * 20;
+                  const active = slotCount >= threshold - 19;
+                  const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
+                  return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "13px" }}>▮</span>;
+                })}
+              </span>
+            </div>
+          </div>
+
+          {/* WORKSPACE PHẢI - hiện trước trên mobile */}
+          <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
           <section className="pane-chart" style={{ position: "relative" }}>
             <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
               <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
@@ -856,9 +981,9 @@ function App() {
                             </td>
                             <td></td><td></td><td></td>
                             <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
-                              <div style={{ display: "flex", gap: "6px" }}>
+                              <div style={{ display: "flex", gap: "5px" }}>
                                 {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
-                                  const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
+                                  const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
                                   const isOn = coinTfs.includes(tf);
                                   const label = tf.replace("M", "");
                                   return (
@@ -866,11 +991,11 @@ function App() {
                                       key={tf}
                                       onClick={() => handleTfToggle(coin.value, tf)}
                                       style={{
-                                        cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
-                                        fontSize: "12px", fontWeight: "bold",
+                                        cursor: "pointer", padding: "3px 6px", borderRadius: "3px",
+                                        fontSize: "11px", fontWeight: "bold",
                                         background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
                                         border: isOn ? "1px solid #26a69a" : "1px solid #444",
-                                        minWidth: "28px", textAlign: "center"
+                                        minWidth: "24px", textAlign: "center", display: "inline-block"
                                       }}
                                     >
                                       {label}
@@ -928,9 +1053,9 @@ function App() {
                             </td>
                             <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
                               {ticketIndex === 0 && (
-                                <div style={{ display: "flex", gap: "6px" }}>
+                                <div style={{ display: "flex", gap: "5px" }}>
                                   {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
-                                    const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
+                                    const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
                                     const isOn = coinTfs.includes(tf);
                                     const label = tf.replace("M", "");
                                     return (
@@ -938,11 +1063,11 @@ function App() {
                                         key={tf}
                                         onClick={() => handleTfToggle(coin.value, tf)}
                                         style={{
-                                          cursor: "pointer", padding: "4px 8px", borderRadius: "4px",
-                                          fontSize: "12px", fontWeight: "bold",
+                                          cursor: "pointer", padding: "3px 6px", borderRadius: "3px",
+                                          fontSize: "11px", fontWeight: "bold",
                                           background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
                                           border: isOn ? "1px solid #26a69a" : "1px solid #444",
-                                          minWidth: "28px", textAlign: "center"
+                                          minWidth: "24px", textAlign: "center", display: "inline-block"
                                         }}
                                       >
                                         {label}
@@ -992,29 +1117,7 @@ function App() {
           </div>
         </section>
         </main>
-
-        {/* SIDEBAR - hiện sau main workspace trên mobile */}
-        <aside className="sidebar-left">
-          <div className="sidebar-header">
-            <div className="app-title">TRADER LÀ SỐ 1</div>
-            <div className="app-subtitle">VIỆT NAM</div>
-          </div>
-
-          {/* Sidebar chỉ còn Biểu Đồ + Khung TG Bot */}
-          <div className="sidebar-content">
-
-
-
-          </div>
-
-          <div className="sidebar-footer">
-            <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
-            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
-              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
-            </button>
-            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
-          </div>
-        </aside>
+        </div>
       </div>
 
       {/* SETTINGS MODAL — Clone 100% từ Desktop App */}
@@ -1029,11 +1132,11 @@ function App() {
 
             {/* Tab Bar */}
             <div className="settings-tab-bar">
-              <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
-                🔑 Cấu Hình API Key
-              </button>
               <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
                 ⚙️ Cấu Hình Chiến Thuật
+              </button>
+              <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
+                🔑 Cấu Hình API Key
               </button>
             </div>
 
@@ -1103,44 +1206,44 @@ function App() {
                         <div className="toggle-grid">
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({...s, main: v}))} />
-                            <span className="toggle-name">Bật MAIN</span>
-                            <span className="toggle-desc">Chiến thuật Đa Khung EMA200</span>
+                            <span className="toggle-name">Đánh Đa Khung EMA200</span>
+                            <span className="toggle-desc">Chiến thuật Đa Khung EMA200 chính</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({...s, xole: v}))} />
-                            <span className="toggle-name">Bật XOLE</span>
-                            <span className="toggle-desc">Chiến thuật Bắt Bẻ Xole</span>
+                            <span className="toggle-name">Bắt Bẻ Xole</span>
+                            <span className="toggle-desc">Chiến thuật bắt bẻ xu hướng Xole</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({...s, dynamicEma200Tp: v}))} />
-                            <span className="toggle-name">TP động EMA200</span>
-                            <span className="toggle-desc">Chốt lời động bám theo EMA200</span>
+                            <span className="toggle-name">Chốt lời bám EMA200</span>
+                            <span className="toggle-desc">Chốt lời động bám theo trục EMA200</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.dynamicPingpongTp} onChange={v => setStrat(s => ({...s, dynamicPingpongTp: v}))} />
-                            <span className="toggle-name">TP Ping-Pong</span>
-                            <span className="toggle-desc">Chốt lời ngắn hạn sóng Ping-Pong</span>
+                            <span className="toggle-name">Chốt lời sóng Ping-Pong</span>
+                            <span className="toggle-desc">Chốt lời ngắn hạn sóng nảy Ping-Pong</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.altcoinFollowBtc} onChange={v => setStrat(s => ({...s, altcoinFollowBtc: v}))} />
-                            <span className="toggle-name">Altcoin neo BTC</span>
-                            <span className="toggle-desc">Altcoin tính Limit bằng EMA200 BTC</span>
+                            <span className="toggle-name">Altcoin đánh theo BTC</span>
+                            <span className="toggle-desc">Altcoin tính điểm Limit bằng EMA200 BTC</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Lớp Bảo Vệ Cục Bộ EMA200 */}
                       <div className="settings-group">
-                        <div className="settings-group-title">Lớp Bảo Vệ Cục Bộ</div>
+                        <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
                         <div className="toggle-grid">
                           {[
-                            ["sidewaySafe", "Chốt Sideway an toàn", "Chốt chủ động khi Sideway + ROI ≥ 20%"],
-                            ["squeezeEscape", "Thoát nén Squeeze", "Thoát sớm khi khung bị nén tam giác"],
-                            ["safeguardEntry", "Bảo vệ Entry", "Thoát hòa khi lỗ sâu >70% SL rồi hồi"],
-                            ["trailingSl", "Trailing SL", "Trailing SL động — khóa lợi nhuận"],
-                            ["maxRoi", "Chốt Max ROI", "Chốt lời khi ROI ≥ 120%"],
-                            ["sidewayVap", "Cắt hòa Vấp EMA", "Cắt hòa khi Vấp EMA200 ≥ 2 lần"],
-                            ["h4Flip", "Đóng H4 đảo chiều", "Đóng vị thế ngược khi H4 đảo chiều"],
+                            ["sidewaySafe", "Chốt sớm khi đi ngang (Sideway)", "Chốt chủ động khi giá đi ngang + ROI ≥ 20%"],
+                            ["squeezeEscape", "Thoát sớm khi bị nén giá", "Thoát sớm khi khung bị nén tam giác"],
+                            ["safeguardEntry", "Thoát hòa vốn khi giá hồi", "Thoát hòa khi lỗ sâu >70% SL rồi hồi về Entry"],
+                            ["trailingSl", "Khóa lời động (Trailing SL)", "Trailing SL động — tự kéo chặn lãi theo sóng"],
+                            ["maxRoi", "Chốt lời lớn (ROI ≥ 120%)", "Tự động chốt lời tối đa khi đạt mốc lợi nhuận cao"],
+                            ["sidewayVap", "Cắt hòa khi vấp cản 2 lần", "Cắt hòa khi vấp trục cản EMA200 ≥ 2 lần"],
+                            ["h4Flip", "Cắt lệnh khi H4 đảo chiều", "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng"],
                           ].map(([key, name, desc]) => (
                             <div className="toggle-row" key={key}>
                               <ToggleSwitch checked={strat[key]} onChange={v => setStrat(s => ({...s, [key]: v}))} />
@@ -1151,48 +1254,116 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Quản Lý Vốn & Rủi Ro EMA200 */}
+                      {/* Điểm Vào Lệnh (Entry Setup) EMA200 */}
                       <div className="settings-group">
-                        <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
-                        <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#1e1e1e", padding: "0 5px" }}>
-                          <button 
-                            onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
-                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >USDT</button>
-                          <button 
-                            onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
-                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >LOT</button>
-                        </div>
+                        <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
                         <div className="risk-grid">
                           <div className="risk-row">
-                            <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                            <label>Đón trước cản (%):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              step="0.01" 
+                              value={entryCfg.entryOffset} 
+                              onChange={e => setEntryCfg(prev => ({...prev, entryOffset: e.target.value}))} 
+                            />
                           </div>
                           <div className="risk-row">
-                            <label>Chốt lời cơ sở M5 (%):</label>
-                            <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.05" />
+                            <label>Khoảng cách nhồi DCA (%):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              step="0.05" 
+                              value={entryCfg.dcaGapPct} 
+                              onChange={e => setEntryCfg(prev => ({...prev, dcaGapPct: e.target.value}))} 
+                            />
                           </div>
                           <div className="risk-row">
-                            <label>Dừng lỗ cơ sở M5 (%):</label>
-                            <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.05" />
+                            <label>Độ chụm đa khung (%):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              step="0.01" 
+                              value={entryCfg.confluencePct} 
+                              onChange={e => setEntryCfg(prev => ({...prev, confluencePct: e.target.value}))} 
+                            />
                           </div>
+                          <div className="risk-row">
+                            <label>Số nến đi ngang tối thiểu:</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              min="1" 
+                              max="200" 
+                              value={entryCfg.accumCandles} 
+                              onChange={e => setEntryCfg(prev => ({...prev, accumCandles: e.target.value}))} 
+                            />
+                          </div>
+                          <div className="risk-row" style={{ marginTop: "4px" }}>
+                            <span style={{ fontSize: "12px", color: "#e0e0e0", fontWeight: "bold" }}>Altcoin neo theo BTC:</span>
+                            <ToggleSwitch 
+                              checked={entryCfg.altcoinFollowBtc} 
+                              onChange={v => setEntryCfg(prev => ({...prev, altcoinFollowBtc: v}))} 
+                            />
+                          </div>
+                          {entryCfg.altcoinFollowBtc && (
+                            <div className="risk-row">
+                              <label>Hệ số nhạy ETH (Vol Mult):</label>
+                              <input 
+                                type="number" 
+                                className="styled-input num" 
+                                step="0.1" 
+                                value={entryCfg.ethVolMult} 
+                                onChange={e => setEntryCfg(prev => ({...prev, ethVolMult: e.target.value}))} 
+                              />
+                            </div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* Hệ Số Nhân Đa Khung (TF Multipliers) EMA200 */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
+                        <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ color: "#aaa", borderBottom: "1px solid #444" }}>
+                              <th style={{ padding: "6px 4px", textAlign: "left" }}>Khung</th>
+                              <th style={{ padding: "6px 4px" }}>Hệ số đón trước</th>
+                              <th style={{ padding: "6px 4px" }}>Hệ số Volume</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              ["M5", "1.0x", "1.0x"],
+                              ["M15", "1.5x", "1.2x"],
+                              ["M30", "2.3x", "1.5x"],
+                              ["H1", "3.3x", "2.0x"],
+                              ["H2", "4.7x", "3.0x"],
+                              ["H4", "6.8x", "5.0x"],
+                            ].map(([tf, offset, vol]) => (
+                              <tr key={tf} style={{ borderBottom: "1px solid #333" }}>
+                                <td style={{ padding: "6px 4px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
+                                <td style={{ padding: "6px 4px", color: "#e0e0e0" }}>{offset}</td>
+                                <td style={{ padding: "6px 4px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </>
                   ) : (
                     <>
                       {/* Chiến Thuật SMC */}
                       <div className="settings-group">
-                        <div className="settings-group-title">Danh Mục Chiến Thuật SMC</div>
+                        <div className="settings-group-title">Chiến Thuật Bắt Sóng SMC</div>
                         <div className="toggle-grid">
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({...s, main: v}))} />
-                            <span className="toggle-name">Bật Chiến thuật SMC Order Block</span>
-                            <span className="toggle-desc">Chiến thuật theo cấu trúc thị trường</span>
+                            <span className="toggle-name">Đánh SMC Order Block</span>
+                            <span className="toggle-desc">Chiến thuật bắt đỉnh đáy theo vùng Order Block</span>
                           </div>
                           <div className="toggle-row" style={{ marginTop: "10px" }}>
-                            <span className="toggle-name" style={{ flex: 1, color: "#e0e0e0", fontSize: "12px" }}>Timeframe base:</span>
+                            <span className="toggle-name" style={{ flex: 1, color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc:</span>
                             <select 
                               className="styled-select" 
                               value={strat.timeframeBase} 
@@ -1208,32 +1379,87 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Quản Lý Vốn & Rủi Ro SMC */}
+                      {/* Điểm Vào Lệnh SMC */}
                       <div className="settings-group">
-                        <div className="settings-group-title">Quản Lý Vốn & Rủi Ro</div>
-                        <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#1e1e1e", padding: "0 5px" }}>
-                          <button 
-                            onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
-                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >USDT</button>
-                          <button 
-                            onClick={() => setRisk(r => ({...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol}))}
-                            style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >LOT</button>
-                        </div>
+                        <div className="settings-group-title">Điểm Vào Lệnh SMC (Order Block)</div>
                         <div className="risk-grid">
                           <div className="risk-row">
-                            <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                            <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({...r, posVol: e.target.value}))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                            <label>Nguồn bắt cản (OB Source):</label>
+                            <select 
+                              className="styled-select" 
+                              style={{ width: "120px", padding: "3px 6px", fontSize: "11px" }} 
+                              value={smcEntryCfg.source} 
+                              onChange={e => setSmcEntryCfg(s => ({...s, source: e.target.value}))}
+                            >
+                              <option value="ALL">Cả hai sóng</option>
+                              <option value="SWING">Chỉ sóng lớn</option>
+                              <option value="INTERNAL">Chỉ sóng nhỏ</option>
+                            </select>
                           </div>
                           <div className="risk-row">
-                            <label>Tỷ lệ Risk:Reward thuận trend:</label>
-                            <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({...r, tpPct: e.target.value}))} min="0.1" step="0.5" />
+                            <label>Hướng vào lệnh:</label>
+                            <select 
+                              className="styled-select" 
+                              style={{ width: "120px", padding: "3px 6px", fontSize: "11px" }} 
+                              value={smcEntryCfg.dir} 
+                              onChange={e => setSmcEntryCfg(s => ({...s, dir: e.target.value}))}
+                            >
+                              <option value="BOTH">Hai chiều</option>
+                              <option value="LONG_ONLY">Chỉ Long</option>
+                              <option value="SHORT_ONLY">Chỉ Short</option>
+                            </select>
                           </div>
                           <div className="risk-row">
-                            <label>Tỷ lệ Risk:Reward ngược trend:</label>
-                            <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({...r, slPct: e.target.value}))} min="0.1" step="0.5" />
+                            <label>Lọc lực nến cản (x ATR):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              step="0.1" 
+                              value={smcEntryCfg.obVol} 
+                              onChange={e => setSmcEntryCfg(s => ({...s, obVol: e.target.value}))} 
+                            />
                           </div>
+                          <div className="risk-row">
+                            <label>Độ dài sóng lớn (Swing nến):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              min="10" 
+                              max="200" 
+                              value={smcEntryCfg.swingLength} 
+                              onChange={e => setSmcEntryCfg(s => ({...s, swingLength: e.target.value}))} 
+                            />
+                          </div>
+                          <div className="risk-row">
+                            <label>Độ dài sóng nhỏ (Internal nến):</label>
+                            <input 
+                              type="number" 
+                              className="styled-input num" 
+                              min="1" 
+                              max="50" 
+                              value={smcEntryCfg.internalLength} 
+                              onChange={e => setSmcEntryCfg(s => ({...s, internalLength: e.target.value}))} 
+                            />
+                          </div>
+                          <div className="risk-row" style={{ marginTop: "4px" }}>
+                            <span style={{ fontSize: "12px", color: "#e0e0e0", fontWeight: "bold" }}>Ép khớp Market khi lọt cản:</span>
+                            <ToggleSwitch 
+                              checked={smcEntryCfg.forceMarket} 
+                              onChange={v => setSmcEntryCfg(s => ({...s, forceMarket: v}))} 
+                            />
+                          </div>
+                          {smcEntryCfg.forceMarket && (
+                            <div className="risk-row">
+                              <label>Trượt giá Market tối đa (%):</label>
+                              <input 
+                                type="number" 
+                                className="styled-input num" 
+                                step="0.1" 
+                                value={smcEntryCfg.maxSlippage} 
+                                onChange={e => setSmcEntryCfg(s => ({...s, maxSlippage: e.target.value}))} 
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1245,6 +1471,58 @@ function App() {
             {/* Footer */}
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>Đóng</button>
+              {settingsTab === "strategy" && (
+                <button 
+                  className="btn-default" 
+                  style={{
+                    backgroundColor: "#333333", color: "#ff9900", border: "1px solid #ff9900",
+                    borderRadius: "4px", padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "bold",
+                    transition: "0.2s"
+                  }}
+                  onClick={() => {
+                    if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình về MẶC ĐỊNH của app không?")) {
+                      if (selectedAccount === "sub1") {
+                        setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+                        setStrat({
+                          main: true, xole: false, dynamicEma200Tp: true,
+                          dynamicPingpongTp: false, altcoinFollowBtc: true,
+                          sidewaySafe: true, squeezeEscape: false, safeguardEntry: true,
+                          trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
+                        });
+                        setEntryCfg({
+                          entryOffset: "0.05",
+                          dcaGapPct: "0.20",
+                          confluencePct: "0.23",
+                          accumCandles: 60,
+                          altcoinFollowBtc: true,
+                          ethVolMult: "1.30",
+                        });
+                      } else if (selectedAccount === "sub2") {
+                        setRisk({ posVol: 100, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
+                        setStrat({
+                          main: true, xole: false, dynamicEma200Tp: false,
+                          dynamicPingpongTp: false, altcoinFollowBtc: false,
+                          sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+                          trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
+                          timeframeBase: "1H",
+                        });
+                        setSmcEntryCfg({
+                          source: "ALL",
+                          dir: "BOTH",
+                          obVol: 2.0,
+                          swingLength: 50,
+                          internalLength: 5,
+                          forceMarket: true,
+                          maxSlippage: 0.8,
+                        });
+                      }
+                      alert("🔄 Đã khôi phục cài đặt về mặc định của nhà sản xuất!");
+                    }
+                  }}
+                >
+                  🔄 KHÔI PHỤC MẶC ĐỊNH
+                </button>
+              )}
               <button className="btn-primary" disabled={isSavingConfig} onClick={async () => {
                 setIsSavingConfig(true);
                 if (settingsTab === "api") {

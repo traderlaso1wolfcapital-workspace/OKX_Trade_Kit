@@ -1070,10 +1070,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         settings_tabs = QtWidgets.QTabWidget()
         settings_tabs.setObjectName("InnerTabs")
         
-        if hasattr(self, 'tab_api') and self.tab_api:
-            settings_tabs.addTab(self.tab_api, "🔑 Cấu Hình API Key")
         if hasattr(self, 'tab_strategy') and self.tab_strategy:
             settings_tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
+        if hasattr(self, 'tab_api') and self.tab_api:
+            settings_tabs.addTab(self.tab_api, "🔑 Cấu Hình API Key")
             
         dlg_layout.addWidget(settings_tabs)
         
@@ -2276,15 +2276,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
         self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
-        add_checkbox(l_toggles, 0, 0, "Bật MAIN", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 (Main).")
-        add_checkbox(l_toggles, 0, 1, "Bật XOLE", self.chk_xole, "Bật/Tắt chiến thuật Bắt Bẻ Xole (Giao dịch ngược xu hướng nhỏ).")
-        add_checkbox(l_toggles, 1, 0, "Bật TP động theo EMA200", self.chk_dynamic_ema200_tp, "Bật cơ chế Chốt lời động bám theo EMA200 của khung thời gian nhỏ hơn liền kề.")
-        add_checkbox(l_toggles, 1, 1, "Bật TP theo Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng Ping-Pong.")
-        add_checkbox(l_toggles, 2, 0, "Altcoin neo theo EMA200 BTC", self.chk_altcoin_follow_btc_ema, "ON: Altcoin tính Limit bằng cản EMA200 của BTC | OFF: Altcoin dùng EMA200 của chính nó", colspan=2)
+        add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
+        add_checkbox(l_toggles, 0, 1, "Bắt Bẻ Xole", self.chk_xole, "Bật/Tắt chiến thuật bắt bẻ xu hướng Xole (Giao dịch ngược xu hướng nhỏ).")
+        add_checkbox(l_toggles, 1, 0, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
+        add_checkbox(l_toggles, 1, 1, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
+        add_checkbox(l_toggles, 2, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
         layout.addWidget(grp_toggles)
 
-        # 2. LỚP BẢO VỆ CỤC BỘ
-        grp_safeguard = QtWidgets.QGroupBox("Lớp Bảo Vệ Cục Bộ")
+        # 2. BẢO VỆ & CẮT LỆNH TỰ ĐỘNG
+        grp_safeguard = QtWidgets.QGroupBox("Bảo Vệ & Cắt Lệnh Tự Động")
 
         l_safeguard = QtWidgets.QGridLayout(grp_safeguard)
         
@@ -2296,13 +2296,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_sideway_vap = ToggleSwitch()
         self.chk_h4_flip = ToggleSwitch()
         
-        add_checkbox(l_safeguard, 0, 0, "Chốt Sideway an toàn", self.chk_sideway_safe, "Chốt lời chủ động khi Sideway strict + ROI >= 20%.")
-        add_checkbox(l_safeguard, 0, 1, "Thoát nén Squeeze", self.chk_squeeze_escape, "Thoát sớm khi khung vị thế bị nén tam giác (Squeeze).")
-        add_checkbox(l_safeguard, 0, 2, "Bảo vệ Entry", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
-        add_checkbox(l_safeguard, 1, 0, "Trailing SL", self.chk_trailing_sl, "Trailing SL động — khóa lợi nhuận khi ROI tăng dần.")
-        add_checkbox(l_safeguard, 1, 1, "Chốt Max ROI", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
-        add_checkbox(l_safeguard, 1, 2, "Cắt hòa Vấp EMA", self.chk_sideway_vap, "Cắt hòa/dương khi Vấp EMA200 >= 2 lần liên tiếp.")
-        add_checkbox(l_safeguard, 2, 0, "Đóng H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi H4 đảo chiều (tích lũy >= 60).")
+        add_checkbox(l_safeguard, 0, 0, "Chốt sớm khi đi ngang (Sideway)", self.chk_sideway_safe, "Chốt lời chủ động khi giá đi ngang + ROI >= 20%.")
+        add_checkbox(l_safeguard, 0, 1, "Thoát sớm khi bị nén giá", self.chk_squeeze_escape, "Thoát sớm khi khung vị thế bị nén tam giác (Squeeze).")
+        add_checkbox(l_safeguard, 0, 2, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
+        add_checkbox(l_safeguard, 1, 0, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
+        add_checkbox(l_safeguard, 1, 1, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
+        add_checkbox(l_safeguard, 1, 2, "Cắt hòa khi vấp cản 2 lần", self.chk_sideway_vap, "Cắt hòa/dương khi vấp trục cản EMA200 >= 2 lần liên tiếp.")
+        add_checkbox(l_safeguard, 2, 0, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
         layout.addWidget(grp_safeguard)
 
         # 3. QUẢN LÝ VỐN & RỦI RO
@@ -2312,7 +2312,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.input_pos_vol = QtWidgets.QDoubleSpinBox(); self.input_pos_vol.setMaximum(1000000)
         tooltip_text = (
-            "Vốn cố định sử dụng cho mỗi lệnh Limit ở mốc M5.\n"
+            "Số tiền cố định sử dụng cho mỗi lệnh Limit ở mốc M5.\n"
             "Các mốc lớn hơn sẽ nhân theo hệ số:\n"
             "M5: x1.0\n"
             "M15: x1.2\n"
@@ -2321,79 +2321,118 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "H2: x3.0\n"
             "H4: x5.0"
         )
-        add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.input_pos_vol, tooltip_text)
+        add_field(l_risk, 0, "Volume Size cố định (USDT):", self.input_pos_vol, tooltip_text)
         
         self.input_tp_pct = QtWidgets.QDoubleSpinBox(); self.input_tp_pct.setSuffix(" %"); self.input_tp_pct.setValue(0.80)
         self.input_sl_pct = QtWidgets.QDoubleSpinBox(); self.input_sl_pct.setSuffix(" %"); self.input_sl_pct.setValue(0.80)
-        add_field(l_risk, 1, "Chốt lời cơ sở (M5):", self.input_tp_pct, "Tỷ lệ Take Profit cơ sở tính theo giá khớp. VD: 0.8%.")
-        add_field(l_risk, 2, "Dừng lỗ cơ sở (M5):", self.input_sl_pct, "Tỷ lệ Stop Loss cơ sở tính theo giá khớp. VD: 0.8%.")
+        add_field(l_risk, 1, "Mức chốt lời gốc (M5):", self.input_tp_pct, "Tỷ lệ chốt lời gốc M5 tính theo giá khớp. VD: 0.8%.")
+        add_field(l_risk, 2, "Mức cắt lỗ gốc (M5):", self.input_sl_pct, "Tỷ lệ cắt lỗ gốc M5 tính theo giá khớp. VD: 0.8%.")
         layout.addWidget(grp_risk)
 
-        # 4. BỘ LỌC & DUNG SAI KỸ THUẬT
-        grp_filter = QtWidgets.QGroupBox("Bộ Lọc & Dung Sai Kỹ Thuật")
+        # 4. BỘ LỌC VÀO LỆNH
+        grp_filter = QtWidgets.QGroupBox("Bộ Lọc Vào Lệnh")
 
         l_filter = QtWidgets.QGridLayout(grp_filter)
         
-        
         self.input_dca_gap_pct = QtWidgets.QDoubleSpinBox(); self.input_dca_gap_pct.setSuffix(" %"); self.input_dca_gap_pct.setDecimals(3)
-        add_field(l_filter, 1, "Khoảng cách DCA tối thiểu:", self.input_dca_gap_pct, "Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.5%) để rải limit. Dưới mức này sẽ gộp lệnh.")
+        add_field(l_filter, 1, "Khoảng cách nhồi DCA (%):", self.input_dca_gap_pct, "Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.5%) để rải limit. Dưới mức này sẽ gộp lệnh.")
         
         self.input_confluence_pct = QtWidgets.QDoubleSpinBox(); self.input_confluence_pct.setSuffix(" %"); self.input_confluence_pct.setDecimals(3)
-        add_field(l_filter, 2, "Hợp lưu EMA200 đa khung:", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
+        add_field(l_filter, 2, "Độ chụm đa khung (%):", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
         
         self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4)
-        add_field(l_filter, 3, "Đệm đón lõm Entry:", self.input_entry_offset, "Đệm (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
+        add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
         self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
-        add_field(l_filter, 4, "Nến tích lũy bắt buộc:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
+        add_field(l_filter, 4, "Số nến đi ngang tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
         # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_filter)
         grp_filter.hide()
 
-        # 5. LƯỢNG TỬ & TIẾN HÓA
-        grp_misc = QtWidgets.QGroupBox("Lượng Tử & Tiến Hóa")
+        # 5. AI DỰ BÁO & TỰ HỌC
+        grp_misc = QtWidgets.QGroupBox("AI Dự Báo & Tự Học")
         l_misc = QtWidgets.QGridLayout(grp_misc)
         
         self.input_q_buffer = QtWidgets.QSpinBox(); self.input_q_buffer.setMaximum(999)
-        add_field(l_misc, 0, "Nến đệm lượng tử:", self.input_q_buffer, "Số nến quá khứ (Buffer) làm vùng đệm cho thuật toán ma trận lượng tử.")
+        add_field(l_misc, 0, "Bộ nhớ nến quá khứ:", self.input_q_buffer, "Số nến quá khứ (Buffer) làm vùng đệm cho thuật toán phân tích.")
         
         self.input_q_forth = QtWidgets.QSpinBox(); self.input_q_forth.setMaximum(999)
-        add_field(l_misc, 1, "Nến dự báo lượng tử:", self.input_q_forth, "Số nến tương lai mô phỏng được thuật toán phóng chiếu.")
+        add_field(l_misc, 1, "Tầm nhìn dự báo tương lai:", self.input_q_forth, "Số nến tương lai mô phỏng được thuật toán phóng chiếu.")
         
         self.input_evo_cycle = QtWidgets.QSpinBox(); self.input_evo_cycle.setMaximum(999999)
-        add_field(l_misc, 2, "Chu kỳ tiến hóa (giây):", self.input_evo_cycle, "Thời gian tối thiểu giữa 2 lần AI chạy tự tiến hóa lại hệ số thông minh.")
-        # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
+        add_field(l_misc, 2, "Chu kỳ tự tối ưu (giây):", self.input_evo_cycle, "Thời gian tối thiểu giữa 2 lần AI chạy tự tối ưu lại hệ số thông minh.")
         layout.addWidget(grp_misc)
         grp_misc.hide()
 
-
-        # 6. ĐÒN BẨY & VOL
-        grp_port = QtWidgets.QGroupBox("Đòn Bẩy Cắt Ngang (Cross)")
+        # 6. ĐÒN BẨY & TỶ TRỌNG VỐN
+        grp_port = QtWidgets.QGroupBox("Đòn Bẩy & Tỷ Trọng Vốn")
         l_port = QtWidgets.QGridLayout(grp_port)
         self.input_btc_lever = QtWidgets.QSpinBox(); self.input_btc_lever.setMaximum(200)
-        add_field(l_port, 0, "BTC Leverage:", self.input_btc_lever, "Đòn bẩy Cross mặc định cho các lệnh BTC (VD: 100x).")
+        add_field(l_port, 0, "Đòn bẩy BTC (x):", self.input_btc_lever, "Đòn bẩy Cross mặc định cho các lệnh BTC (VD: 100x).")
         self.input_btc_vol_mult = QtWidgets.QDoubleSpinBox()
-        add_field(l_port, 1, "BTC Vol Multiplier:", self.input_btc_vol_mult, "Hệ số nhân Volume cho BTC. Giúp tùy chỉnh tỷ trọng tài sản.")
+        add_field(l_port, 1, "Hệ số vốn BTC:", self.input_btc_vol_mult, "Hệ số nhân Volume cho BTC. Giúp tùy chỉnh tỷ trọng tài sản.")
         self.input_eth_lever = QtWidgets.QSpinBox(); self.input_eth_lever.setMaximum(200)
-        add_field(l_port, 2, "ETH Leverage:", self.input_eth_lever, "Đòn bẩy Cross mặc định cho các lệnh ETH (VD: 100x).")
+        add_field(l_port, 2, "Đòn bẩy ETH (x):", self.input_eth_lever, "Đòn bẩy Cross mặc định cho các lệnh ETH (VD: 100x).")
         self.input_eth_vol_mult = QtWidgets.QDoubleSpinBox()
-        add_field(l_port, 3, "ETH Vol Multiplier:", self.input_eth_vol_mult, "Hệ số nhân Volume cho ETH. Giúp tùy chỉnh tỷ trọng tài sản.")
-        # Tạm ẩn Đòn Bẩy Cắt Ngang theo yêu cầu
+        add_field(l_port, 3, "Hệ số vốn ETH:", self.input_eth_vol_mult, "Hệ số nhân Volume cho ETH. Giúp tùy chỉnh tỷ trọng tài sản.")
         layout.addWidget(grp_port)
         grp_port.hide()
         
         layout.addStretch(1)
 
+        btn_row_strat = QtWidgets.QHBoxLayout()
+        self.btn_reset_strategy = HoverSoundButton("🔄 KHÔI PHỤC MẶC ĐỊNH")
+        self.btn_reset_strategy.setStyleSheet("background-color: #333333; color: #ff9900; border: 1px solid #ff9900; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
+        self.btn_reset_strategy.clicked.connect(self.reset_strategy_defaults)
+
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        btn_row_strat.addWidget(self.btn_reset_strategy)
+        btn_row_strat.addWidget(self.btn_save_strategy, 1)
+
         scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
-        main_layout.addWidget(self.btn_save_strategy)
+        main_layout.addLayout(btn_row_strat)
+
+    def reset_strategy_defaults(self):
+        reply = QtWidgets.QMessageBox.question(
+            self, "Khôi Phục Mặc Định",
+            "Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH của app không?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            if hasattr(self, 'chk_main'): self.chk_main.setChecked(True)
+            if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(False)
+            if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(True)
+            if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(False)
+            if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(True)
+            if hasattr(self, 'chk_sideway_safe'): self.chk_sideway_safe.setChecked(True)
+            if hasattr(self, 'chk_squeeze_escape'): self.chk_squeeze_escape.setChecked(False)
+            if hasattr(self, 'chk_safeguard_entry'): self.chk_safeguard_entry.setChecked(True)
+            if hasattr(self, 'chk_trailing_sl'): self.chk_trailing_sl.setChecked(True)
+            if hasattr(self, 'chk_max_roi'): self.chk_max_roi.setChecked(False)
+            if hasattr(self, 'chk_sideway_vap'): self.chk_sideway_vap.setChecked(False)
+            if hasattr(self, 'chk_h4_flip'): self.chk_h4_flip.setChecked(False)
+            if hasattr(self, 'input_pos_vol'): self.input_pos_vol.setValue(100.0)
+            if hasattr(self, 'input_tp_pct'): self.input_tp_pct.setValue(0.80)
+            if hasattr(self, 'input_sl_pct'): self.input_sl_pct.setValue(0.80)
+            if hasattr(self, 'input_dca_gap_pct'): self.input_dca_gap_pct.setValue(0.20)
+            if hasattr(self, 'input_confluence_pct'): self.input_confluence_pct.setValue(0.23)
+            if hasattr(self, 'input_entry_offset'): self.input_entry_offset.setValue(0.05)
+            if hasattr(self, 'input_accum_candles'): self.input_accum_candles.setValue(60)
+            if hasattr(self, 'input_q_buffer'): self.input_q_buffer.setValue(50)
+            if hasattr(self, 'input_q_forth'): self.input_q_forth.setValue(10)
+            if hasattr(self, 'input_evo_cycle'): self.input_evo_cycle.setValue(3600)
+            if hasattr(self, 'input_btc_lever'): self.input_btc_lever.setValue(100)
+            if hasattr(self, 'input_btc_vol_mult'): self.input_btc_vol_mult.setValue(1.0)
+            if hasattr(self, 'input_eth_lever'): self.input_eth_lever.setValue(100)
+            if hasattr(self, 'input_eth_vol_mult'): self.input_eth_vol_mult.setValue(1.3)
+            QtWidgets.QMessageBox.information(self, "Thành công", "🔄 Đã khôi phục cài đặt về mặc định của nhà sản xuất!")
 
 
     def setup_tab_strategy_smc(self):
@@ -2477,15 +2516,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         grp_active_coins.hide()
 
         # 1. DANH MỤC CHIẾN THUẬT
-        grp_toggles = QtWidgets.QGroupBox("Danh Mục Chiến Thuật SMC")
+        grp_toggles = QtWidgets.QGroupBox("Chiến Thuật Bắt Sóng SMC")
         l_toggles = QtWidgets.QGridLayout(grp_toggles)
         self.smc_chk_main = ToggleSwitch()
-        add_checkbox(l_toggles, 0, 0, "Bật Chiến thuật SMC Order Block", self.smc_chk_main, "Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")
+        add_checkbox(l_toggles, 0, 0, "Đánh SMC Order Block", self.smc_chk_main, "Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")
         
         self.smc_combo_tf_base = QtWidgets.QComboBox()
         self.smc_combo_tf_base.addItems(["5m", "15m", "30m", "1H", "2H", "4H"])
         self.smc_combo_tf_base.setCurrentText("1H")
-        add_field(l_toggles, 1, "Timeframe base:", self.smc_combo_tf_base, "Khung thời gian chính để giao dịch thuận xu hướng.")
+        add_field(l_toggles, 1, "Khung thời gian gốc (Base TF):", self.smc_combo_tf_base, "Khung thời gian chính để giao dịch thuận xu hướng.")
         layout.addWidget(grp_toggles)
 
         # 2. QUẢN LÝ VỐN & RỦI RO
@@ -2496,42 +2535,42 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.smc_input_risk_pct = QtWidgets.QDoubleSpinBox()
         
         self.smc_input_pos_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_pos_vol.setMaximum(1000000); self.smc_input_pos_vol.setValue(100.00)
-        add_field(l_risk, 0, "Volume Limit cố định (USDT):", self.smc_input_pos_vol, "Khối lượng vốn cố định (USDT) cho mỗi lệnh Limit SMC.")
+        add_field(l_risk, 0, "Volume Size cố định (USDT):", self.smc_input_pos_vol, "Khối lượng vốn cố định (USDT) cho mỗi lệnh Limit SMC.")
         
         self.smc_input_rr_trend = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_trend.setDecimals(1); self.smc_input_rr_trend.setValue(5.0)
-        add_field(l_risk, 1, "Tỷ lệ Risk:Reward thuận trend:", self.smc_input_rr_trend, "Tỷ lệ lợi nhuận/rủi ro thuận xu hướng (VD: 5.0 = 1:5).")
+        add_field(l_risk, 1, "Tỷ lệ chốt lời Thuận Trend (R:R):", self.smc_input_rr_trend, "Tỷ lệ lợi nhuận/rủi ro thuận xu hướng (VD: 5.0 = 1:5).")
 
         self.smc_input_rr_counter = QtWidgets.QDoubleSpinBox(); self.smc_input_rr_counter.setDecimals(1); self.smc_input_rr_counter.setValue(1.0)
-        add_field(l_risk, 2, "Tỷ lệ Risk:Reward ngược trend:", self.smc_input_rr_counter, "Tỷ lệ lợi nhuận/rủi ro ngược xu hướng (VD: 1.0 = 1:1).")
+        add_field(l_risk, 2, "Tỷ lệ chốt lời Ngược Trend (R:R):", self.smc_input_rr_counter, "Tỷ lệ lợi nhuận/rủi ro ngược xu hướng (VD: 1.0 = 1:1).")
         layout.addWidget(grp_risk)
 
         # 3. CẤU TRÚC SMC & PIVOT
-        grp_smc = QtWidgets.QGroupBox("Cấu Trúc SMC & Order Block")
+        grp_smc = QtWidgets.QGroupBox("Cấu Hình Bắt Sóng SMC")
         l_smc = QtWidgets.QGridLayout(grp_smc)
         
         self.smc_input_swing = QtWidgets.QSpinBox(); self.smc_input_swing.setMaximum(999)
-        add_field(l_smc, 0, "Nến Swing Pivot:", self.smc_input_swing, "Số nến để xác định đáy/đỉnh cấu trúc lớn.")
+        add_field(l_smc, 0, "Độ dài sóng lớn (Swing nến):", self.smc_input_swing, "Số nến để xác định đáy/đỉnh cấu trúc lớn.")
         
         self.smc_input_internal = QtWidgets.QSpinBox(); self.smc_input_internal.setMaximum(999)
-        add_field(l_smc, 1, "Nến Internal Pivot:", self.smc_input_internal, "Số nến để xác định đáy/đỉnh cấu trúc nhỏ.")
+        add_field(l_smc, 1, "Độ dài sóng nhỏ (Internal nến):", self.smc_input_internal, "Số nến để xác định đáy/đỉnh cấu trúc nhỏ.")
         
         self.smc_input_ob_max = QtWidgets.QSpinBox(); self.smc_input_ob_max.setMaximum(999)
-        add_field(l_smc, 2, "Số lượng OB lưu trữ:", self.smc_input_ob_max, "Số lượng vùng Order Block tối đa giữ lại trên RAM.")
+        add_field(l_smc, 2, "Bộ nhớ vùng cản tối đa:", self.smc_input_ob_max, "Số lượng vùng Order Block tối đa giữ lại trên RAM.")
         
         self.smc_input_ob_vol = QtWidgets.QDoubleSpinBox(); self.smc_input_ob_vol.setDecimals(1)
-        add_field(l_smc, 3, "Lọc nến OB x ATR:", self.smc_input_ob_vol, "Nến tạo OB phải lớn hơn N lần ATR(200).")
+        add_field(l_smc, 3, "Lọc lực nến cản (x ATR):", self.smc_input_ob_vol, "Nến tạo OB phải lớn hơn N lần ATR(200).")
         
         self.smc_combo_source = QtWidgets.QComboBox()
         self.smc_combo_source.addItems(["SWING", "INTERNAL", "ALL"])
-        add_field(l_smc, 4, "Nguồn OB ưu tiên:", self.smc_combo_source, "Dùng OB từ cấu trúc lớn (SWING), cấu trúc nhỏ (INTERNAL) hay cả hai.")
+        add_field(l_smc, 4, "Nguồn bắt cản (OB Source):", self.smc_combo_source, "Dùng OB từ cấu trúc lớn (SWING), cấu trúc nhỏ (INTERNAL) hay cả hai.")
         
         self.smc_combo_dir = QtWidgets.QComboBox()
         self.smc_combo_dir.addItems(["BOTH", "LONG_ONLY", "SHORT_ONLY"])
-        add_field(l_smc, 5, "Chiều giao dịch:", self.smc_combo_dir, "Đánh cả 2 chiều hay chỉ ưu tiên Long/Short.")
+        add_field(l_smc, 5, "Hướng vào lệnh:", self.smc_combo_dir, "Đánh cả 2 chiều hay chỉ ưu tiên Long/Short.")
         
         self.smc_combo_tp = QtWidgets.QComboBox()
         self.smc_combo_tp.addItems(["RR", "NEAREST_OB"])
-        add_field(l_smc, 6, "Chế độ Chốt lời:", self.smc_combo_tp, "Chốt lời cố định theo RR hay chốt tại Order Block gần nhất.")
+        add_field(l_smc, 6, "Kiểu chốt lời:", self.smc_combo_tp, "Chốt lời cố định theo RR hay chốt tại Order Block gần nhất.")
         
         self.smc_input_max_setup = QtWidgets.QSpinBox(); self.smc_input_max_setup.setMaximum(99)
         add_field(l_smc, 7, "Số lệnh chạy tối đa:", self.smc_input_max_setup, "Số lượng lệnh (setups) SMC tối đa được mở cùng lúc.")
@@ -2541,16 +2580,46 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         layout.addStretch(1)
 
+        btn_row_smc = QtWidgets.QHBoxLayout()
+        self.btn_reset_strategy_smc = HoverSoundButton("🔄 KHÔI PHỤC MẶC ĐỊNH")
+        self.btn_reset_strategy_smc.setStyleSheet("background-color: #333333; color: #ff9900; border: 1px solid #ff9900; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
+        self.btn_reset_strategy_smc.clicked.connect(self.reset_strategy_defaults_smc)
+
         self.btn_save_strategy = HoverSoundButton("💾 LƯU CẤU HÌNH SMC (AUTO-RELOAD)")
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        btn_row_smc.addWidget(self.btn_reset_strategy_smc)
+        btn_row_smc.addWidget(self.btn_save_strategy, 1)
+
         scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(container)
         main_layout = QtWidgets.QVBoxLayout(self.tab_strategy)
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
-        main_layout.addWidget(self.btn_save_strategy)
+        main_layout.addLayout(btn_row_smc)
+
+    def reset_strategy_defaults_smc(self):
+        reply = QtWidgets.QMessageBox.question(
+            self, "Khôi Phục Mặc Định",
+            "Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình SMC về MẶC ĐỊNH của app không?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            if hasattr(self, 'smc_chk_main'): self.smc_chk_main.setChecked(True)
+            if hasattr(self, 'smc_combo_tf_base'): self.smc_combo_tf_base.setCurrentText("1H")
+            if hasattr(self, 'smc_input_pos_vol'): self.smc_input_pos_vol.setValue(100.0)
+            if hasattr(self, 'smc_input_rr_trend'): self.smc_input_rr_trend.setValue(5.0)
+            if hasattr(self, 'smc_input_rr_counter'): self.smc_input_rr_counter.setValue(1.0)
+            if hasattr(self, 'smc_input_swing'): self.smc_input_swing.setValue(50)
+            if hasattr(self, 'smc_input_internal'): self.smc_input_internal.setValue(5)
+            if hasattr(self, 'smc_input_ob_max'): self.smc_input_ob_max.setValue(20)
+            if hasattr(self, 'smc_input_ob_vol'): self.smc_input_ob_vol.setValue(2.0)
+            if hasattr(self, 'smc_combo_source'): self.smc_combo_source.setCurrentText("ALL")
+            if hasattr(self, 'smc_combo_dir'): self.smc_combo_dir.setCurrentText("BOTH")
+            if hasattr(self, 'smc_combo_tp'): self.smc_combo_tp.setCurrentText("RR")
+            if hasattr(self, 'smc_input_max_setup'): self.smc_input_max_setup.setValue(10)
+            QtWidgets.QMessageBox.information(self, "Thành công", "🔄 Đã khôi phục cài đặt về mặc định của nhà sản xuất!")
 
     def get_selected_env(self):
         return self.account_dropdown.currentData()

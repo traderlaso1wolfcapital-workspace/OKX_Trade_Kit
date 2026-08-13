@@ -64,27 +64,33 @@ ENABLE_PARTIAL_LOCK_SL = True                      # Kéo SL tự động: 1/3 T
 def tf_weight(tf: str) -> int:
     return {"M5": 1, "M15": 2, "M30": 3, "H1": 4, "H2": 5, "H4": 6}.get(tf, 0)
 
-# --- MAIN: Hệ số TP/SL, Offsets, Volume ---
-TF_MULTIPLIERS = {
-    "M5": Decimal("1.0"), "M15": Decimal("1.5333"), "M30": Decimal("2.3333"),
-    "H1": Decimal("3.333"), "H2": Decimal("4.667"), "H4": Decimal("6.772")
-}
-TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v for k, v in TF_MULTIPLIERS.items()}
-TF_VOLUME_MULTIPLIERS = {
-    "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
-    "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
+# --- CẤU TRÚC ĐA KHUNG TẬP TRUNG (UNIFIED TF PROFILES) ---
+TF_CONFIG = {
+    "M5":  {"offset": Decimal("1.0"),    "vol": Decimal("1.0")},
+    "M15": {"offset": Decimal("1.5333"), "vol": Decimal("1.2")},
+    "M30": {"offset": Decimal("2.3333"), "vol": Decimal("1.5")},
+    "H1":  {"offset": Decimal("3.333"),  "vol": Decimal("2.0")},
+    "H2":  {"offset": Decimal("4.667"),  "vol": Decimal("3.0")},
+    "H4":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
 }
 
-# --- XO LE: Hệ số TP/SL, Offsets, Volume (Đảo ngược) ---
-XOLE_TF_MULTIPLIERS = {
-    "M5": Decimal("6.772"), "M15": Decimal("4.667"), "M30": Decimal("3.333"),
-    "H1": Decimal("2.3333"), "H2": Decimal("1.5333"), "H4": Decimal("1.0")
+XOLE_TF_CONFIG = {
+    "M5":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
+    "M15": {"offset": Decimal("4.667"),  "vol": Decimal("3.0")},
+    "M30": {"offset": Decimal("3.333"),  "vol": Decimal("2.0")},
+    "H1":  {"offset": Decimal("2.3333"), "vol": Decimal("1.5")},
+    "H2":  {"offset": Decimal("1.5333"), "vol": Decimal("1.2")},
+    "H4":  {"offset": Decimal("1.0"),    "vol": Decimal("1.0")},
 }
-XOLE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v for k, v in XOLE_TF_MULTIPLIERS.items()}
-XOLE_TF_VOLUME_MULTIPLIERS = {
-    "M5": Decimal("5.0"), "M15": Decimal("3.0"), "M30": Decimal("2.0"),
-    "H1": Decimal("1.5"), "H2": Decimal("1.2"), "H4": Decimal("1.0")
-}
+
+# --- Backward-compatible aliases (Tương thích ngược 100% với bot_strategy, bot_orders, bot_ui) ---
+TF_MULTIPLIERS = {k: v["offset"] for k, v in TF_CONFIG.items()}
+TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in TF_CONFIG.items()}
+TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in TF_CONFIG.items()}
+
+XOLE_TF_MULTIPLIERS = {k: v["offset"] for k, v in XOLE_TF_CONFIG.items()}
+XOLE_TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in XOLE_TF_CONFIG.items()}
+XOLE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in XOLE_TF_CONFIG.items()}
 
 # ==============================================================================
 # 5. CÁC LỚP BẢO VỆ CỤC BỘ (SAFEGUARDS)
