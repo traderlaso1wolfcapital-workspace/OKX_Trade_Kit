@@ -41,14 +41,19 @@ subprocess.run([git, "reset", "HEAD", "TLS1_Trading_Web"], check=False, cwd=base
 
 subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v} [skip ci]"], check=False, cwd=base_dir)
 
+print("[2.2] Đồng bộ với remote trước khi push...")
+subprocess.run([git, "pull", "--no-edit", "origin", "main"], check=False, cwd=base_dir)
+
 print(f"[3] BỎ QUA tạo nhãn phiên bản (Tạm dừng Desktop)...")
 # subprocess.run([git, "tag", f"v{new_v}"], check=False, cwd=base_dir)
 
 print("[4] Đang đẩy code lên GitHub... (Không kích hoạt Action)")
-subprocess.run([git, "push", "origin", "main"], check=False, cwd=base_dir)
-# subprocess.run([git, "push", "origin", f"v{new_v}"], check=False, cwd=base_dir)
+res = subprocess.run([git, "push", "origin", "main"], check=False, cwd=base_dir)
 
 print("=========================================")
-print("HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (KHÔNG RUN ACTION).")
-print(f"Phiên bản: v{new_v}")
+if res.returncode == 0:
+    print("HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (KHÔNG RUN ACTION).")
+    print(f"Phiên bản: v{new_v}")
+else:
+    print("⚠️ CẢNH BÁO: Lỗi khi đẩy code lên GitHub (Exit code != 0).")
 print("=========================================")

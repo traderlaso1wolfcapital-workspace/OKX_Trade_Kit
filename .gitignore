@@ -90,3 +90,12 @@ json_data/
 v e r s i o n . t x t  
 temp_ui_defaults.txt
 zzChay_dong_bo.bat
+
+# Frontend & Dependencies
+node_modules/
+*/node_modules/
+.next/
+*/.next/
+dist/
+*/dist/
+web_frontend/
