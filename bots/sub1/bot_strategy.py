@@ -998,6 +998,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.pos_cycle_filled_tfs.append(_tf)
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
             tracker.active_pos_tf = detected_long_tfs[-1]
+            
+            import bots.sub1.bot_models as bm
+            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "LONG", float(tracker.active_avg_px_long), float(cross_long_amt), tf=detected_long_tfs[-1])
 
         if cross_short_amt > 0:
             tracker.active_avg_px_short = cross_short_vol / (cross_short_amt * contract_val)
@@ -1012,6 +1015,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.pos_cycle_filled_tfs.append(_tf)
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
             tracker.active_pos_tf = detected_short_tfs[-1]
+            
+            import bots.sub1.bot_models as bm
+            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "SHORT", float(tracker.active_avg_px_short), float(cross_short_amt), tf=detected_short_tfs[-1])
     except Exception as e:
         hft_logger.error(f"Lỗi lấy position {coin_name}: {e}", exc_info=True)
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
@@ -1045,14 +1051,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # MARKER
                 current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
                 vol_dca = tracker.last_long_pos_amt
-                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active")
+                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
                 current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
                 vol_dca = tracker.last_long_pos_amt - old_pos_amt_l
-                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active")
                 _tf = getattr(tracker, "active_pos_tf", "M5")
+                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
                 tracker.open_reason_long = f"DCA Khung Lớn Tăng tại [{_tf}]: Cập nhật trung bình giá"
 
         if tracker.has_short:
@@ -1069,14 +1075,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # MARKER
                 current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
                 vol_dca = tracker.last_short_pos_amt
-                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active")
+                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
                 current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
                 vol_dca = tracker.last_short_pos_amt - old_pos_amt_s
-                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active")
                 _tf = getattr(tracker, "active_pos_tf", "M5")
+                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
                 tracker.open_reason_short = f"DCA Khung Lớn Giảm tại [{_tf}]: Cập nhật trung bình giá"
     except Exception:
         pass

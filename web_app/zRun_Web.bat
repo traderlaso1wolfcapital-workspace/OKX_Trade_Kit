@@ -1,5 +1,13 @@
 @echo off
 title TLS1 Trading Web Launcher
+
+echo ===================================================
+echo [0/3] Don dep cac tien trinh cu dang chay ngam...
+echo ===================================================
+for /f "tokens=5" %%a in ('netstat -aon ^| find "8080"') do taskkill /F /PID %%a >nul 2>&1
+for /f "tokens=5" %%a in ('netstat -aon ^| find "5173"') do taskkill /F /PID %%a >nul 2>&1
+echo.
+
 echo ===================================================
 echo [1/3] Kiem tra va cai dat dependencies cho Frontend...
 echo ===================================================

@@ -49,6 +49,7 @@ function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isStoppingBot, setIsStoppingBot] = useState(false);
 
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activePairs, setActivePairs] = useState(["BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
@@ -199,12 +200,12 @@ function App() {
         const now = Date.now();
         setLogs(prev => {
           let newBlocks = [...prev];
-          // Nếu mảng rỗng, hoặc log cách nhau > 1500ms, tạo block mới và ĐẨY LÊN ĐẦU
+          // Nếu mảng rỗng, hoặc log cách nhau > 1500ms, tạo block mới và đẩy lên đầu (tin mới nhất trên cùng)
           if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
             logBlockIdRef.current += 1;
             newBlocks.unshift({ id: logBlockIdRef.current, lines: [e.data] });
           } else {
-            // Log đến liên tục => gộp vào block đầu tiên (đang in dở)
+            // Log đến liên tục => gộp vào block ĐẦU TIÊN (đang in dở)
             newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
           }
           // Giữ tối đa 20 blocks gần nhất để không lag
@@ -261,7 +262,11 @@ function App() {
     const fetchConfig = async () => {
       try {
         const r = await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r.ok) { const d = await r.json(); if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS); }
+        if (r.ok) { 
+          const d = await r.json(); 
+          if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS); 
+          if (d.ENABLED_COINS) setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
+        }
       } catch {}
     };
     const fetchCreds = async () => {
@@ -462,9 +467,11 @@ function App() {
   };
   const handleStopBot = async () => {
     try {
+      setIsStoppingBot(true);
       const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
+    finally { setIsStoppingBot(false); }
   };
   const handleTfToggle = async (coin, tf) => {
     const isOldFormat = Array.isArray(enabledTfs);
@@ -495,7 +502,16 @@ function App() {
 
   const safePos = Array.isArray(positions) ? positions : [];
   const togglePair = (pair) => {
-    setActivePairs(prev => prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair]);
+    setActivePairs(prev => {
+      const updated = prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair];
+      try {
+        fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled_coins: updated.map(p => p.split("-")[0]) }),
+        });
+      } catch {}
+      return updated;
+    });
   };
   const safeEnabledTfs = Array.isArray(enabledTfs) ? enabledTfs : [];
   const isRunning = botStatus === "RUNNING";
@@ -715,13 +731,13 @@ function App() {
                 <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                   <thead>
                     <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                      <th style={{ textAlign: "left", padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
-                      <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                      <th style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>PNL thả nổi</th>
-                      {/* <th style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th> */}
-                      <th style={{ padding: "12px 10px", textAlign: "left", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
-                      <th style={{ textAlign: "center", padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
+                      <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
+                      <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
+                      <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                      <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>PNL thả nổi</th>
+                      {/* <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th> */}
+                      <th style={{ padding: "6px 10px", textAlign: "left", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
+                      <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -732,7 +748,7 @@ function App() {
                       if (posList.length === 0) {
                         return (
                           <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                            <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
+                            <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                 <input
                                   type="checkbox"
@@ -745,7 +761,7 @@ function App() {
                               </div>
                             </td>
                             <td></td><td></td><td></td>
-                            <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
                               <div style={{ display: "flex", gap: "6px" }}>
                                 {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
                                   const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || ["M5", "M15", "M30", "H1", "H2", "H4"]);
@@ -781,7 +797,7 @@ function App() {
                         
                         return (
                           <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: "1px solid #333" }}>
-                            <td style={{ textAlign: "left", padding: "12px 10px", whiteSpace: "nowrap" }}>
+                            <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                 {ticketIndex === 0 ? (
                                   <input
@@ -797,15 +813,15 @@ function App() {
                                 <span style={{ fontSize: "14px" }}>
                                   <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
                                   <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
-                                    ({isLong ? "Long" : "Short"} {pos.lever || "100"}x)
+                                    ({pos.tf ? pos.tf.toLowerCase() : `${isLong ? "Long" : "Short"} ${pos.lever || "100"}x`})
                                   </span>
-                                  {pos.ticket_id && <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{pos.ticket_id}</span>}
+                                  {/* {pos.ticket_id && <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{pos.ticket_id}</span>} */}
                                 </span>
                               </div>
                             </td>
-                            <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
-                            <td style={{ padding: "12px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
-                            <td style={{ padding: "12px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
+                            <td style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                            <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
                               {(() => {
                                 const roi = parseFloat(pos.roi || 0);
                                 const color = roi >= 0 ? "#26a69a" : "#ef5350";
@@ -816,7 +832,7 @@ function App() {
                                 );
                               })()}
                             </td>
-                            <td style={{ padding: "12px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                            <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
                               {ticketIndex === 0 && (
                                 <div style={{ display: "flex", gap: "6px" }}>
                                   {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
@@ -842,26 +858,23 @@ function App() {
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: "center", padding: "12px 10px" }}>
+                            <td style={{ textAlign: "center", padding: "6px 10px" }}>
                               <button 
                                 onClick={async () => {
-                                  if (window.confirm(`Bạn có chắc muốn đóng lệnh ${pos.ticket_id || ''}?`)) {
-                                    try {
-                                      const u = localStorage.getItem('tls1_uid') || loginUid;
-                                      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/bot/positions/close_ticket?uid=${u}`, {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({
-                                          ticket_id: pos.ticket_id,
-                                          instId: pos.instId,
-                                          posSide: pos.posSide,
-                                          pos: pos.pos
-                                        })
-                                      });
-                                      alert("Đã gửi lệnh đóng thành công!");
-                                    } catch (e) {
-                                      alert("Lỗi khi đóng lệnh: " + e.message);
-                                    }
+                                  try {
+                                    const u = localStorage.getItem('tls1_uid') || loginUid;
+                                    await fetch(`/api/bot/positions/close_ticket?uid=${u}`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        ticket_id: pos.ticket_id,
+                                        instId: pos.instId,
+                                        posSide: pos.posSide,
+                                        pos: pos.pos
+                                      })
+                                    });
+                                  } catch (e) {
+                                    alert("Lỗi khi đóng lệnh: " + e.message);
                                   }
                                 }}
                                 style={{ 
@@ -900,7 +913,9 @@ function App() {
 
           <div className="sidebar-footer">
             <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
-            <button onClick={handleStopBot} disabled={!isRunning} className="btn-control btn-stop">■ DỪNG CHẠY BOT</button>
+            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
+              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
+            </button>
             <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
           </div>
         </aside>

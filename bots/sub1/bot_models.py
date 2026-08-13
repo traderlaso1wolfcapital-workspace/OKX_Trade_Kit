@@ -3,7 +3,7 @@ from decimal import Decimal
 import time
 
 
-def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active"):
+def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = ""):
     try:
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
@@ -34,7 +34,8 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
                 "side": side,
                 "price": float(price),
                 "volume": float(volume),
-                "status": "active"
+                "status": "active",
+                "tf": tf
             })
             
         markers[coin] = markers[coin][-50:] # Giữ 50 marker gần nhất
@@ -42,6 +43,54 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
             json.dump(markers, f)
     except Exception as e:
         print(f"Error recording marker: {e}")
+
+def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: float, tf: str = ""):
+    try:
+        import os, json, time
+        local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+        marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')
+        os.makedirs(marker_dir, exist_ok=True)
+        marker_file = os.path.join(marker_dir, "trade_markers.json")
+        markers = {}
+        if os.path.exists(marker_file):
+            try:
+                with open(marker_file, "r", encoding="utf-8") as f:
+                    markers = json.load(f)
+            except Exception: pass
+            
+        has_active = False
+        dirty = False
+        if coin in markers:
+            for m in markers[coin]:
+                if m.get("side", "").lower() == side.lower() and m.get("status") == "active":
+                    has_active = True
+                    if tf and not m.get("tf"):
+                        m["tf"] = tf
+                        dirty = True
+                    break
+                    
+        if not has_active:
+            if coin not in markers:
+                markers[coin] = []
+            ticket_id = f"#INITIAL_{int(time.time() * 1000)}"
+            markers[coin].append({
+                "ticket_id": ticket_id,
+                "time": int(time.time() * 1000),
+                "side": side.upper(),
+                "price": float(price),
+                "volume": float(volume),
+                "status": "active",
+                "tf": tf
+            })
+            dirty = True
+            
+        if dirty:
+            markers[coin] = markers[coin][-50:]
+            with open(marker_file, "w", encoding="utf-8") as f:
+                json.dump(markers, f)
+    except Exception as e:
+        print(f"Error syncing initial marker: {e}")
+
 
 # 🧠 CLASS LƯU TRỮ VÀ QUẢN LÝ TÀI SẢN
 

@@ -91,7 +91,8 @@ def del_nested(d: dict, k1: str, k2: str):
         del d[k1][k2]
 
 class ConfigUpdate(BaseModel):
-    enabled_tfs: Union[List[str], Dict[str, List[str]]]
+    enabled_tfs: Optional[Union[List[str], Dict[str, List[str]]]] = None
+    enabled_coins: Optional[List[str]] = None
 
 class CredentialsUpdate(BaseModel):
     api_key: str
@@ -401,7 +402,8 @@ async def get_bot_config(uid: str, strategy: str = "sub1"):
     if not os.path.exists(config_path):
         # Mặc định cấu hình nếu chưa tồn tại
         return {
-            "ENABLED_TFS": ["M5", "M15", "M30", "H1", "H2", "H4"]
+            "ENABLED_TFS": ["M5", "M15", "M30", "H1", "H2", "H4"],
+            "ENABLED_COINS": ["BTC", "ETH", "XAU"]
         }
         
     try:
@@ -425,7 +427,10 @@ async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str =
         except Exception:
             cfg = {}
             
-    cfg["ENABLED_TFS"] = update_data.enabled_tfs
+    if update_data.enabled_tfs is not None:
+        cfg["ENABLED_TFS"] = update_data.enabled_tfs
+    if update_data.enabled_coins is not None:
+        cfg["ENABLED_COINS"] = update_data.enabled_coins
     
     try:
         with open(config_path, "w", encoding="utf-8") as f:
@@ -522,6 +527,10 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
         except Exception:
             pass
 
+    # Nếu chưa nhập API Key, trả về rỗng (tránh hiển thị rác từ trade_markers cũ)
+    if not (api_key and secret_key and passphrase):
+        return []
+
     # 2. Nếu có credentials, gọi OKX API thật
     if api_key and secret_key and passphrase:
         try:
@@ -540,8 +549,9 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                 "OK-ACCESS-SIGN": signature,
                 "OK-ACCESS-TIMESTAMP": ts,
                 "OK-ACCESS-PASSPHRASE": passphrase,
-                "x-simulated-trading": "1" if is_demo else "0"
             }
+            if is_demo:
+                headers["x-simulated-trading"] = "1"
             
             resp = requests.get(base_url + path_pos, headers=headers, timeout=4)
             if resp.status_code == 200:
@@ -550,7 +560,7 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                     raw_positions = res_pos.get("data", [])
                     
                     # Fetch thêm TP/SL algo để đính vào vị thế
-                    path_algo = "/api/v5/trade/orders-pending?ordType=algo"
+                    path_algo = "/api/v5/trade/orders-algo-pending"
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                     message2 = ts2 + "GET" + path_algo
                     mac2 = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message2, encoding='utf-8'), digestmod=hashlib.sha256)
@@ -561,8 +571,9 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                         "OK-ACCESS-SIGN": signature2,
                         "OK-ACCESS-TIMESTAMP": ts2,
                         "OK-ACCESS-PASSPHRASE": passphrase,
-                        "x-simulated-trading": "1" if is_demo else "0"
                     }
+                    if is_demo:
+                        headers2["x-simulated-trading"] = "1"
                     resp_algo = requests.get(base_url + path_algo, headers=headers2, timeout=4)
                     algo_data = []
                     if resp_algo.status_code == 200:
@@ -615,15 +626,46 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             total_margin = float(m_str)
                             avg_px = float(okx_pos.get("avgPx", 0))
                             last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
-                            leverage = float(okx_pos.get("lever", 1))
                             pos_side = okx_pos.get("posSide", "long").lower()
+                            leverage = float(okx_pos.get("lever", 1))
+                            if pos_side == "net":
+                                pos_val = float(okx_pos.get("pos", 0))
+                                pos_side = "long" if pos_val > 0 else "short"
+                            
+                            # --- AUTO-CLEANUP TRÙNG LỆNH (ZOMBIE TICKETS) ---
+                            active_items = [i for i in items if i.get("status") == "active" and i.get("side", "").lower() == pos_side]
+                            total_active_vol = sum(abs(float(i.get("volume", 0))) for i in active_items)
+                            
+                            if total_active_vol > total_pos + 0.0001:
+                                # Bot bị crash/restart nên tạo ra marker trùng lặp.
+                                # Ta giữ lại các marker mới nhất sao cho tổng volume vừa đủ bằng total_pos.
+                                active_items.sort(key=lambda x: x.get("time", 0), reverse=True)
+                                acc_vol = 0
+                                for i in active_items:
+                                    vol = abs(float(i.get("volume", 0)))
+                                    if acc_vol + 0.0001 >= total_pos:
+                                        # Đã đủ volume, các lệnh còn lại là rác
+                                        i["status"] = "closed"
+                                        dirty_markers = True
+                                    else:
+                                        acc_vol += vol
+                                        # Nếu cộng thêm lệnh này mà bị lố total_pos, ta cắt gọn volume của lệnh này lại
+                                        if acc_vol > total_pos + 0.0001:
+                                            i["volume"] = vol - (acc_vol - total_pos)
+                                            acc_vol = total_pos
+                                            dirty_markers = True
+                            
+                            # Tính lại total_active_vol sau khi cleanup
+                            total_active_vol = sum(abs(float(i.get("volume", 0))) for i in items if i.get("status") == "active" and i.get("side", "").lower() == pos_side)
+                            actual_total_vol = max(total_pos, total_active_vol)
+                            if actual_total_vol == 0: actual_total_vol = 1
                             
                             for item in items:
                                 if item.get("status") == "active" and item.get("side", "").lower() == pos_side:
                                     t_vol = abs(float(item.get("volume", 0)))
                                     if t_vol == 0: t_vol = total_pos # fallback
                                     
-                                    ratio = t_vol / total_pos if total_pos > 0 else 1
+                                    ratio = t_vol / actual_total_vol
                                     t_margin = total_margin * ratio
                                     
                                     t_entry = float(item.get("price", avg_px))
@@ -649,6 +691,7 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                                         "tp": tp_px,
                                         "sl": sl_px,
                                         "lever": str(int(leverage)),
+                                        "tf": item.get("tf", "")
                                     })
                                     
                     # If any markers were auto-closed, save to file
@@ -664,11 +707,17 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                         if coin not in markers or not any(i.get("status") == "active" for i in markers[coin]):
                             avg_px = float(okx_pos.get("avgPx", 0))
                             last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
+                            
+                            pos_side = okx_pos.get("posSide", "long").lower()
+                            pos_val = float(okx_pos.get("pos", 0))
+                            if pos_side == "net":
+                                pos_side = "long" if pos_val > 0 else "short"
+                                
                             formatted_positions.append({
                                 "ticket_id": "#MANUAL",
                                 "instId": inst_id,
-                                "posSide": okx_pos.get("posSide", "long").lower(),
-                                "pos": okx_pos.get("pos"),
+                                "posSide": pos_side,
+                                "pos": str(abs(pos_val)),
                                 "margin": okx_pos.get("margin") or okx_pos.get("imr") or "0",
                                 "avgPx": str(avg_px),
                                 "lastPx": str(last_px),
@@ -707,7 +756,8 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                         "upl": "0.00",
                         "tp": "---",
                         "sl": "---",
-                        "lever": "100"
+                        "lever": "100",
+                        "tf": item.get("tf", "")
                     })
         return mock_positions
     except Exception:
@@ -795,16 +845,30 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             res_json = resp.json()
             if res_json.get("code") != "0":
                 # Net mode okx uses 'net' instead of long/short sometimes
-                if "posSide" in res_json.get("msg", ""):
+                error_msg = res_json.get("msg", "")
+                if res_json.get("data") and isinstance(res_json["data"], list) and len(res_json["data"]) > 0:
+                    error_msg += " " + res_json["data"][0].get("sMsg", "")
+                
+                if "posSide" in error_msg:
                     payload["posSide"] = "net"
                     body_str = json.dumps(payload)
-                    message = ts + "POST" + path_order + body_str
+                    # Phải tạo lại timestamp mới cho request thứ 2
+                    ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                    message = ts2 + "POST" + path_order + body_str
                     mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
                     headers["OK-ACCESS-SIGN"] = base64.b64encode(mac.digest()).decode('utf-8')
-                    requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
+                    headers["OK-ACCESS-TIMESTAMP"] = ts2
+                    
+                    resp2 = requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
+                    res_json2 = resp2.json()
+                    if res_json2.get("code") != "0":
+                        raise Exception(f"OKX Retry Error: {res_json2}")
+                else:
+                    raise Exception(f"OKX Error: {res_json}")
 
         except Exception as e:
             print(f"Error placing partial close: {e}")
+            raise HTTPException(status_code=500, detail=f"OKX API Error: {str(e)}")
 
     return {"message": "Closed ticket successfully"}
 

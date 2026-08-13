@@ -8,7 +8,6 @@ pip install pyinstaller
 
 echo.
 echo [2] Lay duong dan thu vien bieu do...
-cd desktop_app
 python -c "import lightweight_charts, os; print(os.path.join(os.path.dirname(lightweight_charts.__file__), 'js'))" > chart_dir.txt
 set /p CHART_JS_DIR=<chart_dir.txt
 del chart_dir.txt
@@ -20,6 +19,6 @@ python -m PyInstaller --noconfirm TLS1_Trading_Setup.spec
 echo.
 echo ===================================================
 echo HOAN TAT! File EXE da duoc tao thanh cong.
-echo Duong dan: desktop_app\dist\TLS1_Trading_Setup.exe
+echo Duong dan: dist\TLS1_Trading_Setup.exe
 echo ===================================================
 pause
