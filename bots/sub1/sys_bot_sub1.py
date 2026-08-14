@@ -145,8 +145,8 @@ def main():
                 break
             
     if not env_file:
-        print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 1!")
-        print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 1' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!")
+        print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 1!", flush=True)
+        print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 1' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!", flush=True)
         sys.exit(1)
         
     acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")
@@ -189,7 +189,8 @@ def main():
                 except: pass
 
     if not api_key or not secret_key or not passphrase: 
-        raise ValueError(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.")
+        print(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.", flush=True)
+        sys.exit(1)
 
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
@@ -301,7 +302,13 @@ def main():
     
     try: client.request("POST", "/api/v5/account/set-position-mode", body={"posMode": "long_short"})
     except: pass
-    pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
+    
+    try:
+        pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
+    except Exception as e:
+        print(f"❌ [LỖI API]: Không thể khởi tạo kết nối OKX: {e}", flush=True)
+        print("💡 HƯỚNG DẪN SỬA LỖI: API Key của bạn không hợp lệ, bị hết hạn, hoặc bị giới hạn quyền. Vui lòng kiểm tra lại trong mục Cài Đặt!", flush=True)
+        sys.exit(1)
 
     for cfg in bot_sub1.COIN_PORTFOLIO:
         try: client.request("POST", "/api/v5/account/set-leverage", body={"instId": cfg["swap"], "lever": str(cfg["leverage"]), "mgnMode": "cross"})
@@ -528,3 +535,4 @@ def main():
 
 if __name__ == "__main__": 
     main()
+# z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError

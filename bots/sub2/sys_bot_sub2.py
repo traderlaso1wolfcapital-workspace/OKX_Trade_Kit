@@ -150,8 +150,8 @@ def main():
                 break
             
     if not env_file:
-        print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 2!")
-        print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 2' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!")
+        print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 2!", flush=True)
+        print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 2' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!", flush=True)
         sys.exit(1)
         
     acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")
@@ -194,7 +194,8 @@ def main():
                 except: pass
 
     if not api_key or not secret_key or not passphrase: 
-        raise ValueError(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.")
+        print(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.", flush=True)
+        sys.exit(1)
 
     # =========================================================================
     # 🔒 SINGLE INSTANCE LOCK — Ngăn chặn chạy 2 bot cùng tài khoản
@@ -294,16 +295,18 @@ def main():
     state_matrix = {}
 
     import bots.sub2.bot_sub2 as bot_sub2
-    import bots.sub2.bot_config as bot_config
     
     try: client.request("POST", "/api/v5/account/set-position-mode", body={"posMode": "long_short"})
     except: pass
     try:
-        res = client.request("GET", "/api/v5/account/config")
-        pMode = res["data"][0].get("posMode", "net_mode") if (res and "data" in res and res["data"]) else "net_mode"
-    except:
-        pMode = "net_mode"
+        pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
+    except Exception as e:
+        print(f"❌ [LỖI API]: Không thể khởi tạo kết nối OKX: {e}", flush=True)
+        print("💡 HƯỚNG DẪN SỬA LỖI: API Key của bạn không hợp lệ, bị hết hạn, hoặc bị giới hạn quyền. Vui lòng kiểm tra lại trong mục Cài Đặt!", flush=True)
+        sys.exit(1)
     client.pMode = pMode
+
+    import bots.sub2.bot_config as bot_config
 
     for cfg in bot_config.COIN_PORTFOLIO:
         try: client.request("POST", "/api/v5/account/set-leverage", body={"instId": cfg["swap"], "lever": str(bot_config.LEVERAGE), "mgnMode": bot_config.POSITION_MODE})
@@ -502,3 +505,4 @@ def main():
 
 if __name__ == "__main__":
     main()# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
+# z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError

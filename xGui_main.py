@@ -64,8 +64,14 @@ def main():
         
         pass
     except Exception as e:
-        print(f"Có lỗi xảy ra: {e}")
-        input("Nhấn Enter để thoát...")
+        print(f"Có lỗi xảy ra: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.stdout.flush()
+        if sys.stdin.isatty():
+            input("Nhấn Enter để thoát...")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
+# z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError
