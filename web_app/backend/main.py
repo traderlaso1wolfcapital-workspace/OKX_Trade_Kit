@@ -960,7 +960,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 if err_code in ["51023", "51167", "51119"]:
                     print(f"Vị thế {req.instId} không tồn tại hoặc đã bị đóng trước đó.", flush=True)
                 else:
-                    raise HTTPException(status_code=400, detail=f"OKX Error: {err_detail} ({err_code})")
+                    raise HTTPException(status_code=400, detail=f"Lỗi sàn OKX: {err_detail} ({err_code})")
 
         except HTTPException:
             raise
