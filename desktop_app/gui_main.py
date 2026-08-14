@@ -2344,7 +2344,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
         self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
-        add_field(l_filter, 4, "Số nến đi ngang tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải tích lũy đi ngang liên tục để xác nhận vùng hỗ trợ.")
+        add_field(l_filter, 4, "Số nến xu hướng tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")
         # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_filter)
         grp_filter.hide()

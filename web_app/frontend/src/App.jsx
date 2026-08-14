@@ -1278,7 +1278,8 @@ function App() {
                               onChange={e => setEntryCfg(prev => ({...prev, dcaGapPct: e.target.value}))} 
                             />
                           </div>
-                          <div className="risk-row">
+                          {/* Ẩn chỉ số Độ chụm đa khung (%) theo yêu cầu */}
+                          {/* <div className="risk-row">
                             <label>Độ chụm đa khung (%):</label>
                             <input 
                               type="number" 
@@ -1287,9 +1288,9 @@ function App() {
                               value={entryCfg.confluencePct} 
                               onChange={e => setEntryCfg(prev => ({...prev, confluencePct: e.target.value}))} 
                             />
-                          </div>
+                          </div> */}
                           <div className="risk-row">
-                            <label>Số nến đi ngang tối thiểu:</label>
+                            <label>Số nến xu hướng tối thiểu:</label>
                             <input 
                               type="number" 
                               className="styled-input num" 
