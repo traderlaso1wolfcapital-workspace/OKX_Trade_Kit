@@ -358,3 +358,4 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 ## 🆕 TASK CẦN XỬ LÝ (CHO CLINE)
 
 *(Danh sách trống — tất cả lỗi đã được xử lý)*
+- **[15/08/2026]** - Lỗi "đóng từng phần (khung) nhưng lại đi đóng tất cả" khi vị thế thực tế có khối lượng lẻ (ví dụ 0.0075 BTC thay vì số nguyên hợp đồng) và lỗi UI báo đóng nhưng thực tế lệnh vẫn treo trên sàn. Đã fix: Bổ sung logic bắt ngoại lệ chặn `close-position` (đóng 100%) khi lệnh được tính toán là đóng từng phần (do làm tròn tối thiểu lên 1). Đồng thời bắt mã lỗi `51023` từ OKX khi dùng `/api/v5/trade/order` (từ chối do khối lượng khả dụng bị khoá bởi TP/SL), báo lỗi 400 ra UI thay vì âm thầm xoá lệnh ảo ở local. (Mã patch: `z7719`)

@@ -908,13 +908,37 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             
             if okx_pos_vol > 0:
                 if ticket_vol >= total_active_vol - 0.0001:
-                    close_sz = int(okx_pos_vol)
+                    close_sz_val = okx_pos_vol
                 else:
-                    close_sz = max(1, int(okx_pos_vol * percentage))
+                    # Detect decimals precision directly from OKX's 'pos' string to match lotSz
+                    pos_str = "0"
+                    for p in pos_data.get("data", []):
+                        p_side = p.get("posSide", "long").lower()
+                        p_val = float(p.get("pos", 0))
+                        if (p_side == "net" and ((pos_side == "long" and p_val > 0) or (pos_side == "short" and p_val < 0))) or (p_side == pos_side):
+                            pos_str = str(p.get("pos", "0")).replace("-", "")
+                            
+                    decimals = len(pos_str.split(".")[1]) if "." in pos_str else 0
+                    
+                    if decimals == 0:
+                        close_sz_val = max(1, int(okx_pos_vol * percentage))
+                    else:
+                        close_sz_val = round(okx_pos_vol * percentage, decimals)
+                        if close_sz_val <= 0:
+                            close_sz_val = 1 / (10**decimals) # Fallback to min tick size
+                            
+                    # Prevent partial close from accidentally closing 100% due to min size rounding
+                    if close_sz_val >= okx_pos_vol - (1e-9):
+                        raise HTTPException(
+                            status_code=400, 
+                            detail=f"Lỗi: Vị thế trên OKX quá nhỏ ({okx_pos_vol}) nên không thể chia nhỏ để đóng từng phần! Vui lòng đóng toàn bộ vị thế hoặc tăng Volume."
+                        )
             else:
-                close_sz = max(1, int(ticket_vol))
+                close_sz_val = ticket_vol
 
-            if okx_pos_vol > 0 and close_sz >= int(okx_pos_vol):
+            close_sz_str = f"{close_sz_val:.10g}" # Format without trailing zeros
+
+            if okx_pos_vol > 0 and close_sz_val >= okx_pos_vol - (1e-9):
                 path_order = "/api/v5/trade/close-position"
                 order_payload = {
                     "instId": inst_id,
@@ -928,7 +952,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                     "tdMode": "cross",
                     "side": order_side,
                     "ordType": "market",
-                    "sz": str(close_sz),
+                    "sz": close_sz_str,
                     "posSide": pos_side
                 }
                 
@@ -971,7 +995,15 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 err_code = str(res_json.get("code"))
                 err_detail = res_json.get("msg") or "Lỗi đóng vị thế trên OKX"
                 print(f"OKX API Error Response: {res_json}", flush=True)
-                if err_code in ["51023", "51167", "51119"]:
+                
+                # 51167/51119: Position not found. 
+                # 51023: If close-position, position might not exist. If order, availPos is locked!
+                if path_order == "/api/v5/trade/order" and err_code == "51023":
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Lỗi: Không thể đóng từng phần do khối lượng đang bị khóa bởi lệnh chờ (TP/SL). Vui lòng Đóng tất cả hoặc hủy lệnh chờ trước!"
+                    )
+                elif err_code in ["51023", "51167", "51119"]:
                     print(f"Vị thế {req.instId} không tồn tại hoặc đã bị đóng trước đó.", flush=True)
                 else:
                     raise HTTPException(status_code=400, detail=f"Lỗi sàn OKX: {err_detail} ({err_code})")
@@ -1070,3 +1102,5 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
+
+# z7719 | Sửa lỗi close-position khi đóng vị thế lẻ (do dùng int()) và bổ sung cảnh báo 400 khi khối lượng khả dụng bị khóa bởi TP/SL trên OKX.
