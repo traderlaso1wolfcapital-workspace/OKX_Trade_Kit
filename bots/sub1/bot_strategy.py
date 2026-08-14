@@ -680,7 +680,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "100")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "40")))
 
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
@@ -952,7 +952,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "100")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "40")))
 
             _coin_vol_mult = Decimal("1.0")
             for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
@@ -1314,7 +1314,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if not okx_fetched:
             exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 100)))
+                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 40)))
                 _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                 if _risk > 0:
                     _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
@@ -1517,7 +1517,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if not okx_fetched:
             exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 100)))
+                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 40)))
                 _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                 if _risk > 0:
                     _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")

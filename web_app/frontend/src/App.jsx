@@ -126,7 +126,7 @@ function App() {
     timeframeBase: "1H",
   });
   // Risk settings
-  const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+  const [risk, setRisk] = useState({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
   const isInitialRiskRender = useRef(true);
 
   useEffect(() => {
@@ -192,7 +192,7 @@ function App() {
     
     if (selectedAccount === "sub1") {
       // Defaults for Bot EMA200
-      setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+      setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: true,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -759,7 +759,7 @@ function App() {
                 <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
                 <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
                   <button 
-                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol}))}
                     style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button 
@@ -787,7 +787,7 @@ function App() {
                 <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
                 <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
                   <button 
-                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 100 : r.posVol}))}
+                    onClick={() => setRisk(r => ({...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol}))}
                     style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button 
@@ -1539,7 +1539,7 @@ function App() {
                   onClick={() => {
                     if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình về MẶC ĐỊNH của app không?")) {
                       if (selectedAccount === "sub1") {
-                        setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+                        setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
                         setStrat({
                           main: true, xole: false, dynamicEma200Tp: true,
                           dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -1555,7 +1555,7 @@ function App() {
                           ethVolMult: "1.30",
                         });
                       } else if (selectedAccount === "sub2") {
-                        setRisk({ posVol: 100, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
+                        setRisk({ posVol: 40, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
                         setStrat({
                           main: true, xole: false, dynamicEma200Tp: false,
                           dynamicPingpongTp: false, altcoinFollowBtc: false,
