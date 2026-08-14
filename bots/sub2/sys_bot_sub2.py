@@ -152,6 +152,7 @@ def main():
     if not env_file:
         print(f"❌ [LỖI CONFIG]: Chưa cấu hình API Keys cho Bot Sub 2!", flush=True)
         print(f"💡 HƯỚNG DẪN SỬA LỖI: Vui lòng mở App -> Vào Tab 'Cấu hình Sub 2' -> Nhập OKX API Key/Secret/Passphrase -> Bấm '💾 Lưu Cấu Hình API' trước khi bật Bot!", flush=True)
+        time.sleep(5)
         sys.exit(1)
         
     acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")
@@ -195,6 +196,7 @@ def main():
 
     if not api_key or not secret_key or not passphrase: 
         print(f"❌ Thiếu API Key trong file {env_file}! Dừng hệ thống.", flush=True)
+        time.sleep(5)
         sys.exit(1)
 
     # =========================================================================
@@ -303,6 +305,7 @@ def main():
     except Exception as e:
         print(f"❌ [LỖI API]: Không thể khởi tạo kết nối OKX: {e}", flush=True)
         print("💡 HƯỚNG DẪN SỬA LỖI: API Key của bạn không hợp lệ, bị hết hạn, hoặc bị giới hạn quyền. Vui lòng kiểm tra lại trong mục Cài Đặt!", flush=True)
+        time.sleep(5)
         sys.exit(1)
     client.pMode = pMode
 
