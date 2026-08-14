@@ -857,12 +857,67 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             order_side = "sell" if pos_side == "long" else "buy"
             path_order = "/api/v5/trade/order"
             
+            # Calculate dynamic closing size based on ticket percentage
+            positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+            target_coin = inst_id.split("-")[0]
+            total_active_vol = 0.0
+            ticket_vol = float(req.pos)
+            
+            if os.path.exists(positions_path):
+                try:
+                    with open(positions_path, "r", encoding="utf-8") as f:
+                        markers = json.load(f)
+                    if target_coin in markers:
+                        total_active_vol = sum(float(i.get("volume", 0)) for i in markers[target_coin] if i.get("status") == "active" and i.get("side", "").lower() == pos_side)
+                except: pass
+                
+            percentage = 1.0
+            if total_active_vol > 0 and ticket_vol <= total_active_vol:
+                percentage = ticket_vol / total_active_vol
+                
+            # Fetch current position from OKX to know the real total size
+            import requests as req_lib
+            path_pos = f"/api/v5/account/positions?instId={inst_id}"
+            ts_pos = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            mac_pos = hmac.new(bytes(secret_key, encoding='utf8'), bytes(ts_pos + "GET" + path_pos, encoding='utf-8'), digestmod=hashlib.sha256)
+            headers_pos = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": base64.b64encode(mac_pos.digest()).decode('utf-8'),
+                "OK-ACCESS-TIMESTAMP": ts_pos,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+                "x-simulated-trading": "1" if is_demo else "0"
+            }
+            try:
+                resp_pos = req_lib.get(base_url + path_pos, headers=headers_pos, timeout=6)
+                pos_data = resp_pos.json()
+            except:
+                pos_data = {}
+            
+            okx_pos_vol = 0
+            if pos_data.get("code") == "0" and pos_data.get("data"):
+                for p in pos_data["data"]:
+                    p_side = p.get("posSide", "long").lower()
+                    p_val = float(p.get("pos", 0))
+                    if p_side == "net":
+                        if (pos_side == "long" and p_val > 0) or (pos_side == "short" and p_val < 0):
+                            okx_pos_vol = abs(p_val)
+                    elif p_side == pos_side:
+                        okx_pos_vol = abs(p_val)
+            
+            if okx_pos_vol > 0:
+                if ticket_vol >= total_active_vol - 0.0001:
+                    close_sz = int(okx_pos_vol)
+                else:
+                    close_sz = max(1, int(okx_pos_vol * percentage))
+            else:
+                close_sz = max(1, int(ticket_vol))
+
             order_payload = {
                 "instId": inst_id,
                 "tdMode": "cross",
                 "side": order_side,
                 "ordType": "market",
-                "sz": str(req.pos),
+                "sz": str(close_sz),
                 "posSide": pos_side,
                 "reduceOnly": True
             }
@@ -881,14 +936,13 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 "Content-Type": "application/json"
             }
             
-            import requests as req_lib
             resp = req_lib.post(base_url + path_order, headers=headers, data=body_str, timeout=6)
             res_json = resp.json()
             
             # If Net mode error or Position doesn't exist due to posSide mismatch, retry with posSide="net"
             if res_json.get("code") != "0":
                 err_msg = res_json.get("msg", "")
-                if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167"]:
+                if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167", "51119"]:
                     order_payload["posSide"] = "net"
                     body_str = json.dumps(order_payload)
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
