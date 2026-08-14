@@ -826,55 +826,7 @@ async def get_closed_positions(uid: str, strategy: str = "sub1"):
 
 @app.post("/api/bot/positions/close_ticket")
 async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
-    # 1. Update trade_markers.json to mark as closed
-    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
-    coin = req.instId.split("-")[0]
-    ticket_closed = False
-    
-    if os.path.exists(positions_path):
-        try:
-            with open(positions_path, "r", encoding="utf-8") as f:
-                markers = json.load(f)
-                
-            if coin in markers:
-                for item in markers[coin]:
-                    if item.get("ticket_id") == req.ticket_id and item.get("status") == "active":
-                        item["status"] = "closed"
-                        item["close_time"] = int(time.time() * 1000)
-                        
-                        # Use provided UI values if available, otherwise fetch ticker
-                        if req.exitPx and req.upl:
-                            try:
-                                item["exit_price"] = float(req.exitPx)
-                                item["pnl"] = float(req.upl)
-                            except Exception: pass
-                        
-                        if "exit_price" not in item or item["exit_price"] == 0:
-                            try:
-                                import requests as req_lib_tick
-                                res = req_lib_tick.get(f"https://www.okx.com/api/v5/market/ticker?instId={coin}-USDT-SWAP", timeout=3).json()
-                                if res.get("code") == "0" and res.get("data"):
-                                    exit_px = float(res["data"][0]["last"])
-                                    item["exit_price"] = exit_px
-                                    ep = float(item.get("price", exit_px))
-                                    side = item.get("side", "long").lower()
-                                    if side == "long":
-                                        item["pnl"] = (exit_px - ep) / ep * 100.0
-                                    else:
-                                        item["pnl"] = (ep - exit_px) / ep * 100.0
-                            except Exception:
-                                item["exit_price"] = 0
-                                item["pnl"] = 0
-                        ticket_closed = True
-                        break
-                        
-            if ticket_closed:
-                with open(positions_path, "w", encoding="utf-8") as f:
-                    json.dump(markers, f)
-        except Exception as e:
-            print(f"Error updating markers: {e}")
-            
-    # 2. Call OKX API to execute close position on exchange
+    # 1. Call OKX API to execute close position on exchange FIRST
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
@@ -960,6 +912,54 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
         except Exception as e:
             print(f"Error executing close position on OKX: {e}")
             raise HTTPException(status_code=500, detail=f"Lỗi gọi API OKX: {str(e)}")
+
+    # 2. Update trade_markers.json to mark as closed ONLY IF API SUCCEEDED
+    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+    coin = req.instId.split("-")[0]
+    ticket_closed = False
+    
+    if os.path.exists(positions_path):
+        try:
+            with open(positions_path, "r", encoding="utf-8") as f:
+                markers = json.load(f)
+                
+            if coin in markers:
+                for item in markers[coin]:
+                    if item.get("ticket_id") == req.ticket_id and item.get("status") == "active":
+                        item["status"] = "closed"
+                        item["close_time"] = int(time.time() * 1000)
+                        
+                        # Use provided UI values if available, otherwise fetch ticker
+                        if req.exitPx and req.upl:
+                            try:
+                                item["exit_price"] = float(req.exitPx)
+                                item["pnl"] = float(req.upl)
+                            except Exception: pass
+                        
+                        if "exit_price" not in item or item["exit_price"] == 0:
+                            try:
+                                import requests as req_lib_tick
+                                res = req_lib_tick.get(f"https://www.okx.com/api/v5/market/ticker?instId={coin}-USDT-SWAP", timeout=3).json()
+                                if res.get("code") == "0" and res.get("data"):
+                                    exit_px = float(res["data"][0]["last"])
+                                    item["exit_price"] = exit_px
+                                    ep = float(item.get("price", exit_px))
+                                    side = item.get("side", "long").lower()
+                                    if side == "long":
+                                        item["pnl"] = (exit_px - ep) / ep * 100.0
+                                    else:
+                                        item["pnl"] = (ep - exit_px) / ep * 100.0
+                            except Exception:
+                                item["exit_price"] = 0
+                                item["pnl"] = 0
+                        ticket_closed = True
+                        break
+                        
+            if ticket_closed:
+                with open(positions_path, "w", encoding="utf-8") as f:
+                    json.dump(markers, f)
+        except Exception as e:
+            print(f"Error updating markers: {e}")
 
     return {"status": "success", "message": f"Đã đóng vị thế {req.instId} thành công"}
 
