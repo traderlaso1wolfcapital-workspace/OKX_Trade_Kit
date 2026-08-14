@@ -920,6 +920,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 "sz": str(close_sz),
                 "posSide": pos_side
             }
+            print(f"Sending OKX order: {order_payload}", flush=True)
             body_str = json.dumps(order_payload)
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
             message = ts + "POST" + path_order + body_str
@@ -941,7 +942,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             # If Net mode error or Position doesn't exist due to posSide mismatch, retry with posSide="net"
             if res_json.get("code") != "0":
                 err_msg = res_json.get("msg", "")
-                if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167", "51119"]:
+                if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167", "51119", "1"]:
                     order_payload["posSide"] = "net"
                     body_str = json.dumps(order_payload)
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
@@ -955,9 +956,9 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             if res_json.get("code") != "0":
                 err_code = str(res_json.get("code"))
                 err_detail = res_json.get("msg") or "Lỗi đóng vị thế trên OKX"
-                print(f"OKX API Error Response: {res_json}")
+                print(f"OKX API Error Response: {res_json}", flush=True)
                 if err_code in ["51023", "51167", "51119"]:
-                    print(f"Vị thế {req.instId} không tồn tại hoặc đã bị đóng trước đó.")
+                    print(f"Vị thế {req.instId} không tồn tại hoặc đã bị đóng trước đó.", flush=True)
                 else:
                     raise HTTPException(status_code=400, detail=f"OKX Error: {err_detail} ({err_code})")
 
