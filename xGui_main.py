@@ -70,8 +70,11 @@ def main():
         sys.stdout.flush()
         if sys.stdin.isatty():
             input("Nhấn Enter để thoát...")
+        else:
+            import time
+            time.sleep(5)
         sys.exit(1)
 
 if __name__ == "__main__":
     main()
-# z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError
+# z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError, add 5s sleep before exit in xGui_main.py
