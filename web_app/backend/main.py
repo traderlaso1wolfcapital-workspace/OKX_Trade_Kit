@@ -740,6 +740,8 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             })
 
                     return formatted_positions
+                else:
+                    print(f"OKX Fetch Position Error: {res_pos}", flush=True)
         except Exception as e:
             print(f"Error fetching OKX positions: {e}")
 
