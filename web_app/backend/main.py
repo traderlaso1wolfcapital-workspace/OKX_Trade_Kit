@@ -914,15 +914,25 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             else:
                 close_sz = max(1, int(ticket_vol))
 
-            order_payload = {
-                "instId": inst_id,
-                "tdMode": "cross",
-                "side": order_side,
-                "ordType": "market",
-                "sz": str(close_sz),
-                "posSide": pos_side
-            }
-            print(f"Sending OKX order: {order_payload}", flush=True)
+            if okx_pos_vol > 0 and close_sz >= int(okx_pos_vol):
+                path_order = "/api/v5/trade/close-position"
+                order_payload = {
+                    "instId": inst_id,
+                    "mgnMode": "cross",
+                    "posSide": pos_side
+                }
+            else:
+                path_order = "/api/v5/trade/order"
+                order_payload = {
+                    "instId": inst_id,
+                    "tdMode": "cross",
+                    "side": order_side,
+                    "ordType": "market",
+                    "sz": str(close_sz),
+                    "posSide": pos_side
+                }
+                
+            print(f"Sending OKX order to {path_order}: {order_payload}", flush=True)
             body_str = json.dumps(order_payload)
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
             message = ts + "POST" + path_order + body_str
@@ -941,12 +951,13 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             resp = req_lib.post(base_url + path_order, headers=headers, data=body_str, timeout=6)
             res_json = resp.json()
             
-            # If Net mode error or Position doesn't exist due to posSide mismatch, retry with posSide="net"
+            # Fallback for Net Mode
             if res_json.get("code") != "0":
                 err_msg = res_json.get("msg", "")
                 if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167", "51119", "1"]:
                     order_payload["posSide"] = "net"
-                    order_payload["reduceOnly"] = True
+                    if path_order == "/api/v5/trade/order":
+                        order_payload["reduceOnly"] = True
                     body_str = json.dumps(order_payload)
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                     message = ts2 + "POST" + path_order + body_str
