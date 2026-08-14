@@ -946,6 +946,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 err_msg = res_json.get("msg", "")
                 if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167", "51119", "1"]:
                     order_payload["posSide"] = "net"
+                    order_payload["reduceOnly"] = True
                     body_str = json.dumps(order_payload)
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                     message = ts2 + "POST" + path_order + body_str
