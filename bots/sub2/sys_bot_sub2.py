@@ -218,10 +218,9 @@ def main():
                 if psutil.pid_exists(old_pid) and old_pid != os.getpid():
                     try:
                         old_proc = psutil.Process(old_pid)
-                        if "python" in old_proc.name().lower():
-                            print(f"\n{'='*80}")
-                            print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
-                            print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
+                        print(f"\n{'='*80}")
+                        print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
+                        print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
                             print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
                             print(f"   File lock: {lock_file}")
                             print(f"{'='*80}\n")
@@ -509,3 +508,4 @@ def main():
 if __name__ == "__main__":
     main()# z1950 | Đổi đuôi mở rộng file chứa khoá API từ .env sang .api để tăng tính bảo mật, tránh nhầm lẫn
 # z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError
+# z1950 | Fix UI missing PID check causing multi-instance by removing strict 'python' process name requirement from lock check

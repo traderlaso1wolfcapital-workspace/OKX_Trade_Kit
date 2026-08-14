@@ -281,10 +281,18 @@ def get_running_pid(uid: str, strategy: str) -> int:
         try:
             with open(pid_file, "r") as f:
                 pid = int(f.read().strip())
-            if psutil.pid_exists(pid):
-                p = psutil.Process(pid)
-                if "python" in p.name().lower():
+            # Nếu có thư viện psutil, kiểm tra xem pid có thực sự đang chạy không
+            try:
+                import psutil
+                if psutil.pid_exists(pid):
+                    p = psutil.Process(pid)
+                    # Chỉ cần tiến trình tồn tại (vì lock file này là do chính bot tạo ra)
                     return pid
+            except ImportError:
+                # Nếu không có psutil (chạy trên môi trường server không cài đủ), fallback là tin tưởng file pid
+                return pid
+            except Exception:
+                pass
         except:
             pass
     return 0

@@ -426,6 +426,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     if not hasattr(tracker, "mtf_states"):
         loaded = False
         mtf_file = env_paths.get("FILE_MTF_STATES")
+        tracker.is_first_tick_done = False  # Đánh dấu đây là vòng lặp đầu tiên
         if mtf_file and os.path.exists(mtf_file):
             try:
                 import json
@@ -1035,7 +1036,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # MARKER
                 current_price = float(tracker.active_avg_px_long)
                 vol_dca = tracker.last_long_pos_amt
-                bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
+                
+                # CHỈ ghi marker mới nếu không phải vòng lặp đầu tiên (tránh ghi đè/nhân đôi marker do đồng bộ từ OKX)
+                if getattr(tracker, "is_first_tick_done", False):
+                    bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
@@ -1059,7 +1063,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # MARKER
                 current_price = float(tracker.active_avg_px_short)
                 vol_dca = tracker.last_short_pos_amt
-                bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
+                
+                if getattr(tracker, "is_first_tick_done", False):
+                    bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
@@ -2088,7 +2094,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 tracker.active_target_ema_px = tracker.ema200
             tracker.confluence_found_status = True  # Luôn true vì bỏ check dung sai
 
-
             try:
                 cfg_file = env_paths.get("FILE_GLOBAL_CONFIG", "")
                 if cfg_file and os.path.exists(cfg_file):
@@ -2755,8 +2760,12 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                    body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in old_orders])
             except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
 
+    tracker.is_first_tick_done = True
+    return True
+
 # =========================================================================================
 # 🗺️ BẢN ĐỒ GIẢI PHẪU THUẬT TOÁN — CRITICAL STRATEGY MAP (PURE LIMIT CROSS PP0)
 # =========================================================================================
 # z306 | Fixed disabled coin logic in sub1 to properly close positions and cancel all limits
 # z307 | Fix local variable 'target_short_tfs' referenced before assignment during ALTCOIN FALLBACK logic
+# z308 | Fix duplicate marker generation on bot startup syncing to prevent position merge in UI
