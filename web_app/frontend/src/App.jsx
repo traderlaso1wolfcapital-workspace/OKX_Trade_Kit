@@ -217,6 +217,7 @@ function App() {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
+  const priceLinesRef = useRef([]);
   const emaSeriesRef = useRef(null);
   const terminalRef = useRef(null);
   const wsRef = useRef(null);
@@ -559,6 +560,66 @@ function App() {
     const iv = setInterval(fetchCandles, 15000);
     return () => clearInterval(iv);
   }, [selectedCoin, selectedTf, isAuthenticated]);
+
+  // Draw Entry, TP, SL lines on chart for the currently active coin
+  useEffect(() => {
+    if (!candleSeriesRef.current || !positions) return;
+
+    // Remove old lines
+    priceLinesRef.current.forEach(line => {
+      try {
+        candleSeriesRef.current.removePriceLine(line);
+      } catch (e) { }
+    });
+    priceLinesRef.current = [];
+
+    // Draw new lines for the selected coin
+    positions.forEach(pos => {
+      const posCoin = pos.instId?.split('-')[0];
+      const selCoin = selectedCoin?.split('-')[0];
+      
+      if (posCoin === selCoin) {
+        // Entry line
+        if (pos.avgPx && parseFloat(pos.avgPx) > 0) {
+          const entryLine = candleSeriesRef.current.createPriceLine({
+            price: parseFloat(pos.avgPx),
+            color: pos.posSide === 'long' ? '#26a69a' : '#ef5350',
+            lineWidth: 2,
+            lineStyle: 2, // Dashed
+            axisLabelVisible: true,
+            title: `ENTRY ${pos.posSide.toUpperCase()}`,
+          });
+          priceLinesRef.current.push(entryLine);
+        }
+
+        // TP line
+        if (pos.tp && parseFloat(pos.tp) > 0) {
+          const tpLine = candleSeriesRef.current.createPriceLine({
+            price: parseFloat(pos.tp),
+            color: '#26a69a',
+            lineWidth: 2,
+            lineStyle: 1, // Solid
+            axisLabelVisible: true,
+            title: 'TP',
+          });
+          priceLinesRef.current.push(tpLine);
+        }
+
+        // SL line
+        if (pos.sl && parseFloat(pos.sl) > 0) {
+          const slLine = candleSeriesRef.current.createPriceLine({
+            price: parseFloat(pos.sl),
+            color: '#ef5350',
+            lineWidth: 2,
+            lineStyle: 1, // Solid
+            axisLabelVisible: true,
+            title: 'SL',
+          });
+          priceLinesRef.current.push(slLine);
+        }
+      }
+    });
+  }, [positions, selectedCoin]);
 
   const handleStartBot = async () => {
     // 1. Kiểm tra cấu hình API Key
