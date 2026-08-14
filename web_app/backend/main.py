@@ -93,6 +93,9 @@ def del_nested(d: dict, k1: str, k2: str):
 class ConfigUpdate(BaseModel):
     enabled_tfs: Optional[Union[List[str], Dict[str, List[str]]]] = None
     enabled_coins: Optional[List[str]] = None
+    position_volume: Optional[float] = None
+    scalping_tp_pct: Optional[float] = None
+    scalping_sl_pct: Optional[float] = None
 
 class CredentialsUpdate(BaseModel):
     api_key: str
@@ -433,6 +436,12 @@ async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str =
         cfg["ENABLED_TFS"] = update_data.enabled_tfs
     if update_data.enabled_coins is not None:
         cfg["ENABLED_COINS"] = update_data.enabled_coins
+    if update_data.position_volume is not None:
+        cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = update_data.position_volume
+    if update_data.scalping_tp_pct is not None:
+        cfg["SCALPING_TP_PCT"] = update_data.scalping_tp_pct
+    if update_data.scalping_sl_pct is not None:
+        cfg["SCALPING_SL_PCT"] = update_data.scalping_sl_pct
     
     try:
         with open(config_path, "w", encoding="utf-8") as f:
@@ -831,7 +840,6 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 for item in markers[coin]:
                     if item.get("ticket_id") == req.ticket_id and item.get("status") == "active":
                         item["status"] = "closed"
-                        import time
                         item["close_time"] = int(time.time() * 1000)
                         
                         # Use provided UI values if available, otherwise fetch ticker
@@ -843,8 +851,8 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                         
                         if "exit_price" not in item or item["exit_price"] == 0:
                             try:
-                                import requests
-                                res = requests.get(f"https://www.okx.com/api/v5/market/ticker?instId={coin}-USDT-SWAP", timeout=3).json()
+                                import requests as req_lib_tick
+                                res = req_lib_tick.get(f"https://www.okx.com/api/v5/market/ticker?instId={coin}-USDT-SWAP", timeout=3).json()
                                 if res.get("code") == "0" and res.get("data"):
                                     exit_px = float(res["data"][0]["last"])
                                     item["exit_price"] = exit_px
@@ -866,7 +874,7 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
         except Exception as e:
             print(f"Error updating markers: {e}")
             
-    # 2. Call OKX API to execute partial close
+    # 2. Call OKX API to execute close position on exchange
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
@@ -886,25 +894,27 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                         elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
         except Exception: pass
 
-    if api_key and secret_key and passphrase and req.ticket_id != "#MANUAL":
+    if not (api_key and secret_key and passphrase):
+        raise HTTPException(status_code=400, detail=f"Chưa cấu hình API Key cho tài khoản {strategy}! Vui lòng nhập API Key trong mục Cài Đặt.")
+
+    if api_key and secret_key and passphrase:
         try:
-            domain = "www.okx.com"
-            base_url = f"https://{domain}"
+            inst_id = req.instId if req.instId.endswith("-SWAP") else f"{req.instId}-SWAP"
+            pos_side = req.posSide.lower()
+            base_url = "https://www.okx.com"
+            order_side = "sell" if pos_side == "long" else "buy"
             path_order = "/api/v5/trade/order"
             
-            # Determine order side for partial close
-            order_side = "sell" if req.posSide == "long" else "buy"
-            order_pos_side = "long" if req.posSide == "long" else "short" # For Net mode, OKX usually ignores this, but we pass long/short
-            
-            payload = {
-                "instId": req.instId,
+            order_payload = {
+                "instId": inst_id,
                 "tdMode": "cross",
                 "side": order_side,
                 "ordType": "market",
-                "sz": req.pos,
-                "posSide": order_pos_side
+                "sz": str(req.pos),
+                "posSide": pos_side,
+                "reduceOnly": True
             }
-            body_str = json.dumps(payload)
+            body_str = json.dumps(order_payload)
             ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
             message = ts + "POST" + path_order + body_str
             mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
@@ -919,36 +929,39 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                 "Content-Type": "application/json"
             }
             
-            resp = requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
+            import requests as req_lib
+            resp = req_lib.post(base_url + path_order, headers=headers, data=body_str, timeout=6)
             res_json = resp.json()
+            
+            # If Net mode error or Position doesn't exist due to posSide mismatch, retry with posSide="net"
             if res_json.get("code") != "0":
-                # Net mode okx uses 'net' instead of long/short sometimes
-                error_msg = res_json.get("msg", "")
-                if res_json.get("data") and isinstance(res_json["data"], list) and len(res_json["data"]) > 0:
-                    error_msg += " " + res_json["data"][0].get("sMsg", "")
-                
-                if "posSide" in error_msg:
-                    payload["posSide"] = "net"
-                    body_str = json.dumps(payload)
-                    # Phải tạo lại timestamp mới cho request thứ 2
+                err_msg = res_json.get("msg", "")
+                if "posSide" in err_msg or res_json.get("code") in ["51000", "51008", "51023", "51167"]:
+                    order_payload["posSide"] = "net"
+                    body_str = json.dumps(order_payload)
                     ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
                     message = ts2 + "POST" + path_order + body_str
                     mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
                     headers["OK-ACCESS-SIGN"] = base64.b64encode(mac.digest()).decode('utf-8')
                     headers["OK-ACCESS-TIMESTAMP"] = ts2
-                    
-                    resp2 = requests.post(base_url + path_order, headers=headers, data=body_str, timeout=4)
-                    res_json2 = resp2.json()
-                    if res_json2.get("code") != "0":
-                        raise Exception(f"OKX Retry Error: {res_json2}")
+                    resp2 = req_lib.post(base_url + path_order, headers=headers, data=body_str, timeout=6)
+                    res_json = resp2.json()
+
+            if res_json.get("code") != "0":
+                err_code = str(res_json.get("code"))
+                err_detail = res_json.get("msg") or "Lỗi đóng vị thế trên OKX"
+                if err_code in ["51023", "51167", "51119"]:
+                    print(f"Vị thế {req.instId} không tồn tại hoặc đã bị đóng trước đó.")
                 else:
-                    raise Exception(f"OKX Error: {res_json}")
+                    raise HTTPException(status_code=400, detail=f"OKX Error: {err_detail} ({err_code})")
 
+        except HTTPException:
+            raise
         except Exception as e:
-            print(f"Error placing partial close: {e}")
-            raise HTTPException(status_code=500, detail=f"OKX API Error: {str(e)}")
+            print(f"Error executing close position on OKX: {e}")
+            raise HTTPException(status_code=500, detail=f"Lỗi gọi API OKX: {str(e)}")
 
-    return {"message": "Closed ticket successfully"}
+    return {"status": "success", "message": f"Đã đóng vị thế {req.instId} thành công"}
 
 @app.websocket("/ws/logs/{uid}/{strategy}")
 async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):

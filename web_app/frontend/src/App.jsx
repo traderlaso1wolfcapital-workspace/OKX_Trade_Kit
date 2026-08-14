@@ -127,6 +127,42 @@ function App() {
   });
   // Risk settings
   const [risk, setRisk] = useState({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+  const isInitialRiskRender = useRef(true);
+
+  useEffect(() => {
+    if (isInitialRiskRender.current) {
+        isInitialRiskRender.current = false;
+        return;
+    }
+    const timer = setTimeout(() => {
+      try {
+        const u = localStorage.getItem('tls1_uid') || loginUid;
+        if (!u) return;
+        fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${u}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            position_volume: Number(risk.posVol),
+            scalping_tp_pct: Number(risk.tpPct) / 100,
+            scalping_sl_pct: Number(risk.slPct) / 100
+          }),
+        }).then(res => {
+          if (res.ok) {
+            addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
+          }
+        });
+      } catch {}
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [risk, selectedAccount, loginUid]);
+
+  const addSystemLog = (msg) => {
+    setLogs(prev => {
+      let newBlocks = [...prev];
+      newBlocks.unshift({ id: Date.now() + Math.random(), lines: [msg] });
+      if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
+      return newBlocks;
+    });
+  };
 
   // Cấu hình Điểm vào lệnh (Entry Config - EMA200)
   const [entryCfg, setEntryCfg] = useState({
@@ -260,12 +296,12 @@ function App() {
         const now = Date.now();
         setLogs(prev => {
           let newBlocks = [...prev];
-          // Nếu mảng rỗng, hoặc log cách nhau > 1500ms, tạo block mới và đẩy lên đầu (tin mới nhất trên cùng)
+          // LUÔN LUÔN đẩy log mới nhất lên ĐẦU (tin mới nhất trên cùng)
           if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
             logBlockIdRef.current += 1;
             newBlocks.unshift({ id: logBlockIdRef.current, lines: [e.data] });
           } else {
-            // Log đến liên tục => gộp vào block ĐẦU TIÊN (đang in dở)
+            // Log đến liên tục => gộp vào block ĐẦU TIÊN theo chiều xuôi (để bảng không bị lộn ngược)
             newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
           }
           // Giữ tối đa 20 blocks gần nhất để không lag
@@ -336,17 +372,7 @@ function App() {
           const d = await r.json();
           setApiKey(d.api_key || "");
           setSecretKey(d.secret_key || "");
-          setPassphrase(d.passphrase || "");
         }
-      } catch {}
-    };
-    const fetchPositions = async () => {
-      try {
-        const r = await fetch(`/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r.ok) setPositions(await r.json());
-        
-        const r2 = await fetch(`/api/bot/closed_positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r2.ok) setClosedPositions(await r2.json());
       } catch {}
     };
     fetchStatus(); fetchConfig(); fetchCreds(); fetchPositions();
@@ -354,6 +380,16 @@ function App() {
     const p = setInterval(fetchPositions, 5000);
     return () => { clearInterval(s); clearInterval(p); };
   }, [isAuthenticated, selectedAccount]);
+
+  const fetchPositions = async () => {
+    try {
+      const r = await fetch(`/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      if (r.ok) setPositions(await r.json());
+      
+      const r2 = await fetch(`/api/bot/closed_positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      if (r2.ok) setClosedPositions(await r2.json());
+    } catch {}
+  };
 
   // Chart init
   useEffect(() => {
@@ -576,9 +612,14 @@ function App() {
     const updatedTfs = { ...safeDict, [coin]: updatedCoinTfs };
     setEnabledTfs(updatedTfs);
     try {
-      await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+      fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tfs: updatedTfs }),
+      }).then(res => {
+        if (res.ok) {
+          const isOn = updatedCoinTfs.includes(tf);
+          addSystemLog(`⚙️ [SYSTEM] Đã ${isOn ? 'BẬT' : 'TẮT'} khung thời gian ${tf} cho coin ${coin.replace("-USDT-SWAP", "")}`);
+        }
       });
     } catch {}
   };
@@ -597,6 +638,11 @@ function App() {
         fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled_coins: updated.map(p => p.split("-")[0]) }),
+        }).then(res => {
+          if (res.ok) {
+            const isOn = updated.includes(pair);
+            addSystemLog(`⚙️ [SYSTEM] Đã ${isOn ? 'BẬT' : 'TẮT'} giao dịch cho cặp ${pair.replace("-USDT-SWAP", "")}`);
+          }
         });
       } catch {}
       return updated;
@@ -1015,7 +1061,7 @@ function App() {
                         const margin = parseFloat(pos.margin || "0");
                         
                         return (
-                          <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: "1px solid #333" }}>
+                          <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : "1px solid rgba(255, 255, 255, 0.03)" }}>
                             <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                 {ticketIndex === 0 ? (
@@ -1080,22 +1126,32 @@ function App() {
                             <td style={{ textAlign: "center", padding: "6px 10px" }}>
                               <button 
                                 onClick={async () => {
+                                  const coinName = coin.label.replace("-SWAP", "");
+                                  if (!window.confirm(`Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`)) return;
                                   try {
                                     const u = localStorage.getItem('tls1_uid') || loginUid;
-                                    await fetch(`/api/bot/positions/close_ticket?uid=${u}`, {
+                                    const strat = selectedAccount || "sub1";
+                                    const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}`, {
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({
                                         ticket_id: pos.ticket_id,
-                                        instId: pos.instId,
+                                        instId: pos.instId || `${coin.value}-SWAP`,
                                         posSide: pos.posSide,
                                         pos: pos.pos,
                                         upl: pos.upl,
                                         exitPx: pos.lastPx
                                       })
                                     });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                      alert(`✅ Đã đóng vị thế ${coinName} thành công!`);
+                                      fetchPositions();
+                                    } else {
+                                      alert(`❌ Lỗi khi đóng vị thế ${coinName}: ` + (data.detail || data.message || "Lỗi máy chủ"));
+                                    }
                                   } catch (e) {
-                                    alert("Lỗi khi đóng lệnh: " + e.message);
+                                    alert(`❌ Lỗi kết nối khi đóng vị thế ${coinName}: ` + e.message);
                                   }
                                 }}
                                 style={{ 
@@ -1533,10 +1589,12 @@ function App() {
                       body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                     });
                     alert("💾 Đã lưu cấu hình API Key!");
+                    addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản ${selectedAccount}`);
                   } catch { alert("Lỗi khi lưu API Key"); }
                 } else {
                   await new Promise(resolve => setTimeout(resolve, 800)); // Hiệu ứng delay giả lập lưu cấu hình
                   alert("💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
+                  addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho tài khoản ${selectedAccount}`);
                 }
                 setIsSavingConfig(false);
                 setShowSettings(false);

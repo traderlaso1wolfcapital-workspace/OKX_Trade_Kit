@@ -693,7 +693,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
                     break
             
-            tfs_order = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
+            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
             if not old_has:
                 # Cumulative matching (khi restart bot, tính tổng volume dồn)
                 cumulative_vols = {}
@@ -966,7 +966,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
             })
 
-            tfs_order = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
+            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
             cum_vols = {}
             cum = Decimal("0")
             for tf in tfs_order:
@@ -993,9 +993,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
             detected_long_tfs = reconstruct_filled_tfs_from_volume("long", cross_long_vol)
-            for _tf in detected_long_tfs:
-                if _tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(_tf)
+            tracker.pos_cycle_filled_tfs = list(detected_long_tfs)
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
             tracker.active_pos_tf = detected_long_tfs[-1]
             
@@ -1010,9 +1008,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
             detected_short_tfs = reconstruct_filled_tfs_from_volume("short", cross_short_vol)
-            for _tf in detected_short_tfs:
-                if _tf not in tracker.pos_cycle_filled_tfs:
-                    tracker.pos_cycle_filled_tfs.append(_tf)
+            tracker.pos_cycle_filled_tfs = list(detected_short_tfs)
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
             tracker.active_pos_tf = detected_short_tfs[-1]
             
@@ -1023,18 +1019,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
         tracker.active_avg_px_long, tracker.active_avg_px_short = old_avg_px_l, old_avg_px_s
         tracker.long_pos_vol, tracker.short_pos_vol = old_long_vol, old_short_vol
-
-    if not is_enabled:
-        # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
-        # Kệ xác lệnh Market và lệnh TP/SL đã đặt trên sàn -> Bot ngưng phân tích (Return)
-        clean_limit_orders(client, swap_id, "cross")
-              
-        tracker.placed_entry_px_long_by_tf = {}
-        tracker.placed_entry_px_short_by_tf = {}
-        tracker.placed_entry_px_long = "---"
-        tracker.placed_entry_px_short = "---"
-        
-        return  # DỪNG CHU KỲ Ở ĐÂY, NGẮT KẾT NỐI VỚI COIN NÀY!
 
     try:
         if tracker.has_long:
@@ -1049,13 +1033,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.open_reason_long = f"Xu hướng Tăng tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
+                current_price = float(tracker.active_avg_px_long)
                 vol_dca = tracker.last_long_pos_amt
                 bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_l and tracker.last_long_pos_amt > old_pos_amt_l:
                 # DCA MARKER
-                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_long)
+                current_price = float(tracker.active_avg_px_long)
                 vol_dca = tracker.last_long_pos_amt - old_pos_amt_l
                 _tf = getattr(tracker, "active_pos_tf", "M5")
                 bot_models.record_trade_marker(coin_name, "LONG", current_price, vol_dca, "", "active", tf=_tf)
@@ -1073,13 +1057,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.open_reason_short = f"Xu hướng Giảm tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
                 # MARKER
-                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
+                current_price = float(tracker.active_avg_px_short)
                 vol_dca = tracker.last_short_pos_amt
                 bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
                 
             elif old_has_s and tracker.last_short_pos_amt > old_pos_amt_s:
                 # DCA MARKER
-                current_price = float(candles[0][4]) if len(candles) > 0 else float(tracker.active_avg_px_short)
+                current_price = float(tracker.active_avg_px_short)
                 vol_dca = tracker.last_short_pos_amt - old_pos_amt_s
                 _tf = getattr(tracker, "active_pos_tf", "M5")
                 bot_models.record_trade_marker(coin_name, "SHORT", current_price, vol_dca, "", "active", tf=_tf)
@@ -2114,6 +2098,19 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
             except: pass
             target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+
+            if not is_enabled:
+                # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
+                # Kệ xác lệnh Market và lệnh TP/SL đã đặt trên sàn -> Bot ngưng phân tích (Return)
+                clean_limit_orders(client, swap_id, "cross")
+                      
+                tracker.placed_entry_px_long_by_tf = {}
+                tracker.placed_entry_px_short_by_tf = {}
+                tracker.placed_entry_px_long = "---"
+                tracker.placed_entry_px_short = "---"
+                
+                return  # DỪNG CHU KỲ Ở ĐÂY, NGẮT KẾT NỐI VỚI COIN NÀY!
+
             # ====================================================================
             # 🎯 ĐẶT LỆNH LIMIT ĐA KHUNG ĐỒNG PHA (MULTI-TIMEFRAME GRID)
             # ====================================================================
