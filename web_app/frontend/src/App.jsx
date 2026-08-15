@@ -129,8 +129,11 @@ function App() {
       const data = await res.json();
       if (data.code === "0" && data.data && data.data[0]) {
         setTradePrice(data.data[0].last);
+      } else {
+        setTradePrice("API_ERROR");
       }
     } catch (e) {
+      setTradePrice("FETCH_ERROR");
       console.error("Failed to fetch BBO", e);
     }
   };
