@@ -140,7 +140,29 @@ function App() {
 
   const handleSizePct = (pct) => {
     setTradePct(pct);
-    setTradeSize(`${pct}%`);
+    
+    const ctVals = {
+      "XAU-USDT-SWAP": 0.001,
+      "BTC-USDT-SWAP": 0.01,
+      "ETH-USDT-SWAP": 0.1,
+      "SOL-USDT-SWAP": 1,
+      "XRP-USDT-SWAP": 100,
+    };
+    
+    const ctVal = ctVals[selectedCoin];
+    const balance = parseFloat(availBal);
+    const price = parseFloat(tradePrice);
+    
+    if (ctVal && balance > 0 && price > 0) {
+      const usdtToSpend = balance * (pct / 100);
+      const notionalValue = usdtToSpend * 100; // Đòn bẩy 100x
+      let lots = Math.floor(notionalValue / (price * ctVal));
+      if (lots < 0) lots = 0;
+      setTradeSize(lots);
+    } else {
+      // Fallback nếu thiếu dữ liệu giá hoặc số dư
+      setTradeSize(`${pct}%`);
+    }
   };
 
   useEffect(() => {
