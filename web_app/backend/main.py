@@ -275,6 +275,16 @@ async def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 300):
     except Exception as e:
         return {"code": "-1", "msg": str(e), "data": []}
 
+@app.get("/api/market/ticker")
+async def proxy_market_ticker(instId: str):
+    """Proxy OKX ticker API để lấy giá BBO."""
+    try:
+        url = f"https://www.okx.com/api/v5/market/ticker?instId={instId}"
+        resp = requests.get(url, timeout=5)
+        return resp.json()
+    except Exception as e:
+        return {"code": "-1", "msg": str(e), "data": []}
+
 def get_running_pid(uid: str, strategy: str) -> int:
     pid_file = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}.pid")
     if os.path.exists(pid_file):
