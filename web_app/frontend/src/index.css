@@ -1005,3 +1005,9 @@ body.is-resizing-vertical {
 .app-container {
   padding-bottom: 24px; /* Make space for marquee */
 }
+
+@media (max-width: 1000px) {
+  .desktop-only {
+    display: none !important;
+  }
+}

@@ -937,6 +937,62 @@ function App() {
             )}
           </div>
 
+              {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
+              <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
+                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
+                  <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
+                  <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
+                </div>
+
+                {tradeType === 'limit' && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
+                    <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
+                  <input type="number" value={tradeSize} onChange={e => setTradeSize(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Số lượng" />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
+                  <span style={{ color: '#888' }}>Khả dụng</span>
+                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                  <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
+                  <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                  <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
+                  <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
+                </div>
+                
+                {hasTPSL && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                    <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
+                    <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
+                  <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
+                </div>
+              </section>
+
           <div className="sidebar-footer">
             <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
@@ -983,8 +1039,7 @@ function App() {
 
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
-            <div className="chart-and-order-container" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
-              <section className="pane-chart" style={{ position: "relative", flex: 1, minWidth: 0 }}>
+            <section className="pane-chart" style={{ position: "relative" }}>
                 <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
                   <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
                   <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
@@ -1041,63 +1096,6 @@ function App() {
                   >L</button>
                 </div>
               </section>
-
-              {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
-              <section className="pane-order" style={{ width: "260px", minWidth: "260px", background: "#1c1c1e", borderLeft: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto" }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
-                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
-                </div>
-
-                <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
-                  <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
-                  <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
-                </div>
-
-                {tradeType === 'limit' && (
-                  <div style={{ marginBottom: '10px' }}>
-                    <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
-                    <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-                  <input type="number" value={tradeSize} onChange={e => setTradeSize(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Số lượng" />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
-                  <span style={{ color: '#888' }}>Khả dụng</span>
-                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                  <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
-                  <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
-                  <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
-                  <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
-                </div>
-                
-                {hasTPSL && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
-                    <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
-                    <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                  <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
-                  <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
-                </div>
-              </section>
-            </div>
 
             {/* Resizer */}
             <div
