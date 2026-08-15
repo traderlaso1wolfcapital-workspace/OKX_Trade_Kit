@@ -985,7 +985,7 @@ function App() {
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                  <input type="number" step="0.01" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
                   <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
                 </div>
               </div>
