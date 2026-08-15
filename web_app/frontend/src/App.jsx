@@ -125,7 +125,7 @@ function App() {
 
   const handleBBO = async () => {
     try {
-      const res = await fetch(`/api/market/ticker?instId=${selectedCoin}`);
+      const res = await fetch(`/api/market/ticker?instId=${selectedCoin}&t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.code === "0" && data.data && data.data[0]) {
         setTradePrice(data.data[0].last);
