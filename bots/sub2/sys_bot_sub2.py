@@ -221,10 +221,10 @@ def main():
                         print(f"\n{'='*80}")
                         print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
                         print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
-                            print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
-                            print(f"   File lock: {lock_file}")
-                            print(f"{'='*80}\n")
-                            sys.exit(1)
+                        print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
+                        print(f"   File lock: {lock_file}")
+                        print(f"{'='*80}\n")
+                        sys.exit(1)
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
                 if os.path.exists(lock_file):
