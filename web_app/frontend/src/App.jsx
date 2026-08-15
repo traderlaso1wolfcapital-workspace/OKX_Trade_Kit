@@ -130,20 +130,21 @@ function App() {
       if (data.code === "0" && data.data && data.data[0]) {
         setTradePrice(data.data[0].last);
       }
-    } catch(e) {
+    } catch (e) {
       console.error("Failed to fetch BBO", e);
     }
   };
 
   const handleSizePct = (pct) => {
     setTradePct(pct);
-    // Tính toán số lượng lô tương đối nếu có giá. (Lưu ý: thiếu thông tin contract value/leverage nên chỉ ước tính cơ bản hoặc để user tự nhập)
-    if (availBal && tradePrice) {
-      // Một công thức giả định (cần tuỳ chỉnh theo contract value thực tế của OKX)
-      // Ví dụ: Số lượng Lô = (Khả dụng * % / 100) * Đòn_bẩy / (Giá * Giá_trị_1_Lô)
-      // Tạm thời không set cứng tradeSize để tránh sai lệch, chỉ hiển thị UI
-    }
+    setTradeSize(`${pct}%`);
   };
+
+  useEffect(() => {
+    if (tradeType === 'limit') {
+      handleBBO();
+    }
+  }, [selectedCoin, tradeType]);
 
   // Fetch balance
   useEffect(() => {
@@ -155,7 +156,7 @@ function App() {
           const d = await r.json();
           if (d.status === "success") setAvailBal(d.availBal);
         }
-      } catch {}
+      } catch { }
     };
     fetchBalance();
     const interval = setInterval(fetchBalance, 10000);
@@ -163,6 +164,10 @@ function App() {
   }, [isAuthenticated, selectedAccount]);
 
   const handlePlaceOrder = async (side) => {
+    if (String(tradeSize).includes('%')) {
+      alert("Chức năng đặt lệnh theo % chưa tự động quy đổi ra Số Lô (do thiếu tỷ lệ Đòn bẩy và Giá trị hợp đồng). Vui lòng nhập số Lô cụ thể.");
+      return;
+    }
     if (tradeType === "limit" && !tradePrice) return alert("Vui lòng nhập giá Limit");
     if (!tradeSize) return alert("Vui lòng nhập số lượng (Lô)");
     setIsPlacingOrder(true);
@@ -960,97 +965,97 @@ function App() {
             )}
           </div>
 
-              {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
-              <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
-                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
-                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
-                </div>
+          {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
+          <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
+            </div>
 
-                <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
-                  <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
-                  <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
+              <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
+              <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
+              <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
+            </div>
+
+            {tradeType === 'limit' && (
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                  <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
                 </div>
+              </div>
+            )}
 
-                {tradeType === 'limit' && (
-                  <div style={{ marginBottom: '10px' }}>
-                    <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
-                      <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background='#3d3d3f'} onMouseOut={e => e.target.style.background='#2d2d2f'}>BBO</button>
-                    </div>
-                  </div>
-                )}
+            <div style={{ marginBottom: '15px' }}>
+              <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
+              <input type="number" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
 
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-                  <input type="number" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
-                  
-                  {/* Slider phần trăm */}
-                  <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
-                    {/* Background Track */}
-                    <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
-                    
-                    {/* Active Track */}
-                    <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
-                    
-                    {/* Dots */}
-                    {[0, 25, 50, 75, 100].map(pct => (
-                      <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct/100)*16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
-                    ))}
-                    
-                    {/* Thumb visual */}
-                    <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct/100)*16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
+              {/* Slider phần trăm */}
+              <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                {/* Background Track */}
+                <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
 
-                    {/* Native Range Input overlay */}
-                    <input 
-                      type="range" 
-                      min="0" max="100" step="1" 
-                      value={tradePct} 
-                      onChange={e => handleSizePct(Number(e.target.value))} 
-                      style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }} 
-                    />
-                  </div>
-                  
-                  {/* Labels */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
-                    {[0, 25, 50, 75, 100].map(pct => (
-                      <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
-                    ))}
-                  </div>
-                </div>
+                {/* Active Track */}
+                <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
-                  <span style={{ color: '#888' }}>Khả dụng</span>
-                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
-                </div>
+                {/* Dots */}
+                {[0, 25, 50, 75, 100].map(pct => (
+                  <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
+                ))}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                  <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
-                  <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
-                </div>
+                {/* Thumb visual */}
+                <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
-                  <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
-                  <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
-                </div>
-                
-                {hasTPSL && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
-                    <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
-                    <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
-                  </div>
-                )}
+                {/* Native Range Input overlay */}
+                <input
+                  type="range"
+                  min="0" max="100" step="1"
+                  value={tradePct}
+                  onChange={e => handleSizePct(Number(e.target.value))}
+                  style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }}
+                />
+              </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                  <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
-                  <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
-                </div>
-              </section>
+              {/* Labels */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
+                {[0, 25, 50, 75, 100].map(pct => (
+                  <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
+              <span style={{ color: '#888' }}>Khả dụng</span>
+              <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
+              <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+              <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
+              <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
+            </div>
+
+            {hasTPSL && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
+                <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
+              <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
+            </div>
+          </section>
 
           <div className="sidebar-footer">
             <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
@@ -1099,62 +1104,62 @@ function App() {
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
             <section className="pane-chart" style={{ position: "relative" }}>
-                <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
-                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                  </select>
-                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                  </select>
-                </div>
-                <div className="chart-wrapper" ref={chartContainerRef}
-                  onWheel={() => setIsAutoFit(false)}
-                  onTouchStart={() => setIsAutoFit(false)}
-                  onMouseDown={() => setIsAutoFit(false)} />
-                {/* Nút A và L overlay — clone TradingView */}
-                <div style={{
-                  position: "absolute", bottom: "8px", right: "52px",
-                  display: "flex", gap: "4px", zIndex: 10
-                }}>
-                  <button
-                    title="Auto (fits data to screen)"
-                    onClick={() => {
-                      const next = !isAutoFit;
-                      setIsAutoFit(next);
-                      if (next) chartRef.current?.timeScale().fitContent();
-                    }}
-                    style={{
-                      width: "24px", height: "24px",
-                      background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                      color: isAutoFit ? "#fff" : "#d1d4dc",
-                      border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
-                      borderRadius: "3px",
-                      fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      lineHeight: 1
-                    }}
-                  >A</button>
-                  <button
-                    title="Log scale"
-                    onClick={() => {
-                      const next = !isLogScale;
-                      setIsLogScale(next);
-                      chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
-                    }}
-                    style={{
-                      width: "24px", height: "24px",
-                      background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                      color: isLogScale ? "#fff" : "#d1d4dc",
-                      border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
-                      borderRadius: "3px",
-                      fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      lineHeight: 1
-                    }}
-                  >L</button>
-                </div>
-              </section>
+              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
+                <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+                </select>
+                <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                </select>
+              </div>
+              <div className="chart-wrapper" ref={chartContainerRef}
+                onWheel={() => setIsAutoFit(false)}
+                onTouchStart={() => setIsAutoFit(false)}
+                onMouseDown={() => setIsAutoFit(false)} />
+              {/* Nút A và L overlay — clone TradingView */}
+              <div style={{
+                position: "absolute", bottom: "8px", right: "52px",
+                display: "flex", gap: "4px", zIndex: 10
+              }}>
+                <button
+                  title="Auto (fits data to screen)"
+                  onClick={() => {
+                    const next = !isAutoFit;
+                    setIsAutoFit(next);
+                    if (next) chartRef.current?.timeScale().fitContent();
+                  }}
+                  style={{
+                    width: "24px", height: "24px",
+                    background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                    color: isAutoFit ? "#fff" : "#d1d4dc",
+                    border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
+                    borderRadius: "3px",
+                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    lineHeight: 1
+                  }}
+                >A</button>
+                <button
+                  title="Log scale"
+                  onClick={() => {
+                    const next = !isLogScale;
+                    setIsLogScale(next);
+                    chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+                  }}
+                  style={{
+                    width: "24px", height: "24px",
+                    background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                    color: isLogScale ? "#fff" : "#d1d4dc",
+                    border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
+                    borderRadius: "3px",
+                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    lineHeight: 1
+                  }}
+                >L</button>
+              </div>
+            </section>
 
             {/* Resizer */}
             <div
