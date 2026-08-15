@@ -986,7 +986,7 @@ function App() {
                 <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <div style={{ flex: 1, display: 'flex', background: '#2d2d2f', borderRadius: '4px', border: '1px solid #444', overflow: 'hidden' }}>
-                    <input type="number" step="0.01" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num hide-spinners" style={{ flex: 1, border: 'none', background: 'transparent', padding: '0 10px', color: '#fff', outline: 'none' }} placeholder="Giá mua/bán" />
+                    <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, border: 'none', background: 'transparent', padding: '0 10px', color: '#fff', outline: 'none' }} placeholder="Giá mua/bán" />
                     <div style={{ display: 'flex', flexDirection: 'column', width: '20px', borderLeft: '1px solid #444' }}>
                       <button onClick={() => setTradePrice(p => p ? (parseFloat(p) + 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px solid #444', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
