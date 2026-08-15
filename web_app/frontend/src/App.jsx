@@ -140,29 +140,7 @@ function App() {
 
   const handleSizePct = (pct) => {
     setTradePct(pct);
-    
-    const ctVals = {
-      "XAU-USDT-SWAP": 0.001,
-      "BTC-USDT-SWAP": 0.01,
-      "ETH-USDT-SWAP": 0.1,
-      "SOL-USDT-SWAP": 1,
-      "XRP-USDT-SWAP": 100,
-    };
-    
-    const ctVal = ctVals[selectedCoin];
-    const balance = parseFloat(availBal);
-    const price = parseFloat(tradePrice);
-    
-    if (ctVal && balance > 0 && price > 0) {
-      const usdtToSpend = balance * (pct / 100);
-      const notionalValue = usdtToSpend * 100; // Đòn bẩy 100x
-      let lots = Math.floor(notionalValue / (price * ctVal));
-      if (lots < 0) lots = 0;
-      setTradeSize(lots);
-    } else {
-      // Fallback nếu thiếu dữ liệu giá hoặc số dư
-      setTradeSize(`${pct}%`);
-    }
+    setTradeSize(`${pct}%`);
   };
 
   useEffect(() => {
@@ -189,12 +167,53 @@ function App() {
   }, [isAuthenticated, selectedAccount]);
 
   const handlePlaceOrder = async (side) => {
-    if (String(tradeSize).includes('%')) {
-      alert("Chức năng đặt lệnh theo % chưa tự động quy đổi ra Số Lô (do thiếu tỷ lệ Đòn bẩy và Giá trị hợp đồng). Vui lòng nhập số Lô cụ thể.");
-      return;
-    }
     if (tradeType === "limit" && !tradePrice) return alert("Vui lòng nhập giá Limit");
     if (!tradeSize) return alert("Vui lòng nhập số lượng (Lô)");
+    
+    let finalSz = tradeSize;
+    if (String(tradeSize).includes('%')) {
+      const pct = parseFloat(tradeSize.replace('%', ''));
+      const ctVals = {
+        "XAU-USDT-SWAP": 0.001,
+        "BTC-USDT-SWAP": 0.01,
+        "ETH-USDT-SWAP": 0.1,
+        "SOL-USDT-SWAP": 1,
+        "XRP-USDT-SWAP": 100,
+      };
+      const ctVal = ctVals[selectedCoin];
+      const balance = parseFloat(availBal);
+      
+      let price = parseFloat(tradePrice);
+      if (!price || isNaN(price)) {
+         try {
+           const res = await fetch(`/api/market/ticker?instId=${selectedCoin}&t=${Date.now()}`, { cache: 'no-store' });
+           const data = await res.json();
+           if (data.code === "0" && data.data && data.data[0]) {
+             price = parseFloat(data.data[0].last);
+           }
+         } catch(e) {}
+      }
+
+      if (!price || isNaN(price)) {
+        alert("Không thể lấy giá hiện tại để quy đổi Số Lô. Vui lòng bấm BBO hoặc tải lại trang.");
+        return;
+      }
+
+      if (ctVal && balance > 0) {
+        const usdtToSpend = balance * (pct / 100);
+        const notionalValue = usdtToSpend * 100;
+        let lots = Math.floor(notionalValue / (price * ctVal));
+        if (lots < 1) {
+          alert(`Số dư hiện tại (${balance.toFixed(2)} USDT) x 100 đòn bẩy = ${notionalValue.toFixed(2)} USDT. Vẫn không đủ để mua 1 Lô (tối thiểu ~${(price * ctVal).toFixed(2)} USDT/Lô). Vui lòng chọn % cao hơn.`);
+          return;
+        }
+        finalSz = lots.toString();
+      } else {
+        alert("Lỗi quy đổi: Thiếu thông tin số dư khả dụng.");
+        return;
+      }
+    }
+
     setIsPlacingOrder(true);
     try {
       const payload = {
@@ -202,7 +221,7 @@ function App() {
         tdMode: "cross", // Default OKX
         side: side,
         ordType: tradeType,
-        sz: tradeSize.toString(),
+        sz: finalSz,
         px: tradeType === "limit" ? tradePrice.toString() : "",
         reduceOnly: reduceOnly,
         slTriggerPx: hasTPSL && tradeSL ? tradeSL.toString() : "",
