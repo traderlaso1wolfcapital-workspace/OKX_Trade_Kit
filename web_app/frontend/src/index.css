@@ -578,9 +578,9 @@ body {
 }
 .styled-input::placeholder,
 input::placeholder {
-  color: #555555 !important;
-  opacity: 0.65 !important;
-  font-style: italic;
+  color: #888888 !important;
+  opacity: 1 !important;
+  font-style: normal;
   font-size: 11px;
 }
 .modal-footer {

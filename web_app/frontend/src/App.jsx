@@ -991,16 +991,37 @@ function App() {
                   <input type="number" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
                   
                   {/* Slider phần trăm */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 5px' }}>
+                  <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                    {/* Background Track */}
+                    <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
+                    
+                    {/* Active Track */}
+                    <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
+                    
+                    {/* Dots */}
                     {[0, 25, 50, 75, 100].map(pct => (
-                      <div key={pct} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', width: '20%' }} onClick={() => handleSizePct(pct)}>
-                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: tradePct >= pct && pct > 0 ? '2px solid #fff' : '2px solid #555', background: tradePct >= pct && pct > 0 ? '#fff' : '#1c1c1e', marginBottom: '4px', transition: '0.2s' }}></div>
-                        <span style={{ fontSize: '10px', color: tradePct === pct ? '#fff' : '#888' }}>{pct}%</span>
-                      </div>
+                      <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct/100)*16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
+                    ))}
+                    
+                    {/* Thumb visual */}
+                    <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct/100)*16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
+
+                    {/* Native Range Input overlay */}
+                    <input 
+                      type="range" 
+                      min="0" max="100" step="1" 
+                      value={tradePct} 
+                      onChange={e => handleSizePct(Number(e.target.value))} 
+                      style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }} 
+                    />
+                  </div>
+                  
+                  {/* Labels */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
+                    {[0, 25, 50, 75, 100].map(pct => (
+                      <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
                     ))}
                   </div>
-                  {/* Đường line nối phía sau các chấm */}
-                  <div style={{ position: 'relative', top: '-24px', left: '10%', width: '80%', height: '2px', background: '#333', zIndex: 0, pointerEvents: 'none' }}></div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
