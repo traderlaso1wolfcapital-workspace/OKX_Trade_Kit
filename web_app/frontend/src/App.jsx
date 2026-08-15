@@ -103,6 +103,14 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("strategy");
 
+  const [selectedAccount, setSelectedAccount] = useState("sub1");
+  const [fadeClass, setFadeClass] = useState("tab-fade");
+  const [selectedBotType, setSelectedBotType] = useState("ema200");
+  const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
+  const MAX_SLOTS = 100;
+  const [isLogScale, setIsLogScale] = useState(false);
+  const [isAutoFit, setIsAutoFit] = useState(true);
+
   // Order Panel State
   const [tradeType, setTradeType] = useState("limit");
   const [tradePrice, setTradePrice] = useState("");
@@ -165,14 +173,6 @@ function App() {
     }
     setIsPlacingOrder(false);
   };
-
-  const [selectedAccount, setSelectedAccount] = useState("sub1");
-  const [fadeClass, setFadeClass] = useState("tab-fade");
-  const [selectedBotType, setSelectedBotType] = useState("ema200");
-  const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
-  const MAX_SLOTS = 100;
-  const [isLogScale, setIsLogScale] = useState(false);
-  const [isAutoFit, setIsAutoFit] = useState(true);
 
   // Settings state — clone từ Desktop App
   const [apiKey, setApiKey] = useState("");
