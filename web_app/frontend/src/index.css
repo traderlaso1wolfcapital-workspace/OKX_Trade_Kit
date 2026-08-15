@@ -1011,3 +1011,13 @@ body.is-resizing-vertical {
     display: none !important;
   }
 }
+
+/* Hide native spinners for number input */
+.hide-spinners::-webkit-outer-spin-button,
+.hide-spinners::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.hide-spinners[type=number] {
+  -moz-appearance: textfield;
+}
