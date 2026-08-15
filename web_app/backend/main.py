@@ -1072,6 +1072,121 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
 
     return {"status": "success", "message": f"Đã đóng vị thế {req.instId} thành công"}
 
+class OrderRequest(BaseModel):
+    instId: str
+    tdMode: str
+    side: str
+    ordType: str
+    sz: str
+    px: str = ""
+    slTriggerPx: str = ""
+    tpTriggerPx: str = ""
+    reduceOnly: bool = False
+
+def _get_okx_creds(uid: str, strategy: str):
+    import os
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
+    env_path = os.path.join(config_dir, f".api_{strategy}")
+    api_key, secret_key, passphrase, is_demo = "", "", "", False
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
+                        v = v.strip("\"'")
+                        if k == "OKX_API_KEY": api_key = v
+                        elif k == "OKX_SECRET_KEY": secret_key = v
+                        elif k == "OKX_PASSPHRASE": passphrase = v
+                        elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
+        except Exception:
+            pass
+    return api_key, secret_key, passphrase, is_demo
+
+def _okx_signed_request(method, path, body_str, api_key, secret_key, passphrase, is_demo):
+    domain = "www.okx.com"
+    base_url = f"https://{domain}"
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    message = ts + method + path + body_str
+    mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+    signature = base64.b64encode(mac.digest()).decode('utf-8')
+    headers = {
+        "OK-ACCESS-KEY": api_key,
+        "OK-ACCESS-SIGN": signature,
+        "OK-ACCESS-TIMESTAMP": ts,
+        "OK-ACCESS-PASSPHRASE": passphrase,
+        "Content-Type": "application/json"
+    }
+    if is_demo:
+        headers["x-simulated-trading"] = "1"
+    
+    if method == "GET":
+        return requests.get(base_url + path, headers=headers, timeout=5)
+    else:
+        return requests.post(base_url + path, headers=headers, data=body_str, timeout=5)
+
+@app.get("/api/account/balance")
+async def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT"):
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
+    if not api_key:
+        return {"status": "error", "message": "No OKX Credentials"}
+    
+    path = f"/api/v5/account/balance?ccy={ccy}"
+    try:
+        resp = _okx_signed_request("GET", path, "", api_key, secret_key, passphrase, is_demo)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("code") == "0" and len(data.get("data", [])) > 0:
+                details = data["data"][0]["details"]
+                if details:
+                    avail_bal = details[0].get("availBal", "0")
+                    return {"status": "success", "availBal": avail_bal}
+        return {"status": "error", "message": resp.text}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/trade/order")
+async def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1"):
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
+    if not api_key:
+        return {"status": "error", "message": "No OKX Credentials"}
+    
+    path = "/api/v5/trade/order"
+    
+    order_data = {
+        "instId": req.instId,
+        "tdMode": req.tdMode,
+        "side": req.side,
+        "ordType": req.ordType,
+        "sz": req.sz,
+    }
+    if req.reduceOnly:
+        order_data["reduceOnly"] = True
+    
+    if req.px and req.ordType != "market":
+        order_data["px"] = req.px
+        
+    if req.slTriggerPx:
+        order_data["slTriggerPx"] = req.slTriggerPx
+        order_data["slOrdPx"] = "-1" # Market SL
+    if req.tpTriggerPx:
+        order_data["tpTriggerPx"] = req.tpTriggerPx
+        order_data["tpOrdPx"] = "-1" # Market TP
+        
+    body_str = json.dumps(order_data)
+    
+    try:
+        resp = _okx_signed_request("POST", path, body_str, api_key, secret_key, passphrase, is_demo)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("code") == "0":
+                return {"status": "success", "data": data.get("data")}
+            else:
+                return {"status": "error", "message": data.get("msg")}
+        return {"status": "error", "message": resp.text}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.websocket("/ws/logs/{uid}/{strategy}")
 async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     await websocket.accept()

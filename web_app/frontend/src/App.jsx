@@ -103,6 +103,69 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("strategy");
 
+  // Order Panel State
+  const [tradeType, setTradeType] = useState("limit");
+  const [tradePrice, setTradePrice] = useState("");
+  const [tradeSize, setTradeSize] = useState("");
+  const [availBal, setAvailBal] = useState("0");
+  const [reduceOnly, setReduceOnly] = useState(false);
+  const [hasTPSL, setHasTPSL] = useState(false);
+  const [tradeSL, setTradeSL] = useState("");
+  const [tradeTP, setTradeTP] = useState("");
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  // Fetch balance
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchBalance = async () => {
+      try {
+        const r = await fetch(`/api/account/balance?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.status === "success") setAvailBal(d.availBal);
+        }
+      } catch {}
+    };
+    fetchBalance();
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, selectedAccount]);
+
+  const handlePlaceOrder = async (side) => {
+    if (tradeType === "limit" && !tradePrice) return alert("Vui lòng nhập giá Limit");
+    if (!tradeSize) return alert("Vui lòng nhập số lượng (Lô)");
+    setIsPlacingOrder(true);
+    try {
+      const payload = {
+        instId: selectedCoin,
+        tdMode: "cross", // Default OKX
+        side: side,
+        ordType: tradeType,
+        sz: tradeSize.toString(),
+        px: tradeType === "limit" ? tradePrice.toString() : "",
+        reduceOnly: reduceOnly,
+        slTriggerPx: hasTPSL && tradeSL ? tradeSL.toString() : "",
+        tpTriggerPx: hasTPSL && tradeTP ? tradeTP.toString() : ""
+      };
+      const r = await fetch(`/api/trade/order?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (d.status === "success") {
+        alert(`✅ Đặt lệnh ${side.toUpperCase()} thành công!`);
+        setTradeSize("");
+        fetchPositions();
+      } else {
+        alert("❌ Lỗi: " + d.message);
+      }
+    } catch (err) {
+      alert("Lỗi khi gửi yêu cầu đặt lệnh: " + err);
+    }
+    setIsPlacingOrder(false);
+  };
+
   const [selectedAccount, setSelectedAccount] = useState("sub1");
   const [fadeClass, setFadeClass] = useState("tab-fade");
   const [selectedBotType, setSelectedBotType] = useState("ema200");
@@ -577,7 +640,7 @@ function App() {
     positions.forEach(pos => {
       const posCoin = pos.instId?.split('-')[0];
       const selCoin = selectedCoin?.split('-')[0];
-      
+
       if (posCoin === selCoin) {
         // Entry line
         if (pos.avgPx && parseFloat(pos.avgPx) > 0) {
@@ -920,63 +983,121 @@ function App() {
 
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
-            <section className="pane-chart" style={{ position: "relative" }}>
-              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
-                <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
-                <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                </select>
-                <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
-              </div>
-              <div className="chart-wrapper" ref={chartContainerRef}
-                onWheel={() => setIsAutoFit(false)}
-                onTouchStart={() => setIsAutoFit(false)}
-                onMouseDown={() => setIsAutoFit(false)} />
-              {/* Nút A và L overlay — clone TradingView */}
-              <div style={{
-                position: "absolute", bottom: "8px", right: "52px",
-                display: "flex", gap: "4px", zIndex: 10
-              }}>
-                <button
-                  title="Auto (fits data to screen)"
-                  onClick={() => {
-                    const next = !isAutoFit;
-                    setIsAutoFit(next);
-                    if (next) chartRef.current?.timeScale().fitContent();
-                  }}
-                  style={{
-                    width: "24px", height: "24px",
-                    background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                    color: isAutoFit ? "#fff" : "#d1d4dc",
-                    border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
-                    borderRadius: "3px",
-                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    lineHeight: 1
-                  }}
-                >A</button>
-                <button
-                  title="Log scale"
-                  onClick={() => {
-                    const next = !isLogScale;
-                    setIsLogScale(next);
-                    chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
-                  }}
-                  style={{
-                    width: "24px", height: "24px",
-                    background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                    color: isLogScale ? "#fff" : "#d1d4dc",
-                    border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
-                    borderRadius: "3px",
-                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    lineHeight: 1
-                  }}
-                >L</button>
-              </div>
-            </section>
+            <div className="chart-and-order-container" style={{ position: "relative", flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
+              <section className="pane-chart" style={{ position: "relative", flex: 1, minWidth: 0 }}>
+                <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
+                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+                  </select>
+                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                  </select>
+                </div>
+                <div className="chart-wrapper" ref={chartContainerRef}
+                  onWheel={() => setIsAutoFit(false)}
+                  onTouchStart={() => setIsAutoFit(false)}
+                  onMouseDown={() => setIsAutoFit(false)} />
+                {/* Nút A và L overlay — clone TradingView */}
+                <div style={{
+                  position: "absolute", bottom: "8px", right: "52px",
+                  display: "flex", gap: "4px", zIndex: 10
+                }}>
+                  <button
+                    title="Auto (fits data to screen)"
+                    onClick={() => {
+                      const next = !isAutoFit;
+                      setIsAutoFit(next);
+                      if (next) chartRef.current?.timeScale().fitContent();
+                    }}
+                    style={{
+                      width: "24px", height: "24px",
+                      background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                      color: isAutoFit ? "#fff" : "#d1d4dc",
+                      border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
+                      borderRadius: "3px",
+                      fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      lineHeight: 1
+                    }}
+                  >A</button>
+                  <button
+                    title="Log scale"
+                    onClick={() => {
+                      const next = !isLogScale;
+                      setIsLogScale(next);
+                      chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+                    }}
+                    style={{
+                      width: "24px", height: "24px",
+                      background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                      color: isLogScale ? "#fff" : "#d1d4dc",
+                      border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
+                      borderRadius: "3px",
+                      fontSize: "11px", fontWeight: "bold", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      lineHeight: 1
+                    }}
+                  >L</button>
+                </div>
+              </section>
+
+              {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
+              <section className="pane-order" style={{ width: "260px", minWidth: "260px", background: "#1c1c1e", borderLeft: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto" }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
+                  <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
+                  <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
+                  <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
+                </div>
+
+                {tradeType === 'limit' && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
+                    <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
+                  <input type="number" value={tradeSize} onChange={e => setTradeSize(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Số lượng" />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
+                  <span style={{ color: '#888' }}>Khả dụng</span>
+                  <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                  <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
+                  <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                  <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
+                  <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
+                </div>
+                
+                {hasTPSL && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                    <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
+                    <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                  <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
+                  <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
+                </div>
+              </section>
+            </div>
 
             {/* Resizer */}
             <div
