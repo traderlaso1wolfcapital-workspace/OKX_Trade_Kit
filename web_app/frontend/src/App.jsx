@@ -985,7 +985,7 @@ function App() {
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                  <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
                   <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
                 </div>
               </div>
@@ -993,7 +993,7 @@ function App() {
 
             <div style={{ marginBottom: '15px' }}>
               <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-              <input type="number" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
+              <input type="text" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
 
               {/* Slider phần trăm */}
               <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
