@@ -130,7 +130,7 @@ function App() {
       if (data.code === "0" && data.data && data.data[0]) {
         setTradePrice(data.data[0].last);
       } else {
-        setTradePrice("API_ERROR");
+        setTradePrice("ERR: " + (data.code || "unknown"));
       }
     } catch (e) {
       setTradePrice("FETCH_ERROR");
