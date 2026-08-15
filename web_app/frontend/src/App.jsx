@@ -120,7 +120,30 @@ function App() {
   const [hasTPSL, setHasTPSL] = useState(false);
   const [tradeSL, setTradeSL] = useState("");
   const [tradeTP, setTradeTP] = useState("");
+  const [tradePct, setTradePct] = useState(0);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  const handleBBO = async () => {
+    try {
+      const res = await fetch(`/api/market/ticker?instId=${selectedCoin}`);
+      const data = await res.json();
+      if (data.code === "0" && data.data && data.data[0]) {
+        setTradePrice(data.data[0].last);
+      }
+    } catch(e) {
+      console.error("Failed to fetch BBO", e);
+    }
+  };
+
+  const handleSizePct = (pct) => {
+    setTradePct(pct);
+    // Tính toán số lượng lô tương đối nếu có giá. (Lưu ý: thiếu thông tin contract value/leverage nên chỉ ước tính cơ bản hoặc để user tự nhập)
+    if (availBal && tradePrice) {
+      // Một công thức giả định (cần tuỳ chỉnh theo contract value thực tế của OKX)
+      // Ví dụ: Số lượng Lô = (Khả dụng * % / 100) * Đòn_bẩy / (Giá * Giá_trị_1_Lô)
+      // Tạm thời không set cứng tradeSize để tránh sai lệch, chỉ hiển thị UI
+    }
+  };
 
   // Fetch balance
   useEffect(() => {
@@ -956,13 +979,28 @@ function App() {
                 {tradeType === 'limit' && (
                   <div style={{ marginBottom: '10px' }}>
                     <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
-                    <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input type="number" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Giá mua/bán" />
+                      <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background='#3d3d3f'} onMouseOut={e => e.target.style.background='#2d2d2f'}>BBO</button>
+                    </div>
                   </div>
                 )}
 
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-                  <input type="number" value={tradeSize} onChange={e => setTradeSize(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="Số lượng" />
+                  <input type="number" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
+                  
+                  {/* Slider phần trăm */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 5px' }}>
+                    {[0, 25, 50, 75, 100].map(pct => (
+                      <div key={pct} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', width: '20%' }} onClick={() => handleSizePct(pct)}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: tradePct >= pct && pct > 0 ? '2px solid #fff' : '2px solid #555', background: tradePct >= pct && pct > 0 ? '#fff' : '#1c1c1e', marginBottom: '4px', transition: '0.2s' }}></div>
+                        <span style={{ fontSize: '10px', color: tradePct === pct ? '#fff' : '#888' }}>{pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Đường line nối phía sau các chấm */}
+                  <div style={{ position: 'relative', top: '-24px', left: '10%', width: '80%', height: '2px', background: '#333', zIndex: 0, pointerEvents: 'none' }}></div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
