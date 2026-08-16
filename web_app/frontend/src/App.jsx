@@ -1141,7 +1141,11 @@ function App() {
               </button>
             ))}
             {/* Slot indicator - góc phải cùng hàng */}
-            <div style={{ marginLeft: "auto", paddingRight: "12px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
+            <div className="bot-status-indicator" style={{ display: "flex", alignItems: "center", marginLeft: "auto", paddingRight: "15px", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap", flexShrink: 0, color: isRunning ? "#4caf50" : "#ef5350" }}>
+              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: isRunning ? "#4caf50" : "#ef5350", marginRight: "6px", flexShrink: 0 }}></span>
+              {isRunning ? "ĐANG CHẠY" : "ĐÃ DỪNG"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
               <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
               <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
                 {slotCount}/{MAX_SLOTS}
@@ -1236,7 +1240,7 @@ function App() {
                     🖥 Logs
                   </button>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
                   <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
                     {isRunning ? `● ĐANG CHẠY | ${formatUptime(uptime)}` : "● ĐÃ DỪNG"}
                   </span>
@@ -1910,7 +1914,12 @@ function App() {
         </div>
       )}
 
-
+      {/* FOOTER MARQUEE */}
+      <div className="marquee-footer">
+        <div className="marquee-content">
+          ⚠️ CẢNH BÁO: Bot chỉ là công cụ hỗ trợ điểm giao dịch, không phải là lời kêu gọi đầu tư. Bot is only a trading point support tool, not an investment call. ⚠️
+        </div>
+      </div>
     </div>
   );
 }
