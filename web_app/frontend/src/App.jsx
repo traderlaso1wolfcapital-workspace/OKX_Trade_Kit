@@ -374,7 +374,7 @@ function App() {
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: loginUid, password: authStep === "uid" ? "" : level2Password, passphrase: authStep === "uid" ? "" : loginPassphrase })
+        body: JSON.stringify({ uid: loginUid, password: "", passphrase: authStep === "uid" ? "" : loginPassphrase })
       });
       const data = await res.json();
       if (data.status === "success") {
@@ -875,25 +875,18 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                   <input
                     type="password"
-                    placeholder="API Key hoặc Secret Key"
-                    value={level2Password}
-                    onChange={e => setLevel2Password(e.target.value)}
-                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
-                  />
-                  <input
-                    type="password"
-                    placeholder="Passphrase"
+                    placeholder="Mật khẩu Passphrase"
                     value={loginPassphrase}
                     onChange={e => setLoginPassphrase(e.target.value)}
                     style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
                   />
-                  <button type="button" onClick={() => { setAuthStep("uid"); setLevel2Password(""); setLoginPassphrase(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                  <button type="button" onClick={() => { setAuthStep("uid"); setLoginPassphrase(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
                 </div>
               )}
               {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
-                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : (!level2Password || !loginPassphrase))}
+                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !loginPassphrase)}
                 style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
                 {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
