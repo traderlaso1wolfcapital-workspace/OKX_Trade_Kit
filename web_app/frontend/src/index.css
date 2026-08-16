@@ -223,7 +223,7 @@ body {
   border-top: 1px solid #3d3d3d;
   background-color: #1e1e1e;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
 }
 
@@ -238,8 +238,9 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: "Segoe UI", sans-serif;
-  width: 100%;
+  flex: 1;
   text-align: center;
+  white-space: nowrap;
 }
 .btn-start {
   background-color: #2E7D32;
@@ -278,8 +279,8 @@ body {
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
-  transition: all 0.2s;
-  width: 100%;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .btn-settings:hover {
   background-color: #ff9900;

@@ -1116,7 +1116,7 @@ function App() {
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
               {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
             </button>
-            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt Hệ Thống</button>
+            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
           </div>
         </aside>
 
