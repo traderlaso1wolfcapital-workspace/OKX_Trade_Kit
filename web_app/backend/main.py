@@ -107,6 +107,7 @@ class CredentialsUpdate(BaseModel):
 class LoginRequest(BaseModel):
     uid: str
     password: str = None
+    passphrase: str = None
     
 class CloseTicketRequest(BaseModel):
     ticket_id: str
@@ -149,6 +150,7 @@ async def login_with_password(req: LoginRequest):
         # Check if user has saved API keys
         user_dir = get_user_data_dir(uid)
         saved_keys = []
+        saved_phrases = []
         for strategy in ["sub1", "sub2"]:
             env_path = os.path.join(user_dir, f"bots/{strategy}/.api_{strategy}")
             if os.path.exists(env_path):
@@ -158,14 +160,20 @@ async def login_with_password(req: LoginRequest):
                             if "OKX_API_KEY=" in line or "OKX_SECRET_KEY=" in line:
                                 val = line.strip().split("=", 1)[1].strip("\"'")
                                 if val: saved_keys.append(val)
+                            elif "OKX_PASSPHRASE=" in line:
+                                val = line.strip().split("=", 1)[1].strip("\"'")
+                                if val: saved_phrases.append(val)
                 except:
                     pass
                     
-        if saved_keys:
-            if not pwd:
+        if saved_keys or saved_phrases:
+            phrase = req.passphrase
+            if not pwd or not phrase:
                 return {"status": "require_password"}
             if pwd not in saved_keys:
                 return {"status": "error", "message": "Sai API Key hoặc Secret Key!"}
+            if phrase not in saved_phrases:
+                return {"status": "error", "message": "Sai Passphrase!"}
 
         return {"status": "success", "uid": uid}
                 
