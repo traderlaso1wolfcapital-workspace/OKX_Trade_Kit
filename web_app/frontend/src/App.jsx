@@ -1016,106 +1016,106 @@ function App() {
 
           {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
           {false && (
-          <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
-            </div>
+            <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
+              </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-              <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
-              <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
-            </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
+                <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
+              </div>
 
-            <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
-              <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
-              <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
-            </div>
+              <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
+                <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
+                <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
+              </div>
 
-            {tradeType === 'limit' && (
-              <div style={{ marginBottom: '10px' }}>
-                <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ flex: 1, display: 'flex', background: '#2d2d2f', borderRadius: '4px', border: '1px solid #444', overflow: 'hidden' }}>
-                    <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, border: 'none', background: 'transparent', padding: '0 10px', color: '#fff', outline: 'none' }} placeholder="Giá mua/bán" />
-                    <div style={{ display: 'flex', flexDirection: 'column', width: '20px', borderLeft: '1px solid #444' }}>
-                      <button onClick={() => setTradePrice(p => p ? (parseFloat(p) + 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px solid #444', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-                      </button>
-                      <button onClick={() => setTradePrice(p => p && parseFloat(p) > 0 ? (parseFloat(p) - 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                      </button>
+              {tradeType === 'limit' && (
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1, display: 'flex', background: '#2d2d2f', borderRadius: '4px', border: '1px solid #444', overflow: 'hidden' }}>
+                      <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, border: 'none', background: 'transparent', padding: '0 10px', color: '#fff', outline: 'none' }} placeholder="Giá mua/bán" />
+                      <div style={{ display: 'flex', flexDirection: 'column', width: '20px', borderLeft: '1px solid #444' }}>
+                        <button onClick={() => setTradePrice(p => p ? (parseFloat(p) + 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px solid #444', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                        </button>
+                        <button onClick={() => setTradePrice(p => p && parseFloat(p) > 0 ? (parseFloat(p) - 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                      </div>
                     </div>
+                    <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
                   </div>
-                  <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
+                </div>
+              )}
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
+                <input type="text" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
+
+                {/* Slider phần trăm */}
+                <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
+                  {/* Background Track */}
+                  <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
+
+                  {/* Active Track */}
+                  <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
+
+                  {/* Dots */}
+                  {[0, 25, 50, 75, 100].map(pct => (
+                    <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
+                  ))}
+
+                  {/* Thumb visual */}
+                  <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
+
+                  {/* Native Range Input overlay */}
+                  <input
+                    type="range"
+                    min="0" max="100" step="1"
+                    value={tradePct}
+                    onChange={e => handleSizePct(Number(e.target.value))}
+                    style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }}
+                  />
+                </div>
+
+                {/* Labels */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
+                  {[0, 25, 50, 75, 100].map(pct => (
+                    <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
+                  ))}
                 </div>
               </div>
-            )}
 
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-              <input type="text" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
-
-              {/* Slider phần trăm */}
-              <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
-                {/* Background Track */}
-                <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
-
-                {/* Active Track */}
-                <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
-
-                {/* Dots */}
-                {[0, 25, 50, 75, 100].map(pct => (
-                  <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
-                ))}
-
-                {/* Thumb visual */}
-                <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
-
-                {/* Native Range Input overlay */}
-                <input
-                  type="range"
-                  min="0" max="100" step="1"
-                  value={tradePct}
-                  onChange={e => handleSizePct(Number(e.target.value))}
-                  style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }}
-                />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
+                <span style={{ color: '#888' }}>Khả dụng</span>
+                <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
               </div>
 
-              {/* Labels */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
-                {[0, 25, 50, 75, 100].map(pct => (
-                  <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
+                <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
-              <span style={{ color: '#888' }}>Khả dụng</span>
-              <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
-              <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
-              <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
-              <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
-            </div>
-
-            {hasTPSL && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
-                <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
-                <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
+                <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
               </div>
-            )}
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-              <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
-              <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
-            </div>
-          </section>
+              {hasTPSL && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                  <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
+                  <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
+                <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
+              </div>
+            </section>
           )}
 
           <div className="sidebar-footer">
@@ -1146,11 +1146,7 @@ function App() {
               </button>
             ))}
             {/* Slot indicator - góc phải cùng hàng */}
-            <div className="bot-status-indicator" style={{ display: "flex", alignItems: "center", marginLeft: "auto", paddingRight: "15px", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap", flexShrink: 0, color: isRunning ? "#4caf50" : "#ef5350" }}>
-              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", backgroundColor: isRunning ? "#4caf50" : "#ef5350", marginRight: "6px", flexShrink: 0 }}></span>
-              {isRunning ? "ĐANG CHẠY" : "ĐÃ DỪNG"}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}>
+            <div style={{ display: "flex", alignItems: "center", marginLeft: "auto", paddingRight: "12px", gap: "6px", whiteSpace: "nowrap" }}>
               <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
               <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
                 {slotCount}/{MAX_SLOTS}
