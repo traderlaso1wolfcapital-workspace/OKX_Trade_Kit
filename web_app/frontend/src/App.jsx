@@ -362,6 +362,7 @@ function App() {
 
   const [authStep, setAuthStep] = useState("uid");
   const [level2Password, setLevel2Password] = useState("");
+  const [loginPassphrase, setLoginPassphrase] = useState("");
 
   // Login handler — lưu vào localStorage
   const handleLogin = async (e) => {
@@ -373,7 +374,7 @@ function App() {
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: loginUid, password: authStep === "uid" ? "" : level2Password })
+        body: JSON.stringify({ uid: loginUid, password: authStep === "uid" ? "" : level2Password, passphrase: authStep === "uid" ? "" : loginPassphrase })
       });
       const data = await res.json();
       if (data.status === "success") {
@@ -879,13 +880,20 @@ function App() {
                     onChange={e => setLevel2Password(e.target.value)}
                     style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
                   />
-                  <button type="button" onClick={() => { setAuthStep("uid"); setLevel2Password(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                  <input
+                    type="password"
+                    placeholder="Passphrase"
+                    value={loginPassphrase}
+                    onChange={e => setLoginPassphrase(e.target.value)}
+                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <button type="button" onClick={() => { setAuthStep("uid"); setLevel2Password(""); setLoginPassphrase(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
                 </div>
               )}
               {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
-                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !level2Password)}
+                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : (!level2Password || !loginPassphrase))}
                 style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
                 {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
@@ -1115,10 +1123,7 @@ function App() {
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
               {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
             </button>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn-settings" style={{ flex: 1 }} onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
-              <button className="btn-settings" style={{ flex: 1, background: '#ef5350', color: '#fff' }} onClick={() => { localStorage.removeItem("tls1_auth"); localStorage.removeItem("tls1_uid"); window.location.reload(); }}>🚪 Thoát</button>
-            </div>
+            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt Hệ Thống</button>
           </div>
         </aside>
 
@@ -1832,6 +1837,7 @@ function App() {
             {/* Footer */}
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowSettings(false)}>Đóng</button>
+              <button className="btn-secondary" style={{ background: '#ef5350', color: '#fff', border: 'none', marginRight: 'auto' }} onClick={() => { localStorage.removeItem("tls1_auth"); localStorage.removeItem("tls1_uid"); window.location.reload(); }}>🚪 Thoát Tài Khoản</button>
               {settingsTab === "strategy" && (
                 <button
                   className="btn-default"
