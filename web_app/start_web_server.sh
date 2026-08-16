@@ -1,33 +1,39 @@
 #!/bin/bash
 # Dừng các tiến trình cũ nếu có
-pkill -f "python3 main.py"
-pkill -f "vite"
-pkill -f "cloudflared tunnel run"
+echo "Đang dọn dẹp các tiến trình cũ..."
+pkill -f "python3 main.py" 2>/dev/null
+pkill -f "vite" 2>/dev/null
+pkill -f "cloudflared tunnel run" 2>/dev/null
+pm2 delete tls1-bot-backend 2>/dev/null
 
 # Lấy thư mục gốc của script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+PROJECT_ROOT="$(dirname "$DIR")"
+
+echo "Đang cài đặt các thư viện cần thiết (FastAPI, uvicorn)..."
+cd "$DIR/backend"
+pip3 install fastapi uvicorn psutil --break-system-packages 2>/dev/null || pip3 install fastapi uvicorn psutil 2>/dev/null
+
+echo "Đang Build Frontend tối ưu hóa..."
+cd "$DIR/frontend"
+npm install
+npm run build
+
+echo "Đang khởi động toàn bộ hệ thống bằng PM2..."
+cd "$PROJECT_ROOT"
+pm2 start ecosystem.config.js
+pm2 save
 
 # Khởi động Cloudflare Tunnel
 echo "Đang khởi động Cloudflare Tunnel..."
-nohup cloudflared tunnel run --token eyJhIjoiNzFmZjE5ZTAxMzQzM2FkNDBiMWMyYjU3Njk4ZmFmNmUiLCJ0IjoiNWYyZTE0NmEtZjNjOS00NjJlLTg4YzctYzAyNzk2NzQ1MTBlIiwicyI6IlpqaG1Nak13TW1VdFlXUXhPUzAwTVRFeUxUZzJPR0l0T1dJNE1EbGlZelUzWXpoaSJ9 > tunnel.log 2>&1 &
+nohup cloudflared tunnel run --token eyJhIjoiNzFmZjE5ZTAxMzQzM2FkNDBiMWMyYjU3Njk4ZmFmNmUiLCJ0IjoiNWYyZTE0NmEtZjNjOS00NjJlLTg4YzctYzAyNzk2NzQ1MTBlIiwicyI6IlpqaG1Nak13TW1VdFlXUXhPUzAwTVRFeUxUZzJPR0l0T1dJNE1EbGlZelUzWXpoaSJ9 > "$DIR/tunnel.log" 2>&1 &
 TUNNEL_PID=$!
 echo "✅ Cloudflare Tunnel đã thông mạng (PID: $TUNNEL_PID)"
 
-# Khởi động Backend
-echo "Đang khởi động Backend..."
-cd "$DIR/backend"
-nohup python3 main.py > backend.log 2>&1 &
-BACKEND_PID=$!
-echo "✅ Backend đã chạy ngầm (PID: $BACKEND_PID)"
-
-# Khởi động Frontend
-echo "Đang khởi động Frontend..."
-cd "$DIR/frontend"
-nohup npm run dev -- --host 0.0.0.0 > frontend.log 2>&1 &
-FRONTEND_PID=$!
-echo "✅ Frontend đã chạy ngầm (PID: $FRONTEND_PID)"
-
 echo "---------------------------------------------------"
 echo "🚀 HỆ THỐNG ĐÃ SẴN SÀNG CHẠY 24/7!"
-echo "Truy cập Web UI tại: https://autotrader.fun"
-echo "Để dừng hệ thống, hãy chạy lệnh: bash web_app/stop_web_server.sh"
+echo "Toàn bộ Frontend và Backend đã được gộp chung và chạy ngầm trên cổng 8080."
+echo "Truy cập trực tiếp tại máy: http://localhost:8080"
+echo "Truy cập qua Domain: https://autotrader.fun"
+echo "⚠️ LƯU Ý QUAN TRỌNG: Hãy đảm bảo trên Cloudflare Zero Trust bạn đã thêm Public Hostname cho autotrader.fun trỏ về http://localhost:8080"
+echo "Để dừng hệ thống, hãy chạy lệnh: pm2 stop tls1-bot-backend && pkill -f cloudflared"

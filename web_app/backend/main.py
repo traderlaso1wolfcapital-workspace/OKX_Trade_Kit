@@ -12,8 +12,10 @@ import requests
 import csv
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Union
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="TLS1 Trading Web Backend", version="1.0.0")
@@ -1229,6 +1231,20 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     finally:
         if uid in active_connections and strategy in active_connections[uid] and websocket in active_connections[uid][strategy]:
             active_connections[uid][strategy].remove(websocket)
+
+# --- SERVE FRONTEND (REACT) ---
+frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+if os.path.exists(frontend_dist_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist_path, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_react_app(request: Request, full_path: str):
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = os.path.join(frontend_dist_path, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist_path, "index.html"))
 
 if __name__ == "__main__":
     import uvicorn
