@@ -881,24 +881,24 @@ input::placeholder {
 
   .sidebar-footer {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    gap: 4px;
     padding: 8px 10px;
     border-top: 1px solid #3d3d3d;
   }
 
   .sidebar-footer .btn-start {
-    flex: 2;
+    flex: 1;
     margin: 0;
-    font-size: 11px;
+    font-size: 10px;
     padding: 8px 4px;
     white-space: nowrap;
   }
 
   .sidebar-footer .btn-stop {
-    flex: 1.5;
+    flex: 1;
     margin: 0;
-    font-size: 11px;
+    font-size: 10px;
     padding: 8px 4px;
     white-space: nowrap;
   }
@@ -906,9 +906,9 @@ input::placeholder {
   .sidebar-footer .btn-settings {
     flex: 0 0 auto;
     margin: 0;
-    font-size: 11px;
+    font-size: 10px;
     width: auto;
-    padding: 8px 10px;
+    padding: 8px 6px;
     white-space: nowrap;
   }
 
