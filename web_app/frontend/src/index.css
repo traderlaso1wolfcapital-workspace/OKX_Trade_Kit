@@ -219,21 +219,21 @@ body {
 
 /* ============= SIDEBAR FOOTER (Buttons) ============= */
 .sidebar-footer {
-  padding: 12px;
+  padding: 10px;
   border-top: 1px solid #3d3d3d;
   background-color: #1e1e1e;
   display: flex;
   flex-direction: row;
-  gap: 8px;
+  gap: 4px;
 }
 
 .btn-control {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
   color: white;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 7px 10px;
+  padding: 7px 4px;
   min-height: 30px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -273,9 +273,9 @@ body {
   color: #fff;
   border: 1px solid #555;
   border-radius: 4px;
-  padding: 5px 10px;
+  padding: 5px 6px;
   min-height: 24px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
