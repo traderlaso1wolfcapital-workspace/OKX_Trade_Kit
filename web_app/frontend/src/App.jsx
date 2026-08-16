@@ -1883,13 +1883,21 @@ function App() {
                 setIsSavingConfig(true);
                 if (settingsTab === "api") {
                   try {
-                    await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+                    const res = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
                       method: "POST", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                     });
+                    
+                    if (!res.ok) {
+                        const errorData = await res.json();
+                        alert(`❌ Lỗi: ${errorData.detail || "Không thể lưu API Key"}`);
+                        setIsSavingConfig(false);
+                        return;
+                    }
+                    
                     alert("💾 Đã lưu cấu hình API Key!");
                     addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản ${selectedAccount}`);
-                  } catch { alert("Lỗi khi lưu API Key"); }
+                  } catch (e) { alert(`Lỗi kết nối khi lưu API Key: ${e.message}`); }
                 } else {
                   await new Promise(resolve => setTimeout(resolve, 800)); // Hiệu ứng delay giả lập lưu cấu hình
                   alert("💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
