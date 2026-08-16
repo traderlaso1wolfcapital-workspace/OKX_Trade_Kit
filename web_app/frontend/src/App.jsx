@@ -360,6 +360,7 @@ function App() {
   const lastLogTimeRef = useRef(0);
   const logBlockIdRef = useRef(0);
 
+  const [authStep, setAuthStep] = useState("uid");
   const [level2Password, setLevel2Password] = useState("");
 
   // Login handler — lưu vào localStorage
@@ -372,13 +373,15 @@ function App() {
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: loginUid })
+        body: JSON.stringify({ uid: loginUid, password: authStep === "uid" ? "" : level2Password })
       });
       const data = await res.json();
       if (data.status === "success") {
         setIsAuthenticated(true);
         localStorage.setItem("tls1_auth", "true");
         localStorage.setItem("tls1_uid", loginUid);
+      } else if (data.status === "require_password") {
+        setAuthStep("require_password");
       } else if (data.status === "locked" || data.status === "pending") {
         setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
       } else {
@@ -856,20 +859,33 @@ function App() {
 
           <div style={{ padding: "0 20px" }}>
             <h3 style={{ color: "#e0e0e0", marginBottom: "15px", fontSize: "16px" }}>
-              Nhập OKX UID của bạn:
+              {authStep === "uid" ? "Nhập OKX UID của bạn:" : "Nhập OKX API/Secret Key:"}
             </h3>
             <form onSubmit={handleLogin}>
-              <input
-                type="text"
-                placeholder="Ví dụ: 12345678"
-                value={loginUid}
-                onChange={e => setLoginUid(e.target.value)}
-                style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
-              />
+              {authStep === "uid" ? (
+                <input
+                  type="text"
+                  placeholder="Ví dụ: 12345678"
+                  value={loginUid}
+                  onChange={e => setLoginUid(e.target.value)}
+                  style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+                />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
+                  <input
+                    type="password"
+                    placeholder="API Key hoặc Secret Key"
+                    value={level2Password}
+                    onChange={e => setLevel2Password(e.target.value)}
+                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <button type="button" onClick={() => { setAuthStep("uid"); setLevel2Password(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                </div>
+              )}
               {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
-                disabled={isLoggingIn || !loginUid}
+                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !level2Password)}
                 style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
                 {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
@@ -991,6 +1007,7 @@ function App() {
           </div>
 
           {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
+          {false && (
           <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
               <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
@@ -1091,13 +1108,17 @@ function App() {
               <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
             </div>
           </section>
+          )}
 
           <div className="sidebar-footer">
             <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
               {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
             </button>
-            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-settings" style={{ flex: 1 }} onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
+              <button className="btn-settings" style={{ flex: 1, background: '#ef5350', color: '#fff' }} onClick={() => { localStorage.removeItem("tls1_auth"); localStorage.removeItem("tls1_uid"); window.location.reload(); }}>🚪 Thoát</button>
+            </div>
           </div>
         </aside>
 
@@ -1889,12 +1910,7 @@ function App() {
         </div>
       )}
 
-      {/* FOOTER MARQUEE */}
-      <div className="marquee-footer">
-        <div className="marquee-content">
-          ⚠️ CẢNH BÁO: Bot chỉ là công cụ hỗ trợ điểm giao dịch, không phải là lời kêu gọi đầu tư. Bot is only a trading point support tool, not an investment call. ⚠️
-        </div>
-      </div>
+
     </div>
   );
 }

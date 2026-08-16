@@ -146,6 +146,27 @@ async def login_with_password(req: LoginRequest):
         if user_status not in ["ACTIVE", "ON"]:
             return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
             
+        # Check if user has saved API keys
+        user_dir = get_user_data_dir(uid)
+        saved_keys = []
+        for strategy in ["sub1", "sub2"]:
+            env_path = os.path.join(user_dir, f"bots/{strategy}/.api_{strategy}")
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "OKX_API_KEY=" in line or "OKX_SECRET_KEY=" in line:
+                                val = line.strip().split("=", 1)[1].strip("\"'")
+                                if val: saved_keys.append(val)
+                except:
+                    pass
+                    
+        if saved_keys:
+            if not pwd:
+                return {"status": "require_password"}
+            if pwd not in saved_keys:
+                return {"status": "error", "message": "Sai API Key hoặc Secret Key!"}
+
         return {"status": "success", "uid": uid}
                 
     except Exception as e:
