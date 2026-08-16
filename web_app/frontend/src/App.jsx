@@ -169,7 +169,7 @@ function App() {
   const handlePlaceOrder = async (side) => {
     if (tradeType === "limit" && !tradePrice) return alert("Vui lòng nhập giá Limit");
     if (!tradeSize) return alert("Vui lòng nhập số lượng (Lô)");
-    
+
     let finalSz = tradeSize;
     if (String(tradeSize).includes('%')) {
       const pct = parseFloat(tradeSize.replace('%', ''));
@@ -182,16 +182,16 @@ function App() {
       };
       const ctVal = ctVals[selectedCoin];
       const balance = parseFloat(availBal);
-      
+
       let price = parseFloat(tradePrice);
       if (!price || isNaN(price)) {
-         try {
-           const res = await fetch(`/api/market/ticker?instId=${selectedCoin}&t=${Date.now()}`, { cache: 'no-store' });
-           const data = await res.json();
-           if (data.code === "0" && data.data && data.data[0]) {
-             price = parseFloat(data.data[0].last);
-           }
-         } catch(e) {}
+        try {
+          const res = await fetch(`/api/market/ticker?instId=${selectedCoin}&t=${Date.now()}`, { cache: 'no-store' });
+          const data = await res.json();
+          if (data.code === "0" && data.data && data.data[0]) {
+            price = parseFloat(data.data[0].last);
+          }
+        } catch (e) { }
       }
 
       if (!price || isNaN(price)) {
@@ -360,7 +360,6 @@ function App() {
   const lastLogTimeRef = useRef(0);
   const logBlockIdRef = useRef(0);
 
-  const [authStep, setAuthStep] = useState("uid"); // "uid", "require_password", "require_new_password"
   const [level2Password, setLevel2Password] = useState("");
 
   // Login handler — lưu vào localStorage
@@ -373,17 +372,13 @@ function App() {
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: loginUid, password: authStep === "uid" ? "" : level2Password })
+        body: JSON.stringify({ uid: loginUid })
       });
       const data = await res.json();
       if (data.status === "success") {
         setIsAuthenticated(true);
         localStorage.setItem("tls1_auth", "true");
         localStorage.setItem("tls1_uid", loginUid);
-      } else if (data.status === "require_new_password") {
-        setAuthStep("require_new_password");
-      } else if (data.status === "require_password") {
-        setAuthStep("require_password");
       } else if (data.status === "locked" || data.status === "pending") {
         setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
       } else {
@@ -861,34 +856,20 @@ function App() {
 
           <div style={{ padding: "0 20px" }}>
             <h3 style={{ color: "#e0e0e0", marginBottom: "15px", fontSize: "16px" }}>
-              {authStep === "uid" ? "Nhập OKX UID của bạn:" :
-                authStep === "require_new_password" ? "Tạo Mật khẩu cấp 2:" : "Nhập Mật khẩu cấp 2:"}
+              Nhập OKX UID của bạn:
             </h3>
             <form onSubmit={handleLogin}>
-              {authStep === "uid" ? (
-                <input
-                  type="text"
-                  placeholder="Ví dụ: 12345678"
-                  value={loginUid}
-                  onChange={e => setLoginUid(e.target.value)}
-                  style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
-                />
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-                  <input
-                    type="password"
-                    placeholder="Mật khẩu bảo mật"
-                    value={level2Password}
-                    onChange={e => setLevel2Password(e.target.value)}
-                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
-                  />
-                  <button type="button" onClick={() => { setAuthStep("uid"); setLevel2Password(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
-                </div>
-              )}
+              <input
+                type="text"
+                placeholder="Ví dụ: 12345678"
+                value={loginUid}
+                onChange={e => setLoginUid(e.target.value)}
+                style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+              />
               {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
-                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !level2Password)}
+                disabled={isLoggingIn || !loginUid}
                 style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
                 {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}

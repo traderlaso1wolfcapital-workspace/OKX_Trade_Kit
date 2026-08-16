@@ -146,30 +146,7 @@ async def login_with_password(req: LoginRequest):
         if user_status not in ["ACTIVE", "ON"]:
             return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
             
-        import json
-        pwd_dir = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users")
-        os.makedirs(pwd_dir, exist_ok=True)
-        pwd_file = os.path.join(pwd_dir, "passwords.json")
-        passwords = {}
-        if os.path.exists(pwd_file):
-            with open(pwd_file, "r", encoding="utf-8") as f:
-                try: passwords = json.load(f)
-                except: passwords = {}
-                
-        if uid not in passwords:
-            if not pwd:
-                return {"status": "require_new_password"}
-            passwords[uid] = pwd
-            with open(pwd_file, "w", encoding="utf-8") as f:
-                json.dump(passwords, f)
-            return {"status": "success", "uid": uid}
-        else:
-            if not pwd:
-                return {"status": "require_password"}
-            if passwords[uid] == pwd:
-                return {"status": "success", "uid": uid}
-            else:
-                return {"status": "error", "message": "Sai mật khẩu cấp 2!"}
+        return {"status": "success", "uid": uid}
                 
     except Exception as e:
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
@@ -493,6 +470,42 @@ async def get_bot_credentials(uid: str, strategy: str = "sub1"):
 
 @app.post("/api/bot/credentials")
 async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: str = "sub1"):
+    # Xác thực API Key với OKX
+    try:
+        domain = "www.okx.com"
+        base_url = f"https://{domain}"
+        path_cfg = "/api/v5/account/config"
+        ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        message = ts + "GET" + path_cfg
+        mac = hmac.new(bytes(creds.secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+        signature = base64.b64encode(mac.digest()).decode('utf-8')
+
+        headers = {
+            "OK-ACCESS-KEY": creds.api_key,
+            "OK-ACCESS-SIGN": signature,
+            "OK-ACCESS-TIMESTAMP": ts,
+            "OK-ACCESS-PASSPHRASE": creds.passphrase,
+        }
+
+        resp = requests.get(base_url + path_cfg, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            res_data = resp.json()
+            if res_data.get("code") == "0" and len(res_data.get("data", [])) > 0:
+                api_uid = res_data["data"][0].get("uid")
+                main_uid = res_data["data"][0].get("mainUid")
+                # Chấp nhận nếu UID của API trùng với UID đăng nhập (tài khoản chính hoặc sub-account tự đăng nhập)
+                # Hoặc nếu API là của sub-account và mainUid của nó trùng với UID đăng nhập
+                if api_uid != uid and main_uid != uid:
+                    raise HTTPException(status_code=400, detail="API Key không thuộc về tài khoản OKX của bạn (UID không khớp)!")
+            else:
+                 raise HTTPException(status_code=400, detail="API Key không hợp lệ (OKX từ chối).")
+        else:
+            raise HTTPException(status_code=400, detail="Lỗi kết nối OKX API. Vui lòng kiểm tra lại Key, Secret, Passphrase.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Lỗi hệ thống khi kiểm tra API Key: {str(e)}")
+
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     os.makedirs(config_dir, exist_ok=True)
     env_path = os.path.join(config_dir, f".api_{strategy}")
