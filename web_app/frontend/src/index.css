@@ -996,7 +996,7 @@ body.is-resizing-vertical {
 .marquee-content {
   display: inline-block;
   padding-left: 100%;
-  animation: marquee 20s linear infinite;
+  animation: marquee 40s linear infinite;
 }
 
 @keyframes marquee {
