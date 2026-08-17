@@ -1,16 +1,11 @@
 {
-  "short_name": "TLS1 Trading",
-  "name": "TLS1 Trading",
+  "short_name": "AutoTrader",
+  "name": "AutoTrader",
   "icons": [
     {
-      "src": "/logo.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "/logo.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "/logo.ico",
+      "sizes": "192x192 512x512",
+      "type": "image/x-icon"
     }
   ],
   "start_url": ".",
