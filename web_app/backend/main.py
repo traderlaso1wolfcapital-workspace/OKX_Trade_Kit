@@ -168,10 +168,8 @@ async def login_with_password(req: LoginRequest):
                     
         if saved_keys or saved_phrases:
             phrase = req.passphrase
-            if not pwd or not phrase:
+            if not phrase:
                 return {"status": "require_password"}
-            if pwd not in saved_keys:
-                return {"status": "error", "message": "Sai API Key hoặc Secret Key!"}
             if phrase not in saved_phrases:
                 return {"status": "error", "message": "Sai Passphrase!"}
 
@@ -516,23 +514,42 @@ async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: s
             "OK-ACCESS-PASSPHRASE": creds.passphrase,
         }
 
-        resp = requests.get(base_url + path_cfg, headers=headers, timeout=5)
+        print(f"[API CHECK] Validating API Key for UID={uid}, strategy={strategy}", flush=True)
+        resp = requests.get(base_url + path_cfg, headers=headers, timeout=10)
+        print(f"[API CHECK] OKX Response status={resp.status_code}", flush=True)
+        
         if resp.status_code == 200:
             res_data = resp.json()
+            print(f"[API CHECK] OKX Response code={res_data.get('code')}, msg={res_data.get('msg', '')}", flush=True)
             if res_data.get("code") == "0" and len(res_data.get("data", [])) > 0:
                 api_uid = res_data["data"][0].get("uid")
                 main_uid = res_data["data"][0].get("mainUid")
+                print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, login UID={uid}", flush=True)
                 # Chấp nhận nếu UID của API trùng với UID đăng nhập (tài khoản chính hoặc sub-account tự đăng nhập)
                 # Hoặc nếu API là của sub-account và mainUid của nó trùng với UID đăng nhập
                 if api_uid != uid and main_uid != uid:
-                    raise HTTPException(status_code=400, detail="API Key không thuộc về tài khoản OKX của bạn (UID không khớp)!")
+                    raise HTTPException(status_code=400, detail=f"API Key không thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID đăng nhập: {uid})!")
             else:
-                 raise HTTPException(status_code=400, detail="API Key không hợp lệ (OKX từ chối).")
+                okx_msg = res_data.get("msg", "Không rõ lỗi")
+                raise HTTPException(status_code=400, detail=f"API Key không hợp lệ. OKX phản hồi: {okx_msg}")
         else:
-            raise HTTPException(status_code=400, detail="Lỗi kết nối OKX API. Vui lòng kiểm tra lại Key, Secret, Passphrase.")
+            try:
+                err_data = resp.json()
+                okx_msg = err_data.get("msg", resp.text[:200])
+            except:
+                okx_msg = resp.text[:200]
+            print(f"[API CHECK] OKX Error: status={resp.status_code}, body={okx_msg}", flush=True)
+            raise HTTPException(status_code=400, detail=f"Lỗi kết nối OKX API (HTTP {resp.status_code}): {okx_msg}")
     except HTTPException:
         raise
+    except requests.exceptions.Timeout:
+        print(f"[API CHECK] OKX API Timeout!", flush=True)
+        raise HTTPException(status_code=400, detail="Kết nối đến OKX API bị timeout. Vui lòng thử lại.")
+    except requests.exceptions.ConnectionError as e:
+        print(f"[API CHECK] OKX Connection Error: {e}", flush=True)
+        raise HTTPException(status_code=400, detail="Không thể kết nối đến máy chủ OKX. Kiểm tra kết nối mạng của server.")
     except Exception as e:
+        print(f"[API CHECK] Unexpected error: {type(e).__name__}: {e}", flush=True)
         raise HTTPException(status_code=400, detail=f"Lỗi hệ thống khi kiểm tra API Key: {str(e)}")
 
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")

@@ -371,25 +371,34 @@ function App() {
     setIsLoggingIn(true);
     setLoginError("");
     try {
+      const payload = { uid: loginUid, password: "", passphrase: authStep === "uid" ? "" : loginPassphrase };
+      console.log("[AUTH] Sending login request:", { uid: loginUid, authStep, hasPassphrase: !!payload.passphrase });
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uid: loginUid, password: "", passphrase: authStep === "uid" ? "" : loginPassphrase })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
+      console.log("[AUTH] Login response:", data);
       if (data.status === "success") {
         setIsAuthenticated(true);
         localStorage.setItem("tls1_auth", "true");
         localStorage.setItem("tls1_uid", loginUid);
+        // Reset login state for clean next login
+        setAuthStep("uid");
+        setLoginPassphrase("");
+        setLoginError("");
       } else if (data.status === "require_password") {
         setAuthStep("require_password");
+        setLoginError("");
       } else if (data.status === "locked" || data.status === "pending") {
         setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
       } else {
         setLoginError(data.message || "Đăng nhập thất bại");
       }
     } catch (err) {
-      setLoginError("Không thể kết nối đến máy chủ xác thực.");
+      console.error("[AUTH] Login error:", err);
+      setLoginError("Không thể kết nối đến máy chủ xác thực. Hãy kiểm tra kết nối mạng.");
     }
     setIsLoggingIn(false);
   };
