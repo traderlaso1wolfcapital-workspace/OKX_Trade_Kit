@@ -1077,25 +1077,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
         dlg_layout.addWidget(settings_tabs)
         
-        # Nút Đăng Xuất được giấu vào đây thay vì nằm trên header
-        btn_row = QtWidgets.QHBoxLayout()
-        btn_logout_in_settings = QtWidgets.QPushButton("🚪 Đăng Xuất")
-        btn_logout_in_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
-        btn_logout_in_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        btn_logout_in_settings.setStyleSheet("""
-            QPushButton { background-color: #333333; color: #ffffff; min-height: 30px; padding: 4px 14px; border-radius: 4px; border: none; outline: none; font-weight: bold; }
-            QPushButton:hover { background-color: #cc2222; color: #ffffff; }
-        """)
-        def _do_logout_from_settings():
-            dlg.accept()
-            main_win = self.window()
-            if hasattr(main_win, 'handle_logout'):
-                main_win.handle_logout()
-        btn_logout_in_settings.clicked.connect(_do_logout_from_settings)
-        btn_row.addWidget(btn_logout_in_settings)
-        btn_row.addStretch(1)
-        dlg_layout.addLayout(btn_row)
-        
         dlg.exec()
         
         # Giữ lại các widget cấu hình không bị giải phóng bộ nhớ khi dialog đóng
@@ -2381,6 +2362,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addStretch(1)
 
         btn_row_strat = QtWidgets.QHBoxLayout()
+        self.btn_logout_strat = HoverSoundButton("🚪 Đăng Xuất")
+        self.btn_logout_strat.setStyleSheet("background-color: #d32f2f; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
+        self.btn_logout_strat.clicked.connect(self.trigger_logout)
+
         self.btn_reset_strategy = HoverSoundButton("🔄 KHÔI PHỤC MẶC ĐỊNH")
         self.btn_reset_strategy.setStyleSheet("background-color: #333333; color: #ff9900; border: 1px solid #ff9900; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
         self.btn_reset_strategy.clicked.connect(self.reset_strategy_defaults)
@@ -2389,6 +2374,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        btn_row_strat.addWidget(self.btn_logout_strat)
         btn_row_strat.addWidget(self.btn_reset_strategy)
         btn_row_strat.addWidget(self.btn_save_strategy, 1)
 
@@ -2398,6 +2384,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         main_layout.setContentsMargins(0,0,0,0)
         main_layout.addWidget(scroll)
         main_layout.addLayout(btn_row_strat)
+
+    def trigger_logout(self):
+        main_win = self.window()
+        if hasattr(main_win, 'handle_logout'):
+            main_win.handle_logout()
 
     def reset_strategy_defaults(self):
         reply = QtWidgets.QMessageBox.question(
@@ -2581,6 +2572,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         layout.addStretch(1)
 
         btn_row_smc = QtWidgets.QHBoxLayout()
+        self.btn_logout_smc = HoverSoundButton("🚪 Đăng Xuất")
+        self.btn_logout_smc.setStyleSheet("background-color: #d32f2f; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
+        self.btn_logout_smc.clicked.connect(self.trigger_logout)
+
         self.btn_reset_strategy_smc = HoverSoundButton("🔄 KHÔI PHỤC MẶC ĐỊNH")
         self.btn_reset_strategy_smc.setStyleSheet("background-color: #333333; color: #ff9900; border: 1px solid #ff9900; min-height: 40px; font-weight: bold; font-size: 13px; border-radius: 4px; padding: 0 15px;")
         self.btn_reset_strategy_smc.clicked.connect(self.reset_strategy_defaults_smc)
@@ -2589,6 +2584,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_save_strategy.setStyleSheet("background-color: #2E7D32; color: #ffffff; min-height: 40px; font-weight: bold; font-size: 14px; border: none; outline: none; border-radius: 4px;")
         self.btn_save_strategy.clicked.connect(self.save_strategy_settings)
         
+        btn_row_smc.addWidget(self.btn_logout_smc)
         btn_row_smc.addWidget(self.btn_reset_strategy_smc)
         btn_row_smc.addWidget(self.btn_save_strategy, 1)
 
