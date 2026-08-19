@@ -268,6 +268,9 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
                 return resp
             except Exception as e2:
                 err_str = f"{err_str} | Fallback failed: {e2}"
+        if "51010" in err_str or "51015" in err_str or "current account mode" in err_str:
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 51010 (Sai chế độ vị thế).")
+            print("   Bạn vui lòng chuyển sang Chế độ phòng ngừa rủi ro (Hedge Mode), thay vì Chế độ một chiều (One-way Mode) như hiện tại.")
         hft_logger.error(f"Lỗi place_market_entry: {err_str}", exc_info=True)
         print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
@@ -304,6 +307,9 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
             print("   1. Giảm Volume hoặc Risk trong bot_config.py.")
             print("   2. Vào App OKX -> Open Orders hủy bớt các lệnh Limit rác đang giam vốn.")
             print("   3. Nạp thêm USDT vào ví Phái sinh.")
+        elif "51010" in err_str or "51015" in err_str or "current account mode" in err_str:
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 51010 (Sai chế độ vị thế).")
+            print("   Bạn vui lòng chuyển sang Chế độ phòng ngừa rủi ro (Hedge Mode), thay vì Chế độ một chiều (One-way Mode) như hiện tại.")
         raise
 
 def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross"):
