@@ -19,6 +19,11 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[20/08/2026]** - Sửa lỗi Nút "Reset Vốn Gốc (Audit)" trên Web App không hoạt động và Lỗi 2000U hiển thị sai lệch:
+  - **Nguyên nhân 1 (Nút bấm):** Frontend `App.jsx` có nút HTML nhưng chưa được gắn hàm xử lý sự kiện `onClick` và backend `main.py` chưa có endpoint hỗ trợ.
+  - **Nguyên nhân 2 (Lỗi 2000U & Lỗi 51010):** Do người dùng đăng nhập Web App bằng UID mới tinh (chưa cấu hình API Futures/Multi-currency Margin) nên bị OKX trả lỗi 51010. Khi API gặp lỗi, Bot không đọc được equity thật từ sàn nên đã fallback hiển thị mốc 2000U mặc định cho thư mục tài khoản mới này (khác biệt với cấu hình UID Desktop).
+  - **Cập nhật:** Đã gắn thêm API endpoint `/api/bot/reset_capital` ở Backend (`main.py`) để tự động tạo file cờ `reset_wallet_{strategy}.flag`. Cập nhật `App.jsx` gắn logic gọi API cho nút bấm. Hướng dẫn người dùng đăng nhập đúng UID đồng bộ với Desktop App để khắc phục dứt điểm lỗi API.
+
 - **[10/08/2026]** - Hoàn thành xây dựng cấu trúc nền tảng và lõi chiến thuật cho Bot Sub3:
   - **Cập nhật:** Đã tạo thư mục `bots/sub3` chứa các file: `sys_bot_sub3.py` (vòng lặp chính, xử lý PID, kế thừa API Core), `sys_liquid_strategy.py` (state machine 4 giai đoạn theo CRT & Liquidation Sweep), và `utils_ob.py` (thuật toán tính ATR và phát hiện Order Block). Hệ thống đã được kiểm thử chạy luồng giả lập thành công, nhận diện được file PID và không gây crash. (Mã patch: `z3501`)
 

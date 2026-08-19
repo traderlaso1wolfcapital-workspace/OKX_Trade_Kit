@@ -50,6 +50,15 @@ function App() {
   const [lockMessage, setLockMessage] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isStoppingBot, setIsStoppingBot] = useState(false);
+  const [botPnl, setBotPnl] = useState("");
+  const [botWinrate, setBotWinrate] = useState("");
+  const [isBotRunning, setIsBotRunning] = useState(false);
+  const [botUptime, setBotUptime] = useState("00:00:00");
+  const [hwid] = useState(() => `WEB-DEVICE-${navigator.userAgent.length}-TLS1`);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Focus Log
+  const logsEndRef = useRef(null);
 
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activePairs, setActivePairs] = useState([]);
@@ -135,6 +144,23 @@ function App() {
     } catch (e) {
       setTradePrice("FETCH_ERROR");
       console.error("Failed to fetch BBO", e);
+    }
+  };
+
+  const handleResetCapital = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn Reset Vốn Gốc (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?")) return;
+
+    try {
+      const uid = localStorage.getItem("authUid") || "default";
+      const resp = await fetch(`/api/bot/reset_capital?uid=${uid}&strategy=sub1`, { method: "POST" });
+      const data = await resp.json();
+      if (resp.ok) {
+        alert("✅ Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot thành công!");
+      } else {
+        alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+      }
+    } catch (e) {
+      alert("❌ Lỗi kết nối đến Server: " + e.message);
     }
   };
 
@@ -1542,7 +1568,7 @@ function App() {
                   <div className="settings-group">
                     <div className="settings-group-title">Lệnh Can Thiệp Nhanh (Audit Hệ Thống)</div>
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      <button className="btn-audit">♻️ Reset Vốn Gốc (Audit)</button>
+                      <button className="btn-audit" onClick={handleResetCapital}>♻️ Reset Vốn Gốc (Audit)</button>
                     </div>
                   </div>
 
@@ -1551,7 +1577,7 @@ function App() {
                     <div className="settings-group-title">Mã Máy (HWID) Cá Nhân</div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <span style={{ color: "#888" }}>Mã Máy của bạn:</span>
-                      <span className="hwid-value">WEB-DEVICE-{navigator.userAgent.length}-TLS1</span>
+                      <span className="hwid-value">{hwid}</span>
                     </div>
                   </div>
                 </div>
@@ -1896,14 +1922,14 @@ function App() {
                       method: "POST", headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                     });
-                    
+
                     if (!res.ok) {
-                        const errorData = await res.json();
-                        alert(`❌ Lỗi: ${errorData.detail || "Không thể lưu API Key"}`);
-                        setIsSavingConfig(false);
-                        return;
+                      const errorData = await res.json();
+                      alert(`❌ Lỗi: ${errorData.detail || "Không thể lưu API Key"}`);
+                      setIsSavingConfig(false);
+                      return;
                     }
-                    
+
                     alert("💾 Đã lưu cấu hình API Key!");
                     addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản ${selectedAccount}`);
                   } catch (e) { alert(`Lỗi kết nối khi lưu API Key: ${e.message}`); }

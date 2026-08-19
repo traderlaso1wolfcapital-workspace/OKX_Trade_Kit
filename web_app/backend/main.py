@@ -378,9 +378,27 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1
         loop = asyncio.get_event_loop()
         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
         
-        return {"message": f"Bot {strategy} started successfully.", "status": "RUNNING"}
+        return {"status": "success", "message": "Đã khởi động Bot thành công!"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start bot: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/bot/reset_capital")
+async def reset_capital(uid: str, strategy: str = "sub1"):
+    if not uid: raise HTTPException(status_code=400, detail="uid is required")
+    
+    flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
+    os.makedirs(flag_dir, exist_ok=True)
+    
+    # acc_name corresponds to the strategy name (e.g. sub1)
+    acc_name = strategy
+    flag_path = os.path.join(flag_dir, f"reset_wallet_{acc_name}.flag")
+    
+    try:
+        with open(flag_path, "w") as f:
+            f.write("1")
+        return {"status": "success", "message": "Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi tạo cờ reset: {e}")
 
 @app.post("/api/bot/stop")
 async def stop_bot(uid: str, strategy: str = "sub1"):
