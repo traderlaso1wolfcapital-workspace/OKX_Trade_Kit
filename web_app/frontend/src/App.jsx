@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import "./App.css";
 
 const COIN_LIST = [
@@ -393,6 +393,7 @@ function App() {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
   const emaSeriesRef = useRef(null);
   const terminalRef = useRef(null);
@@ -588,6 +589,13 @@ function App() {
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
     });
+    const vs = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // overlay
+    });
+    vs.priceScale().applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+    });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, crosshairMarkerVisible: false,
@@ -597,6 +605,7 @@ function App() {
       borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
     });
     chartRef.current = chart;
+    volumeSeriesRef.current = vs;
     candleSeriesRef.current = cs;
     emaSeriesRef.current = es;
     const resizeObserver = new ResizeObserver((entries) => {
@@ -624,6 +633,9 @@ function App() {
     if (emaSeriesRef.current) {
       try { emaSeriesRef.current.setData([]); } catch { }
     }
+    if (volumeSeriesRef.current) {
+      try { volumeSeriesRef.current.setData([]); } catch { }
+    }
 
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
@@ -636,15 +648,23 @@ function App() {
         const rd = await res.json();
         if (rd.code !== "0" || !rd.data || rd.data.length === 0) return;
         const candles = [];
+        const volumes = [];
         for (let i = rd.data.length - 1; i >= 0; i--) {
           const c = rd.data[i];
           const t = Math.floor(parseInt(c[0]) / 1000);
-          candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) });
+          const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cls = parseFloat(c[4]);
+          const vol = parseFloat(c[5] || "0");
+          candles.push({ time: t, open: o, high: h, low: l, close: cls });
+          volumes.push({ time: t, value: vol, color: cls >= o ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)' });
         }
         // Sắp xếp tăng dần theo time, không trùng
         candles.sort((a, b) => a.time - b.time);
+        volumes.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
+        const uniqueVol = volumes.filter((c, i) => i === 0 || c.time !== volumes[i - 1].time);
+        
         candleSeriesRef.current.setData(unique);
+        volumeSeriesRef.current?.setData(uniqueVol);
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
 
         if (rd.ob_boxes) {
