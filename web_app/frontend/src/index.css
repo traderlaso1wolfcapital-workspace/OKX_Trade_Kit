@@ -26,12 +26,12 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
   background-color: #1a1a1a;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-left: calc(env(safe-area-inset-left) + 3px);
+  padding-right: calc(env(safe-area-inset-right) + 3px);
 }
 
 .content-wrapper {
@@ -325,7 +325,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: #131722;
+  background-color: #0c0c0c;
 }
 .main-workspace.vertical .pane-chart {
   height: var(--chart-ratio, 50%);
@@ -342,7 +342,7 @@ body {
   z-index: 10;
 }
 .resizer.horizontal-resizer {
-  height: 10px;
+  height: 4px;
   cursor: row-resize;
   display: flex;
   justify-content: center;
@@ -353,7 +353,7 @@ body {
   width: 60px;
   height: 4px;
   background-color: #777; /* Bright grey so it stands out */
-  border-radius: 2px;
+  border-radius: 4px;
 }
 .resizer.horizontal-resizer:hover, .resizer.horizontal-resizer:active {
   background-color: #3a3a3a;
@@ -362,7 +362,7 @@ body {
   background-color: #ef5350; /* Bright red when interacted with */
 }
 .resizer.vertical-resizer {
-  width: 10px;
+  width: 4px;
   cursor: col-resize;
   display: flex;
   justify-content: center;
@@ -373,7 +373,7 @@ body {
   height: 60px;
   width: 4px;
   background-color: #777;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 .resizer.vertical-resizer:hover, .resizer.vertical-resizer:active {
   background-color: #3a3a3a;
@@ -1021,4 +1021,32 @@ body.is-resizing-vertical {
 }
 .hide-spinners[type=number] {
   -moz-appearance: textfield;
+}
+
+/* Custom Checkbox */
+input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #777777;
+  border-radius: 4px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  vertical-align: middle;
+  margin: 0;
+}
+input[type="checkbox"]:checked {
+  background-color: transparent;
+  border-color: #777777;
+}
+input[type="checkbox"]:checked::after {
+  content: '✔';
+  color: #00FF00;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: bold;
 }
