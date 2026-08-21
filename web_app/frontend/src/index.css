@@ -34,6 +34,12 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+@media (min-width: 768px) {
+  .app-container {
+    padding: 10px 10px 10px 10px;
+  }
+}
+
 .content-wrapper {
   display: flex;
   flex: 1;
@@ -268,6 +274,17 @@ body {
   border-color: #444;
   cursor: not-allowed;
 }
+.spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  margin-right: 5px;
+  vertical-align: text-bottom;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .btn-settings {
   background-color: #2d2d2d;
   color: #fff;

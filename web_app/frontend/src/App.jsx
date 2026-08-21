@@ -49,6 +49,7 @@ function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isStartingBot, setIsStartingBot] = useState(false);
   const [isStoppingBot, setIsStoppingBot] = useState(false);
   const [botPnl, setBotPnl] = useState("");
   const [botWinrate, setBotWinrate] = useState("");
@@ -69,7 +70,7 @@ function App() {
   const [chartRatio, setChartRatio] = useState(50);
 
   const startResizing = (e) => {
-    e.preventDefault();
+    if (e.type !== "touchstart") e.preventDefault();
     const isVertical = layoutMode === "vertical";
 
     // Add is-resizing to body to prevent iframe capturing mouse events
@@ -82,13 +83,23 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
+
+      let clientX, clientY;
+      if (dragEvent.touches && dragEvent.touches.length > 0) {
+        clientX = dragEvent.touches[0].clientX;
+        clientY = dragEvent.touches[0].clientY;
+      } else {
+        clientX = dragEvent.clientX;
+        clientY = dragEvent.clientY;
+      }
+
       if (isVertical) {
-        let newRatio = ((dragEvent.clientY - rect.top) / rect.height) * 100;
+        let newRatio = ((clientY - rect.top) / rect.height) * 100;
         if (newRatio < 25) newRatio = 25;
         if (newRatio > 75) newRatio = 75;
         setChartRatio(newRatio);
       } else {
-        let newRatio = ((dragEvent.clientX - rect.left) / rect.width) * 100;
+        let newRatio = ((clientX - rect.left) / rect.width) * 100;
         if (newRatio < 25) newRatio = 25;
         if (newRatio > 75) newRatio = 75;
         setChartRatio(newRatio);
@@ -99,9 +110,13 @@ function App() {
       document.body.classList.remove("is-resizing-vertical");
       document.removeEventListener("mousemove", doDrag);
       document.removeEventListener("mouseup", stopDrag);
+      document.removeEventListener("touchmove", doDrag);
+      document.removeEventListener("touchend", stopDrag);
     };
     document.addEventListener("mousemove", doDrag);
     document.addEventListener("mouseup", stopDrag);
+    document.addEventListener("touchmove", doDrag, { passive: false });
+    document.addEventListener("touchend", stopDrag);
   };
 
   const [activeTab, setActiveTab] = useState("positions");
@@ -816,9 +831,11 @@ function App() {
     }
 
     try {
+      setIsStartingBot(true);
       const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi khởi động bot!"); }
+    finally { setIsStartingBot(false); }
   };
   const handleStopBot = async () => {
     try {
@@ -1147,7 +1164,9 @@ function App() {
           )}
 
           <div className="sidebar-footer">
-            <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
+            <button onClick={handleStartBot} disabled={isRunning || isStartingBot} className="btn-control btn-start">
+              {isStartingBot ? <><span className="spinner"></span> ĐANG BẮT ĐẦU...</> : "▶ BẮT ĐẦU CHẠY BOT"}
+            </button>
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
               {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
             </button>
@@ -1254,6 +1273,7 @@ function App() {
             <div
               className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
               onMouseDown={startResizing}
+              onTouchStart={startResizing}
             />
 
             <section className="pane-tabs">
@@ -1262,14 +1282,19 @@ function App() {
                   <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
                     📊 Bảng Vị Thế ({safePos.length})
                   </button>
-                  <button className={`tab-btn ${activeTab === "history" ? "active" : ""}`} onClick={() => setActiveTab("history")}>
-                    📜 Lịch Sử Lệnh ({closedPositions.length})
-                  </button>
                   <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
                     🖥 Logs
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  <button
+                    className={`tab-btn ${activeTab === "history" ? "active" : ""}`}
+                    onClick={() => setActiveTab("history")}
+                    title={`Lịch Sử Lệnh (${closedPositions.length})`}
+                    style={{ borderLeft: "1px solid #333", borderRight: "1px solid #333", padding: "0 10px" }}
+                  >
+                    📜
+                  </button>
                   <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
                     {isRunning ? `● ĐANG CHẠY | ${formatUptime(uptime)}` : "● ĐÃ DỪNG"}
                   </span>
@@ -1410,6 +1435,8 @@ function App() {
                                     )}
                                     <span style={{ fontSize: "14px" }}>
                                       <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                      {isLong && <span style={{ color: "#4CAF50", marginLeft: "6px", fontSize: "14px" }}>🟢</span>}
+                                      {!isLong && <span style={{ color: "#ef5350", marginLeft: "6px", fontSize: "14px" }}>🔴</span>}
                                       <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
                                         ({pos.tf ? pos.tf.toLowerCase() : `${isLong ? "Long" : "Short"} ${pos.lever || "100"}x`})
                                       </span>
