@@ -376,7 +376,8 @@ class HoverSoundButton(QtWidgets.QPushButton):
         self.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
 
     def enterEvent(self, event):
-        play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.5)
+        if self.isEnabled():
+            play_ui_sound("juniorsoundays-ui-sound-70-527837.mp3", 0.5)
         super().enterEvent(event)
 
 class BotSubprocessWorker(QtCore.QThread):
@@ -1121,7 +1122,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         control_layout.setContentsMargins(0, 5, 15, 5)
         control_layout.setSpacing(10)
 
-        self.btn_start = QtWidgets.QPushButton("▶ BẮT ĐẦU CHẠY BOT")
+        self.btn_start = HoverSoundButton("▶ BẮT ĐẦU CHẠY BOT")
         self.btn_start.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
         self.btn_start.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.btn_start.setStyleSheet("""
@@ -1129,11 +1130,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
             QPushButton:hover { background-color: #388E3C; border: 1px solid #ffaa00; }
             QPushButton:disabled { background-color: #555555; color: #888888; border: 1px solid #444; }
         """)
-        self.btn_start_hover = ButtonHoverSoundFilter(self.btn_start)
-        self.btn_start.installEventFilter(self.btn_start_hover)
+
         self.btn_start.clicked.connect(self.start_bot)
 
-        self.btn_stop = QtWidgets.QPushButton("■ DỪNG CHẠY BOT")
+        self.btn_stop = HoverSoundButton("■ DỪNG CHẠY BOT")
         self.btn_stop.setFont(QtGui.QFont("Segoe UI", 10, QtGui.QFont.Weight.Bold))
         self.btn_stop.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.btn_stop.setStyleSheet("""
@@ -1141,8 +1141,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             QPushButton:hover { background-color: #D32F2F; border: 1px solid #ffaa00; }
             QPushButton:disabled { background-color: #555555; color: #888888; border: 1px solid #444; }
         """)
-        self.btn_stop_hover = ButtonHoverSoundFilter(self.btn_stop)
-        self.btn_stop.installEventFilter(self.btn_stop_hover)
+
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_bot)
 
@@ -1218,8 +1217,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
                 QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
             """)
-            self.btn_open_settings_hover = ButtonHoverSoundFilter(self.btn_open_settings)
-            self.btn_open_settings.installEventFilter(self.btn_open_settings_hover)
+
             self.btn_open_settings.clicked.connect(self.open_settings_dialog)
 
             self.btn_open_community = QtWidgets.QPushButton("💬 Join Cộng đồng")
@@ -1229,8 +1227,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
                 QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
             """)
-            self.btn_open_community_hover = ButtonHoverSoundFilter(self.btn_open_community)
-            self.btn_open_community.installEventFilter(self.btn_open_community_hover)
+
             self.btn_open_community.clicked.connect(self.open_community_dialog)
             # Cộng Đồng → sẽ được add vào header_layout bởi MainWindow
             # Cài Đặt → sẽ được add vào corner_widget của tab_live_view
@@ -1240,8 +1237,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
         # Khung phân vùng Tab Live View
         self.tab_live_view = QtWidgets.QTabWidget()
-        self.live_view_hover_filter = HoverSoundFilter(self.tab_live_view.tabBar())
-        self.tab_live_view.tabBar().installEventFilter(self.live_view_hover_filter)
+
         self.tab_live_view.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.tab_live_view.tabBar().setExpanding(False)
         self.tab_live_view.tabBar().setUsesScrollButtons(False)
@@ -1390,7 +1386,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         pos_layout.setContentsMargins(0, 5, 0, 5)
         
         self.pos_table = FocusClearTableWidget(0, 6)
-        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "PNL thả nổi", "Chốt lời | Dừng lỗ", "Cắt lệnh"])
+        self.pos_table.setHorizontalHeaderLabels(["Cặp giao dịch", "Giá vào lệnh", "Ký quỹ", "PNL thả nổi", "TF trade", "Cắt lệnh"])
         header = self.pos_table.horizontalHeader()
         header.setMinimumSectionSize(75)
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
@@ -1398,12 +1394,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         header.setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.Interactive)
         self.pos_table.setColumnWidth(2, 85)
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.ResizeMode.Interactive)
+        self.pos_table.setColumnWidth(4, 175)
         header.setSectionResizeMode(5, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
         self.pos_table.setStyleSheet(
             "QTableWidget { background-color: #1a1a1a; gridline-color: #333333; color: #ffffff; border: 1px solid #333333; font-size: 15px; selection-background-color: #162e3b; selection-color: #ffffff; }"
             "QTableWidget::item:selected { background-color: #162e3b; color: #ffffff; border: 1px solid #20687a; }"
-            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 14px; }"
+            "QHeaderView::section { background-color: #2b2b2b; color: #ffffff; font-weight: bold; border: 1px solid #333333; padding: 4px; font-size: 13px; }"
         )
         self.pos_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pos_table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -1415,6 +1412,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.pos_worker.positions_signal.connect(self.update_positions_table)
         # Sẽ load data ngay khi user chọn account (sự kiện load_selected_account sẽ được sửa lại để gọi apply_current_api_to_worker)
         self.pos_worker.start()
+        self.update_positions_table([])
         
         # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart, không dùng splitter riêng giữa chart và bảng vị thế)
         self.pos_table.verticalHeader().setDefaultSectionSize(32)
@@ -1446,8 +1444,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         for chk in [self.chk_tf_m5, self.chk_tf_m15, self.chk_tf_m30, self.chk_tf_h1, self.chk_tf_h2, self.chk_tf_h4]:
             chk.stateChanged.connect(self._on_dash_tf_changed)
             
-        if self.strategy_id == "sub2":
-            self.dash_tfs_container.hide()
+        self.dash_tfs_container.hide()
 
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
@@ -1574,6 +1571,23 @@ class BotInstanceWidget(QtWidgets.QWidget):
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Lỗi hệ thống", f"Lỗi khi đóng lệnh: {e}")
         
+    def toggle_tf_trade(self, coin_id, tf):
+        if getattr(self, '_is_loading_settings', False): return
+        if not hasattr(self, 'enabled_tfs_dict'):
+            self.enabled_tfs_dict = {}
+            self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            
+        current = self.enabled_tfs_dict.get(coin_id, self.fallback_tfs).copy()
+        if tf in current:
+            current.remove(tf)
+        else:
+            current.append(tf)
+            
+        self.enabled_tfs_dict[coin_id] = current
+        self.save_strategy_settings(silent=True)
+        if hasattr(self, '_current_positions'):
+            self.update_positions_table(self._current_positions)
+
     def update_positions_table(self, positions):
         if not hasattr(self, 'pos_table') or not self.pos_table:
             return
@@ -1645,7 +1659,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             chk.setChecked(is_checked)
             svg_path = os.path.join(USER_DATA_DIR, "check_green.svg").replace("\\", "/")
             chk.setStyleSheet(
-                f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} "
+                f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 4px; background-color: transparent; }} "
                 f"QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
             )
             chk.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
@@ -1661,18 +1675,53 @@ class BotInstanceWidget(QtWidgets.QWidget):
             lbl_sym = QtWidgets.QLabel(instId_text)
             lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 15px;")
 
+            border_line = QtWidgets.QFrame()
+            border_line.setFixedWidth(3)
+            if is_active:
+                border_line.setStyleSheet("background-color: #4caf50;" if side == "Long" else "background-color: #ff5252;")
+            else:
+                border_line.setStyleSheet("background-color: transparent;")
+
             w0 = QtWidgets.QWidget()
             l0 = QtWidgets.QHBoxLayout(w0)
-            l0.setContentsMargins(6, 0, 6, 0)
+            l0.setContentsMargins(0, 0, 6, 0)
             l0.setSpacing(6)
+            l0.addWidget(border_line)
+            l0.addSpacing(6)
             l0.addWidget(chk)
             l0.addWidget(lbl_sym)
             l0.addStretch(1)
             self.pos_table.setCellWidget(row, 0, w0)
 
+            # Cột 4 (TF trade) - Luôn hiển thị
+            tf_container = QtWidgets.QWidget()
+            tf_layout = QtWidgets.QHBoxLayout(tf_container)
+            tf_layout.setContentsMargins(0, 0, 0, 0)
+            tf_layout.setSpacing(4)
+            tf_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            
+            if not hasattr(self, 'enabled_tfs_dict'):
+                self.enabled_tfs_dict = {}
+                self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            
+            swap_id = f"{instId}-SWAP"
+            current_tfs = self.enabled_tfs_dict.get(swap_id, self.fallback_tfs)
+
+            for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
+                btn = QtWidgets.QPushButton(tf.replace("M", ""))
+                btn.setFixedSize(24, 19)
+                btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+                if tf in current_tfs:
+                    btn.setStyleSheet("background-color: #1d766b; color: #f0f0f0; border-radius: 4px; font-weight: bold; font-size: 12px; border: 1px solid #1d766b; padding: 0px;")
+                else:
+                    btn.setStyleSheet("background-color: #222222; color: #aaaaaa; border: 1px solid #444444; border-radius: 4px; font-size: 12px; padding: 0px;")
+                btn.clicked.connect(lambda checked, c=swap_id, t=tf: self.toggle_tf_trade(c, t))
+                tf_layout.addWidget(btn)
+            self.pos_table.setCellWidget(row, 4, tf_container)
+
             if not is_active:
-                # Cặp coin chưa có lệnh: Các cột 1..5 để trống hoàn toàn
-                for c in range(1, 6):
+                # Cặp coin chưa có lệnh: Các cột 1, 2, 3, 5 để trống hoàn toàn
+                for c in [1, 2, 3, 5]:
                     self.pos_table.removeCellWidget(row, c)
                     item_empty = QtWidgets.QTableWidgetItem("")
                     item_empty.setTextAlignment(int(QtCore.Qt.AlignmentFlag.AlignCenter))
@@ -1713,89 +1762,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             pnl_label.setStyleSheet("background: transparent;")
             self.pos_table.setCellWidget(row, 3, pnl_label)
 
-            # Cột 4 (Chốt lời | Dừng lỗ)
-            tp_list = pos.get("tp_list", [])
-            sl_list = pos.get("sl_list", [])
-            
-            # --- Fallback: Lấy từ JSON data (Setup) nếu API OKX chưa trả về ---
-            if not tp_list or not sl_list:
-                try:
-                    acc_name = self.get_acc_name()
-                    base_coin = instId.replace("-USDT", "")
-                    json_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data", f"{acc_name}_{base_coin}_chart.json")
-                    if os.path.exists(json_path):
-                        with open(json_path, "r", encoding="utf-8") as f:
-                            c_data = json.load(f)
-                            if "markers" in c_data:
-                                is_long = float(pos.get("pos", 0)) > 0
-                                cands = [m for m in c_data["markers"] if m.get("type") == "SETUP" and ((m.get("side") == "LONG" and is_long) or (m.get("side") == "SHORT" and not is_long))]
-                                if cands:
-                                    best = min(cands, key=lambda m: abs(float(m.get("price", 0)) - entry_px))
-                                    b_px = float(best.get("price", 0))
-                                    if b_px > 0 and abs(entry_px - b_px) / b_px <= 0.05:
-                                        if not tp_list and best.get("tp"): tp_list.append(str(best.get("tp")))
-                                        if not sl_list and best.get("sl"): sl_list.append(str(best.get("sl")))
-                except:
-                    pass
-                    
-            # --- Fallback 2: Tính theo công thức RR ---
-            if not tp_list or not sl_list:
-                is_long = float(pos.get("pos", 0)) > 0
-                if self.strategy_id == "sub1" and entry_px > 0:
-                    tp_pct = getattr(self, "input_tp_pct").value() / 100.0 if hasattr(self, "input_tp_pct") else 0.012
-                    sl_pct = getattr(self, "input_sl_pct").value() / 100.0 if hasattr(self, "input_sl_pct") else 0.012
-                    if is_long:
-                        if not sl_list: sl_list.append(f"{entry_px * (1 - sl_pct):.2f}")
-                        if not tp_list: tp_list.append(f"{entry_px * (1 + tp_pct):.2f}")
-                    else:
-                        if not sl_list: sl_list.append(f"{entry_px * (1 + sl_pct):.2f}")
-                        if not tp_list: tp_list.append(f"{entry_px * (1 - tp_pct):.2f}")
-                elif self.strategy_id == "sub2" and entry_px > 0:
-                    rr_trend = getattr(self, "smc_input_rr_trend").value() if hasattr(self, "smc_input_rr_trend") else 5.0
-                    default_sl_pct = 0.01
-                    if is_long:
-                        if not sl_list: sl_list.append(f"{entry_px * (1 - default_sl_pct):.2f}")
-                        if not tp_list: tp_list.append(f"{entry_px * (1 + default_sl_pct * rr_trend):.2f}")
-                    else:
-                        if not sl_list: sl_list.append(f"{entry_px * (1 + default_sl_pct):.2f}")
-                        if not tp_list: tp_list.append(f"{entry_px * (1 - default_sl_pct * rr_trend):.2f}")
 
-            # --- Tính giá trị Lời/Lỗ PNL thực tế bằng USDT theo TP/SL ---
-            is_long = _safe_float(pos.get("pos", 0)) > 0 or str(pos.get("posSide", "")).lower() == "long"
-            
-            tp_pnl_str = "—"
-            tp_color = "#777777"
-            if tp_list and entry_px > 0 and size > 0:
-                try:
-                    tp_px = _safe_float(tp_list[0])
-                    if tp_px > 0:
-                        tp_pnl_val = size * (tp_px - entry_px) / entry_px if is_long else size * (entry_px - tp_px) / entry_px
-                        tp_pnl_str = f"+{tp_pnl_val:,.2f}" if tp_pnl_val >= 0 else f"{tp_pnl_val:,.2f}"
-                        tp_color = "#81c784" # สี xanh nhạt nhẹ nhàng
-                except:
-                    pass
-
-            sl_pnl_str = "—"
-            sl_color = "#777777"
-            if sl_list and entry_px > 0 and size > 0:
-                try:
-                    sl_px = _safe_float(sl_list[0])
-                    if sl_px > 0:
-                        sl_pnl_val = size * (sl_px - entry_px) / entry_px if is_long else size * (entry_px - sl_px) / entry_px
-                        sl_pnl_str = f"{sl_pnl_val:,.2f}" if sl_pnl_val <= 0 else f"+{sl_pnl_val:,.2f}"
-                        sl_color = "#ef5350" # Màu đỏ nhạt nhẹ nhàng
-                except:
-                    pass
-
-            tpsl_label = QtWidgets.QLabel()
-            tpsl_label.setText(
-                f"<span style='font-size: 15px; font-weight: normal; color: {tp_color};'>{tp_pnl_str}</span> "
-                f"<span style='font-size: 15px; font-weight: normal; color: #555555;'>|</span> "
-                f"<span style='font-size: 15px; font-weight: normal; color: {sl_color};'>{sl_pnl_str}</span>"
-            )
-            tpsl_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            tpsl_label.setStyleSheet("background: transparent;")
-            self.pos_table.setCellWidget(row, 4, tpsl_label)
 
             # Cột 5 (Cắt lệnh: Nút Đóng thu nhỏ 15% vừa ô)
             raw_inst_id = str(pos.get("instId", ""))
@@ -1804,7 +1771,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             btn_container = QtWidgets.QWidget()
             btn_layout = QtWidgets.QHBoxLayout(btn_container)
-            btn_layout.setContentsMargins(6, 1, 6, 1)
+            btn_layout.setContentsMargins(10, 4, 10, 4)
             btn_layout.setSpacing(0)
 
             btn_close = QtWidgets.QPushButton("Đóng")
@@ -2230,7 +2197,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if not os.path.exists(svg_path):
             with open(svg_path, "w", encoding="utf-8") as f:
                 f.write(svg_content)
-        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 4px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
         
         self.chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
         self.chk_cfg_xau.setStyleSheet(cb_style)
@@ -2488,7 +2455,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if not os.path.exists(svg_path):
             with open(svg_path, "w", encoding="utf-8") as f:
                 f.write(svg_content)
-        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 2px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
+        cb_style = f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid #777777; border-radius: 4px; background-color: transparent; }} QCheckBox::indicator:checked {{ image: url({svg_path}); }}"
         
         self.smc_chk_cfg_xau = QtWidgets.QCheckBox("XAU-USDT-SWAP")
         self.smc_chk_cfg_xau.setStyleSheet(cb_style)
@@ -2908,12 +2875,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             
             enabled_tfs = cfg.get("ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
-            if hasattr(self, 'chk_tf_m5'): self.chk_tf_m5.setChecked("M5" in enabled_tfs)
-            if hasattr(self, 'chk_tf_m15'): self.chk_tf_m15.setChecked("M15" in enabled_tfs)
-            if hasattr(self, 'chk_tf_m30'): self.chk_tf_m30.setChecked("M30" in enabled_tfs)
-            if hasattr(self, 'chk_tf_h1'): self.chk_tf_h1.setChecked("H1" in enabled_tfs)
-            if hasattr(self, 'chk_tf_h2'): self.chk_tf_h2.setChecked("H2" in enabled_tfs)
-            if hasattr(self, 'chk_tf_h4'): self.chk_tf_h4.setChecked("H4" in enabled_tfs)
+            if isinstance(enabled_tfs, list):
+                self.enabled_tfs_dict = {}
+                self.fallback_tfs = enabled_tfs
+            else:
+                self.enabled_tfs_dict = enabled_tfs
+                self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
             
             
             self.input_q_buffer.setValue(int(cfg.get("QUANTUM_BUFFER_CANDLES", getattr(bot_config, "QUANTUM_BUFFER_CANDLES", 10))))
@@ -3209,12 +3176,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLED_COINS": enabled,
                 "RESET_CONFIG_V23": True,
                 
-                "ENABLED_TFS": [tf for tf, chk in [("M5", getattr(self, 'chk_tf_m5', None)), 
-                                                   ("M15", getattr(self, 'chk_tf_m15', None)), 
-                                                   ("M30", getattr(self, 'chk_tf_m30', None)), 
-                                                   ("H1", getattr(self, 'chk_tf_h1', None)), 
-                                                   ("H2", getattr(self, 'chk_tf_h2', None)), 
-                                                   ("H4", getattr(self, 'chk_tf_h4', None))] if chk and chk.isChecked()],
+                "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', ["M5", "M15", "M30", "H1", "H2", "H4"]),
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
@@ -4058,8 +4020,8 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setSpacing(5)
 
         header_layout = QtWidgets.QHBoxLayout()
-        title = QtWidgets.QLabel("<span style='color: white;'>TRADER LÀ SỐ 1 - VIỆT NAM</span>")
-        title.setFont(QtGui.QFont("Segoe UI", 16, QtGui.QFont.Weight.Bold))
+        title = QtWidgets.QLabel("<span style='color: white; margin-left: 10px; margin-right: 10px;'>https://AutoTrader.fun</span>")
+        title.setFont(QtGui.QFont("Segoe UI", 20, QtGui.QFont.Weight.Bold))
         header_layout.addWidget(title)
         
         header_layout.addStretch()
@@ -4796,7 +4758,7 @@ class UpdateDialog(QtWidgets.QDialog):
                 background-color: #161922;
                 border: 1px solid #2d3345;
                 border-top: 3px solid #ff9800;
-                border-radius: 8px;
+                border-radius: 6px;
             }
             QLabel {
                 background: transparent;
@@ -5372,7 +5334,7 @@ def main():
         QMessageBox {
             border: 1px solid #cccccc;
             border-top: 3px solid #ff9800;
-            border-radius: 8px;
+            border-radius: 6px;
         }
 
         QMessageBox QLabel, QMessageBox QLabel *, QLabel#qt_msgbox_label, QLabel#qt_msgboxbox_ex_label,

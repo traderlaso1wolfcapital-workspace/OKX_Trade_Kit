@@ -303,6 +303,7 @@ function App() {
   });
   // Risk settings
   const [risk, setRisk] = useState({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+  const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const isInitialRiskRender = useRef(true);
 
   useEffect(() => {
@@ -481,6 +482,12 @@ function App() {
       ws.onmessage = (e) => {
         const now = Date.now();
         setLogs(prev => {
+          // Xóa hoàn toàn log cũ nếu gặp dấu hiệu in Dashboard mới
+          if (typeof e.data === 'string' && e.data.includes("bot_sub1.py")) {
+            logBlockIdRef.current += 1;
+            return [{ id: logBlockIdRef.current, lines: [e.data] }];
+          }
+
           let newBlocks = [...prev];
           // LUÔN LUÔN đẩy log mới nhất lên ĐẦU (tin mới nhất trên cùng)
           if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
@@ -584,8 +591,8 @@ function App() {
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { color: "#131722" }, textColor: "#d1d4dc" },
-      grid: { vertLines: { color: "#2b2b43" }, horzLines: { color: "#2b2b43" } },
+      layout: { background: { color: "#0c0c0c" }, textColor: "#e0e0e0" },
+      grid: { vertLines: { color: "rgba(42, 42, 42, 0.3)" }, horzLines: { color: "rgba(42, 42, 42, 0.3)" } },
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
     });
@@ -604,9 +611,19 @@ function App() {
       upColor: "#26a69a", downColor: "#ef5350",
       borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
     });
+    const vs = chart.addSeries(HistogramSeries, {
+      color: '#26a69a',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // Set as overlay
+    });
+    chart.priceScale('').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+    
     chartRef.current = chart;
     volumeSeriesRef.current = vs;
     candleSeriesRef.current = cs;
+    volumeSeriesRef.current = vs;
     emaSeriesRef.current = es;
     const resizeObserver = new ResizeObserver((entries) => {
       if (chartRef.current && entries.length > 0) {
@@ -777,6 +794,9 @@ function App() {
     });
     priceLinesRef.current = [];
 
+    // TẠM THỜI ẨN (THEO YÊU CẦU CỦA USER):
+    return;
+
     // Draw new lines for the selected coin
     positions.forEach(pos => {
       const posCoin = pos.instId?.split('-')[0];
@@ -941,7 +961,7 @@ function App() {
                   placeholder="Ví dụ: 12345678"
                   value={loginUid}
                   onChange={e => setLoginUid(e.target.value)}
-                  style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+                  style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "15px", textAlign: "center" }}
                 />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
@@ -950,36 +970,36 @@ function App() {
                     placeholder="Mật khẩu Passphrase"
                     value={loginPassphrase}
                     onChange={e => setLoginPassphrase(e.target.value)}
-                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "4px", fontSize: "14px", textAlign: "center" }}
+                    style={{ width: "200px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "15px", textAlign: "center" }}
                   />
-                  <button type="button" onClick={() => { setAuthStep("uid"); setLoginPassphrase(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                  <button type="button" onClick={() => { setAuthStep("uid"); setLoginPassphrase(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "14px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
                 </div>
               )}
-              {loginError && <div style={{ color: "#ff3333", fontSize: "13px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
+              {loginError && <div style={{ color: "#ff3333", fontSize: "14px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
                 disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !loginPassphrase)}
-                style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
+                style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
                 {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
               </button>
             </form>
 
             <div style={{ marginTop: "20px", textAlign: "left", fontSize: "12px", color: "#aaaaaa", lineHeight: "1.6" }}>
-              <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 5px 0", fontSize: "13px" }}>✅ ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:</p>
+              <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 5px 0", fontSize: "14px" }}>✅ ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:</p>
               <p style={{ margin: "0 0 5px 0" }}>1. Đăng ký tài khoản OKX dưới Link Ref của cộng đồng TLS1, mã ref: <strong style={{ color: "#00ffff", cursor: "pointer" }} onClick={() => { navigator.clipboard.writeText("HoanPhiTLS1"); alert("✅ Đã Copy Mã Ref!"); }}>HoanPhiTLS1</strong></p>
               <p style={{ margin: "0 0 15px 0" }}>2. Hoặc thực hiện chuyển Ref về TLS1 nếu đã có sẵn tài khoản OKX.</p>
 
               <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
                 <button
                   onClick={() => window.open("https://www.okx.com/join/HoanPhiTLS1", "_blank")}
-                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}
+                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" }}
                 >
                   Đăng ký OKX (VIP)
                 </button>
                 <button
                   onClick={() => window.open("https://t.me/traderlaso1/6758", "_blank")}
-                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}
+                  style={{ flex: 1, padding: "8px", background: "transparent", border: "1px solid #555", color: "#58a6ff", borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" }}
                 >
                   Hướng dẫn chuyển Ref
                 </button>
@@ -1005,7 +1025,7 @@ function App() {
     <div className="app-container">
       {/* BANNER KHÓA / CHỜ DUYỆT — giống Desktop App */}
       {lockMessage && (
-        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "13px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
+        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "14px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
           {lockMessage}
         </div>
       )}
@@ -1023,16 +1043,22 @@ function App() {
             {selectedAccount === "sub1" ? (
               <div className="group-box" style={{ position: "relative" }}>
                 <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
+                <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", backgroundColor: "#252526", padding: "0 5px" }}>
+                  <button onClick={() => setIsRiskCollapsed(!isRiskCollapsed)} style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "12px", padding: "0" }}>
+                    {isRiskCollapsed ? "˅" : "˄"}
+                  </button>
+                </div>
                 <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
                   >LOT</button>
                 </div>
+                {!isRiskCollapsed && (
                 <div className="risk-grid">
                   <div className="risk-row">
                     <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
@@ -1047,20 +1073,27 @@ function App() {
                     <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.05" />
                   </div>
                 </div>
+                )}
               </div>
             ) : (
               <div className="group-box" style={{ position: "relative" }}>
                 <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
+                <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", backgroundColor: "#252526", padding: "0 5px" }}>
+                  <button onClick={() => setIsRiskCollapsed(!isRiskCollapsed)} style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "12px", padding: "0" }}>
+                    {isRiskCollapsed ? "˅" : "˄"}
+                  </button>
+                </div>
                 <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
                   >LOT</button>
                 </div>
+                {!isRiskCollapsed && (
                 <div className="risk-grid">
                   <div className="risk-row">
                     <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
@@ -1075,6 +1108,7 @@ function App() {
                     <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.5" />
                   </div>
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -1206,7 +1240,7 @@ function App() {
                   background: selectedAccount === sub ? "#2d2d2d" : "transparent",
                   color: selectedAccount === sub ? "#ff9900" : "#a0a0a0",
                   border: "none", borderRight: "1px solid #333", borderBottom: selectedAccount === sub ? "2px solid #ff9900" : "2px solid transparent",
-                  padding: "10px 20px", fontSize: "13px", fontWeight: "bold", cursor: "pointer", transition: "0.2s"
+                  padding: "10px 20px", fontSize: "14px", fontWeight: "bold", cursor: "pointer", transition: "0.2s"
                 }}
               >
                 {label}
@@ -1223,7 +1257,7 @@ function App() {
                   const threshold = (i + 1) * 20;
                   const active = slotCount >= threshold - 19;
                   const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
-                  return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "13px" }}>▮</span>;
+                  return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "14px" }}>▮</span>;
                 })}
               </span>
             </div>
@@ -1232,14 +1266,15 @@ function App() {
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
             <section className="pane-chart" style={{ position: "relative" }}>
-              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
-                <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
-                <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                </select>
-                <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
+              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "4px 10px" }}>
+                <div style={{ display: "flex", gap: "10px", alignItems: "center", marginRight: "70px" }}>
+                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+                  </select>
+                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="chart-wrapper" ref={chartContainerRef}
                 onWheel={() => setIsAutoFit(false)}
@@ -1307,11 +1342,21 @@ function App() {
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  <button
-                    className={`tab-btn ${activeTab === "history" ? "active" : ""}`}
+                  <button 
+                    className={activeTab === "history" ? "active-icon-btn" : "icon-btn"} 
                     onClick={() => setActiveTab("history")}
                     title={`Lịch Sử Lệnh (${closedPositions.length})`}
-                    style={{ borderLeft: "1px solid #333", borderRight: "1px solid #333", padding: "0 10px" }}
+                    style={{ 
+                      padding: "4px 8px", 
+                      background: activeTab === "history" ? "#ff990022" : "#222", 
+                      border: activeTab === "history" ? "1px solid #ff9900" : "1px solid #444", 
+                      borderRadius: "6px", 
+                      cursor: "pointer", 
+                      fontSize: "15px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
                   >
                     📜
                   </button>
@@ -1334,26 +1379,26 @@ function App() {
                     <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                       <thead>
                         <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Thời gian đóng</th>
-                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch (TF)</th>
-                          <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào</th>
-                          <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá đóng</th>
-                          <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Thời gian đóng</th>
+                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Cặp giao dịch (TF)</th>
+                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá vào</th>
+                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá đóng</th>
+                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Ký quỹ</th>
                           <th style={{ padding: "6px 15px", textAlign: "right", fontSize: "15px", whiteSpace: "nowrap", minWidth: "120px" }}>PNL (USDT)</th>
                         </tr>
                       </thead>
                       <tbody>
                         {closedPositions.map((pos) => (
                           <tr key={pos.ticket_id} style={{ borderBottom: "1px solid #333" }}>
-                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "13px", color: "#aaa" }}>
+                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", color: "#aaa" }}>
                               {new Date(pos.closeTime).toLocaleString('vi-VN')}
                             </td>
-                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", fontWeight: "bold", color: pos.posSide === "long" ? "#4caf50" : "#ff5252" }}>
+                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", fontWeight: "bold", color: pos.posSide === "long" ? "#4caf50" : "#ff5252" }}>
                               {pos.instId.replace("-SWAP", "")} ({pos.tf})
                             </td>
-                            <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.entryPx).toFixed(4)}</td>
-                            <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.exitPx).toFixed(4)}</td>
-                            <td style={{ padding: "6px 10px", fontSize: "14px" }}>{parseFloat(pos.pos).toFixed(2)}</td>
+                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.entryPx).toFixed(4)}</td>
+                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.exitPx).toFixed(4)}</td>
+                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.pos).toFixed(2)}</td>
                             <td style={{ padding: "6px 15px", fontSize: "15px", fontWeight: "bold", color: parseFloat(pos.pnl) >= 0 ? "#4caf50" : "#ff5252" }}>
                               {parseFloat(pos.pnl) >= 0 ? "+" : ""}{parseFloat(pos.pnl).toFixed(4)} $
                             </td>
@@ -1377,7 +1422,7 @@ function App() {
                           <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
                           <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
                           <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                          <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>PNL thả nổi</th>
+                          <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
                           {/* <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th> */}
                           <th style={{ padding: "6px 10px", textAlign: "left", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
                           <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
@@ -1391,7 +1436,7 @@ function App() {
                           if (posList.length === 0) {
                             return (
                               <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: "3px solid transparent" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                     <input
                                       type="checkbox"
@@ -1400,7 +1445,7 @@ function App() {
                                       onClick={e => e.stopPropagation()}
                                       style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
                                     />
-                                    <span style={{ color: "#aaa", fontSize: "14px" }}>{coin.label.replace("-SWAP", "")}</span>
+                                    <span style={{ color: "#aaa", fontSize: "15px" }}>{coin.label.replace("-SWAP", "")}</span>
                                   </div>
                                 </td>
                                 <td></td><td></td><td></td>
@@ -1415,11 +1460,11 @@ function App() {
                                           key={tf}
                                           onClick={() => handleTfToggle(coin.value, tf)}
                                           style={{
-                                            cursor: "pointer", padding: "3px 6px", borderRadius: "3px",
-                                            fontSize: "11px", fontWeight: "bold",
-                                            background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
-                                            border: isOn ? "1px solid #26a69a" : "1px solid #444",
-                                            minWidth: "24px", textAlign: "center", display: "inline-block"
+                                            cursor: "pointer", padding: "0px", borderRadius: "6px",
+                                            fontSize: "12px", fontWeight: "bold",
+                                            background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
+                                            border: isOn ? "1px solid #1d766b" : "1px solid #444444",
+                                            width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
                                           }}
                                         >
                                           {label}
@@ -1440,7 +1485,7 @@ function App() {
 
                             return (
                               <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : "1px solid rgba(255, 255, 255, 0.03)" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: isLong ? "3px solid #4caf50" : "3px solid #ff5252" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                     {ticketIndex === 0 ? (
                                       <input
@@ -1453,7 +1498,7 @@ function App() {
                                     ) : (
                                       <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
                                     )}
-                                    <span style={{ fontSize: "14px" }}>
+                                    <span style={{ fontSize: "15px" }}>
                                       <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
                                       {isLong && <span style={{ color: "#4CAF50", marginLeft: "6px", fontSize: "14px" }}>🟢</span>}
                                       {!isLong && <span style={{ color: "#ef5350", marginLeft: "6px", fontSize: "14px" }}>🔴</span>}
@@ -1464,15 +1509,15 @@ function App() {
                                     </span>
                                   </div>
                                 </td>
-                                <td style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
-                                <td style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
-                                <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap" }}>
+                                <td style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
+                                <td style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                                <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
                                   {(() => {
                                     const roi = parseFloat(pos.roi || 0);
                                     const color = roi >= 0 ? "#26a69a" : "#ef5350";
                                     return (
                                       <span style={{ color }}>
-                                        {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
+                                        {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT &nbsp;&nbsp; ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
                                       </span>
                                     );
                                   })()}
@@ -1489,11 +1534,11 @@ function App() {
                                             key={tf}
                                             onClick={() => handleTfToggle(coin.value, tf)}
                                             style={{
-                                              cursor: "pointer", padding: "3px 6px", borderRadius: "3px",
-                                              fontSize: "11px", fontWeight: "bold",
-                                              background: isOn ? "#26a69a" : "#222", color: isOn ? "#fff" : "#888",
-                                              border: isOn ? "1px solid #26a69a" : "1px solid #444",
-                                              minWidth: "24px", textAlign: "center", display: "inline-block"
+                                              cursor: "pointer", padding: "0px", borderRadius: "6px",
+                                              fontSize: "12px", fontWeight: "bold",
+                                              background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
+                                              border: isOn ? "1px solid #1d766b" : "1px solid #444444",
+                                              width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
                                             }}
                                           >
                                             {label}
@@ -1536,8 +1581,8 @@ function App() {
                                     }}
                                     style={{
                                       background: "#c62828", color: "white", border: "none",
-                                      borderRadius: "4px", padding: "6px 16px", cursor: "pointer",
-                                      fontSize: "13px", fontWeight: "bold"
+                                      borderRadius: "6px", padding: "6px 16px", cursor: "pointer",
+                                      fontSize: "14px", fontWeight: "bold"
                                     }}>
                                     Đóng
                                   </button>
@@ -1805,7 +1850,7 @@ function App() {
                               className="styled-select"
                               value={strat.timeframeBase}
                               onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
-                              style={{ width: "100px", background: "#1e1e1e", color: "#fff", border: "1px solid #555", borderRadius: "4px", padding: "4px" }}
+                              style={{ width: "100px", background: "#1e1e1e", color: "#fff", border: "1px solid #555", borderRadius: "6px", padding: "4px" }}
                             >
                               <option value="15M">15M</option>
                               <option value="30M">30M</option>
@@ -1914,7 +1959,7 @@ function App() {
                   className="btn-default"
                   style={{
                     backgroundColor: "#333333", color: "#ff9900", border: "1px solid #ff9900",
-                    borderRadius: "4px", padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "bold",
+                    borderRadius: "6px", padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "bold",
                     transition: "0.2s"
                   }}
                   onClick={() => {
