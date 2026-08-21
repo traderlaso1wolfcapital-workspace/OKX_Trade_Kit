@@ -590,10 +590,11 @@ function App() {
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
     });
     const vs = chart.addSeries(HistogramSeries, {
-      color: '#26a69a',
       priceFormat: { type: 'volume' },
       priceScaleId: '', // overlay
-      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+    vs.priceScale().applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
     });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
@@ -661,7 +662,7 @@ function App() {
         volumes.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
         const uniqueVol = volumes.filter((c, i) => i === 0 || c.time !== volumes[i - 1].time);
-        
+
         if (chartRef.current) {
           chartRef.current.applyOptions({
             watermark: {
@@ -674,7 +675,7 @@ function App() {
             }
           });
         }
-        
+
         candleSeriesRef.current.setData(unique);
         volumeSeriesRef.current?.setData(uniqueVol);
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
@@ -1249,20 +1250,24 @@ function App() {
             <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} style={{ background: '#444', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: (!isRunning || isStoppingBot) ? 0.6 : 1 }}>
               {isStoppingBot ? "⏳ ĐANG DỪNG..." : "🔴 DỪNG HOẠT ĐỘNG"}
             </button>
-            <button className="btn-settings" onClick={() => setShowSettings(true)} style={{ marginLeft: 'auto', background: '#333', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}>⚙️ Cài Đặt</button>
           </div>
 
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
             <section className="pane-chart" style={{ position: "relative" }}>
-              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
-                <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
-                <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                </select>
-                <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                </select>
+              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 10px", borderBottom: "1px solid #333" }}>
+                <span style={{ color: "#ff9900", fontSize: "14px", fontWeight: "bold" }}>Tổng quan (chart_logs)</span>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px", background: "#222" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+                  </select>
+                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold", background: "#222" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                  </select>
+                  <button className="btn-settings" onClick={() => setShowSettings(true)} style={{ background: '#333', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    ⚙️ Cài Đặt
+                  </button>
+                </div>
               </div>
               <div className="chart-wrapper" ref={chartContainerRef}
                 onWheel={() => setIsAutoFit(false)}
