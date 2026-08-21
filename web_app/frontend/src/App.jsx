@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
 import "./App.css";
 
 const COIN_LIST = [
@@ -393,7 +393,6 @@ function App() {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
-  const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
   const emaSeriesRef = useRef(null);
   const terminalRef = useRef(null);
@@ -584,28 +583,20 @@ function App() {
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { type: 'solid', color: "#000000" }, textColor: "#d1d4dc" },
-      grid: { vertLines: { color: "rgba(43,43,43,0.3)" }, horzLines: { color: "rgba(43,43,43,0.3)" } },
+      layout: { background: { color: "#131722" }, textColor: "#d1d4dc" },
+      grid: { vertLines: { color: "#2b2b43" }, horzLines: { color: "#2b2b43" } },
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
-    });
-    const vs = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: 'volume' },
-      priceScaleId: '', // overlay
-    });
-    vs.priceScale().applyOptions({
-      scaleMargins: { top: 0.85, bottom: 0 },
     });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, crosshairMarkerVisible: false,
     });
     const cs = chart.addSeries(CandlestickSeries, {
-      upColor: "#0ECB81", downColor: "#F6465D",
-      borderVisible: false, wickUpColor: "#0ECB81", wickDownColor: "#F6465D",
+      upColor: "#26a69a", downColor: "#ef5350",
+      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
     });
     chartRef.current = chart;
-    volumeSeriesRef.current = vs;
     candleSeriesRef.current = cs;
     emaSeriesRef.current = es;
     const resizeObserver = new ResizeObserver((entries) => {
@@ -633,9 +624,6 @@ function App() {
     if (emaSeriesRef.current) {
       try { emaSeriesRef.current.setData([]); } catch { }
     }
-    if (volumeSeriesRef.current) {
-      try { volumeSeriesRef.current.setData([]); } catch { }
-    }
 
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
@@ -648,36 +636,15 @@ function App() {
         const rd = await res.json();
         if (rd.code !== "0" || !rd.data || rd.data.length === 0) return;
         const candles = [];
-        const volumes = [];
         for (let i = rd.data.length - 1; i >= 0; i--) {
           const c = rd.data[i];
           const t = Math.floor(parseInt(c[0]) / 1000);
-          const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cls = parseFloat(c[4]);
-          const vol = parseFloat(c[5] || "0");
-          candles.push({ time: t, open: o, high: h, low: l, close: cls });
-          volumes.push({ time: t, value: vol, color: cls >= o ? 'rgba(14,203,129,0.5)' : 'rgba(246,70,93,0.5)' });
+          candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) });
         }
         // Sắp xếp tăng dần theo time, không trùng
         candles.sort((a, b) => a.time - b.time);
-        volumes.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
-        const uniqueVol = volumes.filter((c, i) => i === 0 || c.time !== volumes[i - 1].time);
-
-        if (chartRef.current) {
-          chartRef.current.applyOptions({
-            watermark: {
-              color: 'rgba(255, 255, 255, 0.05)',
-              visible: true,
-              text: `${selectedCoin.replace("-SWAP", "")} (${selectedTf})`,
-              fontSize: 48,
-              horzAlign: 'center',
-              vertAlign: 'center',
-            }
-          });
-        }
-
         candleSeriesRef.current.setData(unique);
-        volumeSeriesRef.current?.setData(uniqueVol);
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
 
         if (rd.ob_boxes) {
@@ -1196,7 +1163,7 @@ function App() {
             </section>
           )}
 
-          <div className="sidebar-footer" style={{ display: 'none' }}>
+          <div className="sidebar-footer">
             <button onClick={handleStartBot} disabled={isRunning || isStartingBot} className="btn-control btn-start">
               {isStartingBot ? <><span className="spinner"></span> ĐANG BẮT ĐẦU...</> : "▶ BẮT ĐẦU CHẠY BOT"}
             </button>
@@ -1242,32 +1209,17 @@ function App() {
             </div>
           </div>
 
-          {/* ACTION TOOLBAR */}
-          <div style={{ display: 'flex', gap: '10px', padding: '10px 15px', background: '#121212', borderBottom: '1px solid #222', alignItems: 'center' }}>
-            <button onClick={handleStartBot} disabled={isRunning || isStartingBot} style={{ background: '#2e7d32', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: (isRunning || isStartingBot) ? 0.6 : 1 }}>
-              {isStartingBot ? <><span className="spinner"></span> ĐANG BẮT ĐẦU...</> : "▶ BẮT ĐẦU CHẠY BOT"}
-            </button>
-            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} style={{ background: '#444', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: (!isRunning || isStoppingBot) ? 0.6 : 1 }}>
-              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "🔴 DỪNG HOẠT ĐỘNG"}
-            </button>
-          </div>
-
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
           <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
             <section className="pane-chart" style={{ position: "relative" }}>
-              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 10px", borderBottom: "1px solid #333" }}>
-                <span style={{ color: "#ff9900", fontSize: "14px", fontWeight: "bold" }}>Tổng quan (chart_logs)</span>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px", background: "#222" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                  </select>
-                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold", background: "#222" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                  </select>
-                  <button className="btn-settings" onClick={() => setShowSettings(true)} style={{ background: '#333', color: '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    ⚙️ Cài Đặt
-                  </button>
-                </div>
+              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "4px 10px" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold" }}>📈</span>
+                <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
+                  {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
+                </select>
+                <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
+                  {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
+                </select>
               </div>
               <div className="chart-wrapper" ref={chartContainerRef}
                 onWheel={() => setIsAutoFit(false)}
