@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
 import "./App.css";
 
 const COIN_LIST = [
@@ -393,6 +393,7 @@ function App() {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
   const priceLinesRef = useRef([]);
   const emaSeriesRef = useRef(null);
   const terminalRef = useRef(null);
@@ -583,20 +584,27 @@ function App() {
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { color: "#131722" }, textColor: "#d1d4dc" },
-      grid: { vertLines: { color: "#2b2b43" }, horzLines: { color: "#2b2b43" } },
+      layout: { background: { type: 'solid', color: "#000000" }, textColor: "#d1d4dc" },
+      grid: { vertLines: { color: "rgba(43,43,43,0.3)" }, horzLines: { color: "rgba(43,43,43,0.3)" } },
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
+    });
+    const vs = chart.addSeries(HistogramSeries, {
+      color: '#26a69a',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // overlay
+      scaleMargins: { top: 0.8, bottom: 0 },
     });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, crosshairMarkerVisible: false,
     });
     const cs = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350",
-      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+      upColor: "#0ECB81", downColor: "#F6465D",
+      borderVisible: false, wickUpColor: "#0ECB81", wickDownColor: "#F6465D",
     });
     chartRef.current = chart;
+    volumeSeriesRef.current = vs;
     candleSeriesRef.current = cs;
     emaSeriesRef.current = es;
     const resizeObserver = new ResizeObserver((entries) => {
@@ -624,6 +632,9 @@ function App() {
     if (emaSeriesRef.current) {
       try { emaSeriesRef.current.setData([]); } catch { }
     }
+    if (volumeSeriesRef.current) {
+      try { volumeSeriesRef.current.setData([]); } catch { }
+    }
 
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
@@ -636,15 +647,36 @@ function App() {
         const rd = await res.json();
         if (rd.code !== "0" || !rd.data || rd.data.length === 0) return;
         const candles = [];
+        const volumes = [];
         for (let i = rd.data.length - 1; i >= 0; i--) {
           const c = rd.data[i];
           const t = Math.floor(parseInt(c[0]) / 1000);
-          candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]) });
+          const o = parseFloat(c[1]), h = parseFloat(c[2]), l = parseFloat(c[3]), cls = parseFloat(c[4]);
+          const vol = parseFloat(c[5] || "0");
+          candles.push({ time: t, open: o, high: h, low: l, close: cls });
+          volumes.push({ time: t, value: vol, color: cls >= o ? 'rgba(14,203,129,0.5)' : 'rgba(246,70,93,0.5)' });
         }
         // Sắp xếp tăng dần theo time, không trùng
         candles.sort((a, b) => a.time - b.time);
+        volumes.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
+        const uniqueVol = volumes.filter((c, i) => i === 0 || c.time !== volumes[i - 1].time);
+        
+        if (chartRef.current) {
+          chartRef.current.applyOptions({
+            watermark: {
+              color: 'rgba(255, 255, 255, 0.05)',
+              visible: true,
+              text: `${selectedCoin.replace("-SWAP", "")} (${selectedTf})`,
+              fontSize: 48,
+              horzAlign: 'center',
+              vertAlign: 'center',
+            }
+          });
+        }
+        
         candleSeriesRef.current.setData(unique);
+        volumeSeriesRef.current?.setData(uniqueVol);
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
 
         if (rd.ob_boxes) {
@@ -1163,7 +1195,7 @@ function App() {
             </section>
           )}
 
-          <div className="sidebar-footer">
+          <div className="sidebar-footer" style={{ display: 'none' }}>
             <button onClick={handleStartBot} disabled={isRunning || isStartingBot} className="btn-control btn-start">
               {isStartingBot ? <><span className="spinner"></span> ĐANG BẮT ĐẦU...</> : "▶ BẮT ĐẦU CHẠY BOT"}
             </button>
@@ -1207,6 +1239,17 @@ function App() {
                 })}
               </span>
             </div>
+          </div>
+
+          {/* ACTION TOOLBAR */}
+          <div style={{ display: 'flex', gap: '10px', padding: '10px 15px', background: '#121212', borderBottom: '1px solid #222', alignItems: 'center' }}>
+            <button onClick={handleStartBot} disabled={isRunning || isStartingBot} style={{ background: '#2e7d32', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: (isRunning || isStartingBot) ? 0.6 : 1 }}>
+              {isStartingBot ? <><span className="spinner"></span> ĐANG BẮT ĐẦU...</> : "▶ BẮT ĐẦU CHẠY BOT"}
+            </button>
+            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} style={{ background: '#444', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', opacity: (!isRunning || isStoppingBot) ? 0.6 : 1 }}>
+              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "🔴 DỪNG HOẠT ĐỘNG"}
+            </button>
+            <button className="btn-settings" onClick={() => setShowSettings(true)} style={{ marginLeft: 'auto', background: '#333', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: '4px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}>⚙️ Cài Đặt</button>
           </div>
 
           {/* WORKSPACE PHẢI - hiện trước trên mobile */}
