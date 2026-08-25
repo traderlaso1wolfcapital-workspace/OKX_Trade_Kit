@@ -1463,13 +1463,18 @@ function App() {
                             const isLong = pos.posSide === "long";
                             const upl = parseFloat(pos.upl || "0");
                             const margin = parseFloat(pos.margin || "0");
+                            const isChild = pos.is_child;
+                            const isAggregate = pos.is_aggregate || (!isChild && ticketIndex === 0);
 
                             return (
-                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : "1px solid rgba(255, 255, 255, 0.03)", position: "relative" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: "16px" }}>
-                                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "4px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>
+                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), position: "relative", backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: isChild ? "38px" : "16px" }}>
+                                  {!isChild && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "4px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>}
+                                  {isChild && (
+                                    <div style={{ position: "absolute", left: "16px", top: "-50%", bottom: "50%", width: "12px", borderLeft: "1px solid rgba(255, 255, 255, 0.2)", borderBottom: "1px solid rgba(255, 255, 255, 0.2)" }}></div>
+                                  )}
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                                    {ticketIndex === 0 ? (
+                                    {!isChild ? (
                                       <input
                                         type="checkbox"
                                         checked={isChecked}
@@ -1480,14 +1485,18 @@ function App() {
                                     ) : (
                                       <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
                                     )}
-                                    <span style={{ fontSize: "15px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                      <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                    <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                      <span style={{ color: isChild ? "#bbb" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                      {pos.children_count > 0 && <span style={{ color: "#aaa", fontSize: "11px", border: "1px solid #555", borderRadius: "10px", padding: "1px 6px" }}>Lệnh tổng</span>}
+                                      {isChild && <span style={{ color: "#888", fontSize: "11px", border: "1px solid #444", borderRadius: "10px", padding: "1px 6px" }}>Tách</span>}
                                       <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
                                         {isLong ? "Long" : "Short"} {pos.lever || "100"}x
                                       </span>
-                                      <span style={{ color: "#aaa", fontSize: "12px" }}>
-                                        ({pos.tf ? pos.tf.toLowerCase() : ""})
-                                      </span>
+                                      {pos.tf && (
+                                        <span style={{ color: "#aaa", fontSize: "12px" }}>
+                                          ({pos.tf.toLowerCase()})
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                 </td>

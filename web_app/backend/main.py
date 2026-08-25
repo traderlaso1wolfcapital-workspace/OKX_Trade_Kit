@@ -700,134 +700,126 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                                 markers = json.load(f)
                         except Exception: pass
 
-                    # Create a map of OKX positions by instId
+                    # Group OKX positions by instId and posSide (handling native OKX split positions)
                     okx_pos_map = {}
                     for pos in raw_positions:
-                        okx_pos_map[pos.get("instId")] = pos
+                        instId = pos.get("instId")
+                        posSide = pos.get("posSide", "long").lower()
+                        if posSide == "net":
+                            posSide = "long" if float(pos.get("pos", 0)) > 0 else "short"
+                        
+                        key = (instId, posSide)
+                        if key not in okx_pos_map:
+                            okx_pos_map[key] = []
+                        okx_pos_map[key].append(pos)
 
-                    # Sync and build tickets
+                    # Auto-sync: Clean up zombie virtual tickets in trade_markers if OKX position is closed
                     dirty_markers = False
                     for coin, items in markers.items():
                         inst_id = f"{coin}-USDT-SWAP"
-                        okx_pos = okx_pos_map.get(inst_id)
-                        
-                        has_active = any(i.get("status") == "active" for i in items)
-                        if has_active and not okx_pos:
-                            # Auto-sync: OKX closed but local still active
-                            for item in items:
-                                if item.get("status") == "active":
-                                    item["status"] = "closed"
-                            dirty_markers = True
-                        elif has_active and okx_pos:
-                            # Split into virtual tickets
-                            tp_px = "---"
-                            sl_px = "---"
-                            for o in algo_data:
-                                if o.get("instId") == inst_id:
-                                    if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
-                                    if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
-                            
-                            total_pos = abs(float(okx_pos.get("pos", 1)))
-                            m_str = okx_pos.get("margin", "")
-                            if not m_str or float(m_str) == 0:
-                                m_str = okx_pos.get("imr", "0")
-                            total_margin = float(m_str)
-                            avg_px = float(okx_pos.get("avgPx", 0))
-                            last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
-                            pos_side = okx_pos.get("posSide", "long").lower()
-                            leverage = float(okx_pos.get("lever", 1))
-                            if pos_side == "net":
-                                pos_val = float(okx_pos.get("pos", 0))
-                                pos_side = "long" if pos_val > 0 else "short"
-                            
-                            # --- AUTO-CLEANUP TRÙNG LỆNH (ZOMBIE TICKETS) ---
-                            active_items = [i for i in items if i.get("status") == "active" and i.get("side", "").lower() == pos_side]
-                            total_active_vol = sum(abs(float(i.get("volume", 0))) for i in active_items)
-                            
-                            if total_active_vol > total_pos + 0.0001:
-                                # Bot bị crash/restart nên tạo ra marker trùng lặp.
-                                # Ta giữ lại các marker mới nhất sao cho tổng volume vừa đủ bằng total_pos.
-                                active_items.sort(key=lambda x: x.get("time", 0), reverse=True)
-                                acc_vol = 0
-                                for i in active_items:
-                                    vol = abs(float(i.get("volume", 0)))
-                                    if acc_vol + 0.0001 >= total_pos:
-                                        # Đã đủ volume, các lệnh còn lại là rác
-                                        i["status"] = "closed"
-                                        dirty_markers = True
-                                    else:
-                                        acc_vol += vol
-                                        # Nếu cộng thêm lệnh này mà bị lố total_pos, ta cắt gọn volume của lệnh này lại
-                                        if acc_vol > total_pos + 0.0001:
-                                            i["volume"] = vol - (acc_vol - total_pos)
-                                            acc_vol = total_pos
-                                            dirty_markers = True
-                            
-                            # Tính lại total_active_vol sau khi cleanup
-                            total_active_vol = sum(abs(float(i.get("volume", 0))) for i in items if i.get("status") == "active" and i.get("side", "").lower() == pos_side)
-                            actual_total_vol = max(total_pos, total_active_vol)
-                            if actual_total_vol == 0: actual_total_vol = 1
-                            
-                            # Aggregate virtual tickets into a single position
-                            active_tfs = []
-                            for item in items:
-                                if item.get("status") == "active" and item.get("side", "").lower() == pos_side:
-                                    tf = item.get("tf", "").upper()
-                                    if tf and tf not in active_tfs:
-                                        active_tfs.append(tf)
-                            
-                            active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                            tf_str = " ".join(active_tfs).lower() if active_tfs else ""
+                        for side in ["long", "short"]:
+                            side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
+                            if side_items and (inst_id, side) not in okx_pos_map:
+                                for item in side_items: item["status"] = "closed"
+                                dirty_markers = True
 
-                            if pos_side == "long":
-                                roi_val = ((last_px - avg_px) / avg_px) * 100 * leverage
-                            else:
-                                roi_val = ((avg_px - last_px) / avg_px) * 100 * leverage
-                                
-                            upl_val = total_margin * (roi_val / 100)
-
-                            formatted_positions.append({
-                                "ticket_id": "#AGGREGATED",
-                                "instId": inst_id,
-                                "posSide": pos_side,
-                                "pos": str(total_pos),
-                                "margin": f"{total_margin:.2f}",
-                                "avgPx": str(avg_px),
-                                "lastPx": str(last_px),
-                                "roi": f"{roi_val:.2f}",
-                                "upl": f"{upl_val:.4f}",
-                                "tp": tp_px,
-                                "sl": sl_px,
-                                "lever": str(int(leverage)),
-                                "tf": tf_str
-                            })
-                                    
-                    # If any markers were auto-closed, save to file
                     if dirty_markers:
                         try:
                             with open(positions_path, "w", encoding="utf-8") as f:
                                 json.dump(markers, f)
                         except Exception: pass
-                        
-                    # If we don't have any markers but have OKX positions (e.g. manual trades), show them as 1 ticket
-                    for inst_id, okx_pos in okx_pos_map.items():
+
+                    # Build formatted positions
+                    for key, items_okx in okx_pos_map.items():
+                        inst_id, pos_side = key
                         coin = inst_id.split("-")[0]
-                        if coin not in markers or not any(i.get("status") == "active" for i in markers[coin]):
-                            avg_px = float(okx_pos.get("avgPx", 0))
-                            last_px = float(okx_pos.get("last", avg_px)) if okx_pos.get("last") else avg_px
-                            
-                            pos_side = okx_pos.get("posSide", "long").lower()
-                            pos_val = float(okx_pos.get("pos", 0))
-                            if pos_side == "net":
-                                pos_side = "long" if pos_val > 0 else "short"
+                        
+                        total_pos = sum(abs(float(i.get("pos", 0))) for i in items_okx)
+                        if total_pos == 0: continue
+                        
+                        total_margin = sum(float(i.get("margin") or i.get("imr") or "0") for i in items_okx)
+                        avg_px = sum(float(i.get("avgPx", 0)) * abs(float(i.get("pos", 0))) for i in items_okx) / total_pos if total_pos > 0 else 0
+                        
+                        first_okx = items_okx[0]
+                        last_px = float(first_okx.get("last", avg_px)) if first_okx.get("last") else avg_px
+                        leverage = float(first_okx.get("lever", 1))
+                        
+                        tp_px = "---"
+                        sl_px = "---"
+                        for o in algo_data:
+                            if o.get("instId") == inst_id:
+                                if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
+                                if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
                                 
-                            formatted_positions.append({
-                                "ticket_id": "#MANUAL",
-                                "instId": inst_id,
-                                "posSide": pos_side,
-                                "pos": str(abs(pos_val)),
-                                "margin": okx_pos.get("margin") or okx_pos.get("imr") or "0",
-                                "avgPx": str(avg_px),
+                        # Get matching virtual tickets to extract the 'tf' labels
+                        active_items = [i for i in markers.get(coin, []) if i.get("side", "").lower() == pos_side and i.get("status") == "active"]
+                        active_tfs = []
+                        for item in active_items:
+                            tf = item.get("tf", "").upper()
+                            if tf and tf not in active_tfs:
+                                active_tfs.append(tf)
+                        
+                        active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                        tf_str = " ".join(active_tfs).lower() if active_tfs else ""
+                        
+                        if pos_side == "long":
+                            roi_val = ((last_px - avg_px) / avg_px) * 100 * leverage
+                        else:
+                            roi_val = ((avg_px - last_px) / avg_px) * 100 * leverage
+                            
+                        upl_val = total_margin * (roi_val / 100)
+                        
+                        parent_id = f"AGG_{inst_id}_{pos_side}"
+                        
+                        # Add Aggregated Row (Total Position)
+                        formatted_positions.append({
+                            "ticket_id": parent_id if len(items_okx) > 1 else (active_items[-1].get("ticket_id") if active_items else "#MANUAL"),
+                            "is_aggregate": True,
+                            "instId": inst_id,
+                            "posSide": pos_side,
+                            "pos": str(total_pos),
+                            "margin": f"{total_margin:.2f}",
+                            "avgPx": str(avg_px),
+                            "lastPx": str(last_px),
+                            "roi": f"{roi_val:.2f}",
+                            "upl": f"{upl_val:.4f}",
+                            "tp": tp_px,
+                            "sl": sl_px,
+                            "lever": str(int(leverage)),
+                            "tf": tf_str,
+                            "children_count": len(items_okx) if len(items_okx) > 1 else 0
+                        })
+                        
+                        # Add Child Rows (Native Split Positions)
+                        if len(items_okx) > 1:
+                            for idx, i_okx in enumerate(items_okx):
+                                c_pos = abs(float(i_okx.get("pos", 0)))
+                                c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
+                                c_avg_px = float(i_okx.get("avgPx", 0))
+                                
+                                if pos_side == "long":
+                                    c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                                else:
+                                    c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
+                                c_upl = c_margin * (c_roi / 100)
+                                
+                                formatted_positions.append({
+                                    "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
+                                    "is_child": True,
+                                    "parent_id": parent_id,
+                                    "instId": inst_id,
+                                    "posSide": pos_side,
+                                    "pos": str(c_pos),
+                                    "margin": f"{c_margin:.2f}",
+                                    "avgPx": str(c_avg_px),
+                                    "lastPx": str(last_px),
+                                    "roi": f"{c_roi:.2f}",
+                                    "upl": f"{c_upl:.4f}",
+                                    "tp": tp_px,
+                                    "sl": sl_px,
+                                    "lever": str(int(leverage)),
+                                    "tf": ""
+                                })
                                 "lastPx": str(last_px),
                                 "roi": okx_pos.get("uplRatio", "0.00"),
                                 "upl": okx_pos.get("upl", "0.00"),
@@ -956,24 +948,9 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
             order_side = "sell" if pos_side == "long" else "buy"
             path_order = "/api/v5/trade/order"
             
-            # Calculate dynamic closing size based on ticket percentage
-            positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
-            target_coin = inst_id.split("-")[0]
-            total_active_vol = 0.0
             ticket_vol = float(req.pos)
+            ticket_id = getattr(req, "ticket_id", "")
             
-            if os.path.exists(positions_path):
-                try:
-                    with open(positions_path, "r", encoding="utf-8") as f:
-                        markers = json.load(f)
-                    if target_coin in markers:
-                        total_active_vol = sum(float(i.get("volume", 0)) for i in markers[target_coin] if i.get("status") == "active" and i.get("side", "").lower() == pos_side)
-                except: pass
-                
-            percentage = 1.0
-            if total_active_vol > 0 and ticket_vol <= total_active_vol:
-                percentage = ticket_vol / total_active_vol
-                
             # Fetch current position from OKX to know the real total size
             import requests as req_lib
             path_pos = f"/api/v5/account/positions?instId={inst_id}"
@@ -999,40 +976,15 @@ async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str 
                     p_val = float(p.get("pos", 0))
                     if p_side == "net":
                         if (pos_side == "long" and p_val > 0) or (pos_side == "short" and p_val < 0):
-                            okx_pos_vol = abs(p_val)
+                            okx_pos_vol += abs(p_val)
                     elif p_side == pos_side:
-                        okx_pos_vol = abs(p_val)
+                        okx_pos_vol += abs(p_val)
             
-            if okx_pos_vol > 0:
-                if ticket_vol >= total_active_vol - 0.0001:
-                    close_sz_val = okx_pos_vol
-                else:
-                    # Detect decimals precision directly from OKX's 'pos' string to match lotSz
-                    pos_str = "0"
-                    for p in pos_data.get("data", []):
-                        p_side = p.get("posSide", "long").lower()
-                        p_val = float(p.get("pos", 0))
-                        if (p_side == "net" and ((pos_side == "long" and p_val > 0) or (pos_side == "short" and p_val < 0))) or (p_side == pos_side):
-                            pos_str = str(p.get("pos", "0")).replace("-", "")
-                            
-                    decimals = len(pos_str.split(".")[1]) if "." in pos_str else 0
-                    
-                    if decimals == 0:
-                        close_sz_val = max(1, int(okx_pos_vol * percentage))
-                    else:
-                        close_sz_val = round(okx_pos_vol * percentage, decimals)
-                        if close_sz_val <= 0:
-                            close_sz_val = 1 / (10**decimals) # Fallback to min tick size
-                            
-                    # Prevent partial close from accidentally closing 100% due to min size rounding
-                    if close_sz_val >= okx_pos_vol - (1e-9):
-                        raise HTTPException(
-                            status_code=400, 
-                            detail=f"Lỗi: Vị thế trên OKX quá nhỏ ({okx_pos_vol}) nên không thể chia nhỏ để đóng từng phần! Vui lòng đóng toàn bộ vị thế hoặc tăng Volume."
-                        )
+            if ticket_id.startswith("AGG_") or ticket_id.startswith("#MANUAL") or ticket_vol >= okx_pos_vol - 1e-9:
+                close_sz_val = okx_pos_vol
             else:
                 close_sz_val = ticket_vol
-
+                
             close_sz_str = f"{close_sz_val:.10g}" # Format without trailing zeros
 
             if okx_pos_vol > 0 and close_sz_val >= okx_pos_vol - (1e-9):
