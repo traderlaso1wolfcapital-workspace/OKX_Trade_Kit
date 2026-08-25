@@ -768,39 +768,39 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             actual_total_vol = max(total_pos, total_active_vol)
                             if actual_total_vol == 0: actual_total_vol = 1
                             
+                            # Aggregate virtual tickets into a single position
+                            active_tfs = []
                             for item in items:
                                 if item.get("status") == "active" and item.get("side", "").lower() == pos_side:
-                                    t_vol = abs(float(item.get("volume", 0)))
-                                    if t_vol == 0: t_vol = total_pos # fallback
-                                    
-                                    ratio = t_vol / actual_total_vol
-                                    t_margin = total_margin * ratio
-                                    
-                                    t_entry = float(item.get("price", avg_px))
-                                    
-                                    # Calculate ROI for this specific ticket
-                                    if pos_side == "long":
-                                        roi_val = ((last_px - t_entry) / t_entry) * 100 * leverage
-                                    else:
-                                        roi_val = ((t_entry - last_px) / t_entry) * 100 * leverage
-                                        
-                                    upl_val = t_margin * (roi_val / 100)
-                                    
-                                    formatted_positions.append({
-                                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
-                                        "instId": inst_id,
-                                        "posSide": pos_side,
-                                        "pos": str(t_vol),
-                                        "margin": f"{t_margin:.2f}",
-                                        "avgPx": str(t_entry),
-                                        "lastPx": str(last_px),
-                                        "roi": f"{roi_val:.2f}",
-                                        "upl": f"{upl_val:.4f}",
-                                        "tp": tp_px,
-                                        "sl": sl_px,
-                                        "lever": str(int(leverage)),
-                                        "tf": item.get("tf", "")
-                                    })
+                                    tf = item.get("tf", "").upper()
+                                    if tf and tf not in active_tfs:
+                                        active_tfs.append(tf)
+                            
+                            active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                            tf_str = " ".join(active_tfs).lower() if active_tfs else ""
+
+                            if pos_side == "long":
+                                roi_val = ((last_px - avg_px) / avg_px) * 100 * leverage
+                            else:
+                                roi_val = ((avg_px - last_px) / avg_px) * 100 * leverage
+                                
+                            upl_val = total_margin * (roi_val / 100)
+
+                            formatted_positions.append({
+                                "ticket_id": "#AGGREGATED",
+                                "instId": inst_id,
+                                "posSide": pos_side,
+                                "pos": str(total_pos),
+                                "margin": f"{total_margin:.2f}",
+                                "avgPx": str(avg_px),
+                                "lastPx": str(last_px),
+                                "roi": f"{roi_val:.2f}",
+                                "upl": f"{upl_val:.4f}",
+                                "tp": tp_px,
+                                "sl": sl_px,
+                                "lever": str(int(leverage)),
+                                "tf": tf_str
+                            })
                                     
                     # If any markers were auto-closed, save to file
                     if dirty_markers:

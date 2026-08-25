@@ -576,8 +576,11 @@ function App() {
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { color: "#0c0c0c" }, textColor: "#e0e0e0" },
-      grid: { vertLines: { color: "rgba(42, 42, 42, 0.3)" }, horzLines: { color: "rgba(42, 42, 42, 0.3)" } },
+      layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
+      grid: { 
+        vertLines: { color: 'rgba(255, 255, 255, 0.05)' }, 
+        horzLines: { color: 'rgba(255, 255, 255, 0.05)' } 
+      },
       crosshair: { mode: 1 },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
     });
@@ -597,7 +600,7 @@ function App() {
     chart.priceScale('').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
     });
-    
+
     chartRef.current = chart;
     candleSeriesRef.current = cs;
     volumeSeriesRef.current = vs;
@@ -648,7 +651,7 @@ function App() {
         candles.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
         candleSeriesRef.current.setData(unique);
-        
+
         const uniqueVolume = unique.map(c => ({
           time: c.time,
           value: c.volume || 0,
@@ -657,7 +660,7 @@ function App() {
         if (volumeSeriesRef.current) {
           volumeSeriesRef.current.setData(uniqueVolume);
         }
-        
+
         emaSeriesRef.current?.setData(calculateEMA(unique, 200));
 
         if (rd.ob_boxes) {
@@ -852,9 +855,16 @@ function App() {
     } catch { alert("Lỗi khởi động bot!"); }
   };
   const handleStopBot = async () => {
+    const currentUid = localStorage.getItem('tls1_uid') || loginUid;
+    const confirmKey = window.prompt("Vui lòng nhập mã bảo mật (OKX UID) để xác nhận dừng Bot:");
+    if (confirmKey !== currentUid) {
+      if (confirmKey !== null) alert("Mã xác nhận không đúng! Không thể dừng Bot.");
+      return;
+    }
+    
     try {
       setIsStoppingBot(true);
-      const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, { method: "POST" });
+      const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${currentUid}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
     finally { setIsStoppingBot(false); }
@@ -1033,20 +1043,20 @@ function App() {
                   >LOT</button>
                 </div>
                 {!isRiskCollapsed && (
-                <div className="risk-grid">
-                  <div className="risk-row">
-                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                    <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                  <div className="risk-grid">
+                    <div className="risk-row">
+                      <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                      <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                    </div>
+                    <div className="risk-row">
+                      <label>Mức chốt lời gốc M5 (%):</label>
+                      <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.05" />
+                    </div>
+                    <div className="risk-row">
+                      <label>Mức cắt lỗ gốc M5 (%):</label>
+                      <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.05" />
+                    </div>
                   </div>
-                  <div className="risk-row">
-                    <label>Mức chốt lời gốc M5 (%):</label>
-                    <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.05" />
-                  </div>
-                  <div className="risk-row">
-                    <label>Mức cắt lỗ gốc M5 (%):</label>
-                    <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.05" />
-                  </div>
-                </div>
                 )}
               </div>
             ) : (
@@ -1068,20 +1078,20 @@ function App() {
                   >LOT</button>
                 </div>
                 {!isRiskCollapsed && (
-                <div className="risk-grid">
-                  <div className="risk-row">
-                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                    <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                  <div className="risk-grid">
+                    <div className="risk-row">
+                      <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                      <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
+                    </div>
+                    <div className="risk-row">
+                      <label>Tỷ lệ chốt lời Thuận Trend (R:R):</label>
+                      <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.5" />
+                    </div>
+                    <div className="risk-row">
+                      <label>Tỷ lệ chốt lời Ngược Trend (R:R):</label>
+                      <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.5" />
+                    </div>
                   </div>
-                  <div className="risk-row">
-                    <label>Tỷ lệ chốt lời Thuận Trend (R:R):</label>
-                    <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.5" />
-                  </div>
-                  <div className="risk-row">
-                    <label>Tỷ lệ chốt lời Ngược Trend (R:R):</label>
-                    <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.5" />
-                  </div>
-                </div>
                 )}
               </div>
             )}
@@ -1313,16 +1323,16 @@ function App() {
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  <button 
-                    className={activeTab === "history" ? "active-icon-btn" : "icon-btn"} 
+                  <button
+                    className={activeTab === "history" ? "active-icon-btn" : "icon-btn"}
                     onClick={() => setActiveTab("history")}
                     title={`Lịch Sử Lệnh (${closedPositions.length})`}
-                    style={{ 
-                      padding: "4px 8px", 
-                      background: activeTab === "history" ? "#ff990022" : "#222", 
-                      border: activeTab === "history" ? "1px solid #ff9900" : "1px solid #444", 
-                      borderRadius: "6px", 
-                      cursor: "pointer", 
+                    style={{
+                      padding: "4px 8px",
+                      background: activeTab === "history" ? "#ff990022" : "#222",
+                      border: activeTab === "history" ? "1px solid #ff9900" : "1px solid #444",
+                      borderRadius: "6px",
+                      cursor: "pointer",
                       fontSize: "15px",
                       display: "flex",
                       alignItems: "center",
@@ -1455,8 +1465,9 @@ function App() {
                             const margin = parseFloat(pos.margin || "0");
 
                             return (
-                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : "1px solid rgba(255, 255, 255, 0.03)" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: isLong ? "3px solid #4caf50" : "3px solid #ff5252" }}>
+                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : "1px solid rgba(255, 255, 255, 0.03)", position: "relative" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: "16px" }}>
+                                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "4px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                     {ticketIndex === 0 ? (
                                       <input
@@ -1469,12 +1480,14 @@ function App() {
                                     ) : (
                                       <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
                                     )}
-                                    <span style={{ fontSize: "15px" }}>
+                                    <span style={{ fontSize: "15px", display: "flex", alignItems: "center", gap: "6px" }}>
                                       <span style={{ color: "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
-                                      <span style={{ color: "#aaa", fontSize: "12px", marginLeft: "6px" }}>
-                                        ({pos.tf ? pos.tf.toLowerCase() : `${isLong ? "Long" : "Short"} ${pos.lever || "100"}x`})
+                                      <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                                        {isLong ? "Long" : "Short"} {pos.lever || "100"}x
                                       </span>
-                                      {/* {pos.ticket_id && <span style={{ display: "block", fontSize: "11px", color: "#888" }}>{pos.ticket_id}</span>} */}
+                                      <span style={{ color: "#aaa", fontSize: "12px" }}>
+                                        ({pos.tf ? pos.tf.toLowerCase() : ""})
+                                      </span>
                                     </span>
                                   </div>
                                 </td>
