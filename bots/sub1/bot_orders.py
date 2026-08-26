@@ -396,7 +396,10 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                 current_weight = tf_weights.get(max_filled_tf, 0)
                 upgrade_tf = max_filled_tf
                 
-                temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+                if getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_big_tf", None):
+                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(tracker.xole_big_tf, Decimal("1.0"))
+                else:
+                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
                 base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
                 
                 if side in ["long", "net"]:

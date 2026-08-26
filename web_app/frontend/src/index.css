@@ -8,8 +8,8 @@
 body {
   margin: 0;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  background-color: #1a1a1a;
-  color: #e0e0e0;
+  background-color: #0B1120;
+  color: #fff;
   overflow: hidden;
   height: 100vh;
   font-size: 13px;
@@ -17,9 +17,9 @@ body {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1a1a1a; }
-::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #666; }
+::-webkit-scrollbar-track { background: #0B1120; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748B; }
 
 /* ============= LAYOUT ============= */
 .app-container {
@@ -27,7 +27,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100%;
-  background-color: #1a1a1a;
+  background-color: #0B1120;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: calc(env(safe-area-inset-left) + 3px);
@@ -47,7 +47,7 @@ body {
   width: 340px;
   min-width: 340px;
   background-color: #252526;
-  border-left: 1px solid #3d3d3d;
+  border-left: 1px solid #334155;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -55,8 +55,8 @@ body {
 
 .sidebar-header {
   padding: 12px 15px 10px;
-  background-color: #1e1e1e;
-  border-bottom: 1px solid #3d3d3d;
+  background-color: #222;
+  border-bottom: 1px solid #334155;
   text-align: center;
   flex-shrink: 0;
 }
@@ -88,12 +88,12 @@ body {
 
 /* ============= GROUP BOX ============= */
 .group-box {
-  border: 1px solid #555;
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 18px 10px 10px 10px;
   margin-bottom: 14px;
   position: relative;
-  background-color: #2a2a2a;
+  background-color: transparent;
 }
 .group-box-title {
   position: absolute;
@@ -103,7 +103,7 @@ body {
   padding: 0 5px;
   font-size: 10px;
   font-weight: bold;
-  color: #aaa;
+  color: #888;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -131,7 +131,7 @@ body {
 .styled-input.num {
   width: 90px;
   padding: 4px 10px;
-  background-color: #1e1e1e;
+  background-color: #222;
   border: 1px solid #444;
   border-radius: 4px;
   color: #ffffff;
@@ -151,9 +151,9 @@ body {
 
 /* ============= STYLED SELECT ============= */
 .styled-select {
-  background-color: #2d2d2d;
-  color: #e0e0e0;
-  border: 1px solid #555;
+  background-color: #222;
+  color: #fff;
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 5px 10px;
   font-size: 13px;
@@ -165,8 +165,8 @@ body {
 }
 .styled-select:hover { border-color: #ffb74d; }
 .styled-select option {
-  background-color: #1e1e1e;
-  color: #e0e0e0;
+  background-color: #222;
+  color: #fff;
 }
 
 /* ============= TF BADGE BUTTONS ============= */
@@ -178,8 +178,8 @@ body {
 .tf-badge-btn {
   font-size: 11px;
   font-weight: bold;
-  color: #aaaaaa;
-  border: 1px solid #3d3d3d;
+  color: #94A3B8aaa;
+  border: 1px solid #334155;
   border-radius: 3px;
   padding: 4px 2px;
   background-color: #161616;
@@ -189,12 +189,12 @@ body {
   font-family: "Segoe UI", sans-serif;
 }
 .tf-badge-btn:hover {
-  border-color: #666;
+  border-color: #64748B;
   background-color: #222;
   color: #fff;
 }
 .tf-badge-btn.checked {
-  border-color: #666;
+  border-color: #64748B;
   background-color: #1a3a1a;
   color: #4CAF50;
 }
@@ -220,8 +220,8 @@ body {
 /* ============= SIDEBAR FOOTER (Buttons) ============= */
 .sidebar-footer {
   padding: 10px;
-  border-top: 1px solid #3d3d3d;
-  background-color: #1e1e1e;
+  border-top: 1px solid #333;
+  background-color: #222;
   display: flex;
   flex-direction: row;
   gap: 4px;
@@ -250,9 +250,9 @@ body {
   border-color: #ffaa00;
 }
 .btn-start:disabled {
-  background-color: #555;
+  background-color: #475569;
   color: #888;
-  border-color: #444;
+  border-color: #475569;
   cursor: not-allowed;
 }
 .btn-stop {
@@ -263,15 +263,15 @@ body {
   border-color: #ffaa00;
 }
 .btn-stop:disabled {
-  background-color: #555;
+  background-color: #475569;
   color: #888;
-  border-color: #444;
+  border-color: #475569;
   cursor: not-allowed;
 }
 .btn-settings {
-  background-color: #2d2d2d;
+  background-color: #222;
   color: #fff;
-  border: 1px solid #555;
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 5px 6px;
   min-height: 24px;
@@ -299,8 +299,8 @@ body {
 
 .bot-tabs-bar {
   display: flex;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #333;
+  background-color: #0B1120;
+  border-bottom: 1px solid #334155;
   width: 100%;
   padding-left: 10px;
   align-items: center;
@@ -329,15 +329,15 @@ body {
 }
 .main-workspace.vertical .pane-chart {
   height: var(--chart-ratio, 50%);
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #334155;
 }
 .main-workspace.horizontal .pane-chart {
   width: var(--chart-ratio, 50%);
-  border-right: 1px solid #333;
+  border-right: 1px solid #334155;
 }
 
 .resizer {
-  background-color: #2a2a2a;
+  background-color: transparent;
   position: relative;
   z-index: 10;
 }
@@ -385,7 +385,7 @@ body {
 .pane-titlebar {
   height: 26px;
   background-color: #1a1a2e;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #334155;
   padding: 0 12px;
   display: flex;
   align-items: center;
@@ -411,7 +411,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: #1e1e1e;
+  background-color: #222;
 }
 .main-workspace.vertical .pane-tabs {
   height: calc(100% - var(--chart-ratio, 50%) - 10px); /* 10px is resizer height */
@@ -422,8 +422,8 @@ body {
 
 .tab-bar-header {
   height: 30px;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #333;
+  background-color: #0B1120;
+  border-bottom: 1px solid #334155;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -434,9 +434,9 @@ body {
 .tab-bar-header::-webkit-scrollbar { display: none; }
 .tab-buttons { display: flex; height: 100%; flex-shrink: 0; }
 .tab-btn {
-  background: #1a1a1a;
+  background: #0B1120;
   border: none;
-  border-right: 1px solid #333;
+  border-right: 1px solid #334155;
   color: #a0a0a0;
   font-size: 12px;
   font-weight: bold;
@@ -452,11 +452,11 @@ body {
   border-top-right-radius: 3px;
 }
 .tab-btn:hover {
-  background-color: #333;
+  background-color: #222;
   color: #fff;
 }
 .tab-btn.active {
-  background-color: #2d2d2d;
+  background-color: #222;
   color: #FF9900;
   border-bottom: 2px solid #FF9900;
 }
@@ -497,7 +497,7 @@ body {
 
 /* ============= POSITIONS TABLE ============= */
 .positions-table-wrapper {
-  background-color: #1a1a1a;
+  background-color: #0B1120;
   overflow-y: auto;
   height: 100%;
 }
@@ -512,16 +512,16 @@ body {
   color: #ffffff;
   font-weight: bold;
   padding: 6px 10px;
-  border: 1px solid #333;
+  border: 1px solid #334155;
   font-size: 13px;
   position: sticky;
   top: 0;
 }
 .positions-table td {
   padding: 7px 10px;
-  border: 1px solid #333;
+  border: 1px solid #334155;
   color: #ffffff;
-  background-color: #1a1a1a;
+  background-color: #0B1120;
 }
 .positions-table tr:hover td {
   background-color: #162e3b;
@@ -548,8 +548,8 @@ body {
   justify-content: center;
 }
 .modal-content {
-  background-color: #1e1e1e;
-  border: 1px solid #555;
+  background-color: #222;
+  border: 1px solid #444;
   border-radius: 6px;
   width: 420px;
   overflow: hidden;
@@ -558,7 +558,7 @@ body {
 }
 .modal-header {
   background-color: #252526;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #334155;
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -576,8 +576,8 @@ body {
   display: block; font-size: 11px; color: #888; margin-bottom: 4px;
 }
 .styled-input {
-  background-color: #2d2d2d; color: #e0e0e0;
-  border: 1px solid #555; border-radius: 4px;
+  background-color: #222; color: #fff;
+  border: 1px solid #444; border-radius: 4px;
   padding: 6px 10px; font-size: 12px; outline: none; width: 100%;
   font-family: "Consolas", monospace;
 }
@@ -589,7 +589,7 @@ input::placeholder {
   font-size: 11px;
 }
 .modal-footer {
-  background-color: #1a1a1a;
+  background-color: #0B1120;
   border-top: 1px solid #333;
   padding: 10px 16px;
   display: flex;
@@ -603,11 +603,11 @@ input::placeholder {
 }
 .btn-primary:hover { background-color: #e08800; }
 .btn-secondary {
-  background-color: #2d2d2d; color: #e0e0e0;
-  border: 1px solid #555; border-radius: 4px;
+  background-color: #222; color: #fff;
+  border: 1px solid #444; border-radius: 4px;
   padding: 6px 14px; font-size: 12px; cursor: pointer;
 }
-.btn-secondary:hover { background-color: #333; }
+.btn-secondary:hover { background-color: #222; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: scale(0.96); }
@@ -626,8 +626,8 @@ input::placeholder {
 }
 .settings-tab-bar {
   display: flex;
-  background-color: #1a1a1a;
-  border-bottom: 1px solid #333;
+  background-color: #0B1120;
+  border-bottom: 1px solid #334155;
   flex-direction: row-reverse;
 }
 .settings-tab-btn {
@@ -652,7 +652,7 @@ input::placeholder {
   touch-action: pan-y !important;
   flex: 1;
   padding: 16px;
-  background-color: #1e1e1e;
+  background-color: #222;
   box-sizing: border-box;
 }
 
@@ -660,18 +660,18 @@ input::placeholder {
   width: 6px;
 }
 .settings-body::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #0B1120;
 }
 .settings-body::-webkit-scrollbar-thumb {
-  background: #444;
+  background: #475569;
   border-radius: 3px;
 }
 .settings-body::-webkit-scrollbar-thumb:hover {
-  background: #666;
+  background: #64748B;
 }
 
 .settings-group {
-  border: 1px solid #555;
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 18px 12px 12px 12px;
   margin-bottom: 16px;
@@ -682,11 +682,11 @@ input::placeholder {
   position: absolute;
   top: -8px;
   left: 10px;
-  background-color: #1e1e1e;
+  background-color: #222;
   padding: 0 5px;
   font-size: 11px;
   font-weight: bold;
-  color: #aaa;
+  color: #888;
   text-transform: uppercase;
 }
 
@@ -703,22 +703,22 @@ input::placeholder {
   align-items: center;
   justify-content: center;
 }
-.btn-add-acc { background-color: #28a745; }
-.btn-del-acc { background-color: #dc3545; }
+.btn-add-acc { background-color: #10B981; }
+.btn-del-acc { background-color: #EF4444; }
 
 .btn-audit {
-  background-color: #2d2d2d;
+  background-color: #222;
   color: #fff;
-  border: 1px solid #555;
+  border: 1px solid #444;
   border-radius: 4px;
   padding: 8px 12px;
   font-weight: bold;
   cursor: pointer;
 }
-.btn-audit:hover { background-color: #444; }
+.btn-audit:hover { background-color: #475569; }
 
 .hwid-value {
-  color: #00ffff;
+  color: #38BDF8;
   font-weight: bold;
   font-size: 14px;
   cursor: pointer;
@@ -747,7 +747,7 @@ input::placeholder {
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #555;
+  background-color: #475569;
   transition: .2s;
   border-radius: 10px;
 }
@@ -775,7 +775,7 @@ input::placeholder {
   left: 6px;
   right: auto;
 }
-.toggle-name { font-weight: bold; color: #e0e0e0; font-size: 12px;}
+.toggle-name { font-weight: bold; color: #fff; font-size: 12px;}
 .toggle-desc { display: none; }
 
 /* Risk Grid */
@@ -788,7 +788,7 @@ input::placeholder {
   justify-content: space-between;
   align-items: center;
 }
-.risk-row label { color: #e0e0e0; font-size: 12px; }
+.risk-row label { color: #fff; font-size: 12px; }
 .risk-row input { width: 100px; text-align: right; }
 
 /* ============= TABLET/IPAD LANDSCAPE ============= */
@@ -836,7 +836,7 @@ input::placeholder {
     width: 100% !important;
     height: var(--chart-ratio, 50%) !important;
     border-right: none;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #334155;
     flex-shrink: 0;
   }
 
@@ -884,7 +884,7 @@ input::placeholder {
     flex-direction: row;
     gap: 4px;
     padding: 8px 10px;
-    border-top: 1px solid #3d3d3d;
+    border-top: 1px solid #333;
   }
 
   .sidebar-footer .btn-start {
@@ -979,12 +979,12 @@ body.is-resizing-vertical {
 /* ============= MARQUEE FOOTER ============= */
 .marquee-footer {
   width: 100%;
-  background-color: #1a1a1a;
-  color: #ffcc00;
+  background-color: #0B1120;
+  color: #F59E0B;
   padding: 4px 0;
   font-size: 12px;
   font-weight: bold;
-  border-top: 1px solid #3d3d3d;
+  border-top: 1px solid #333;
   overflow: hidden;
   white-space: nowrap;
   box-sizing: border-box;
@@ -1042,7 +1042,7 @@ input[type="checkbox"]:checked {
 }
 input[type="checkbox"]:checked::after {
   content: '✔';
-  color: #00FF00;
+  color: #10B981;
   position: absolute;
   top: 50%;
   left: 50%;

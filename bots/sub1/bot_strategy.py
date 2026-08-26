@@ -1,4 +1,4 @@
-from bots.sub1.bot_config import *
+﻿from bots.sub1.bot_config import *
 from bots.sub1.bot_config import tf_weight
 from bots.sub1.bot_ui import *  # pyright: ignore[reportGeneralTypeIssues]
 import time
@@ -1171,16 +1171,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         pos_tf = getattr(tracker, "active_pos_tf", "M5")
         is_squeeze = getattr(tracker, f"is_{pos_tf.lower()}_squeeze", False)
         if globals_ref.ENABLE_SQUEEZE_ESCAPE_EXIT and is_squeeze:
-            if is_in_profit:
-                # Dời SL về dương nhẹ (trả phí giao dịch ~ 0.1% ROE / đòn bẩy)
-                # Tính giá phòng thủ: Lãi 0.1% trên vốn = avg_px * (1 + 0.001 / leverage)
-                defense_sl_px = round_to_tick(avg_px_l * (Decimal("1") + (Decimal("0.001") / Decimal(str(cfg["leverage"])))), tick_sz)
-                if tracker.live_price <= defense_sl_px:
-                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Squeeze Defense LONG: ROI {current_roi_pct:.1f}%", "cross")
-                    tracker.closure_reason_long = "Squeeze_Defense_Exit"
-                    tracker.record_exit("LONG", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
-                    return
+            # Sửa lỗi: Chỉ kích hoạt Squeeze Defense khi giá đã đi xa hơn mức phí giao dịch (tối thiểu 0.15% giá)
+            defense_sl_px = round_to_tick(avg_px_l * (Decimal("1") + Decimal("0.0015")), tick_sz)
+            if tracker.live_price > defense_sl_px:
+                tracker.squeeze_defense_active_long = True
+            
+            if getattr(tracker, "squeeze_defense_active_long", False) and tracker.live_price <= defense_sl_px:
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
+                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Squeeze Defense LONG: ROI {current_roi_pct:.1f}%", "cross")
+                tracker.closure_reason_long = "Squeeze_Defense_Exit"
+                tracker.record_exit("LONG", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
+                tracker.squeeze_defense_active_long = False
+                return
 
         # 1.7 Dynamic Ping-Pong TP
         if globals_ref.ENABLE_DYNAMIC_PINGPONG_TP and is_squeeze:
@@ -1254,7 +1256,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             except Exception:
                 pass
                 
-            active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+            if getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_big_tf", None):
+                active_tf_mult = globals_ref.TF_MULTIPLIERS.get(tracker.xole_big_tf, Decimal("1.0"))
+            else:
+                active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
             active_coin_sl_pct = globals_ref.SCALPING_SL_PCT * active_tf_mult
             # -------------------------------
 
@@ -1457,7 +1462,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             except Exception:
                 pass
                 
-            active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
+            if getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_big_tf", None):
+                active_tf_mult = globals_ref.TF_MULTIPLIERS.get(tracker.xole_big_tf, Decimal("1.0"))
+            else:
+                active_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
             active_coin_sl_pct = globals_ref.SCALPING_SL_PCT * active_tf_mult
             # -------------------------------
 
@@ -2769,3 +2777,4 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 # z306 | Fixed disabled coin logic in sub1 to properly close positions and cancel all limits
 # z307 | Fix local variable 'target_short_tfs' referenced before assignment during ALTCOIN FALLBACK logic
 # z308 | Fix duplicate marker generation on bot startup syncing to prevent position merge in UI
+

@@ -280,9 +280,9 @@ function App() {
 
   // Strategy toggles (clone Công Tắc Chiến Thuật)
   const [strat, setStrat] = useState({
-    main: true, xole: false, dynamicEma200Tp: true,
+    main: true, xole: true, dynamicEma200Tp: true,
     dynamicPingpongTp: false, altcoinFollowBtc: true,
-    sidewaySafe: true, squeezeEscape: false, safeguardEntry: true,
+    sidewaySafe: false, squeezeEscape: false, safeguardEntry: true,
     trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
     timeframeBase: "1H",
   });
@@ -750,9 +750,20 @@ function App() {
         }
 
         if (isInitialFit) {
-          chartRef.current?.timeScale().fitContent(); // Fit duy nhất 1 lần khi mới load
-          isInitialFit = false;
-        }
+            setTimeout(() => {
+              const timeScale = chartRef.current?.timeScale();
+              if (timeScale && unique && unique.length > 0) {
+                const maxLen = unique.length;
+                timeScale.setVisibleLogicalRange({
+                  from: maxLen - 60, // Zoom to last 60 candles
+                  to: maxLen + 5     // Leave a small gap on the right
+                });
+              } else {
+                chartRef.current?.timeScale().fitContent();
+              }
+            }, 100);
+            isInitialFit = false;
+          }
       } catch (err) {
         console.error("Error fetching candles:", err);
       }
@@ -1469,11 +1480,9 @@ function App() {
 
                             return (
                               <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), position: "relative", backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: isChild ? "38px" : "16px" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: isChild ? "32px" : "16px" }}>
                                   {!isChild && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "4px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>}
-                                  {isChild && (
-                                    <div style={{ position: "absolute", left: "16px", top: "-50%", bottom: "50%", width: "12px", borderLeft: "1px solid rgba(255, 255, 255, 0.2)", borderBottom: "1px solid rgba(255, 255, 255, 0.2)" }}></div>
-                                  )}
+                                  
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                     {!isChild ? (
                                       <input
@@ -1486,36 +1495,41 @@ function App() {
                                     ) : (
                                       <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
                                     )}
+                                    
                                     <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                      <span style={{ color: isChild ? "#bbb" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
-                                      {pos.children_count > 0 && <span style={{ color: "#aaa", fontSize: "11px", border: "1px solid #555", borderRadius: "10px", padding: "1px 6px" }}>Lệnh tổng</span>}
-                                      {isChild && <span style={{ color: "#888", fontSize: "11px", border: "1px solid #444", borderRadius: "10px", padding: "1px 6px" }}>Tách</span>}
-                                      <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
-                                        {isLong ? "Long" : "Short"} {pos.lever || "100"}x
-                                      </span>
-                                      {pos.tf && (
-                                        <span style={{ color: "#aaa", fontSize: "12px" }}>
-                                          ({pos.tf.toLowerCase()})
+                                      <span style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                      
+                                      
+                                      
+                                      {!isChild && (
+                                        <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                                          {isLong ? "Long" : "Short"} {pos.lever || "100"}x
+                                        </span>
+                                      )}
+                                      
+                                      {isChild && pos.tf && (
+                                        <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
+                                          {pos.tf.toLowerCase()}
                                         </span>
                                       )}
                                     </span>
                                   </div>
                                 </td>
-                                <td style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
-                                <td style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                                <td style={{ padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
+                                <td style={{ padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
                                 <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
                                   {(() => {
                                     const roi = parseFloat(pos.roi || 0);
                                     const color = roi >= 0 ? "#26a69a" : "#ef5350";
                                     return (
                                       <span style={{ color }}>
-                                        {upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT &nbsp;&nbsp; ({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)
-                                      </span>
+                                          <span style={{ fontSize: "17px" }}>{upl >= 0 ? "+" : ""}{upl.toFixed(2)}</span> USDT &nbsp;&nbsp; <span style={{ opacity: 0.97 }}>({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)</span>
+                                        </span>
                                     );
                                   })()}
                                 </td>
                                 <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
-                                  {ticketIndex === 0 && (
+                                  {!isChild && ticketIndex === 0 && (
                                     <div style={{ display: "flex", gap: "5px" }}>
                                       {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
                                         const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
@@ -1677,14 +1691,10 @@ function App() {
                       <div className="settings-group">
                         <div className="settings-group-title">Công Tắc Chiến Thuật</div>
                         <div className="toggle-grid">
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({ ...s, main: v }))} />
-                            <span className="toggle-name">Đánh Đa Khung EMA200</span>
-                            <span className="toggle-desc">Chiến thuật Đa Khung EMA200 chính</span>
-                          </div>
+                          
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({ ...s, xole: v }))} />
-                            <span className="toggle-name">Bắt Bẻ Xole</span>
+                            <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
                             <span className="toggle-desc">Chiến thuật bắt bẻ xu hướng Xole</span>
                           </div>
                           <div className="toggle-row">
@@ -1692,16 +1702,8 @@ function App() {
                             <span className="toggle-name">Chốt lời bám EMA200</span>
                             <span className="toggle-desc">Chốt lời động bám theo trục EMA200</span>
                           </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.dynamicPingpongTp} onChange={v => setStrat(s => ({ ...s, dynamicPingpongTp: v }))} />
-                            <span className="toggle-name">Chốt lời sóng Ping-Pong</span>
-                            <span className="toggle-desc">Chốt lời ngắn hạn sóng nảy Ping-Pong</span>
-                          </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.altcoinFollowBtc} onChange={v => setStrat(s => ({ ...s, altcoinFollowBtc: v }))} />
-                            <span className="toggle-name">Altcoin đánh theo BTC</span>
-                            <span className="toggle-desc">Altcoin tính điểm Limit bằng EMA200 BTC</span>
-                          </div>
+                          
+                          
                         </div>
                       </div>
 
@@ -1710,12 +1712,12 @@ function App() {
                         <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
                         <div className="toggle-grid">
                           {[
-                            ["sidewaySafe", "Chốt sớm khi đi ngang (Sideway)", "Chốt chủ động khi giá đi ngang + ROI ≥ 20%"],
-                            ["squeezeEscape", "Thoát sớm khi bị nén giá", "Thoát sớm khi khung bị nén tam giác"],
+                            // ["sidewaySafe", "Chốt sớm khi đi ngang (Sideway)", "Chốt chủ động khi giá đi ngang + ROI ≥ 20%"],
+                            // ["squeezeEscape", "Thoát sớm khi bị nén giá", "Thoát sớm khi khung bị nén tam giác"],
                             ["safeguardEntry", "Thoát hòa vốn khi giá hồi", "Thoát hòa khi lỗ sâu >70% SL rồi hồi về Entry"],
                             ["trailingSl", "Khóa lời động (Trailing SL)", "Trailing SL động — tự kéo chặn lãi theo sóng"],
                             ["maxRoi", "Chốt lời lớn (ROI ≥ 120%)", "Tự động chốt lời tối đa khi đạt mốc lợi nhuận cao"],
-                            ["sidewayVap", "Cắt hòa khi vấp cản 2 lần", "Cắt hòa khi vấp trục cản EMA200 ≥ 2 lần"],
+                            // ["sidewayVap", "Cắt hòa khi vấp cản 2 lần", "Cắt hòa khi vấp trục cản EMA200 ≥ 2 lần"],
                             ["h4Flip", "Cắt lệnh khi H4 đảo chiều", "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng"],
                           ].map(([key, name, desc]) => (
                             <div className="toggle-row" key={key}>
@@ -1831,11 +1833,7 @@ function App() {
                       <div className="settings-group">
                         <div className="settings-group-title">Chiến Thuật Bắt Sóng SMC</div>
                         <div className="toggle-grid">
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.main} onChange={v => setStrat(s => ({ ...s, main: v }))} />
-                            <span className="toggle-name">Đánh SMC Order Block</span>
-                            <span className="toggle-desc">Chiến thuật bắt đỉnh đáy theo vùng Order Block</span>
-                          </div>
+                          
                           <div className="toggle-row" style={{ marginTop: "10px" }}>
                             <span className="toggle-name" style={{ flex: 1, color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc:</span>
                             <select

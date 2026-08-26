@@ -790,6 +790,41 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             "children_count": len(items_okx) if len(items_okx) > 1 else 0
                         })
                         
+                        # Add Child Rows (Synthesize from bot's trade_markers.json if OKX returns aggregated)
+                        if len(items_okx) == 1 and len(active_items) > 1:
+                            # Update parent children count
+                            formatted_positions[-1]["children_count"] = len(active_items)
+                            
+                            for idx, item in enumerate(active_items):
+                                c_pos = abs(float(item.get("sz", 0)))
+                                c_avg_px = float(item.get("px", 0))
+                                # Estimate margin based on proportion of total_pos
+                                c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
+                                
+                                if pos_side == "long":
+                                    c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                                else:
+                                    c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
+                                c_upl = c_margin * (c_roi / 100)
+                                
+                                formatted_positions.append({
+                                    "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
+                                    "is_child": True,
+                                    "parent_id": parent_id,
+                                    "instId": inst_id,
+                                    "posSide": pos_side,
+                                    "pos": str(c_pos),
+                                    "margin": f"{c_margin:.2f}",
+                                    "avgPx": str(c_avg_px),
+                                    "lastPx": str(last_px),
+                                    "roi": f"{c_roi:.2f}",
+                                    "upl": f"{c_upl:.4f}",
+                                    "tp": tp_px,
+                                    "sl": sl_px,
+                                    "lever": str(int(leverage)),
+                                    "tf": item.get("tf", "").upper()
+                                })
+
                         # Add Child Rows (Native Split Positions)
                         if len(items_okx) > 1:
                             for idx, i_okx in enumerate(items_okx):
@@ -837,23 +872,61 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
             
         mock_positions = []
         for coin, items in data.items():
-            for item in items:
-                if item.get("status") == "active":
-                    mock_positions.append({
-                        "ticket_id": item.get("ticket_id", f"#{item.get('time', '')}"),
-                        "instId": f"{coin}-USDT-SWAP",
-                        "posSide": item.get("side", "long").lower(),
-                        "pos": str(item.get("volume", "1.0")),
-                        "margin": "0.00",
-                        "avgPx": str(item.get("price")),
-                        "lastPx": str(item.get("price")),
-                        "roi": "0.00",
-                        "upl": "0.00",
-                        "tp": "---",
-                        "sl": "---",
-                        "lever": "100",
-                        "tf": item.get("tf", "")
-                    })
+            inst_id = f"{coin}-USDT-SWAP"
+            for side in ["long", "short"]:
+                active_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
+                if not active_items: continue
+                
+                total_pos = sum(float(i.get("volume", "1.0")) for i in active_items)
+                if total_pos == 0: continue
+                avg_px = sum(float(i.get("price", 0)) * float(i.get("volume", "1.0")) for i in active_items) / total_pos
+                
+                parent_id = f"AGG_{inst_id}_{side}_MOCK"
+                
+                active_tfs = []
+                for item in active_items:
+                    tf = item.get("tf", "").upper()
+                    if tf and tf not in active_tfs:
+                        active_tfs.append(tf)
+                active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                
+                mock_positions.append({
+                    "ticket_id": parent_id if len(active_items) > 1 else active_items[-1].get("ticket_id", "#MOCK"),
+                    "is_aggregate": True,
+                    "instId": inst_id,
+                    "posSide": side,
+                    "pos": str(total_pos),
+                    "margin": "0.00",
+                    "avgPx": str(avg_px),
+                    "lastPx": str(avg_px),
+                    "roi": "0.00",
+                    "upl": "0.00",
+                    "tp": "---",
+                    "sl": "---",
+                    "lever": "100",
+                    "tf": " ".join(active_tfs).lower(),
+                    "children_count": len(active_items) if len(active_items) > 1 else 0
+                })
+                
+                if len(active_items) > 1:
+                    for idx, item in enumerate(active_items):
+                        mock_positions.append({
+                            "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
+                            "is_child": True,
+                            "parent_id": parent_id,
+                            "instId": inst_id,
+                            "posSide": side,
+                            "pos": str(item.get("volume", "1.0")),
+                            "margin": "0.00",
+                            "avgPx": str(item.get("price")),
+                            "lastPx": str(item.get("price")),
+                            "roi": "0.00",
+                            "upl": "0.00",
+                            "tp": "---",
+                            "sl": "---",
+                            "lever": "100",
+                            "tf": item.get("tf", "").upper()
+                        })
         return mock_positions
     except Exception:
         return []

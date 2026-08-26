@@ -20,21 +20,14 @@ if not exist node_modules (
 )
 cd ..
 
+start "TLS1 Web Frontend (Vite)" cmd /k "cd frontend && npm run dev"
+
 echo.
 echo ===================================================
 echo [2/3] Dang khoi chay FastAPI Backend (Port 8080)...
 echo ===================================================
-start "TLS1 Web Backend (FastAPI)" cmd /c "..\..\..\.venv\Scripts\python backend\main.py"
+..\..\..\.venv\Scripts\python backend\main.py > backend_error.log 2>&1
 
-echo.
-echo ===================================================
-echo [3/3] Dang khoi chay React Frontend (Port 5173)...
-echo ===================================================
-cd frontend
-start "TLS1 Web Frontend (Vite)" cmd /c "npm run dev"
-cd ..
-
-echo.
 echo ===================================================
 echo [+] KHOI CHAY HOAN TAT!
 echo [+] Backend dang chay tai: http://localhost:8080

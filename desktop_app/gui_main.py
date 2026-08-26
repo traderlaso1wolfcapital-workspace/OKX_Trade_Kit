@@ -821,9 +821,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
             "ALTCOIN_FOLLOW_BTC_EMA": True,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
-            "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
+            "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
             "ENABLE_SAFEGUARD_ENTRY_EXIT": True,
-            "ENABLE_TRAILING_SL": False,
+            "ENABLE_TRAILING_SL": True,
             "ENABLE_MAX_ROI_EXIT": False,
             "ENABLE_SIDEWAY_VAP_EXIT": False,
             "ENABLE_H4_FLIP_CLOSE": True,
@@ -2224,11 +2224,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
         self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
-        add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
-        add_checkbox(l_toggles, 0, 1, "Bắt Bẻ Xole", self.chk_xole, "Bật/Tắt chiến thuật bắt bẻ xu hướng Xole (Giao dịch ngược xu hướng nhỏ).")
-        add_checkbox(l_toggles, 1, 0, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
-        add_checkbox(l_toggles, 1, 1, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
-        add_checkbox(l_toggles, 2, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
+        # add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
+        add_checkbox(l_toggles, 0, 0, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật bắt bẻ xu hướng Xole (Giao dịch ngược xu hướng nhỏ).")
+        add_checkbox(l_toggles, 0, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
+        # add_checkbox(l_toggles, 1, 1, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
+        # add_checkbox(l_toggles, 2, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
         layout.addWidget(grp_toggles)
 
         # 2. BẢO VỆ & CẮT LỆNH TỰ ĐỘNG
@@ -2244,13 +2244,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_sideway_vap = ToggleSwitch()
         self.chk_h4_flip = ToggleSwitch()
         
-        add_checkbox(l_safeguard, 0, 0, "Chốt sớm khi đi ngang (Sideway)", self.chk_sideway_safe, "Chốt lời chủ động khi giá đi ngang + ROI >= 20%.")
-        add_checkbox(l_safeguard, 0, 1, "Thoát sớm khi bị nén giá", self.chk_squeeze_escape, "Thoát sớm khi khung vị thế bị nén tam giác (Squeeze).")
-        add_checkbox(l_safeguard, 0, 2, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
-        add_checkbox(l_safeguard, 1, 0, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
-        add_checkbox(l_safeguard, 1, 1, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
-        add_checkbox(l_safeguard, 1, 2, "Cắt hòa khi vấp cản 2 lần", self.chk_sideway_vap, "Cắt hòa/dương khi vấp trục cản EMA200 >= 2 lần liên tiếp.")
-        add_checkbox(l_safeguard, 2, 0, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
+        # add_checkbox(l_safeguard, 0, 0, "Chốt sớm khi đi ngang (Sideway)", self.chk_sideway_safe, "Chốt lời chủ động khi giá đi ngang + ROI >= 20%.")
+        # add_checkbox(l_safeguard, 0, 1, "Thoát sớm khi bị nén giá", self.chk_squeeze_escape, "Thoát sớm khi khung vị thế bị nén tam giác (Squeeze).")
+        add_checkbox(l_safeguard, 0, 0, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
+        add_checkbox(l_safeguard, 0, 1, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
+        add_checkbox(l_safeguard, 1, 0, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
+        # add_checkbox(l_safeguard, 1, 2, "Cắt hòa khi vấp cản 2 lần", self.chk_sideway_vap, "Cắt hòa/dương khi vấp trục cản EMA200 >= 2 lần liên tiếp.")
+        add_checkbox(l_safeguard, 1, 1, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
         layout.addWidget(grp_safeguard)
 
         # 3. QUẢN LÝ VỐN & RỦI RO
@@ -3936,9 +3936,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
             "ALTCOIN_FOLLOW_BTC_EMA": True,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
-            "ENABLE_SQUEEZE_ESCAPE_EXIT": True,
+            "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
             "ENABLE_SAFEGUARD_ENTRY_EXIT": True,
-            "ENABLE_TRAILING_SL": False,
+            "ENABLE_TRAILING_SL": True,
             "ENABLE_MAX_ROI_EXIT": False,
             "ENABLE_SIDEWAY_VAP_EXIT": False,
             "ENABLE_H4_FLIP_CLOSE": True,
