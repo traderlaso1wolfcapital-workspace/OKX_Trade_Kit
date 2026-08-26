@@ -2225,7 +2225,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
         # add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
-        add_checkbox(l_toggles, 0, 0, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật bắt bẻ xu hướng Xole (Giao dịch ngược xu hướng nhỏ).")
+        add_checkbox(l_toggles, 0, 0, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
         add_checkbox(l_toggles, 0, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
         # add_checkbox(l_toggles, 1, 1, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
         # add_checkbox(l_toggles, 2, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)

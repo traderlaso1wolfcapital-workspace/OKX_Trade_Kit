@@ -1695,12 +1695,12 @@ function App() {
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({ ...s, xole: v }))} />
                             <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
-                            <span className="toggle-desc">Chiến thuật bắt bẻ xu hướng Xole</span>
+                            <span className="toggle-help" onClick={() => alert("Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
                             <span className="toggle-name">Chốt lời bám EMA200</span>
-                            <span className="toggle-desc">Chốt lời động bám theo trục EMA200</span>
+                            <span className="toggle-help" onClick={() => alert("Chốt lời động bám theo trục EMA200")} title="Chốt lời động bám theo trục EMA200" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
                           </div>
                           
                           
@@ -1723,7 +1723,7 @@ function App() {
                             <div className="toggle-row" key={key}>
                               <ToggleSwitch checked={strat[key]} onChange={v => setStrat(s => ({ ...s, [key]: v }))} />
                               <span className="toggle-name">{name}</span>
-                              <span className="toggle-desc">{desc}</span>
+                              <span className="toggle-help" onClick={() => alert(desc)} title={desc} style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
                             </div>
                           ))}
                         </div>
