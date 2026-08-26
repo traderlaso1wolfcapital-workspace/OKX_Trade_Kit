@@ -19,6 +19,11 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/08/2026]** - Hoàn thiện các yêu cầu UI/UX Web App & Hỗ trợ Tách lệnh OKX nguyên bản (Native Split Positions):
+  - **Cập nhật 1 (Bảo mật):** Thêm bước xác thực bảo mật (Prompt UID) khi bấm nút `DỪNG CHẠY BOT` trong `App.jsx`, ngăn chặn rủi ro xung đột/vô tình bấm nhầm từ thiết bị khác khi dùng chung API Key.
+  - **Cập nhật 2 (UI Gạch viền):** Thay thế chữ "Long"/"Short" thô cứng bằng các gạch dọc màu Xanh/Đỏ 4px ở đầu hàng bảng Vị thế, kết hợp làm mềm UI tổng thể.
+  - **Cập nhật 3 (Màu Chart):** Đổi màu nền của Lightweight Charts sang tone tối (`#131722`) và ẩn bớt lưới (grid) để đồng bộ hoàn toàn với giao diện ban đêm (Dark Mode) nguyên bản của TradingView.
+  - **Cập nhật 4 (OKX Native Split):** Viết lại hoàn toàn logic get/close positions ở `main.py` để sử dụng dữ liệu Tách vị thế (Split Position) nguyên gốc từ OKX API (dựa trên nhóm `instId` và `posSide`). Giao diện tự động phân cấp thành hàng **"Lệnh tổng"** (Aggregated) và các hàng **"Tách"** (Child rows) lùi đầu dòng hình chữ L, loại bỏ hoàn toàn cơ chế chia phần trăm ảo (virtual ticket percentage) trước đây. Lệnh đóng vị thế nay đẩy thẳng `posId` hoặc kích thước hợp đồng (size) thật lên sàn OKX đảm bảo khớp 100% không còn lệch volume.
 - **[20/08/2026]** - Sửa lỗi Nút "Reset Vốn Gốc (Audit)" trên Web App không hoạt động và Lỗi 2000U hiển thị sai lệch:
   - **Nguyên nhân 1 (Nút bấm):** Frontend `App.jsx` có nút HTML nhưng chưa được gắn hàm xử lý sự kiện `onClick` và backend `main.py` chưa có endpoint hỗ trợ.
   - **Nguyên nhân 2 (Lỗi 2000U & Lỗi 51010):** Do người dùng đăng nhập Web App bằng UID mới tinh (chưa cấu hình API Futures/Multi-currency Margin) nên bị OKX trả lỗi 51010. Khi API gặp lỗi, Bot không đọc được equity thật từ sàn nên đã fallback hiển thị mốc 2000U mặc định cho thư mục tài khoản mới này (khác biệt với cấu hình UID Desktop).

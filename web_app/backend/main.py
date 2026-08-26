@@ -820,13 +820,6 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                                     "lever": str(int(leverage)),
                                     "tf": ""
                                 })
-                                "lastPx": str(last_px),
-                                "roi": okx_pos.get("uplRatio", "0.00"),
-                                "upl": okx_pos.get("upl", "0.00"),
-                                "tp": "---",
-                                "sl": "---",
-                                "lever": okx_pos.get("lever", "100"),
-                            })
 
                     return formatted_positions
                 else:

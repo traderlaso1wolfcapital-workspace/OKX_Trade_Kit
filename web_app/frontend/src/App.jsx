@@ -576,13 +576,14 @@ function App() {
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc' },
-      grid: { 
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' }, 
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' } 
+      layout: { background: { type: 'solid', color: '#0e1118' }, textColor: '#787b86' },
+      grid: {
+        vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
+        horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
       },
       crosshair: { mode: 1 },
-      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8 },
+      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8, borderColor: '#2a2e39' },
+      rightPriceScale: { borderColor: '#2a2e39' },
     });
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
@@ -861,7 +862,7 @@ function App() {
       if (confirmKey !== null) alert("Mã xác nhận không đúng! Không thể dừng Bot.");
       return;
     }
-    
+
     try {
       setIsStoppingBot(true);
       const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${currentUid}`, { method: "POST" });
