@@ -39,20 +39,20 @@ subprocess.run([git, "add", "."], check=False, cwd=base_dir)
 print("[2.1] Tạm thời loại bỏ TLS1_Trading_Web và các file dev thọ khỏi commit lần này...")
 subprocess.run([git, "reset", "HEAD", "TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"], check=False, cwd=base_dir)
 
-subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v} [skip ci]"], check=False, cwd=base_dir)
+subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
 
 print("[2.2] Đồng bộ với remote trước khi push...")
 subprocess.run([git, "pull", "--no-edit", "origin", "main"], check=False, cwd=base_dir)
 
-print(f"[3] BỎ QUA tạo nhãn phiên bản (Tạm dừng Desktop)...")
-# subprocess.run([git, "tag", f"v{new_v}"], check=False, cwd=base_dir)
+print(f"[3] Đang tạo nhãn phiên bản (Tag) v{new_v} để kích hoạt Build Action...")
+subprocess.run([git, "tag", f"v{new_v}"], check=False, cwd=base_dir)
 
-print("[4] Đang đẩy code lên GitHub... (Không kích hoạt Action)")
-res = subprocess.run([git, "push", "origin", "main"], check=False, cwd=base_dir)
+print("[4] Đang đẩy code lên GitHub và kích hoạt Build Action...")
+res = subprocess.run([git, "push", "origin", "main", "--tags"], check=False, cwd=base_dir)
 
 print("=========================================")
 if res.returncode == 0:
-    print("HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (KHÔNG RUN ACTION).")
+    print("HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ACTION ĐANG CHẠY TRÊN SERVER).")
     print(f"Phiên bản: v{new_v}")
 else:
     print("⚠️ CẢNH BÁO: Lỗi khi đẩy code lên GitHub (Exit code != 0).")
