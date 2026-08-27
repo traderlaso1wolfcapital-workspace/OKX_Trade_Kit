@@ -741,8 +741,13 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                         avg_px = sum(float(i.get("avgPx", 0)) * abs(float(i.get("pos", 0))) for i in items_okx) / total_pos if total_pos > 0 else 0
                         
                         first_okx = items_okx[0]
-                        last_px = float(first_okx.get("last", avg_px)) if first_okx.get("last") else avg_px
+                        # Use OKX's native 'last' price, fallback to markPx, then avgPx
+                        last_px = float(first_okx.get("last") or first_okx.get("markPx") or avg_px)
                         leverage = float(first_okx.get("lever", 1))
+                        
+                        # Use OKX's native UPL and uplRatio directly (much more accurate)
+                        total_upl = sum(float(i.get("upl", 0)) for i in items_okx)
+                        total_upl_ratio = float(first_okx.get("uplRatio", 0)) * 100 if len(items_okx) == 1 else (total_upl / total_margin * 100 if total_margin > 0 else 0)
                         
                         tp_px = "---"
                         sl_px = "---"
@@ -762,13 +767,6 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                         active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
                         tf_str = " ".join(active_tfs).lower() if active_tfs else ""
                         
-                        if pos_side == "long":
-                            roi_val = ((last_px - avg_px) / avg_px) * 100 * leverage
-                        else:
-                            roi_val = ((avg_px - last_px) / avg_px) * 100 * leverage
-                            
-                        upl_val = total_margin * (roi_val / 100)
-                        
                         parent_id = f"AGG_{inst_id}_{pos_side}"
                         
                         # Add Aggregated Row (Total Position)
@@ -781,8 +779,8 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                             "margin": f"{total_margin:.2f}",
                             "avgPx": str(avg_px),
                             "lastPx": str(last_px),
-                            "roi": f"{roi_val:.2f}",
-                            "upl": f"{upl_val:.4f}",
+                            "roi": f"{total_upl_ratio:.2f}",
+                            "upl": f"{total_upl:.4f}",
                             "tp": tp_px,
                             "sl": sl_px,
                             "lever": str(int(leverage)),
@@ -801,11 +799,15 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                                 # Estimate margin based on proportion of total_pos
                                 c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
                                 
-                                if pos_side == "long":
-                                    c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                                if c_avg_px > 0:
+                                    if pos_side == "long":
+                                        c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                                    else:
+                                        c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
+                                    c_upl = c_margin * (c_roi / 100)
                                 else:
-                                    c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
-                                c_upl = c_margin * (c_roi / 100)
+                                    c_roi = 0
+                                    c_upl = 0
                                 
                                 formatted_positions.append({
                                     "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
@@ -832,11 +834,9 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
                                 c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
                                 c_avg_px = float(i_okx.get("avgPx", 0))
                                 
-                                if pos_side == "long":
-                                    c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
-                                else:
-                                    c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
-                                c_upl = c_margin * (c_roi / 100)
+                                # Use OKX native values directly
+                                c_upl = float(i_okx.get("upl", 0))
+                                c_roi = float(i_okx.get("uplRatio", 0)) * 100
                                 
                                 formatted_positions.append({
                                     "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
