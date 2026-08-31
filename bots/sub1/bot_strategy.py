@@ -179,6 +179,8 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                     set_val("EMA_CONFLUENCE_TOLERANCE_PCT", Decimal(str(cfg["EMA_CONFLUENCE_TOLERANCE_PCT"])))
                 if "BASE_ENTRY_OFFSET_PCT" in cfg:
                     set_val("BASE_ENTRY_OFFSET_PCT", Decimal(str(cfg["BASE_ENTRY_OFFSET_PCT"])))
+                if "XOLE_FIXED_ENTRY_OFFSET_PCT" in cfg:
+                    set_val("XOLE_FIXED_ENTRY_OFFSET_PCT", Decimal(str(cfg["XOLE_FIXED_ENTRY_OFFSET_PCT"])))
                     # Tự động tính toán lại bảng offsets nếu BASE_ENTRY_OFFSET_PCT bị thay đổi
                     for t in targets:
                         if t is not None:
@@ -538,8 +540,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         _is_xl_pos = getattr(tracker, "xole_tf", None) == tf
 
         is_xole = getattr(tracker, "is_xole_pos", False)
-        if is_xole and hasattr(globals_ref, "XOLE_TF_ENTRY_OFFSETS"):
-            base_buffer = globals_ref.XOLE_TF_ENTRY_OFFSETS.get(tf, Decimal("0.0006"))
+        if is_xole:
+            if hasattr(globals_ref, "XOLE_FIXED_ENTRY_OFFSET_PCT"):
+                base_buffer = Decimal(str(globals_ref.XOLE_FIXED_ENTRY_OFFSET_PCT))
+            elif hasattr(globals_ref, "XOLE_TF_ENTRY_OFFSETS"):
+                base_buffer = globals_ref.XOLE_TF_ENTRY_OFFSETS.get(tf, Decimal("0.0006"))
+            else:
+                base_buffer = getattr(globals_ref, "TF_ENTRY_OFFSETS", {}).get(tf, Decimal("0.0006"))
         else:
             base_buffer = getattr(globals_ref, "TF_ENTRY_OFFSETS", {}).get(tf, Decimal("0.0006"))
         

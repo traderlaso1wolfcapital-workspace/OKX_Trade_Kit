@@ -92,6 +92,7 @@ TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in TF_CONFIG
 XOLE_TF_MULTIPLIERS = {k: v["offset"] for k, v in XOLE_TF_CONFIG.items()}
 XOLE_TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in XOLE_TF_CONFIG.items()}
 XOLE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in XOLE_TF_CONFIG.items()}
+XOLE_FIXED_ENTRY_OFFSET_PCT = Decimal("-0.02") # Đệm lùi cố định -2% đón muộn quét thanh khoản cho XOLE
 
 # ==============================================================================
 # 5. CÁC LỚP BẢO VỆ CỤC BỘ (SAFEGUARDS)
