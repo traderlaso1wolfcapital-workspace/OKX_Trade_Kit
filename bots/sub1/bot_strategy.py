@@ -2287,12 +2287,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.is_macro_overextended = True
                             print(f"\n🚨 [CẦU DAO VĨ MÔ] {coin_name} vượt ngưỡng rướn {_limit_pct*100:.1f}% (Cách H4 {_macro_dist_pct*100:.1f}%). Khóa rải lưới M5, M15, M30!")
                     elif _is_overextended:
-                        # Mở khóa ở mốc H2
-                        _macro_is_up = (tracker.live_price > _h4_ema200)
-                        if (_macro_is_up and tracker.live_price <= _h2_ema200) or \
-                           (not _macro_is_up and tracker.live_price >= _h2_ema200):
+                        # Mở khóa ở mốc 2%
+                        _unlock_limit = Decimal("0.02")
+                        if _macro_dist_pct <= _unlock_limit:
                             tracker.is_macro_overextended = False
-                            print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã chạm về trạm H2. Mở lại lưới M5, M15, M30!")
+                            print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã điều chỉnh về gần H4 (Cách {_macro_dist_pct*100:.1f}% <= 2%). Mở lại lưới thuận xu hướng!")
 
             _is_overextended = getattr(tracker, "is_macro_overextended", False)
             _blocked_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])] if _is_overextended else []

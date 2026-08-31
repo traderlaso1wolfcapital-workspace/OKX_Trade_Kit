@@ -48,12 +48,13 @@ print(f"[3] Đang tạo nhãn phiên bản (Tag) v{new_v} để kích hoạt Bui
 subprocess.run([git, "tag", f"v{new_v}"], check=False, cwd=base_dir)
 
 print("[4] Đang đẩy code lên GitHub và kích hoạt Build Action...")
-res = subprocess.run([git, "push", "origin", "main", "--tags"], check=False, cwd=base_dir)
+res = subprocess.run([git, "push", "origin", "main"], check=False, cwd=base_dir)
+res_tag = subprocess.run([git, "push", "origin", f"v{new_v}"], check=False, cwd=base_dir)
 
 print("=========================================")
-if res.returncode == 0:
-    print("HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ACTION ĐANG CHẠY TRÊN SERVER).")
+if res.returncode == 0 and res_tag.returncode == 0:
+    print("🚀 HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ACTION ĐANG CHẠY TRÊN SERVER).")
     print(f"Phiên bản: v{new_v}")
 else:
-    print("⚠️ CẢNH BÁO: Lỗi khi đẩy code lên GitHub (Exit code != 0).")
+    print("❌ THẤT BẠI: Quá trình đẩy code hoặc tạo Tag lên GitHub gặp lỗi (Exit code != 0).")
 print("=========================================")
