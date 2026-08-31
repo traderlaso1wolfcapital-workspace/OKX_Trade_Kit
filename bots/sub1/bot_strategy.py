@@ -967,7 +967,17 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
             })
 
-            tfs_order = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            _is_pyramid_reconstruct = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            _tfs_enabled = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+            valid_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in _tfs_enabled]
+            
+            if _is_pyramid_reconstruct:
+                # DCA Dương: Khớp từ TF lớn xuống TF nhỏ
+                tfs_order = list(reversed(valid_tfs))
+            else:
+                # DCA Âm: Khớp từ TF nhỏ lên TF lớn
+                tfs_order = list(valid_tfs)
+
             cum_vols = {}
             cum = Decimal("0")
             for tf in tfs_order:
@@ -982,7 +992,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     break
 
             if not filled_tfs:
-                filled_tfs = ["M5"]
+                filled_tfs = [tfs_order[0]] if tfs_order else ["M5"]
 
             return filled_tfs
 
