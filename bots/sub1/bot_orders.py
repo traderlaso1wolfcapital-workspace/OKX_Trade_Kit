@@ -382,7 +382,10 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         if tracker:
             filled = getattr(tracker, "pos_cycle_filled_tfs", [])
             if filled:
-                max_filled_tf = max(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                if getattr(globals_ref, "ENABLE_PYRAMID_DCA", False):
+                    max_filled_tf = min(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                else:
+                    max_filled_tf = max(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
             else:
                 max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
         else:

@@ -12,6 +12,7 @@ from typing import Any
 # ==============================================================================
 # ------------------------------------------------------------------------------
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
+ENABLE_PYRAMID_DCA = False        # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - TẮT LÀ DCA ÂM
 ENABLE_STRATEGY_XOLE = True       # ❷ CHIẾN THUẬT BẮT BẺ (XOLE)
 
 ENABLE_DYNAMIC_EMA200_TP = True   # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO)

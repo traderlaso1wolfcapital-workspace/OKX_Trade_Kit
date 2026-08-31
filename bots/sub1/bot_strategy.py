@@ -1,4 +1,4 @@
-﻿from bots.sub1.bot_config import *
+from bots.sub1.bot_config import *
 from bots.sub1.bot_config import tf_weight
 from bots.sub1.bot_ui import *  # pyright: ignore[reportGeneralTypeIssues]
 import time
@@ -2299,16 +2299,53 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             aligned_long_tfs = get_aligned_tfs(start_tf, "UPTREND") if allowed_long else []
             # ⚡ DCA FILTER MỚI: Dùng pos_cycle_filled_tfs thay vì active_pos_tf
-            # KB1: TF đã filled trong chu kỳ này → KHÔNG DCA lại
-            # KB2: TF chưa filled → ĐƯỢC DCA
-            # KB3: Sau TP/SL (pos_cycle_filled_tfs bị reset) → TF có thể vào lại
             _filled_long = tracker.pos_cycle_filled_tfs if tracker.has_long else []
-            target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
+            
+            _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            if _is_pyramid:
+                TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+                reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
+                
+                new_target_long_tfs = []
+                anchor_tf = reversed_tfs[0] if reversed_tfs else None
+                
+                if anchor_tf in aligned_long_tfs and anchor_tf not in _filled_long:
+                    new_target_long_tfs.append(anchor_tf)
+                
+                for i in range(len(reversed_tfs) - 1):
+                    current_tf = reversed_tfs[i]
+                    next_tf = reversed_tfs[i+1]
+                    if current_tf in _filled_long:
+                        if next_tf in aligned_long_tfs and next_tf not in _filled_long:
+                            new_target_long_tfs.append(next_tf)
+                            
+                target_long_tfs = new_target_long_tfs
+            else:
+                target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
+                
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
             aligned_short_tfs = get_aligned_tfs(start_tf, "DOWNTREND") if allowed_short else []
             _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
-            target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+            
+            if _is_pyramid:
+                new_target_short_tfs = []
+                anchor_tf = reversed_tfs[0] if reversed_tfs else None
+                
+                if anchor_tf in aligned_short_tfs and anchor_tf not in _filled_short:
+                    new_target_short_tfs.append(anchor_tf)
+                
+                for i in range(len(reversed_tfs) - 1):
+                    current_tf = reversed_tfs[i]
+                    next_tf = reversed_tfs[i+1]
+                    if current_tf in _filled_short:
+                        if next_tf in aligned_short_tfs and next_tf not in _filled_short:
+                            new_target_short_tfs.append(next_tf)
+                            
+                target_short_tfs = new_target_short_tfs
+            else:
+                target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+                
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
 
             # ⚡ ALTCOIN FALLBACK: Khi BTC có tín hiệu (allowed_short/long=True)

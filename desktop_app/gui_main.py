@@ -871,8 +871,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.api_files.extend([f for f in os.listdir(proj_bot_dir) if f.startswith('.api') and not f.endswith('.bak')])
         bot_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}")
         os.makedirs(bot_dir, exist_ok=True)
-        # Tự động tạo 5 tài khoản phụ rỗng mặc định & các file JSON cấu hình mặc định nếu chưa có
-        for i in range(1, 6):
+        # Tự động tạo 1 tài khoản phụ rỗng mặc định & các file JSON cấu hình mặc định nếu chưa có
+        for i in range(1, 2):
             default_env = os.path.join(bot_dir, f".api_sub{i}")
             if not os.path.exists(default_env):
                 try:
@@ -915,9 +915,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             for env in self.api_files:
                 if env == ".api":
                     display = "Tài khoản chính"
+                elif env == ".api_sub1":
+                    display = "Tài khoản phụ 1"
                 else:
-                    sub_name = env.replace(".api_sub", "")
-                    display = f"Tài khoản phụ {sub_name}"
+                    sub_name = env.replace(".api_", "")
+                    display = sub_name
                 self.account_dropdown.addItem(display, env)
         self.account_dropdown.blockSignals(False)
 
@@ -1018,9 +1020,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
             for env in self.api_files:
                 if env == ".api":
                     display = "Tài khoản chính"
+                elif env == ".api_sub1":
+                    display = "Tài khoản phụ 1"
                 else:
-                    sub_name = env.replace(".api_sub", "")
-                    display = f"Tài khoản phụ {sub_name}"
+                    sub_name = env.replace(".api_", "")
+                    display = sub_name
                 self.account_dropdown.addItem(display, env)
 
         target_env = ".api" if self.strategy_id == "sub1" else f".api_{self.strategy_id}"
@@ -1416,7 +1420,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart, không dùng splitter riêng giữa chart và bảng vị thế)
         self.pos_table.verticalHeader().setDefaultSectionSize(32)
-        self.tab_positions.setFixedHeight(148)
         chart_layout.addWidget(self.tab_positions)
 
         # Khởi tạo Khung thời gian giao dịch ở Dashboard dưới dạng container để nhét vào TopRightCorner
@@ -1609,43 +1612,60 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if "XRP" in inst: return 4
             return 99
 
-        # Phân loại vị thế theo 3 coin chính: XAU, BTC, ETH
-        pos_by_coin = {}
-        other_positions = []
-        for pos in positions:
-            inst = str(pos.get("instId", "")).upper()
-            if "XAU" in inst:
-                pos_by_coin["XAU"] = pos
-            elif "BTC" in inst:
-                pos_by_coin["BTC"] = pos
-            elif "ETH" in inst:
-                pos_by_coin["ETH"] = pos
-            else:
-                other_positions.append(pos)
-
-        # Xây dựng danh sách dòng: Luôn gồm [XAU, BTC, ETH] theo thứ tự, sau đó tới các coin khác
-        primary_coins = [("XAU", "XAU-USDT"), ("BTC", "BTC-USDT"), ("ETH", "ETH-USDT")]
-        rows_data = []
-        for coin_key, default_inst in primary_coins:
-            rows_data.append((coin_key, default_inst, pos_by_coin.get(coin_key)))
-        for pos in other_positions:
-            inst_id = str(pos.get("instId", "")).replace("-SWAP", "")
-            coin_key = inst_id.split("-")[0]
-            rows_data.append((coin_key, inst_id, pos))
-
-        self.pos_table.setRowCount(len(rows_data))
-
         # Đọc danh sách ENABLED_COINS từ config
-        enabled_coins = ["BTC", "ETH", "XAU"]
+        enabled_coins = ["XAU", "BTC", "ETH"]
         try:
             acc_name = self.get_acc_name()
             json_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data", f"{acc_name}_global_config.json")
             if os.path.exists(json_path):
                 with open(json_path, "r", encoding="utf-8") as f:
                     cfg_data = json.load(f)
-                    enabled_coins = cfg_data.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])
+                    enabled_coins = cfg_data.get("ENABLED_COINS", ["XAU", "BTC", "ETH"])
         except:
             pass
+
+        enabled_coins_upper = [c.upper() for c in enabled_coins]
+
+        # Đảm bảo XAU, BTC, ETH luôn có trên cùng nếu chúng được bật hoặc có lệnh
+        default_order = ["XAU", "BTC", "ETH"]
+        display_coins = []
+        for c in default_order:
+            if c in enabled_coins_upper:
+                display_coins.append(c)
+        for c in enabled_coins_upper:
+            if c not in display_coins:
+                display_coins.append(c)
+
+        # Phân loại vị thế theo coin
+        pos_by_coin = {}
+        for pos in positions:
+            inst = str(pos.get("instId", "")).upper()
+            coin_key = inst.split("-")[0]
+            pos_by_coin.setdefault(coin_key, []).append(pos)
+            if coin_key not in display_coins:
+                display_coins.append(coin_key)
+
+        # Xây dựng danh sách dòng
+        rows_data = []
+        for coin_key in display_coins:
+            default_inst = f"{coin_key}-USDT"
+            coin_positions = pos_by_coin.get(coin_key, [])
+            if not coin_positions:
+                rows_data.append((coin_key, default_inst, None))
+            else:
+                for pos in coin_positions:
+                    inst_id = str(pos.get("instId", "")).replace("-SWAP", "")
+                    rows_data.append((coin_key, inst_id, pos))
+
+        self.pos_table.setRowCount(len(rows_data))
+        
+        # Tự động mở rộng chiều cao bảng để không bị cuộn
+        header_height = self.pos_table.horizontalHeader().height()
+        if header_height <= 0:
+            header_height = 28
+        row_height = 32
+        total_height = header_height + (len(rows_data) * row_height) + 12
+        self.tab_positions.setFixedHeight(total_height)
 
         for row, (coin_key, default_inst, pos) in enumerate(rows_data):
             instId = default_inst
@@ -1667,12 +1687,24 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             if is_active:
                 lever = pos.get("lever", "")
-                side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
-                instId_text = f"{instId} <span style='font-size: 12px;'>({side} {lever}x)</span>"
+                pos_side_api = pos.get("posSide", "long").lower()
+                if pos_side_api == "net":
+                    side = "Long" if float(pos.get("pos", 0)) > 0 else "Short"
+                else:
+                    side = "Long" if pos_side_api == "long" else "Short"
+                
+                tag_text = f"{side} {lever}x"
+                tag_bg = "rgba(76, 175, 80, 0.15)" if side == "Long" else "rgba(255, 82, 82, 0.15)"
+                tag_color = "#4caf50" if side == "Long" else "#ff5252"
+                
+                lbl_tag = QtWidgets.QLabel(tag_text)
+                lbl_tag.setStyleSheet(f"background-color: {tag_bg}; color: {tag_color}; font-size: 11px; font-weight: bold; padding: 1px 4px; border-radius: 4px;")
+                lbl_tag.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+                lbl_tag.setFixedHeight(18)
             else:
-                instId_text = instId
+                lbl_tag = None
 
-            lbl_sym = QtWidgets.QLabel(instId_text)
+            lbl_sym = QtWidgets.QLabel(instId)
             lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 15px;")
 
             border_line = QtWidgets.QFrame()
@@ -1690,6 +1722,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
             l0.addSpacing(6)
             l0.addWidget(chk)
             l0.addWidget(lbl_sym)
+            if lbl_tag:
+                l0.addWidget(lbl_tag)
             l0.addStretch(1)
             self.pos_table.setCellWidget(row, 0, w0)
 
@@ -2154,18 +2188,19 @@ class BotInstanceWidget(QtWidgets.QWidget):
             layout_obj.addWidget(widget, row, 1)
 
 
-        def add_checkbox(layout_obj, row, col, label_text, widget, tooltip_text, colspan=1):
+        def add_checkbox(layout_obj, row, col, label_text, widget, tooltip_text, colspan=1, rowspan=1):
             lbl = QtWidgets.QLabel(label_text)
             lbl.setStyleSheet("color: #e0e0e0; font-weight: bold;")
             btn_help = HelpButton(tooltip_text)
             
             h_lbl = QtWidgets.QHBoxLayout()
+            h_lbl.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
             h_lbl.addWidget(widget)
             h_lbl.addWidget(lbl)
             h_lbl.addWidget(btn_help)
             h_lbl.addStretch()
             
-            layout_obj.addLayout(h_lbl, row, col, 1, colspan)
+            layout_obj.addLayout(h_lbl, row, col, rowspan, colspan)
 
 
         # 0. GIAO DIỆN & LOGO
@@ -2219,16 +2254,18 @@ class BotInstanceWidget(QtWidgets.QWidget):
         l_toggles = QtWidgets.QGridLayout(grp_toggles)
         
         self.chk_main = ToggleSwitch()
+        self.chk_pyramid = ToggleSwitch(width=40, height=20)
         self.chk_xole = ToggleSwitch()
         self.chk_dynamic_ema200_tp = ToggleSwitch()
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
         self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
         # add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
-        add_checkbox(l_toggles, 0, 0, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
-        add_checkbox(l_toggles, 0, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
-        # add_checkbox(l_toggles, 1, 1, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
-        # add_checkbox(l_toggles, 2, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
+        add_checkbox(l_toggles, 0, 0, "Chế độ: DCA Dương (Mới)", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).", rowspan=2)
+        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
+        add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
+        # add_checkbox(l_toggles, 2, 0, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
+        # add_checkbox(l_toggles, 3, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
         layout.addWidget(grp_toggles)
 
         # 2. BẢO VỆ & CẮT LỆNH TỰ ĐỘNG
@@ -2415,8 +2452,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
             layout_obj.addLayout(h_lbl, row, 0)
             layout_obj.addWidget(widget, row, 1)
 
-        def add_checkbox(layout_obj, row, col, label_text, widget, tooltip_text, colspan=1):
+        def add_checkbox(layout_obj, row, col, label_text, widget, tooltip_text, colspan=1, rowspan=1):
             h = QtWidgets.QHBoxLayout()
+            h.setAlignment(QtCore.Qt.AlignmentFlag.AlignVCenter)
             h.addWidget(widget)
             lbl = QtWidgets.QLabel(label_text)
             lbl.setStyleSheet("color: #e0e0e0;")
@@ -2424,7 +2462,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             btn_help = HelpButton(tooltip_text)
             h.addWidget(btn_help)
             h.addStretch()
-            layout_obj.addLayout(h, row, col, 1, colspan)
+            layout_obj.addLayout(h, row, col, rowspan, colspan)
 
         # 0. GIAO DIỆN & LOGO
         grp_ui = QtWidgets.QGroupBox("Giao Diện & Hệ Thống")
@@ -2801,6 +2839,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             elif self.strategy_id == "sub1":
                 if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
+                if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", False))))
                 if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
                 if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
                 if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
@@ -3178,6 +3217,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
                 "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', ["M5", "M15", "M30", "H1", "H2", "H4"]),
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
+                "ENABLE_PYRAMID_DCA": self.chk_pyramid.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
                 "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),
@@ -3891,8 +3931,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # Remove any existing icon
             base_name = txt[2:].strip() if len(txt) > 0 and txt[0] in ["🟢", "⚪", "🟣", "🔴", "🟡", "⚫"] else txt
             
-            icon = "🟢" if i == index else "⚫"
-            self.bot_tabs.setTabText(i, f"{icon} {base_name}")
+            # Tạm thời bỏ icon trạng thái theo yêu cầu user
+            self.bot_tabs.setTabText(i, base_name)
             
         # Hiệu ứng thị giác chuyển trang mượt mà (Fade-in animation) khi đổi giữa các Bot
         target_widget = self.bot_tabs.widget(index)
@@ -4083,7 +4123,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.panel_sub2 = BotInstanceWidget("sub2", "Bot SMC (Sub 2)", self.api_files)
         self.panel_sub3 = BotInstanceWidget("sub3", "Bot Liquidation (Sub 3)", self.api_files)
         
-        self.bot_tabs.addTab(self.panel_main, "⚪ Bot EMA200")
+        self.bot_tabs.addTab(self.panel_main, "Bot EMA200")
         
         # Add nút Cộng Đồng thẳng vào header (thay hẳn Đăng Xuất)
         if hasattr(self, '_header_layout') and hasattr(self.panel_main, 'btn_open_community'):
