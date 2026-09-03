@@ -347,15 +347,24 @@ def check_algo_tpsl_status(client, inst_id: str, pos_side: str, td_mode: str, si
     status = {"has_tp": False, "has_sl": False, "tp_px": Decimal("0"), "sl_px": Decimal("0"), "size_matched": True}
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
+        expected_exit_side = "sell" if pos_side in ("long", "buy") else ("buy" if pos_side in ("short", "sell") else None)
         for o in pending_algo:
-            if o.get("clOrdId", "").startswith(CL_ORD_PREFIX) and o.get("posSide") == pos_side and o.get("tdMode") == td_mode:
+            o_pos_side = o.get("posSide", "")
+            o_td_mode = o.get("tdMode", "")
+            o_side = o.get("side", "")
+            
+            # Khớp posSide tương ứng hoặc khớp chiều thoát lệnh (sell cho Long, buy cho Short)
+            pos_match = (o_pos_side == pos_side) or (o_pos_side in ("net", "") and expected_exit_side and o_side == expected_exit_side)
+            if pos_match and (o_td_mode == td_mode or not o_td_mode):
                 order_sz = Decimal(o.get("sz", "0"))
                 if order_sz != size:
                     status["size_matched"] = False
                 if o.get("tpTriggerPx") and Decimal(o.get("tpTriggerPx", "0")) > 0: 
-                    status["has_tp"] = True; status["tp_px"] = Decimal(o["tpTriggerPx"])
+                    status["has_tp"] = True
+                    status["tp_px"] = Decimal(o["tpTriggerPx"])
                 if o.get("slTriggerPx") and Decimal(o.get("slTriggerPx", "0")) > 0: 
-                    status["has_sl"] = True; status["sl_px"] = Decimal(o["slTriggerPx"])
+                    status["has_sl"] = True
+                    status["sl_px"] = Decimal(o["slTriggerPx"])
         return status
     except Exception as e:
         hft_logger.error(f"Lỗi check_algo_tpsl_status: {e}", exc_info=True)
@@ -452,9 +461,9 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         elif streak == 3: streak_mult = Decimal("0.4")
         else: streak_mult = Decimal("0.3")
         
-        if is_xl_pos:
-            target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult) * streak_mult
-            target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult) * streak_mult
+        if is_hd_pos:
+            target_tp_pct = getattr(tracker, "hedge_tp_pct", getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult)) * streak_mult
+            target_sl_pct = getattr(tracker, "hedge_sl_pct", getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult)) * streak_mult
         else:
             # Nhân hệ số TF và hệ số bóp TP/SL (streak_mult)
             target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult * streak_mult
@@ -478,17 +487,10 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         abs_size_dec = abs(size_dec)
         status = check_algo_tpsl_status(client, inst_id, side, td_mode, abs_size_dec)
         
-        # Nếu đã có lệnh nhưng lệch giá mục tiêu quá 0.5% (do đổi TF), xem như kích thước/vị thế không khớp để đặt lại
-        if status["size_matched"]:
-            if status["has_tp"] and status["tp_px"] > 0 and calc_tp > 0:
-                diff_tp = abs(status["tp_px"] - calc_tp) / calc_tp
-                if diff_tp > Decimal("0.005"):
-                    status["size_matched"] = False
-            if status["has_sl"] and status["sl_px"] > 0 and calc_sl > 0:
-                diff_sl = abs(status["sl_px"] - calc_sl) / calc_sl
-                if diff_sl > Decimal("0.005"):
-                    status["size_matched"] = False
-
+        # ⚡ TÔN TRỌNG TP/SL CỦA CEO:
+        # Nếu trên sàn ĐÃ CÓ TP hoặc SL và khối lượng khớp với vị thế hiện tại:
+        # Tuyệt đối KHÔNG xóa và KHÔNG gài đè lại khi lệch giá. Giữ nguyên giá do CEO thiết lập.
+        # Chỉ hủy và gài lại khi khối lượng vị thế thay đổi (ví dụ vừa cắn DCA nhồi thêm lệnh).
         if not status["size_matched"]:
             clean_algo_orders(client, inst_id, td_mode, side)
             status["has_tp"] = False

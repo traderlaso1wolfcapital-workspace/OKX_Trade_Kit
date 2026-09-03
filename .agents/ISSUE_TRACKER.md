@@ -19,6 +19,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[04/09/2026]** - Tôn Trọng TP/SL Do CEO Chỉnh Tay Trên Sàn (Manual TP/SL Override):
+  - **Yêu cầu:** Khi CEO can thiệp thay đổi giá TP hoặc SL trực tiếp trên App/Web OKX, bot quét thấy lệnh đã có TP/SL thì bỏ qua (SKIP), không được xóa đi đặt đè lại giá của bot. Nếu CEO bấm hủy TP hoặc SL thì bot mới tự động gài lại theo chuẩn.
+  - **Cập nhật:**
+    1. **Bỏ kiểm tra lệch giá (`diff_tp > 0.005` / `diff_sl > 0.005`):** Khi khối lượng vị thế không đổi (`size_matched = True`), bot tôn trọng 100% mức giá TP/SL hiện tại trên sàn và không bao giờ xóa đi gài lại.
+    2. **Mở rộng nhận diện (`check_algo_tpsl_status`):** Nhận diện mọi lệnh điều kiện TP/SL tương ứng với vị thế (`posSide` hoặc chiều thoát lệnh `side`), bao gồm cả lệnh do CEO đặt tay từ App OKX không có tiền tố của bot.
+    3. **Tự động đóng vai trò lưới bảo hiểm:** Bot chỉ tính toán và tự động đặt TP/SL khi trên sàn **chưa có TP** hoặc **chưa có SL**, hoặc khi vị thế **cắn thêm DCA** (volume tăng lên làm lệnh cũ không còn bao phủ đủ).
+    4. Sửa biến `is_xl_pos` thành `is_hd_pos` hỗ trợ đầy đủ `hedge_tp_pct`/`hedge_sl_pct`.
+
 - **[04/09/2026]** - Rà Soát Toàn Diện & Tối Ưu Hóa Logic Bậc Thang DCA Dương (Pyramid):
   - **Phát hiện & Xử lý:**
     1. **Tách biệt Anchor TF:** Trong chế độ DCA Dương, logic chọn `anchor_tf` chỉ được phép chạy khi **chưa có vị thế** (`not tracker.has_long`/`not tracker.has_short`). Khi vị thế đã mở, bot chỉ chạy logic bậc thang tiến dần xuống các khung nhỏ hơn và ngắt nhịp (`break`) để duy trì duy nhất 1 lệnh limit gài sẵn tiếp theo. Tránh tình trạng khung lớn đảo pha gây đặt lệnh ngược lại phía sau (tránh DCA âm).
