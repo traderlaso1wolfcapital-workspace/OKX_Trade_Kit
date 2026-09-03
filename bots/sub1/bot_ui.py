@@ -427,6 +427,35 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             return "[PINGPONG]"
         return "[TREND]"
 
+    def _get_waiting_str(tk):
+        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", True)
+        enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+        best_tf = getattr(tk, "active_target_tf", "M5")
+        
+        # Trend entry TF phụ thuộc vào DCA Âm/Dương
+        if is_pyramid:
+            entry_tf = best_tf
+        else:
+            entry_tf = enabled_tfs[0] if enabled_tfs else "M5"
+            
+        trend = getattr(tk, "trend", "SIDEWAY")
+        is_macro = getattr(tk, "is_macro_overextended", False)
+        
+        if is_macro:
+            # HEDGE luôn rình bắt đỉnh/đáy ở khung nhỏ nhất (M5), bất kể Âm hay Dương
+            hedge_entry_tf = enabled_tfs[0] if enabled_tfs else "M5"
+            h4_ema = getattr(tk, "h4_ema200", Decimal("0"))
+            if h4_ema > 0 and getattr(tk, "live_price", 0) > h4_ema:
+                return f", chờ SHORT [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
+            elif h4_ema > 0 and getattr(tk, "live_price", 0) < h4_ema:
+                return f", chờ LONG [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
+            return f", chờ [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
+            
+        if trend == "UPTREND": return f", chờ LONG [TREND] tại {fmt_tf(entry_tf)}"
+        if trend == "DOWNTREND": return f", chờ SHORT [TREND] tại {fmt_tf(entry_tf)}"
+        if trend == "HEDGE": return f", chờ LONG/SHORT tại {fmt_tf(entry_tf)}"
+        return f", quan sát Sideway tại {fmt_tf(best_tf)}"
+
     def _get_last_info_str(tk):
         """Trả về chuỗi thông tin lệnh đóng gần nhất và Win Streak"""
         cur_streak = 0
@@ -534,7 +563,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             
             if has_pending:
                 has_any = True
-                line_main = f"    {coin_name} ╭─  Chưa có vị thế"
+                line_main = f"    {coin_name} ╭─  Chưa có vị thế{_get_waiting_str(tk)}"
                 idx_branch = line_main.index("╭─")
                 indent_branch = " " * idx_branch
                 lines = [line_main]
@@ -560,7 +589,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
                 pos_lines.append((0, coin_name, lines))
             else:
-                line_main = f"    {coin_name} ╭─  Chưa có vị thế"
+                line_main = f"    {coin_name} ╭─  Chưa có vị thế{_get_waiting_str(tk)}"
                 idx_branch = line_main.index("╭─")
                 indent_branch = " " * idx_branch
                 pos_lines.append((0, coin_name, [line_main, f"{indent_branch}╰─ {_get_last_info_str(tk)}"]))
