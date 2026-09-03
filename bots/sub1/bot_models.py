@@ -158,6 +158,13 @@ class AssetTracker:
         }
         self.placed_target_tf = "M5"
         self.active_pos_tf = "M5"
+        self.pos_cycle_filled_tfs: list[str] = []
+        self.pos_cycle_closed_tfs: list[str] = []
+        self.is_xole_pos: bool = False
+        self.xole_tf: str | None = None
+        self.xole_pos_side: str = ""
+        self.xole_win_streak: int = 0
+        self.last_closed_mode: str = ""
         
         self.has_long, self.has_short = False, False
         self.active_avg_px_long, self.active_avg_px_short = Decimal("0"), Decimal("0")
@@ -199,14 +206,6 @@ class AssetTracker:
         self.last_closed_reason = ""
         self.last_candle_timestamp = 0
         self.closed_history: list[dict] = []  # Lưu lịch sử nhiều lệnh gần nhất
-        self.pos_cycle_filled_tfs = []        # TF đã khớp trong chu kỳ vị thế hiện tại
-        self.pos_cycle_closed_tfs: list[str] = []  # Lưu TF đã đóng để hiển thị cụm DCA
-
-        # Partial Lock SL stage: 0=chưa kích hoạt, 1=kéo về Entry (hòa vốn), 2=kéo về 1/3 TP
-        self.partial_lock_stage_long = 0
-        self.partial_lock_stage_short = 0
-
-        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ amend limit khi nến của TF đó đã đóng
         # Key: tf name (M5/M15/M30/H1/H2/H4), Value: timestamp nến đóng cuối cùng đã update limit
         self.last_limit_update_ts: dict[str, int] = {}
 
@@ -219,18 +218,26 @@ class AssetTracker:
             self.last_closed_reason = f"[{reason_code}]"  # Chỉ hiện code khi desc rỗng
             
         # ⚡ Tăng/Reset win_streak theo khung thời gian (Shrinking TP logic)
-        tf = getattr(self, "active_pos_tf", "M5")
+        is_xole = getattr(self, "is_xole_pos", False) and getattr(self, "xole_pos_side", "") == side
+        if is_xole:
+            self.last_closed_mode = "XOLE"
+            tf = getattr(self, "xole_tf", getattr(self, "active_pos_tf", "M5")) or "M5"
+            if roi >= Decimal("0"):
+                self.xole_win_streak = getattr(self, "xole_win_streak", 0) + 1
+            else:
+                self.xole_win_streak = 0
+        else:
+            self.last_closed_mode = "TREND"
+            tf = getattr(self, "active_pos_tf", "M5")
+            
         if tf not in self.mtf_states:
             self.mtf_states[tf] = {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False}
             
-        if roi > Decimal("0") or roi == Decimal("0"):  # Mọi lần đóng lệnh (tp bot, tp tay, hòa) đều +1 streak
+        if roi >= Decimal("0"):  # Mọi lần đóng lệnh (tp bot, tp tay, hòa) đều +1 streak
             self.mtf_states[tf]["win_streak"] = self.mtf_states[tf].get("win_streak", 0) + 1
-            if self.mtf_states[tf]["win_streak"] >= 3:
-                self.mtf_states[tf]["streak_locked"] = True
         else:
             self.mtf_states[tf]["win_streak"] = 0
-            self.mtf_states[tf]["streak_locked"] = False
-            
+        self.mtf_states[tf]["streak_locked"] = False
 
         def fmt_tf(t): return t.lower() if t.upper().startswith("M") else t.upper()
         tfs = sorted(self.pos_cycle_closed_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(), 0))

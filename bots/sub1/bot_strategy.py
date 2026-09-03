@@ -455,6 +455,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             # BUG FIX: Restore active_pos_tf từ file, tránh bị reset về M5 sau restart
                             if "active_pos_tf" in coin_data:
                                 tracker.active_pos_tf = coin_data["active_pos_tf"]
+                            if "last_closed_mode" in coin_data: tracker.last_closed_mode = coin_data["last_closed_mode"]
+                            if "xole_win_streak" in coin_data: tracker.xole_win_streak = int(coin_data["xole_win_streak"])
+                            if "is_xole_pos" in coin_data: tracker.is_xole_pos = bool(coin_data["is_xole_pos"])
+                            if "xole_tf" in coin_data: tracker.xole_tf = coin_data["xole_tf"]
+                            if "xole_pos_side" in coin_data: tracker.xole_pos_side = coin_data["xole_pos_side"]
                         else:
                             tracker.mtf_states = coin_data
                         loaded = True
@@ -462,17 +467,19 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 pass
         if not loaded:
             tracker.mtf_states = {
-                "M5": {"accum": getattr(tracker, "accum_candle_count", 0), "fail": getattr(tracker, "cycle_fail_count", 0), "back": getattr(tracker, "back_count", 0), "forth": getattr(tracker, "forth_count", 0), "side": getattr(tracker, "current_side", "none"), "ts": getattr(tracker, "last_candle_timestamp", 0), "locked": False},
-                "M15": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-                "M30": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-                "H1": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-                "H2": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False},
-                "H4": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False}
+                "M5": {"accum": getattr(tracker, "accum_candle_count", 0), "fail": getattr(tracker, "cycle_fail_count", 0), "back": getattr(tracker, "back_count", 0), "forth": getattr(tracker, "forth_count", 0), "side": getattr(tracker, "current_side", "none"), "ts": getattr(tracker, "last_candle_timestamp", 0), "locked": False, "win_streak": 0, "streak_locked": False},
+                "M15": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False},
+                "M30": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False},
+                "H1": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False},
+                "H2": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False},
+                "H4": {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False}
             }
         
         # Đảm bảo toàn bộ các khung thời gian đều có đầy đủ cấu trúc
         for tf in [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]:
-            tracker.mtf_states.setdefault(tf, {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False})
+            tracker.mtf_states.setdefault(tf, {"accum": 0, "fail": 0, "back": 0, "forth": 0, "side": "none", "ts": 0, "locked": False, "win_streak": 0, "streak_locked": False})
+            tracker.mtf_states[tf].setdefault("win_streak", 0)
+            tracker.mtf_states[tf].setdefault("streak_locked", False)
             
         tracker.placed_target_tf = "M5"
         tracker.active_pos_tf = "M5"
@@ -1371,6 +1378,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.closure_reason_long = ""
         tracker.last_pos_state = "none"
         tracker.partial_lock_stage_long = 0  # Reset partial lock stage cho chu kỳ tiếp theo
+        tracker.is_xole_pos = False
+        tracker.xole_tf = None
+        tracker.xole_pos_side = ""
 
     if tracker.has_short and active_short_pos:
         pos_s = active_short_pos[0]
@@ -1577,6 +1587,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.closure_reason_short = ""
         tracker.last_pos_state = "none"
         tracker.partial_lock_stage_short = 0  # Reset partial lock stage cho chu kỳ tiếp theo
+        tracker.is_xole_pos = False
+        tracker.xole_tf = None
+        tracker.xole_pos_side = ""
 
     if not tracker.has_long and tracker.accum_candle_count >= 100 and tracker.trend == "UPTREND":
         if tracker.last_pos_state in ["had_long", "had_both"]: tracker.last_pos_state = "none"
@@ -1654,6 +1667,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 "last_closed_side": tracker.last_closed_side,
                 "last_closed_roi": str(tracker.last_closed_roi),
                 "last_closed_reason": tracker.last_closed_reason,
+                "last_closed_mode": getattr(tracker, "last_closed_mode", ""),
+                "xole_win_streak": getattr(tracker, "xole_win_streak", 0),
+                "is_xole_pos": getattr(tracker, "is_xole_pos", False),
+                "xole_tf": getattr(tracker, "xole_tf", None),
+                "xole_pos_side": getattr(tracker, "xole_pos_side", ""),
                 "pos_cycle_filled_tfs": list(getattr(tracker, "pos_cycle_filled_tfs", [])),
                 "active_pos_tf": getattr(tracker, "active_pos_tf", "M5")
             }
@@ -1674,9 +1692,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ==============================================================================
     def _is_tf_valid(tf):
         st = tracker.mtf_states[tf]
-        # Trend còn hiệu lực khi: đủ nến tích lũy + side rõ ràng + không bị lock
+        # Trend còn hiệu lực khi: đủ nến tích lũy + side rõ ràng + không bị lock cứng
         # ⚡ KHÔNG dùng fail count ở đây — EMA34/89 vs EMA200 là tiêu chí cuối cùng
-        return (not st["locked"] and not st.get("streak_locked", False) and
+        return (not st["locked"] and
                 st["accum"] >= globals_ref.REQUIRED_ACCUMULATION_CANDLES and
                 st["side"] in ("above", "under"))
 
@@ -1940,29 +1958,31 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         elif xl_trend == "DOWNTREND" and tracker.live_price <= _h2_ema_xl:
             xl_found = False
 
-    tracker.is_xole_pos = xl_found
-    
-
-    if xl_found:
-        # ⚡ XOLE cũng là overlay TF-cục bộ: KHÔNG override trend/best_tf toàn cục
-        tracker.xole_pos_side = "long" if xl_trend == "UPTREND" else "short"
-        tracker.xole_tf = xl_tf               # TF duy nhất chịu ảnh hưởng xole
-        tracker.xole_entry_ema = xl_entry
-        tracker.xole_big_tf = xl_big_tf
-        if xl_entry > 0:
-            if xl_target > 0:
-                xl_reward_pct = abs(xl_target - xl_entry) / xl_entry
-            else:
-                tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(xl_tf, Decimal("1.0"))
-                xl_reward_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.02")) * tf_mult
-            
-            base_offset = getattr(globals_ref, "BASE_ENTRY_OFFSET_PCT", Decimal("0.0006"))
-            xl_tp_pct = xl_reward_pct - base_offset
-            if xl_tp_pct < Decimal("0.0005"): xl_tp_pct = Decimal("0.0005")
-            tracker.xole_tp_pct = xl_tp_pct
-            tracker.xole_sl_pct = xl_reward_pct
-    else:
-        tracker.xole_tf = None                # Reset khi không còn xole
+    # ⚡ KHÓA TRẠNG THÁI XOLE KHI ĐANG CÓ VỊ THẾ: Không bị ghi đè bởi xl_found của vòng sau
+    has_any_pos = tracker.has_long or tracker.has_short
+    if not has_any_pos:
+        tracker.is_xole_pos = xl_found
+        if xl_found:
+            # ⚡ XOLE cũng là overlay TF-cục bộ: KHÔNG override trend/best_tf toàn cục
+            tracker.xole_pos_side = "long" if xl_trend == "UPTREND" else "short"
+            tracker.xole_tf = xl_tf               # TF duy nhất chịu ảnh hưởng xole
+            tracker.xole_entry_ema = xl_entry
+            tracker.xole_big_tf = xl_big_tf
+            if xl_entry > 0:
+                if xl_target > 0:
+                    xl_reward_pct = abs(xl_target - xl_entry) / xl_entry
+                else:
+                    tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(xl_tf, Decimal("1.0"))
+                    xl_reward_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.02")) * tf_mult
+                
+                base_offset = getattr(globals_ref, "BASE_ENTRY_OFFSET_PCT", Decimal("0.0006"))
+                xl_tp_pct = xl_reward_pct - base_offset
+                if xl_tp_pct < Decimal("0.0005"): xl_tp_pct = Decimal("0.0005")
+                tracker.xole_tp_pct = xl_tp_pct
+                tracker.xole_sl_pct = xl_reward_pct
+        else:
+            tracker.xole_tf = None                # Reset khi không còn xole
+            tracker.xole_pos_side = ""
 
     # Lọc nhiễu rụt râu
     if is_new_candle_closed and not tracker.has_long and not tracker.has_short:

@@ -395,6 +395,31 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             return "·", 2
         return "·", 1
 
+    def _get_mode_tag(tk, side):
+        """Trả về nhãn chiến thuật [TREND] hoặc [XOLE]"""
+        if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_pos_side", "") == side:
+            return "[XOLE]"
+        if getattr(tk, "is_ping_pong_pos", False) and getattr(tk, "ping_pong_pos_side", "") == side:
+            return "[PINGPONG]"
+        return "[TREND]"
+
+    def _get_last_info_str(tk):
+        """Trả về chuỗi thông tin lệnh đóng gần nhất và Win Streak"""
+        cur_streak = 0
+        if getattr(tk, "mtf_states", None):
+            cur_streak = max([st.get("win_streak", 0) for st in tk.mtf_states.values()])
+        xole_streak = getattr(tk, "xole_win_streak", 0)
+        display_streak = max(cur_streak, xole_streak)
+        
+        last_mode = getattr(tk, "last_closed_mode", "")
+        mode_str = f" [{last_mode}]" if last_mode else ""
+        
+        if getattr(tk, "last_closed_side", ""):
+            pnl_sign = "+" if tk.last_closed_roi > 0 else ""
+            roi_disp = f"{pnl_sign}{tk.last_closed_roi:.1f}%"
+            return f"Đã đóng {tk.last_closed_side}{mode_str} ({roi_disp}) ⭢ Win Streak: {display_streak}"
+        return f"Chưa có lệnh đóng ⭢ Win Streak: {display_streak}"
+
     pos_lines = []  # list of (mode_priority, coin_name, line_list)
     for cfg in COIN_PORTFOLIO:
         sid = cfg["swap"]
@@ -418,23 +443,22 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = fmt_tf("M5").ljust(18)
             long_vol = f"{tk.long_pos_vol:.0f} U" if getattr(tk, "long_pos_vol", 0) > 0 else ""
             long_vol_str = f" = {long_vol.ljust(6)} " if long_vol else " "
-            line_main = f"    {coin_name} ╭─ Đã khớp LONG [{filled_str.strip()}]{long_vol_str.rstrip()}"
+            mode_tag = _get_mode_tag(tk, "long")
+            line_main = f"    {coin_name} ╭─ Đã khớp LONG {mode_tag} [{filled_str.strip()}]{long_vol_str.rstrip()}"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
             placed_long_dict = getattr(tk, "placed_entry_px_long_by_tf", {})
             filled = getattr(tk, "pos_cycle_filled_tfs", [])
             active_dca_tfs = [tf for tf, px in placed_long_dict.items() if px not in ("---", "ERR") and tf not in filled]
-            has_dca = len(active_dca_tfs) > 0
-            prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
+            lines.append(f"{indent_branch}├─ Entry: {entry_px_str.strip()}  (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
-                for i, tf in enumerate(active_dca_tfs_sorted):
-                    prefix = "╰─" if i == len(active_dca_tfs_sorted) - 1 else "├─"
+                for tf in active_dca_tfs_sorted:
                     vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}{prefix} Chờ DCA: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
+                    lines.append(f"{indent_branch}├─ Chờ DCA: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
+            lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
             pos_lines.append((mode, coin_name, lines))
         if tk.has_short:
             has_any = True
@@ -449,23 +473,22 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = fmt_tf("M5").ljust(18)
             short_vol = f"{tk.short_pos_vol:.0f} U" if getattr(tk, "short_pos_vol", 0) > 0 else ""
             short_vol_str = f" = {short_vol.ljust(6)} " if short_vol else " "
-            line_main = f"    {coin_name} ╭─ Đã khớp SHORT [{filled_str.strip()}]{short_vol_str.rstrip()}"
+            mode_tag = _get_mode_tag(tk, "short")
+            line_main = f"    {coin_name} ╭─ Đã khớp SHORT {mode_tag} [{filled_str.strip()}]{short_vol_str.rstrip()}"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
             placed_short_dict = getattr(tk, "placed_entry_px_short_by_tf", {})
             filled_short = getattr(tk, "pos_cycle_filled_tfs", [])
             active_dca_tfs = [tf for tf, px in placed_short_dict.items() if px not in ("---", "ERR") and tf not in filled_short]
-            has_dca = len(active_dca_tfs) > 0
-            prefix = "├─" if has_dca else "╰─"
-            lines.append(f"{indent_branch}{prefix} Entry: {entry_px_str.strip()}  (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
+            lines.append(f"{indent_branch}├─ Entry: {entry_px_str.strip()}  (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_short_dict[tf]))
-                for i, tf in enumerate(active_dca_tfs_sorted):
-                    prefix = "╰─" if i == len(active_dca_tfs_sorted) - 1 else "├─"
+                for tf in active_dca_tfs_sorted:
                     vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}{prefix} Chờ DCA: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
+                    lines.append(f"{indent_branch}├─ Chờ DCA: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
+            lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
             pos_lines.append((mode, coin_name, lines))
         # DCA PENDING (có lệnh chờ nhưng chưa có vị thế mở)
         if not tk.has_long and not tk.has_short:
@@ -498,19 +521,23 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 active_s = [tf for tf, px in placed_short_dict2.items() if px not in ("---", "ERR")]
                 if active_l:
                     active_l_sorted = sorted(active_l, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
-                    for i, tf in enumerate(active_l_sorted):
-                        prefix = "╰─" if not active_s and i == len(active_l_sorted) - 1 else "├─"
+                    for tf in active_l_sorted:
+                        tag = "[XOLE]" if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_tf", None) == tf else "[TREND]"
                         vol_str = _get_vol_str(tk, tf)
-                        lines.append(f"{indent_branch}{prefix}  Đang limit LONG: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
+                        lines.append(f"{indent_branch}├─  Đang limit LONG {tag}: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
                 if active_s:
                     active_s_sorted = sorted(active_s, key=lambda tf: Decimal(placed_short_dict2[tf]))
-                    for i, tf in enumerate(active_s_sorted):
-                        prefix = "╰─" if i == len(active_s_sorted) - 1 else "├─"
+                    for tf in active_s_sorted:
+                        tag = "[XOLE]" if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_tf", None) == tf else "[TREND]"
                         vol_str = _get_vol_str(tk, tf)
-                        lines.append(f"{indent_branch}{prefix}  Đang limit SHORT: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
+                        lines.append(f"{indent_branch}├─  Đang limit SHORT {tag}: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
+                lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
                 pos_lines.append((0, coin_name, lines))
             else:
-                pos_lines.append((0, coin_name, [f"    {coin_name} ╭─  Chưa có vị thế"]))
+                line_main = f"    {coin_name} ╭─  Chưa có vị thế"
+                idx_branch = line_main.index("╭─")
+                indent_branch = " " * idx_branch
+                pos_lines.append((0, coin_name, [line_main, f"{indent_branch}╰─ {_get_last_info_str(tk)}"]))
         else:
             # Có vị thế 1 bên, in pending bên kia nếu có
             if not tk.has_long:

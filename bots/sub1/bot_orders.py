@@ -432,16 +432,24 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         
         # ⚡ Tính hệ số giảm (Shrink) TP/SL dựa trên chuỗi thắng (win_streak)
         streak_mult = Decimal("1.0")
-        if tracker and max_filled_tf in tracker.mtf_states:
-            win_streak = tracker.mtf_states[max_filled_tf].get("win_streak", 0)
-            streak = min(win_streak, 4)
-            if streak == 0: streak_mult = Decimal("1.0")
-            elif streak == 1: streak_mult = Decimal("0.8")
-            elif streak == 2: streak_mult = Decimal("0.6")
-            elif streak == 3: streak_mult = Decimal("0.4")
-            else: streak_mult = Decimal("0.3")
-        
         is_xl_pos = getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_pos_side", "") == side if tracker else False
+        
+        if is_xl_pos:
+            # Ưu tiên lấy xole_tf làm chuẩn tra cứu streak
+            xl_tf = getattr(tracker, "xole_tf", max_filled_tf) or max_filled_tf
+            win_streak = getattr(tracker, "xole_win_streak", 0)
+            if win_streak == 0 and tracker and xl_tf in tracker.mtf_states:
+                win_streak = tracker.mtf_states[xl_tf].get("win_streak", 0)
+        else:
+            win_streak = tracker.mtf_states[max_filled_tf].get("win_streak", 0) if (tracker and max_filled_tf in tracker.mtf_states) else 0
+            
+        streak = min(win_streak, 4)
+        if streak == 0: streak_mult = Decimal("1.0")
+        elif streak == 1: streak_mult = Decimal("0.8")
+        elif streak == 2: streak_mult = Decimal("0.6")
+        elif streak == 3: streak_mult = Decimal("0.4")
+        else: streak_mult = Decimal("0.3")
+        
         if is_xl_pos:
             target_tp_pct = getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult) * streak_mult
             target_sl_pct = getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult) * streak_mult
