@@ -160,6 +160,11 @@ class AssetTracker:
         self.active_pos_tf = "M5"
         self.pos_cycle_filled_tfs: list[str] = []
         self.pos_cycle_closed_tfs: list[str] = []
+        self.is_hedge_pos: bool = False
+        self.hedge_tf: str | None = None
+        self.hedge_pos_side: str = ""
+        self.hedge_win_streak: int = 0
+        # Aliases tương thích ngược cho XOLE
         self.is_xole_pos: bool = False
         self.xole_tf: str | None = None
         self.xole_pos_side: str = ""
@@ -218,14 +223,16 @@ class AssetTracker:
             self.last_closed_reason = f"[{reason_code}]"  # Chỉ hiện code khi desc rỗng
             
         # ⚡ Tăng/Reset win_streak theo khung thời gian (Shrinking TP logic)
-        is_xole = getattr(self, "is_xole_pos", False) and getattr(self, "xole_pos_side", "") == side
-        if is_xole:
-            self.last_closed_mode = "XOLE"
-            tf = getattr(self, "xole_tf", getattr(self, "active_pos_tf", "M5")) or "M5"
+        is_hedge = (getattr(self, "is_hedge_pos", False) or getattr(self, "is_xole_pos", False)) and (getattr(self, "hedge_pos_side", "") == side or getattr(self, "xole_pos_side", "") == side)
+        if is_hedge:
+            self.last_closed_mode = "HEDGE"
+            tf = getattr(self, "hedge_tf", None) or getattr(self, "xole_tf", None) or getattr(self, "active_pos_tf", "M5") or "M5"
             if roi >= Decimal("0"):
-                self.xole_win_streak = getattr(self, "xole_win_streak", 0) + 1
+                new_streak = getattr(self, "hedge_win_streak", getattr(self, "xole_win_streak", 0)) + 1
             else:
-                self.xole_win_streak = 0
+                new_streak = 0
+            self.hedge_win_streak = new_streak
+            self.xole_win_streak = new_streak
         else:
             self.last_closed_mode = "TREND"
             tf = getattr(self, "active_pos_tf", "M5")

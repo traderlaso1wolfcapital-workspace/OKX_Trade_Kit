@@ -12,10 +12,11 @@ from typing import Any
 # ==============================================================================
 # ------------------------------------------------------------------------------
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
-ENABLE_PYRAMID_DCA = False        # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - TẮT LÀ DCA ÂM
-ENABLE_STRATEGY_XOLE = True       # ❷ CHIẾN THUẬT BẮT BẺ (XOLE)
+ENABLE_PYRAMID_DCA = True         # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - MẶC ĐỊNH BẬT
+ENABLE_STRATEGY_HEDGE = True      # ❷ CHIẾN THUẬT ĐẢO CHIỀU (HEDGE)
+ENABLE_STRATEGY_XOLE = True       # Alias tương thích ngược
 
-ENABLE_DYNAMIC_EMA200_TP = True   # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO)
+ENABLE_DYNAMIC_EMA200_TP = False  # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO) - MẶC ĐỊNH TẮT
 ENABLE_DYNAMIC_PINGPONG_TP = False # CHỐT LỜI ĐỘNG TẠM THỜI (PING-PONG)
 
 ALTCOIN_FOLLOW_BTC_EMA = True     # 🔄 ON: Altcoin neo limit theo BTC | LOCK: Altcoin dùng EMA200 của chính nó
@@ -75,7 +76,7 @@ TF_CONFIG = {
     "H4":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
 }
 
-XOLE_TF_CONFIG = {
+HEDGE_TF_CONFIG = {
     "M5":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
     "M15": {"offset": Decimal("4.667"),  "vol": Decimal("3.0")},
     "M30": {"offset": Decimal("3.333"),  "vol": Decimal("2.0")},
@@ -83,27 +84,33 @@ XOLE_TF_CONFIG = {
     "H2":  {"offset": Decimal("1.5333"), "vol": Decimal("1.2")},
     "H4":  {"offset": Decimal("1.0"),    "vol": Decimal("1.0")},
 }
+XOLE_TF_CONFIG = HEDGE_TF_CONFIG
 
 # --- Backward-compatible aliases (Tương thích ngược 100% với bot_strategy, bot_orders, bot_ui) ---
 TF_MULTIPLIERS = {k: v["offset"] for k, v in TF_CONFIG.items()}
 TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in TF_CONFIG.items()}
 TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in TF_CONFIG.items()}
 
-XOLE_TF_MULTIPLIERS = {k: v["offset"] for k, v in XOLE_TF_CONFIG.items()}
-XOLE_TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in XOLE_TF_CONFIG.items()}
-XOLE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in XOLE_TF_CONFIG.items()}
-XOLE_FIXED_ENTRY_OFFSET_PCT = Decimal("-0.02") # Đệm lùi cố định -2% đón muộn quét thanh khoản cho XOLE
+HEDGE_TF_MULTIPLIERS = {k: v["offset"] for k, v in HEDGE_TF_CONFIG.items()}
+HEDGE_TF_VOLUME_MULTIPLIERS = {k: v["vol"] for k, v in HEDGE_TF_CONFIG.items()}
+HEDGE_TF_ENTRY_OFFSETS = {k: BASE_ENTRY_OFFSET_PCT * v["offset"] for k, v in HEDGE_TF_CONFIG.items()}
+HEDGE_FIXED_ENTRY_OFFSET_PCT = Decimal("-0.02") # Đệm lùi cố định -2% đón muộn quét thanh khoản cho HEDGE
+
+XOLE_TF_MULTIPLIERS = HEDGE_TF_MULTIPLIERS
+XOLE_TF_VOLUME_MULTIPLIERS = HEDGE_TF_VOLUME_MULTIPLIERS
+XOLE_TF_ENTRY_OFFSETS = HEDGE_TF_ENTRY_OFFSETS
+XOLE_FIXED_ENTRY_OFFSET_PCT = HEDGE_FIXED_ENTRY_OFFSET_PCT
 
 # ==============================================================================
 # 5. CÁC LỚP BẢO VỆ CỤC BỘ (SAFEGUARDS)
 # ==============================================================================
 ENABLE_SIDEWAY_SAFE_EXIT    = False  # Chốt lời chủ động khi Sideway strict + ROI >= 20%
-ENABLE_SQUEEZE_ESCAPE_EXIT  = True   # Phòng thủ SL Dương khi xuất hiện Nén tam giác (Squeeze)
-ENABLE_SAFEGUARD_ENTRY_EXIT = True  # Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry
+ENABLE_SQUEEZE_ESCAPE_EXIT  = False  # Phòng thủ SL Dương khi xuất hiện Nén tam giác (Squeeze) - MẶC ĐỊNH TẮT
+ENABLE_SAFEGUARD_ENTRY_EXIT = False  # Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry - MẶC ĐỊNH TẮT
 ENABLE_TRAILING_SL          = False  # Trailing SL động — khóa lợi nhuận khi ROI tăng dần
 ENABLE_MAX_ROI_EXIT         = False  # Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng)
 ENABLE_SIDEWAY_VAP_EXIT     = False  # Cắt hòa/dương khi Vấp EMA200 >= 2 lần liên tiếp
-ENABLE_H4_FLIP_CLOSE        = True   # Đóng toàn bộ vị thế ngược chiều khi H4 side đảo chiều (accum >= 60)
+ENABLE_H4_FLIP_CLOSE        = False  # Đóng toàn bộ vị thế ngược chiều khi H4 side đảo chiều - MẶC ĐỊNH TẮT
 
 # ==============================================================================
 # 6. HỆ THỐNG & KẾT NỐI (SYSTEM CONFIGURATION)

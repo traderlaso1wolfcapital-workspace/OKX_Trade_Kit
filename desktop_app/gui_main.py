@@ -2262,7 +2262,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         # add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
         add_checkbox(l_toggles, 0, 0, "Chế độ: DCA Dương (Mới)", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).", rowspan=2)
-        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
+        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
         add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
         # add_checkbox(l_toggles, 2, 0, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
         # add_checkbox(l_toggles, 3, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
@@ -2402,14 +2402,15 @@ class BotInstanceWidget(QtWidgets.QWidget):
         )
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             if hasattr(self, 'chk_main'): self.chk_main.setChecked(True)
-            if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(False)
-            if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(True)
+            if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(True)
+            if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(True)
+            if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(False)
             if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(False)
             if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(True)
-            if hasattr(self, 'chk_sideway_safe'): self.chk_sideway_safe.setChecked(True)
+            if hasattr(self, 'chk_sideway_safe'): self.chk_sideway_safe.setChecked(False)
             if hasattr(self, 'chk_squeeze_escape'): self.chk_squeeze_escape.setChecked(False)
-            if hasattr(self, 'chk_safeguard_entry'): self.chk_safeguard_entry.setChecked(True)
-            if hasattr(self, 'chk_trailing_sl'): self.chk_trailing_sl.setChecked(True)
+            if hasattr(self, 'chk_safeguard_entry'): self.chk_safeguard_entry.setChecked(False)
+            if hasattr(self, 'chk_trailing_sl'): self.chk_trailing_sl.setChecked(False)
             if hasattr(self, 'chk_max_roi'): self.chk_max_roi.setChecked(False)
             if hasattr(self, 'chk_sideway_vap'): self.chk_sideway_vap.setChecked(False)
             if hasattr(self, 'chk_h4_flip'): self.chk_h4_flip.setChecked(False)
@@ -2839,8 +2840,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             elif self.strategy_id == "sub1":
                 if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
-                if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", False))))
-                if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))
+                if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", True))))
+                if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_HEDGE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))))
                 if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
                 if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
                 if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(bool(cfg.get("ALTCOIN_FOLLOW_BTC_EMA", getattr(bot_config, "ALTCOIN_FOLLOW_BTC_EMA", False))))
@@ -3231,6 +3232,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', ["M5", "M15", "M30", "H1", "H2", "H4"]),
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_PYRAMID_DCA": self.chk_pyramid.isChecked(),
+                "ENABLE_STRATEGY_HEDGE": self.chk_xole.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
                 "ENABLE_DYNAMIC_PINGPONG_TP": self.chk_dynamic_pingpong_tp.isChecked(),

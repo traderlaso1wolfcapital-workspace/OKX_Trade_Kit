@@ -94,8 +94,9 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "200"))),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
-            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
-            "ENABLE_STRATEGY_XOLE": bool(globals_ref.ENABLE_STRATEGY_XOLE),
+            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", True))),
+            "ENABLE_STRATEGY_HEDGE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
+            "ENABLE_STRATEGY_XOLE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
             "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
             "ENABLE_DYNAMIC_PINGPONG_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_PINGPONG_TP", False)),
             "ALTCOIN_FOLLOW_BTC_EMA": bool(globals_ref.ALTCOIN_FOLLOW_BTC_EMA),
@@ -160,7 +161,10 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
                 if "ENABLE_PYRAMID_DCA" in cfg: set_val("ENABLE_PYRAMID_DCA", bool(cfg["ENABLE_PYRAMID_DCA"]))
-                if "ENABLE_STRATEGY_XOLE" in cfg: set_val("ENABLE_STRATEGY_XOLE", bool(cfg["ENABLE_STRATEGY_XOLE"]))
+                if "ENABLE_STRATEGY_HEDGE" in cfg or "ENABLE_STRATEGY_XOLE" in cfg:
+                    _h_val = bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", True)))
+                    set_val("ENABLE_STRATEGY_HEDGE", _h_val)
+                    set_val("ENABLE_STRATEGY_XOLE", _h_val)
                 if "ENABLE_DYNAMIC_EMA200_TP" in cfg: set_val("ENABLE_DYNAMIC_EMA200_TP", bool(cfg["ENABLE_DYNAMIC_EMA200_TP"]))
                 if "ENABLE_DYNAMIC_PINGPONG_TP" in cfg: set_val("ENABLE_DYNAMIC_PINGPONG_TP", bool(cfg["ENABLE_DYNAMIC_PINGPONG_TP"]))
                 if "ALTCOIN_FOLLOW_BTC_EMA" in cfg: set_val("ALTCOIN_FOLLOW_BTC_EMA", bool(cfg["ALTCOIN_FOLLOW_BTC_EMA"]))
@@ -181,8 +185,10 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                     set_val("EMA_CONFLUENCE_TOLERANCE_PCT", Decimal(str(cfg["EMA_CONFLUENCE_TOLERANCE_PCT"])))
                 if "BASE_ENTRY_OFFSET_PCT" in cfg:
                     set_val("BASE_ENTRY_OFFSET_PCT", Decimal(str(cfg["BASE_ENTRY_OFFSET_PCT"])))
-                if "XOLE_FIXED_ENTRY_OFFSET_PCT" in cfg:
-                    set_val("XOLE_FIXED_ENTRY_OFFSET_PCT", Decimal(str(cfg["XOLE_FIXED_ENTRY_OFFSET_PCT"])))
+                if "HEDGE_FIXED_ENTRY_OFFSET_PCT" in cfg or "XOLE_FIXED_ENTRY_OFFSET_PCT" in cfg:
+                    _fix_off = Decimal(str(cfg.get("HEDGE_FIXED_ENTRY_OFFSET_PCT", cfg.get("XOLE_FIXED_ENTRY_OFFSET_PCT", "-0.02"))))
+                    set_val("HEDGE_FIXED_ENTRY_OFFSET_PCT", _fix_off)
+                    set_val("XOLE_FIXED_ENTRY_OFFSET_PCT", _fix_off)
                     # Tự động tính toán lại bảng offsets nếu BASE_ENTRY_OFFSET_PCT bị thay đổi
                     for t in targets:
                         if t is not None:
@@ -191,9 +197,10 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                             if tf_mults and base_offset > 0:
                                 setattr(t, "TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in tf_mults.items()})
                             
-                            xole_tf_mults = getattr(t, "XOLE_TF_MULTIPLIERS", {})
-                            if xole_tf_mults and base_offset > 0:
-                                setattr(t, "XOLE_TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in xole_tf_mults.items()})
+                            hedge_tf_mults = getattr(t, "HEDGE_TF_MULTIPLIERS", getattr(t, "XOLE_TF_MULTIPLIERS", {}))
+                            if hedge_tf_mults and base_offset > 0:
+                                setattr(t, "HEDGE_TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in hedge_tf_mults.items()})
+                                setattr(t, "XOLE_TF_ENTRY_OFFSETS", {k: base_offset * v for k, v in hedge_tf_mults.items()})
                                 
                 if "REQUIRED_ACCUMULATION_CANDLES" in cfg:
                     set_val("REQUIRED_ACCUMULATION_CANDLES", int(cfg["REQUIRED_ACCUMULATION_CANDLES"]))
@@ -458,10 +465,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             if "active_pos_tf" in coin_data:
                                 tracker.active_pos_tf = coin_data["active_pos_tf"]
                             if "last_closed_mode" in coin_data: tracker.last_closed_mode = coin_data["last_closed_mode"]
-                            if "xole_win_streak" in coin_data: tracker.xole_win_streak = int(coin_data["xole_win_streak"])
-                            if "is_xole_pos" in coin_data: tracker.is_xole_pos = bool(coin_data["is_xole_pos"])
-                            if "xole_tf" in coin_data: tracker.xole_tf = coin_data["xole_tf"]
-                            if "xole_pos_side" in coin_data: tracker.xole_pos_side = coin_data["xole_pos_side"]
+                            _hd_streak = int(coin_data.get("hedge_win_streak", coin_data.get("xole_win_streak", 0)))
+                            tracker.hedge_win_streak = _hd_streak
+                            tracker.xole_win_streak = _hd_streak
+                            _is_hd = bool(coin_data.get("is_hedge_pos", coin_data.get("is_xole_pos", False)))
+                            tracker.is_hedge_pos = _is_hd
+                            tracker.is_xole_pos = _is_hd
+                            _hd_tf = coin_data.get("hedge_tf", coin_data.get("xole_tf", None))
+                            tracker.hedge_tf = _hd_tf
+                            tracker.xole_tf = _hd_tf
+                            _hd_side = coin_data.get("hedge_pos_side", coin_data.get("xole_pos_side", ""))
+                            tracker.hedge_pos_side = _hd_side
+                            tracker.xole_pos_side = _hd_side
                         else:
                             tracker.mtf_states = coin_data
                         loaded = True
@@ -530,15 +545,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             return base
 
     def calculate_entry_px(tf, side):
-        _xl_tf  = getattr(tracker, "xole_tf", None)
+        _xl_tf  = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
         if side == "long":
             if _xl_tf and tf == _xl_tf:
-                target_ema = getattr(tracker, "xole_entry_ema", Decimal("0"))
+                target_ema = getattr(tracker, "hedge_entry_ema", getattr(tracker, "xole_entry_ema", Decimal("0")))
             else:
                 target_ema = get_optimal_ema_for_tf(tf, "UPTREND")
         else:
             if _xl_tf and tf == _xl_tf:
-                target_ema = getattr(tracker, "xole_entry_ema", Decimal("0"))
+                target_ema = getattr(tracker, "hedge_entry_ema", getattr(tracker, "xole_entry_ema", Decimal("0")))
             else:
                 target_ema = get_optimal_ema_for_tf(tf, "DOWNTREND")
 
@@ -546,12 +561,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             return Decimal("0")
 
         _is_pp_pos = False
-        _is_xl_pos = getattr(tracker, "xole_tf", None) == tf
+        _is_xl_pos = (getattr(tracker, "hedge_tf", None) == tf) or (getattr(tracker, "xole_tf", None) == tf)
 
-        is_xole = getattr(tracker, "is_xole_pos", False)
-        if is_xole:
-            if hasattr(globals_ref, "XOLE_FIXED_ENTRY_OFFSET_PCT"):
+        is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+        if is_hedge:
+            if hasattr(globals_ref, "HEDGE_FIXED_ENTRY_OFFSET_PCT"):
+                base_buffer = Decimal(str(globals_ref.HEDGE_FIXED_ENTRY_OFFSET_PCT))
+            elif hasattr(globals_ref, "XOLE_FIXED_ENTRY_OFFSET_PCT"):
                 base_buffer = Decimal(str(globals_ref.XOLE_FIXED_ENTRY_OFFSET_PCT))
+            elif hasattr(globals_ref, "HEDGE_TF_ENTRY_OFFSETS"):
+                base_buffer = globals_ref.HEDGE_TF_ENTRY_OFFSETS.get(tf, Decimal("0.0006"))
             elif hasattr(globals_ref, "XOLE_TF_ENTRY_OFFSETS"):
                 base_buffer = globals_ref.XOLE_TF_ENTRY_OFFSETS.get(tf, Decimal("0.0006"))
             else:
@@ -1051,11 +1070,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if tracker.has_long:
             if not old_has_l:
                 tracker.mtf_volumes_at_entry = {"vol_5m": float(candles[0][5]), "vol_30m": float(candles_m15[0][5])}
-                _is_xl = getattr(tracker, "is_xole_pos", False)
+                _is_xl = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
                 if _is_xl:
-                    _big = getattr(tracker, "xole_big_tf", "")
-                    tracker.open_reason_long = f"Xo Le Hedge (LONG {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
+                    _big = getattr(tracker, "hedge_big_tf", getattr(tracker, "xole_big_tf", ""))
+                    tracker.open_reason_long = f"Đánh Sóng Đảo Chiều Hedge (LONG {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
                 else:
                     tracker.open_reason_long = f"Xu hướng Tăng tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
@@ -1078,11 +1097,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if tracker.has_short:
             if not old_has_s:
                 tracker.mtf_volumes_at_entry = {"vol_5m": float(candles[0][5]), "vol_30m": float(candles_m15[0][5])}
-                _is_xl = getattr(tracker, "is_xole_pos", False)
+                _is_xl = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
                 _tf = getattr(tracker, "active_target_tf", tracker.active_pos_tf)
                 if _is_xl:
-                    _big = getattr(tracker, "xole_big_tf", "")
-                    tracker.open_reason_short = f"Xo Le Hedge (SHORT {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
+                    _big = getattr(tracker, "hedge_big_tf", getattr(tracker, "xole_big_tf", ""))
+                    tracker.open_reason_short = f"Đánh Sóng Đảo Chiều Hedge (SHORT {_tf}): Cấu trúc đảo chiều sớm ngược pha {_big}"
                 else:
                     tracker.open_reason_short = f"Xu hướng Giảm tại [{_tf}]: Đồng pha EMA34/89/200 xếp lớp"
                 
@@ -1380,6 +1399,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.closure_reason_long = ""
         tracker.last_pos_state = "none"
         tracker.partial_lock_stage_long = 0  # Reset partial lock stage cho chu kỳ tiếp theo
+        tracker.is_hedge_pos = False
+        tracker.hedge_tf = None
+        tracker.hedge_pos_side = ""
         tracker.is_xole_pos = False
         tracker.xole_tf = None
         tracker.xole_pos_side = ""
@@ -1589,6 +1611,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.closure_reason_short = ""
         tracker.last_pos_state = "none"
         tracker.partial_lock_stage_short = 0  # Reset partial lock stage cho chu kỳ tiếp theo
+        tracker.is_hedge_pos = False
+        tracker.hedge_tf = None
+        tracker.hedge_pos_side = ""
         tracker.is_xole_pos = False
         tracker.xole_tf = None
         tracker.xole_pos_side = ""
@@ -1670,10 +1695,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 "last_closed_roi": str(tracker.last_closed_roi),
                 "last_closed_reason": tracker.last_closed_reason,
                 "last_closed_mode": getattr(tracker, "last_closed_mode", ""),
-                "xole_win_streak": getattr(tracker, "xole_win_streak", 0),
-                "is_xole_pos": getattr(tracker, "is_xole_pos", False),
-                "xole_tf": getattr(tracker, "xole_tf", None),
-                "xole_pos_side": getattr(tracker, "xole_pos_side", ""),
+                "hedge_win_streak": getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0)),
+                "is_hedge_pos": getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)),
+                "hedge_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)),
+                "hedge_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")),
+                "xole_win_streak": getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0)),
+                "is_xole_pos": getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)),
+                "xole_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)),
+                "xole_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")),
                 "pos_cycle_filled_tfs": list(getattr(tracker, "pos_cycle_filled_tfs", [])),
                 "active_pos_tf": getattr(tracker, "active_pos_tf", "M5")
             }
@@ -1874,8 +1903,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # Bỏ chặn SIDEWAY cưỡng bức để các TF lớn hơn vẫn gài DCA độc lập bình thường
 
 
-    def get_xole_opp(trk):
-        # ⚡ CHỈ CHO PHÉP XO LE KHI ĐÃ VƯỢT NGƯỠNG RƯỚN VĨ MÔ (MACRO_EXTENSION_LIMIT_PCT)
+    def get_hedge_opp(trk):
+        # ⚡ CHỈ CHO PHÉP ĐÁNH SÓNG ĐẢO CHIỀU (HEDGE) KHI ĐÃ VƯỢT NGƯỠNG RƯỚN VĨ MÔ
         if not getattr(trk, "is_macro_overextended", False):
             return False, None, None, None, None, None
             
@@ -1927,7 +1956,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         break
                     else:
                         opp_tf = tf_n
-                        # Không break, tiếp tục tìm TF lớn hơn xem có cản nằm phía trước mặt không
                 
                 if is_down and is_raw_up(tf_n):
                     found_opp = True
@@ -1938,7 +1966,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         break
                     else:
                         opp_tf = tf_n
-                        # Không break, tiếp tục tìm
             
             if found_opp:
                 trend = "UPTREND" if is_up else "DOWNTREND"
@@ -1946,13 +1973,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
         return False, None, None, None, None, None
 
-    xl_found, xl_trend, xl_tf, xl_entry, xl_target, xl_big_tf = get_xole_opp(tracker)
+    get_xole_opp = get_hedge_opp # Alias tương thích ngược
+    xl_found, xl_trend, xl_tf, xl_entry, xl_target, xl_big_tf = get_hedge_opp(tracker)
     
     # 🕹️ Áp dụng công tắc BẬT/TẮT chiến thuật
-    if not getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True):
+    _enable_hedge = getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))
+    if not _enable_hedge:
         xl_found = False
     
-    # ⚡ BỘ LỌC BẢO VỆ XO LE TẠI TRẠM H2: Giá chạm/vượt H2 về phía H4 sẽ cấm mở vị thế XO LE mới
+    # ⚡ BỘ LỌC BẢO VỆ HEDGE TẠI TRẠM H2: Giá chạm/vượt H2 về phía H4 sẽ cấm mở vị thế HEDGE mới
     _h2_ema_xl = get_ema200_for_tf("H2")
     if xl_found and _h2_ema_xl > 0:
         if xl_trend == "UPTREND" and tracker.live_price >= _h2_ema_xl:
@@ -1960,30 +1989,40 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         elif xl_trend == "DOWNTREND" and tracker.live_price <= _h2_ema_xl:
             xl_found = False
 
-    # ⚡ KHÓA TRẠNG THÁI XOLE KHI ĐANG CÓ VỊ THẾ: Không bị ghi đè bởi xl_found của vòng sau
+    # ⚡ KHÓA TRẠNG THÁI HEDGE KHI ĐANG CÓ VỊ THẾ: Không bị ghi đè bởi xl_found của vòng sau
     has_any_pos = tracker.has_long or tracker.has_short
     if not has_any_pos:
+        tracker.is_hedge_pos = xl_found
         tracker.is_xole_pos = xl_found
         if xl_found:
-            # ⚡ XOLE cũng là overlay TF-cục bộ: KHÔNG override trend/best_tf toàn cục
-            tracker.xole_pos_side = "long" if xl_trend == "UPTREND" else "short"
-            tracker.xole_tf = xl_tf               # TF duy nhất chịu ảnh hưởng xole
+            # ⚡ HEDGE cũng là overlay TF-cục bộ: KHÔNG override trend/best_tf toàn cục
+            _side_str = "long" if xl_trend == "UPTREND" else "short"
+            tracker.hedge_pos_side = _side_str
+            tracker.xole_pos_side = _side_str
+            tracker.hedge_tf = xl_tf
+            tracker.xole_tf = xl_tf
+            tracker.hedge_entry_ema = xl_entry
             tracker.xole_entry_ema = xl_entry
+            tracker.hedge_big_tf = xl_big_tf
             tracker.xole_big_tf = xl_big_tf
             if xl_entry > 0:
                 if xl_target > 0:
                     xl_reward_pct = abs(xl_target - xl_entry) / xl_entry
                 else:
-                    tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(xl_tf, Decimal("1.0"))
+                    tf_mult = getattr(globals_ref, "HEDGE_TF_MULTIPLIERS", getattr(globals_ref, "TF_MULTIPLIERS", {})).get(xl_tf, Decimal("1.0"))
                     xl_reward_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.02")) * tf_mult
                 
                 base_offset = getattr(globals_ref, "BASE_ENTRY_OFFSET_PCT", Decimal("0.0006"))
                 xl_tp_pct = xl_reward_pct - base_offset
                 if xl_tp_pct < Decimal("0.0005"): xl_tp_pct = Decimal("0.0005")
+                tracker.hedge_tp_pct = xl_tp_pct
+                tracker.hedge_sl_pct = xl_reward_pct
                 tracker.xole_tp_pct = xl_tp_pct
                 tracker.xole_sl_pct = xl_reward_pct
         else:
-            tracker.xole_tf = None                # Reset khi không còn xole
+            tracker.hedge_tf = None
+            tracker.hedge_pos_side = ""
+            tracker.xole_tf = None
             tracker.xole_pos_side = ""
 
     # Lọc nhiễu rụt râu
@@ -2409,7 +2448,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # Điều này giúp vượt qua bộ lọc get_aligned_tfs (nơi có thể chặn do squeeze hoặc fail limit)
             # ⚠️ QUAN TRỌNG: Phải tôn trọng bộ lọc DCA — nếu vị thế đã tồn tại, chỉ inject TF lớn hơn active_pos_tf
-            _cur_xl_tf = getattr(tracker, "xole_tf", None)
+            _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
             
             # Helper: kiểm tra TF có được phép inject không
             # KB1: TF đã filled → KHÔNG inject (tránh DCA trùng)
@@ -2419,8 +2458,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     return True  # Chưa có vị thế → được phép inject
                 return tf not in tracker.pos_cycle_filled_tfs
             
-
-                    
             if _cur_xl_tf and _cur_xl_tf not in target_long_tfs and allowed_long:
                 if _can_inject_tf(_cur_xl_tf, tracker.has_long):
                     _xl_tf_ema200 = get_ema200_for_tf(_cur_xl_tf)

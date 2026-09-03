@@ -19,6 +19,24 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[04/09/2026]** - Hiển thị % Khoảng cách tới EMA200 H4 tại Cột Price trong Bảng Terminal (`bot_ui.py`):
+  - **Yêu cầu:** Thêm % khoảng cách từ giá hiện tại đến EMA200 H4 vào cột `Price` trong bảng trạng thái đa khung (Ví dụ: `80,870.0 (10.6%)`).
+  - **Cập nhật:** 
+    - Cập nhật dòng hiển thị mỗi coin trong `table_lines`: `price_disp = f"{format_with_commas(tk.live_price, 1)} ({abs(dist_to_h4):.1f}%)"`.
+    - Căn chỉnh độ rộng cột `Price` lên 18 ký tự và căn lề phải ngay ngắn.
+    - Cập nhật viền bảng phân cách (`tbl_bar`) và viền đáy bảng (`bottom_bar`) tự động co giãn khớp 100% với chiều dài tiêu đề.
+
+- **[04/09/2026]** - Chuẩn hóa Cấu hình Mặc định (DCA Dương ON, Hedge ON, Dynamic EMA200 OFF, Toàn bộ Safeguards OFF) & Đổi Tên Toàn Diện XOLE ➔ HEDGE:
+  - **Yêu cầu:** 
+    1. Khi cài đặt mới App chưa có cấu hình JSON hoặc mở Web App lần đầu: Chế độ DCA Dương = ON, Đánh sóng đảo chiều (Hedge) = ON, Chốt lời bám EMA200 = OFF, toàn bộ nhóm Bảo vệ & Cắt lệnh tự động = OFF.
+    2. Đổi toàn bộ XOLE trong toàn bộ mã nguồn và tên gọi thành HEDGE (bao gồm thông báo Terminal: `[TREND]` vs `[HEDGE]`, lệnh limit `Đang limit LONG [TREND/HEDGE]`).
+  - **Cập nhật:**
+    1. Cập nhật `bot_config.py` và `sys_bot_sub1.py`: Set `ENABLE_PYRAMID_DCA=True`, `ENABLE_STRATEGY_HEDGE=True`, `ENABLE_DYNAMIC_EMA200_TP=False`, toàn bộ safeguards (`ENABLE_SIDEWAY_SAFE_EXIT`, `ENABLE_SQUEEZE_ESCAPE_EXIT`, `ENABLE_SAFEGUARD_ENTRY_EXIT`, `ENABLE_TRAILING_SL`, `ENABLE_MAX_ROI_EXIT`, `ENABLE_SIDEWAY_VAP_EXIT`, `ENABLE_H4_FLIP_CLOSE`) = `False`.
+    2. Cập nhật `gui_main.py`: Thiết lập mặc định ban đầu và nút Khôi phục mặc định đồng bộ đúng trạng thái trên.
+    3. Cập nhật `App.jsx` (Web App): Bổ sung công tắc `Chế độ: DCA Dương (Mới)`, set state khởi tạo và reset mặc định đồng bộ, cập nhật tooltip HEDGE.
+    4. Thay thế nhãn hiển thị Terminal UI trong `bot_ui.py`: `_get_mode_tag()` trả về `[HEDGE]`, dòng chờ limit hiển thị `Đang limit LONG [HEDGE]` / `[TREND]`, cập nhật nhóm giải thích `HEDGE`.
+    5. Cập nhật `bot_models.py`, `bot_orders.py`, `bot_strategy.py` sử dụng các trường và hàm `is_hedge_pos`, `hedge_tf`, `hedge_win_streak`, `get_hedge_opp`, bảo lưu aliases `xole_*` để tương thích ngược 100%.
+
 - **[04/09/2026]** - Sửa lỗi Bật DCA Dương (Pyramid) nhưng Bot vẫn đặt lệnh limit M5 (Chạy nhầm DCA Âm):
   - **Nguyên nhân 1 (Thiếu Reload Config vào Bộ nhớ):** Người dùng bật công tắc "Chế độ: DCA Dương (Mới)" trên giao diện Desktop GUI (`chk_pyramid`), GUI lưu `"ENABLE_PYRAMID_DCA": true` vào file JSON cấu hình. Tuy nhiên, hàm tiến hóa cấu hình định kỳ `run_ai_self_evolution()` trong `bot_strategy.py` lại KHÔNG có dòng đọc key `"ENABLE_PYRAMID_DCA"` từ JSON. Do đó, biến runtime `globals_ref.ENABLE_PYRAMID_DCA` trong bot vẫn luôn giữ giá trị `False` (DCA Âm). Ở chế độ DCA Âm, bot rải lệnh limit ở toàn bộ các TF thỏa mãn (cả M5 và H4) dẫn đến việc XAU chưa có vị thế nhưng đã treo lệnh limit M5.
   - **Nguyên nhân 2 (Ghi đè cấu hình lúc khởi động):** Hàm `sync_initial_config_to_json()` ép ghi đè giá trị mặc định từ `bot_config.py` (False) vào JSON thay vì bảo lưu trạng thái người dùng đã chọn trên GUI.

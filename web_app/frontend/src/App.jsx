@@ -280,10 +280,10 @@ function App() {
 
   // Strategy toggles (clone Công Tắc Chiến Thuật)
   const [strat, setStrat] = useState({
-    main: true, xole: true, dynamicEma200Tp: true,
+    main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
     dynamicPingpongTp: false, altcoinFollowBtc: true,
-    sidewaySafe: false, squeezeEscape: false, safeguardEntry: true,
-    trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
+    sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+    trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
     timeframeBase: "1H",
   });
   // Risk settings
@@ -356,10 +356,10 @@ function App() {
       // Defaults for Bot EMA200
       setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
-        main: true, xole: false, dynamicEma200Tp: true,
+        main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
-        sidewaySafe: true, squeezeEscape: false, safeguardEntry: true,
-        trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
+        sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+        trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
       });
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
     } else if (selectedAccount === "sub2") {
@@ -1691,19 +1691,21 @@ function App() {
                       <div className="settings-group">
                         <div className="settings-group-title">Công Tắc Chiến Thuật</div>
                         <div className="toggle-grid">
-                          
                           <div className="toggle-row">
-                            <ToggleSwitch checked={strat.xole} onChange={v => setStrat(s => ({ ...s, xole: v }))} />
+                            <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
+                            <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
+                            <span className="toggle-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định)." style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
                             <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
-                            <span className="toggle-help" onClick={() => alert("Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật XOLE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
+                            <span className="toggle-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
                             <span className="toggle-name">Chốt lời bám EMA200</span>
                             <span className="toggle-help" onClick={() => alert("Chốt lời động bám theo trục EMA200")} title="Chốt lời động bám theo trục EMA200" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
                           </div>
-                          
-                          
                         </div>
                       </div>
 
@@ -1957,10 +1959,10 @@ function App() {
                       if (selectedAccount === "sub1") {
                         setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
                         setStrat({
-                          main: true, xole: false, dynamicEma200Tp: true,
+                          main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
                           dynamicPingpongTp: false, altcoinFollowBtc: true,
-                          sidewaySafe: true, squeezeEscape: false, safeguardEntry: true,
-                          trailingSl: true, maxRoi: false, sidewayVap: false, h4Flip: false,
+                          sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+                          trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
                         });
                         setEntryCfg({
                           entryOffset: "0.05",

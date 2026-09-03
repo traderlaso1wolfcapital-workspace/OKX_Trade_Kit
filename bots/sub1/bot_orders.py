@@ -399,8 +399,10 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                 current_weight = tf_weights.get(max_filled_tf, 0)
                 upgrade_tf = max_filled_tf
                 
-                if getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_big_tf", None):
-                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(tracker.xole_big_tf, Decimal("1.0"))
+                is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+                hedge_big = getattr(tracker, "hedge_big_tf", getattr(tracker, "xole_big_tf", None))
+                if is_hedge and hedge_big:
+                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(hedge_big, Decimal("1.0"))
                 else:
                     temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
                 base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
@@ -432,14 +434,14 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         
         # ⚡ Tính hệ số giảm (Shrink) TP/SL dựa trên chuỗi thắng (win_streak)
         streak_mult = Decimal("1.0")
-        is_xl_pos = getattr(tracker, "is_xole_pos", False) and getattr(tracker, "xole_pos_side", "") == side if tracker else False
+        is_hd_pos = (getattr(tracker, "is_hedge_pos", False) or getattr(tracker, "is_xole_pos", False)) and (getattr(tracker, "hedge_pos_side", "") == side or getattr(tracker, "xole_pos_side", "") == side) if tracker else False
         
-        if is_xl_pos:
-            # Ưu tiên lấy xole_tf làm chuẩn tra cứu streak
-            xl_tf = getattr(tracker, "xole_tf", max_filled_tf) or max_filled_tf
-            win_streak = getattr(tracker, "xole_win_streak", 0)
-            if win_streak == 0 and tracker and xl_tf in tracker.mtf_states:
-                win_streak = tracker.mtf_states[xl_tf].get("win_streak", 0)
+        if is_hd_pos:
+            # Ưu tiên lấy hedge_tf làm chuẩn tra cứu streak
+            hd_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", max_filled_tf)) or max_filled_tf
+            win_streak = getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0))
+            if win_streak == 0 and tracker and hd_tf in tracker.mtf_states:
+                win_streak = tracker.mtf_states[hd_tf].get("win_streak", 0)
         else:
             win_streak = tracker.mtf_states[max_filled_tf].get("win_streak", 0) if (tracker and max_filled_tf in tracker.mtf_states) else 0
             

@@ -256,13 +256,15 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     # print(f"\n☢ CHIẾN THUẬT ĐANG KÍCH HOẠT: {btc_trend_mode}") # Ẩn theo yêu cầu
     
     table_lines = []
-    table_lines.append("-" * 78)
-    table_lines.append(f" {'Coin':^4} | {m5_lbl:^7} | {m15_lbl:^7} | {m30_lbl:^7} | {h1_lbl:^7} | {h2_lbl:^7} | {h4_lbl:^7} |   Price   ")
-    table_lines.append("-" * 78)
+    tbl_header = f" {'Coin':^4} | {m5_lbl:^7} | {m15_lbl:^7} | {m30_lbl:^7} | {h1_lbl:^7} | {h2_lbl:^7} | {h4_lbl:^7} | {'Price':^18} "
+    tbl_bar = "-" * len(tbl_header)
+    table_lines.append(tbl_bar)
+    table_lines.append(tbl_header)
+    table_lines.append(tbl_bar)
     
     exp_groups = {
         "POS": [],
-        "XOLE": [],
+        "HEDGE": [],
         "PINGPONG": [],
         "LIMIT": [],
         "WAIT": []
@@ -284,9 +286,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         
     def _get_vol_str(tk_obj, tf_name):
         target_usdt = target_vol
-        _is_xl = getattr(tk_obj, "xole_tf", None)
+        _is_xl = getattr(tk_obj, "hedge_tf", getattr(tk_obj, "xole_tf", None))
         if _is_xl:
-            v_mult = getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))
+            v_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf_name, Decimal("1.0"))
         else:
             v_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))
         vol_val = target_usdt * v_mult
@@ -295,7 +297,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     for cfg_idx, cfg in enumerate(COIN_PORTFOLIO):
         sid = cfg["swap"]
         if sid not in state_matrix: 
-            table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'0.0':>9} ")
+            table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':>18} ")
             continue
             
         tk = state_matrix[sid]
@@ -305,8 +307,10 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         h4_ema200_raw = getattr(tk, "h4_ema200", Decimal("0"))
         if h4_ema200_raw > 0:
             dist_to_h4 = ((tk.live_price - h4_ema200_raw) / h4_ema200_raw * 100)
+            dist_str = f"{abs(dist_to_h4):.1f}%"
         else:
             dist_to_h4 = Decimal("0")
+            dist_str = "--%"
         
         # Dùng cho WAIT section (vẫn cần target_tf và dist_ema)
         target_tf = getattr(tk, "active_target_tf", "M5")
@@ -319,7 +323,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         h2_str = fmt_tf_state(tk.mtf_states.get("H2", {"accum":0,"fail":0,"side":"none"}))
         h4_str = fmt_tf_state(tk.mtf_states.get("H4", {"accum":0,"fail":0,"side":"none"}))
         
-        table_lines.append(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {format_with_commas(tk.live_price, 1):>9} ")
+        price_disp = f"{format_with_commas(tk.live_price, 1)} ({dist_str})"
+        table_lines.append(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {price_disp:>18} ")
 
         # BÁO CÁO PHÂN TÍCH REALTIME
         has_any_exp = False
@@ -364,17 +369,17 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 exp_groups["PINGPONG"].append((1, globals_ref.tf_weight(pp_tf), cfg_idx, f"  ✧ [{cfg['coin']}]: Kích hoạt Ping-Pong [{pp_tf}] [Isolated x50] (SHORT {pp_tf}->{pp_big_tf}) tại {px_str} ({format_with_commas(display_vol, 0)}U)."))
                 has_any_exp = True
 
-        # Xo Le Hedge
-        if getattr(tk, "is_xole_pos", False):
-            xl_tf = getattr(tk, "xole_tf", tk.active_target_tf)
-            xl_big_tf = getattr(tk, "xole_big_tf", "")
+        # Sóng Đảo Chiều (Hedge)
+        if getattr(tk, "is_hedge_pos", getattr(tk, "is_xole_pos", False)):
+            xl_tf = getattr(tk, "hedge_tf", getattr(tk, "xole_tf", tk.active_target_tf))
+            xl_big_tf = getattr(tk, "hedge_big_tf", getattr(tk, "xole_big_tf", ""))
             if tk.placed_entry_px_long != "---": 
                 px_str = f"{format_with_commas(tk.placed_entry_px_long):>8}"
-                exp_groups["XOLE"].append((0, globals_ref.tf_weight(xl_tf), cfg_idx, f"  ✧ [{cfg['coin']}]: Kích hoạt Xo Le Hedge [{xl_tf}] (Bắt đáy {xl_tf}->{xl_big_tf}) tại {px_str}."))
+                exp_groups["HEDGE"].append((0, globals_ref.tf_weight(xl_tf), cfg_idx, f"  ✧ [{cfg['coin']}]: Kích hoạt Sóng Đảo Chiều (Hedge) [{xl_tf}] (Bắt đáy {xl_tf}->{xl_big_tf}) tại {px_str}."))
                 has_any_exp = True
             if tk.placed_entry_px_short != "---": 
                 px_str = f"{format_with_commas(tk.placed_entry_px_short):>8}"
-                exp_groups["XOLE"].append((1, globals_ref.tf_weight(xl_tf), cfg_idx, f"  ✧ [{cfg['coin']}]: Kích hoạt Xo Le Hedge [{xl_tf}] (Bắt đỉnh {xl_tf}->{xl_big_tf}) tại {px_str}."))
+                exp_groups["HEDGE"].append((1, globals_ref.tf_weight(xl_tf), cfg_idx, f"  ✧ [{cfg['coin']}]: Kích hoạt Sóng Đảo Chiều (Hedge) [{xl_tf}] (Bắt đỉnh {xl_tf}->{xl_big_tf}) tại {px_str}."))
                 has_any_exp = True
 
         # MAIN DCA limits (Only print standalone if NO position is active)
@@ -408,14 +413,14 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         """Trả về icon chiến thuật"""
         if getattr(tk, "is_ping_pong_pos", False) and getattr(tk, "ping_pong_pos_side", "") == side:
             return "·", 3
-        if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_pos_side", "") == side:
+        if (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_pos_side", "") == side or getattr(tk, "xole_pos_side", "") == side):
             return "·", 2
         return "·", 1
 
     def _get_mode_tag(tk, side):
-        """Trả về nhãn chiến thuật [TREND] hoặc [XOLE]"""
-        if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_pos_side", "") == side:
-            return "[XOLE]"
+        """Trả về nhãn chiến thuật [TREND] hoặc [HEDGE]"""
+        if (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_pos_side", "") == side or getattr(tk, "xole_pos_side", "") == side):
+            return "[HEDGE]"
         if getattr(tk, "is_ping_pong_pos", False) and getattr(tk, "ping_pong_pos_side", "") == side:
             return "[PINGPONG]"
         return "[TREND]"
@@ -425,7 +430,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         cur_streak = 0
         if getattr(tk, "mtf_states", None):
             cur_streak = max([st.get("win_streak", 0) for st in tk.mtf_states.values()])
-        xole_streak = getattr(tk, "xole_win_streak", 0)
+        xole_streak = getattr(tk, "hedge_win_streak", getattr(tk, "xole_win_streak", 0))
         display_streak = max(cur_streak, xole_streak)
         
         last_mode = getattr(tk, "last_closed_mode", "")
@@ -539,13 +544,15 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 if active_l:
                     active_l_sorted = sorted(active_l, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
                     for tf in active_l_sorted:
-                        tag = "[XOLE]" if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_tf", None) == tf else "[TREND]"
+                        _is_hd = (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_tf", None) == tf or getattr(tk, "xole_tf", None) == tf)
+                        tag = "[HEDGE]" if _is_hd else "[TREND]"
                         vol_str = _get_vol_str(tk, tf)
                         lines.append(f"{indent_branch}├─  Đang limit LONG {tag}: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
                 if active_s:
                     active_s_sorted = sorted(active_s, key=lambda tf: Decimal(placed_short_dict2[tf]))
                     for tf in active_s_sorted:
-                        tag = "[XOLE]" if getattr(tk, "is_xole_pos", False) and getattr(tk, "xole_tf", None) == tf else "[TREND]"
+                        _is_hd = (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_tf", None) == tf or getattr(tk, "xole_tf", None) == tf)
+                        tag = "[HEDGE]" if _is_hd else "[TREND]"
                         vol_str = _get_vol_str(tk, tf)
                         lines.append(f"{indent_branch}├─  Đang limit SHORT {tag}: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
                 lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
@@ -645,4 +652,5 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     print("")
     for line in table_lines:
         print(line)
-    print("=" * 78 + "\n")
+    bottom_bar = "=" * len(table_lines[0]) if table_lines else "=" * 78
+    print(bottom_bar + "\n")
