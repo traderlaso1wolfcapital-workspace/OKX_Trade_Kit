@@ -4223,7 +4223,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # --- NẾU LÀ LẦN ĐẦU MỞ APP (STARTUP), ÉP AUTO-UPDATE BẮT BUỘC NGAY ---
             if is_startup:
-                print(f"[AutoUpdate] Phát hiện bản cập nhật mới v{remote_version} khi mở app. Tiến hành tự động nâng cấp...")
+                try: print(f"[AutoUpdate] Phát hiện bản cập nhật mới v{remote_version} khi mở app. Tiến hành tự động nâng cấp...")
+                except UnicodeEncodeError: print(f"[AutoUpdate] Detected new update v{remote_version} on startup. Auto-upgrading...")
                 QtCore.QTimer.singleShot(500, lambda: self.run_update_app(bypass_confirm=True))
         elif has_update is False:
             # Đã là bản mới nhất → ẩn nút đi, không chiếm diện tích
