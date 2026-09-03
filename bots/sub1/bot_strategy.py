@@ -398,11 +398,13 @@ def run_strategy_cycle(*args, **kwargs):
     import sys; globals_ref = sys.modules[__name__]
     cfg = args[1] if len(args) > 1 else kwargs.get("cfg", {})
     swap_id = cfg.get("swap", "")
+    coin_name = cfg.get("coin", "")
+    inst_id = cfg.get("instId", "")
     
     original_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
     
     if isinstance(original_enabled_tfs, dict):
-        current_coin_tfs = original_enabled_tfs.get(swap_id, ["M5", "M15", "M30", "H1", "H2", "H4"])
+        current_coin_tfs = original_enabled_tfs.get(swap_id, original_enabled_tfs.get(coin_name, original_enabled_tfs.get(inst_id, ["M5", "M15", "M30", "H1", "H2", "H4"])))
     else:
         current_coin_tfs = original_enabled_tfs
         
@@ -2329,8 +2331,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         allowed_long = (btc_dir in ("UPTREND", "HEDGE")) and btc_h4_side != "under"
                         allowed_short = (btc_dir in ("DOWNTREND", "HEDGE")) and btc_h4_side != "above"
 
-            # ⚡ Bổ sung Bypass vị thế cho Xo Le Hedge (Mở lệnh ngược chiều)
-            _cur_xl_tf = getattr(tracker, "xole_tf", None)
+            # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Mở lệnh ngược chiều)
+            _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
             if _cur_xl_tf:
                 _xl_tf_ema200 = get_ema200_for_tf(_cur_xl_tf)
                 if _xl_tf_ema200 > 0:
@@ -2384,17 +2386,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
                 
                 new_target_long_tfs = []
-                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
-                
-                if anchor_tf and anchor_tf not in _filled_long:
-                    new_target_long_tfs.append(anchor_tf)
-                
-                for i in range(len(reversed_tfs) - 1):
-                    current_tf = reversed_tfs[i]
-                    next_tf = reversed_tfs[i+1]
-                    if current_tf in _filled_long:
-                        if next_tf in aligned_long_tfs and next_tf not in _filled_long:
-                            new_target_long_tfs.append(next_tf)
+                if not tracker.has_long:
+                    # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
+                    anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
+                    if anchor_tf:
+                        new_target_long_tfs.append(anchor_tf)
+                else:
+                    # Đã có vị thế: Tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                    for i in range(len(reversed_tfs) - 1):
+                        current_tf = reversed_tfs[i]
+                        next_tf = reversed_tfs[i+1]
+                        if current_tf in _filled_long:
+                            if next_tf in aligned_long_tfs and next_tf not in _filled_long:
+                                new_target_long_tfs.append(next_tf)
+                                break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
                             
                 target_long_tfs = new_target_long_tfs
             else:
@@ -2407,17 +2412,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             
             if _is_pyramid:
                 new_target_short_tfs = []
-                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
-                
-                if anchor_tf and anchor_tf not in _filled_short:
-                    new_target_short_tfs.append(anchor_tf)
-                
-                for i in range(len(reversed_tfs) - 1):
-                    current_tf = reversed_tfs[i]
-                    next_tf = reversed_tfs[i+1]
-                    if current_tf in _filled_short:
-                        if next_tf in aligned_short_tfs and next_tf not in _filled_short:
-                            new_target_short_tfs.append(next_tf)
+                if not tracker.has_short:
+                    # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
+                    anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
+                    if anchor_tf:
+                        new_target_short_tfs.append(anchor_tf)
+                else:
+                    # Đã có vị thế: Tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                    for i in range(len(reversed_tfs) - 1):
+                        current_tf = reversed_tfs[i]
+                        next_tf = reversed_tfs[i+1]
+                        if current_tf in _filled_short:
+                            if next_tf in aligned_short_tfs and next_tf not in _filled_short:
+                                new_target_short_tfs.append(next_tf)
+                                break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
                             
                 target_short_tfs = new_target_short_tfs
             else:
@@ -2431,10 +2439,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if coin_name != "BTC" and not tracker.has_long and not tracker.has_short:
                 fallback_tf = None
                 TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
-                if best_tf in TFS:
-                    fallback_tf = best_tf
-                elif TFS:
-                    fallback_tf = max(TFS, key=tf_weight)
+                if _is_pyramid:
+                    # ⚡ DCA DƯƠNG: Nếu Altcoin chưa có TF aligned nhưng được phép mở vị thế theo BTC,
+                    # BẮT BUỘC phải neo vào khung lớn nhất (anchor TF), tuyệt đối KHÔNG được rơi về TF nhỏ (như M5)
+                    fallback_tf = max(TFS, key=tf_weight) if TFS else "H4"
+                else:
+                    if best_tf in TFS:
+                        fallback_tf = best_tf
+                    elif TFS:
+                        fallback_tf = max(TFS, key=tf_weight)
                 
                 if fallback_tf and fallback_tf not in _blocked_tfs:
                     if allowed_long and not target_long_tfs:
@@ -2451,9 +2464,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
             
             # Helper: kiểm tra TF có được phép inject không
-            # KB1: TF đã filled → KHÔNG inject (tránh DCA trùng)
-            # KB2: TF chưa filled → ĐƯỢC inject
+            # KB1: TF không được tích chọn trong ENABLED_TFS → CẤM tuyệt đối
+            # KB2: TF đã filled → KHÔNG inject (tránh DCA trùng)
+            # KB3: TF chưa filled và nằm trong ENABLED_TFS → ĐƯỢC inject
             def _can_inject_tf(tf, has_pos):
+                _cur_enabled = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+                if tf not in _cur_enabled:
+                    return False
                 if not has_pos:
                     return True  # Chưa có vị thế → được phép inject
                 return tf not in tracker.pos_cycle_filled_tfs
@@ -2475,6 +2492,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # ⚡ Dedup target TFs (phòng thủ — tránh trùng lặp TF gây cancel/replace vô ích)
             target_long_tfs = list(dict.fromkeys(target_long_tfs))
             target_short_tfs = list(dict.fromkeys(target_short_tfs))
+
+            # ⚡ BỘ LỌC TỐI THƯỢNG (TF TRADE FILTER):
+            # Tuyệt đối chỉ cho phép đặt lệnh ở các khung thời gian được TÍCH CHỌN trong TF Trade (ENABLED_TFS).
+            # Bất kỳ khung nào bị bỏ tích sẽ bị loại bỏ 100% và bot sẽ tự động hủy lệnh treo (nếu có) trên sàn.
+            _tfs_allowed_now = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
+            target_long_tfs = [tf for tf in target_long_tfs if tf in _tfs_allowed_now]
+            target_short_tfs = [tf for tf in target_short_tfs if tf in _tfs_allowed_now]
 
             # ⚡ ALTCOIN TF CAP: Không cho Altcoin đặt limit ở TF vượt quá TF lớn nhất của BTC
             if coin_name != "BTC" and _is_alt_synced:
@@ -2535,9 +2559,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh LONG ở các TF mục tiêu
             for tf in target_long_tfs:
-                _is_xl = getattr(tracker, "xole_tf", None)
+                _is_xl = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
                 if _is_xl:
-                    tf_vol_mult = getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
                 tf_target_usdt = target_usdt * tf_vol_mult
@@ -2718,9 +2742,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh SHORT ở các TF mục tiêu
             for tf in target_short_tfs:
-                _is_xl = getattr(tracker, "xole_tf", None)
+                _is_xl = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
                 if _is_xl:
-                    tf_vol_mult = getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
                 tf_target_usdt = target_usdt * tf_vol_mult

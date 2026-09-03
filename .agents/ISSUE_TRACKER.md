@@ -19,6 +19,19 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[04/09/2026]** - Rà Soát Toàn Diện & Tối Ưu Hóa Logic Bậc Thang DCA Dương (Pyramid):
+  - **Phát hiện & Xử lý:**
+    1. **Tách biệt Anchor TF:** Trong chế độ DCA Dương, logic chọn `anchor_tf` chỉ được phép chạy khi **chưa có vị thế** (`not tracker.has_long`/`not tracker.has_short`). Khi vị thế đã mở, bot chỉ chạy logic bậc thang tiến dần xuống các khung nhỏ hơn và ngắt nhịp (`break`) để duy trì duy nhất 1 lệnh limit gài sẵn tiếp theo. Tránh tình trạng khung lớn đảo pha gây đặt lệnh ngược lại phía sau (tránh DCA âm).
+    2. **Đồng bộ Hedge Bypass:** Thay thế toàn bộ các biến sót `tracker.xole_tf` thành `getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))` tại các chốt kiểm tra bypass vị thế và khối lượng limit.
+    3. **Bộ lọc Tối thượng TF Trade:** Bất kỳ khung nào bị bỏ tích trên giao diện sẽ bị cắt đứt 100% tại mọi luồng đặt lệnh.
+
+- **[04/09/2026]** - Thiết Lập Bộ Lọc Tối Thượng Cho TF Trade (`ENABLED_TFS`):
+  - **Yêu cầu:** Đảm bảo khi CEO bỏ tích bất kỳ khung thời gian nào trong bảng TF Trade (ví dụ: bỏ tích M5), bot BẮT BUỘC không được phép giao dịch khung đó trong mọi tình huống (kể cả DCA, Altcoin Fallback hay Hedge).
+  - **Cập nhật:**
+    - Bổ sung bộ lọc tối thượng (`_tfs_allowed_now`) ngay tại cổng chốt chặn trước khi đặt lệnh limit trong `_run_strategy_cycle_impl()`: `target_long_tfs = [tf for tf in target_long_tfs if tf in _tfs_allowed_now]`. Bất kỳ TF nào bị bỏ tích sẽ bị loại bỏ 100%, và bot sẽ kích hoạt hủy lệnh treo trên sàn ngay lập tức.
+    - Cập nhật hàm `_can_inject_tf()` kiểm tra nghiêm ngặt `ENABLED_TFS` trước khi cho phép inject lệnh Hedge.
+    - Nâng cấp nạp cấu hình `current_coin_tfs` trong `run_strategy_cycle()` hỗ trợ tra cứu linh hoạt theo cả `swap_id`, `coin_name` và `instId`.
+
 - **[04/09/2026]** - Hiển thị % Khoảng cách tới EMA200 H4 tại Cột Price trong Bảng Terminal (`bot_ui.py`):
   - **Yêu cầu:** Thêm % khoảng cách từ giá hiện tại đến EMA200 H4 vào cột `Price` trong bảng trạng thái đa khung (Ví dụ: `80,870.0 (10.6%)`).
   - **Cập nhật:** 
