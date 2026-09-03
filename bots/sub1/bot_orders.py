@@ -216,14 +216,15 @@ def close_position_market(client, inst_id: str, pos_side: str, size: str, log_re
 
 def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     """
-    Dọn dẹp toàn bộ lệnh Limit và TP/SL của tất cả các đồng coin trong danh mục khi khởi động.
+    Dọn dẹp toàn bộ lệnh Limit rác cũ khi khởi động.
+    BẢO LƯU nguyên vẹn toàn bộ lệnh TP/SL của vị thế để đảm bảo an toàn tuyệt đối.
     """
     try:
         import time
-        print("🧹 [STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh rác trên OKX...")
+        print("🧹 [STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh Limit rác trên OKX (Bảo lưu TP/SL)...")
         for item in portfolio:
             inst_id = item["swap"]
-            # 1. Quét và Hủy Limit
+            # 1. Quét và Hủy Limit chờ cũ (tránh lệnh treo sai giá từ phiên trước)
             try:
                 pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id}).get("data", [])
                 if pending_regular:
@@ -233,19 +234,8 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
                         time.sleep(0.1)
             except Exception as e:
                 hft_logger.error(f"Lỗi cleanup startup Limit ({inst_id}): {e}")
-            
-            # 2. Quét và Hủy TP/SL
-            try:
-                pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"}).get("data", [])
-                if pending_algo:
-                    body_cancel_algo = [{"algoId": o["algoId"], "instId": inst_id} for o in pending_algo]
-                    for i in range(0, len(body_cancel_algo), 10):
-                        client.request("POST", "/api/v5/trade/cancel-algos", body=body_cancel_algo[i:i+10])
-                        time.sleep(0.1)
-            except Exception as e:
-                hft_logger.error(f"Lỗi cleanup startup Algo ({inst_id}): {e}")
         
-        print("✅ [STARTUP CLEANUP]: Hoàn tất dọn dẹp lệnh. Sẵn sàng chạy chiến lược.")
+        print("✅ [STARTUP CLEANUP]: Hoàn tất dọn dẹp lệnh Limit. Bảo lưu 100% TP/SL của vị thế.")
     except Exception as e:
         hft_logger.error(f"Lỗi cleanup_all_orders_on_startup: {e}", exc_info=True)
 
