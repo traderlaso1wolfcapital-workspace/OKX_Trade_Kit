@@ -94,6 +94,7 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "200"))),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
+            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
             "ENABLE_STRATEGY_XOLE": bool(globals_ref.ENABLE_STRATEGY_XOLE),
             "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
             "ENABLE_DYNAMIC_PINGPONG_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_PINGPONG_TP", False)),
@@ -158,6 +159,7 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                     
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
+                if "ENABLE_PYRAMID_DCA" in cfg: set_val("ENABLE_PYRAMID_DCA", bool(cfg["ENABLE_PYRAMID_DCA"]))
                 if "ENABLE_STRATEGY_XOLE" in cfg: set_val("ENABLE_STRATEGY_XOLE", bool(cfg["ENABLE_STRATEGY_XOLE"]))
                 if "ENABLE_DYNAMIC_EMA200_TP" in cfg: set_val("ENABLE_DYNAMIC_EMA200_TP", bool(cfg["ENABLE_DYNAMIC_EMA200_TP"]))
                 if "ENABLE_DYNAMIC_PINGPONG_TP" in cfg: set_val("ENABLE_DYNAMIC_PINGPONG_TP", bool(cfg["ENABLE_DYNAMIC_PINGPONG_TP"]))
@@ -2343,9 +2345,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
                 
                 new_target_long_tfs = []
-                anchor_tf = reversed_tfs[0] if reversed_tfs else None
+                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
                 
-                if anchor_tf in aligned_long_tfs and anchor_tf not in _filled_long:
+                if anchor_tf and anchor_tf not in _filled_long:
                     new_target_long_tfs.append(anchor_tf)
                 
                 for i in range(len(reversed_tfs) - 1):
@@ -2366,9 +2368,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             
             if _is_pyramid:
                 new_target_short_tfs = []
-                anchor_tf = reversed_tfs[0] if reversed_tfs else None
+                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
                 
-                if anchor_tf in aligned_short_tfs and anchor_tf not in _filled_short:
+                if anchor_tf and anchor_tf not in _filled_short:
                     new_target_short_tfs.append(anchor_tf)
                 
                 for i in range(len(reversed_tfs) - 1):

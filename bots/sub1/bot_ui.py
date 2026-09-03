@@ -139,7 +139,24 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     # Calculate Uptime
     bot_start_time = system_config.get("BOT_START_TIME", time.time())
     
-    r2_c1 = ""
+    # Hiển thị Chế độ DCA (DCA Dương / DCA Âm)
+    is_pyramid = False
+    try:
+        cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
+        if cfg_path and os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as _f:
+                _cfg = json.load(_f)
+                if "ENABLE_PYRAMID_DCA" in _cfg:
+                    is_pyramid = bool(_cfg["ENABLE_PYRAMID_DCA"])
+                else:
+                    is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        else:
+            is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+    except:
+        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        
+    mode_txt = "Mode: DCA Dương" if is_pyramid else "Mode: DCA Âm"
+    r2_c1 = f"{mode_txt:^21}"
     
     r2_c2 = f" PNL: {pnl_str:>8} U "
     r2_c3 = f" Vol : {vol_str_top:>8} U "

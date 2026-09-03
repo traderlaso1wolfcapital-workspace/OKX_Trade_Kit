@@ -19,6 +19,15 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[04/09/2026]** - Sửa lỗi Bật DCA Dương (Pyramid) nhưng Bot vẫn đặt lệnh limit M5 (Chạy nhầm DCA Âm):
+  - **Nguyên nhân 1 (Thiếu Reload Config vào Bộ nhớ):** Người dùng bật công tắc "Chế độ: DCA Dương (Mới)" trên giao diện Desktop GUI (`chk_pyramid`), GUI lưu `"ENABLE_PYRAMID_DCA": true` vào file JSON cấu hình. Tuy nhiên, hàm tiến hóa cấu hình định kỳ `run_ai_self_evolution()` trong `bot_strategy.py` lại KHÔNG có dòng đọc key `"ENABLE_PYRAMID_DCA"` từ JSON. Do đó, biến runtime `globals_ref.ENABLE_PYRAMID_DCA` trong bot vẫn luôn giữ giá trị `False` (DCA Âm). Ở chế độ DCA Âm, bot rải lệnh limit ở toàn bộ các TF thỏa mãn (cả M5 và H4) dẫn đến việc XAU chưa có vị thế nhưng đã treo lệnh limit M5.
+  - **Nguyên nhân 2 (Ghi đè cấu hình lúc khởi động):** Hàm `sync_initial_config_to_json()` ép ghi đè giá trị mặc định từ `bot_config.py` (False) vào JSON thay vì bảo lưu trạng thái người dùng đã chọn trên GUI.
+  - **Nguyên nhân 3 (Neo cứng TF Khởi đầu):** Logic chọn `anchor_tf` cho DCA Dương bị gán cứng vào `reversed_tfs[0]` (H4). Nếu H4 không thỏa mãn xu hướng mà H2/H1 thỏa mãn, bot sẽ bị kẹt không đặt bất kỳ lệnh nào.
+  - **Cập nhật:**
+    1. Bổ sung `if "ENABLE_PYRAMID_DCA" in cfg: set_val("ENABLE_PYRAMID_DCA", bool(cfg["ENABLE_PYRAMID_DCA"]))` vào `run_ai_self_evolution()` để bot cập nhật ngay lập tức trạng thái DCA Dương khi GUI thay đổi.
+    2. Cập nhật `sync_initial_config_to_json()` ưu tiên lấy giá trị từ file cấu hình JSON hiện hữu nếu có.
+    3. Nâng cấp logic chọn `anchor_tf` thành `next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)` để tự động chọn khung thời gian lớn nhất đang có xu hướng hợp lệ làm điểm khởi đầu cho chuỗi Pyramid. Khi chưa có vị thế, bot CHỈ đặt duy nhất 1 lệnh tại TF lớn nhất này và triệt tiêu hoàn toàn các lệnh limit rải nhỏ như M5.
+
 - **[26/08/2026]** - Hoàn thiện các yêu cầu UI/UX Web App & Hỗ trợ Tách lệnh OKX nguyên bản (Native Split Positions):
   - **Cập nhật 1 (Bảo mật):** Thêm bước xác thực bảo mật (Prompt UID) khi bấm nút `DỪNG CHẠY BOT` trong `App.jsx`, ngăn chặn rủi ro xung đột/vô tình bấm nhầm từ thiết bị khác khi dùng chung API Key.
   - **Cập nhật 2 (UI Gạch viền):** Thay thế chữ "Long"/"Short" thô cứng bằng các gạch dọc màu Xanh/Đỏ 4px ở đầu hàng bảng Vị thế, kết hợp làm mềm UI tổng thể.
