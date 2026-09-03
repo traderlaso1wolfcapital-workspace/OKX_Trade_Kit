@@ -3102,8 +3102,21 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     data_arr = res.get("data", [])
                     if data_arr:
                         main_uid = data_arr[0].get("mainUid", "")
+                        api_uid = data_arr[0].get("uid", "")
+                        
+                        if str(api_uid) == str(CURRENT_UID):
+                            display_err = f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {CURRENT_UID}).\n\nVui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để Trade."
+                            msg = QtWidgets.QMessageBox(self)
+                            msg.setWindowTitle("Lỗi API Key (Chặn TK Chính)")
+                            msg.setText(display_err)
+                            self.play_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                            msg.exec()
+                            self.btn_save_api.setText("💾 LƯU CẤU HÌNH API KEY")
+                            self.btn_save_api.setEnabled(True)
+                            return
+                            
                         if main_uid and str(main_uid) != str(CURRENT_UID):
-                            display_err = f"API Key này KHÔNG thuộc về UID {CURRENT_UID}!\n\nVui lòng chỉ nhập API Key của tài khoản chính hoặc tài khoản phụ trực thuộc UID {CURRENT_UID}."
+                            display_err = f"API Key này KHÔNG thuộc về UID {CURRENT_UID}!\n\nVui lòng chỉ nhập API Key của tài khoản phụ trực thuộc UID {CURRENT_UID}."
                             msg = QtWidgets.QMessageBox(self)
                             msg.setWindowTitle("Lỗi API Key (Sai Chủ)")
                             msg.setText(display_err)
@@ -3306,6 +3319,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 data_arr = res.get("data", [])
                 if data_arr:
                     main_uid = data_arr[0].get("mainUid", "")
+                    api_uid = data_arr[0].get("uid", "")
+                    if str(api_uid) == str(CURRENT_UID): return False
                     if main_uid and str(main_uid) != str(CURRENT_UID): return False
             return True
         except Exception:

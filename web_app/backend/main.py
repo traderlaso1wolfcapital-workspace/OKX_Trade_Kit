@@ -543,10 +543,13 @@ async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: s
                 api_uid = res_data["data"][0].get("uid")
                 main_uid = res_data["data"][0].get("mainUid")
                 print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, login UID={uid}", flush=True)
-                # Chấp nhận nếu UID của API trùng với UID đăng nhập (tài khoản chính hoặc sub-account tự đăng nhập)
-                # Hoặc nếu API là của sub-account và mainUid của nó trùng với UID đăng nhập
-                if api_uid != uid and main_uid != uid:
-                    raise HTTPException(status_code=400, detail=f"API Key không thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID đăng nhập: {uid})!")
+                # 1. Chặn tuyệt đối không cho dùng API Key của tài khoản chính (api_uid == uid)
+                if str(api_uid) == str(uid):
+                    raise HTTPException(status_code=400, detail=f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {uid}). Vui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để kết nối!")
+                
+                # 2. Phải là tài khoản phụ thuộc về tài khoản chính đang đăng nhập
+                if str(main_uid) != str(uid):
+                    raise HTTPException(status_code=400, detail=f"API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID đăng nhập: {uid})!")
             else:
                 okx_msg = res_data.get("msg", "Không rõ lỗi")
                 raise HTTPException(status_code=400, detail=f"API Key không hợp lệ. OKX phản hồi: {okx_msg}")
