@@ -131,8 +131,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     r0 = f" ⚡ Thợ săn EMA200  |   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  "
     
     r1_c1 = f"   {sync_time:^15}   "
-    r1_c2 = f" Gốc: {format_with_commas(von_goc, 2):>8} U "
-    r1_c3 = f" Tổng: {format_with_commas(von_hien_tai, 2):>8} U "
+    r1_c2 = f" Gốc: {format_with_commas(von_goc, 2):>8} $ "
+    r1_c3 = f" Tổng: {format_with_commas(von_hien_tai, 2):>8} $ "
     r1_c4 = f" Win: {ai_winrate:.1f}% / {total_pos:<3}"
     r1 = f"{r1_c1:<21}|{r1_c2:<19}|{r1_c3:<19}|{r1_c4:<16}"
 
@@ -158,7 +158,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     mode_txt = "Mode: DCA Dương" if is_pyramid else "Mode: DCA Âm"
     r2_c1 = f"{mode_txt:^21}"
     
-    r2_c2 = f" PNL: {pnl_str:>8} U "
+    r2_c2 = f" PNL: {pnl_str:>8} $ "
     r2_c3 = f" Vol : {vol_str_top:>8} U "
     r2_c4 = f" M/M: {mm_str:<10}"
     r2 = f"{r2_c1:<21}|{r2_c2:<19}|{r2_c3:<19}|{r2_c4:<16}"
@@ -563,7 +563,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             
             if has_pending:
                 has_any = True
-                line_main = f"    {coin_name} ╭─  Chưa có vị thế{_get_waiting_str(tk)}"
+                line_main = f"    {coin_name} ╭─  Chưa có vị thế"
                 idx_branch = line_main.index("╭─")
                 indent_branch = " " * idx_branch
                 lines = [line_main]

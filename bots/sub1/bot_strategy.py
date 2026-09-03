@@ -1128,7 +1128,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # Nếu BTC đang có vị thế ở TF lớn (vd H4), Altcoin cùng hướng phải kế thừa TF đó
     # để TP/SL tính cùng hệ số, tránh tình trạng BTC H4-SL 14.2% mà ETH vẫn M5-SL 2.1%
     btc_sync_tf_changed = False
-    if coin_name != "BTC":
+    if coin_name != "BTC" and _is_alt_synced:
         btc_tk_sync = state_matrix.get("BTC-USDT-SWAP")
         if btc_tk_sync:
             btc_pos_tf = getattr(btc_tk_sync, "active_pos_tf", "M5")
@@ -1866,15 +1866,19 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     tracker.signal_short_tf = signal_short_tf
 
     # Xác định trend và best_tf (TF lớn nhất có tín hiệu làm chủ)
+    # ⚡ Sửa đổi theo yêu cầu Sếp: Bỏ qua HEDGE cục bộ khi các TF nhỏ ngược chiều TF lớn. Luôn theo trend của TF lớn nhất.
+    best_tf = None
     if signal_long_tf and signal_short_tf:
-        tracker.trend = "HEDGE"
         best_tf = signal_short_tf if tf_weight(signal_short_tf) > tf_weight(signal_long_tf) else signal_long_tf
     elif signal_long_tf:
-        tracker.trend = "UPTREND"
         best_tf = signal_long_tf
     elif signal_short_tf:
-        tracker.trend = "DOWNTREND"
         best_tf = signal_short_tf
+
+    if best_tf and best_tf == signal_long_tf:
+        tracker.trend = "UPTREND"
+    elif best_tf and best_tf == signal_short_tf:
+        tracker.trend = "DOWNTREND"
     else:
         tracker.trend = "SIDEWAY"
         best_tf = "M5"
@@ -2436,7 +2440,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # ⚡ ALTCOIN FALLBACK: Khi BTC có tín hiệu (allowed_short/long=True)
             # nhưng Altcoin chưa có TF nào aligned → force đặt limit theo BTC direction
             # Phải đảm bảo fallback_tf nằm trong TFS (khung thời gian được tích chọn)
-            if coin_name != "BTC" and not tracker.has_long and not tracker.has_short:
+            if coin_name != "BTC" and _is_alt_synced and not tracker.has_long and not tracker.has_short:
                 fallback_tf = None
                 TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 if _is_pyramid:
