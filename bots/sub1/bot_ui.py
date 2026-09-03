@@ -297,7 +297,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     for cfg_idx, cfg in enumerate(COIN_PORTFOLIO):
         sid = cfg["swap"]
         if sid not in state_matrix: 
-            table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':>18} ")
+            table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^18} ")
             continue
             
         tk = state_matrix[sid]
@@ -323,8 +323,10 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         h2_str = fmt_tf_state(tk.mtf_states.get("H2", {"accum":0,"fail":0,"side":"none"}))
         h4_str = fmt_tf_state(tk.mtf_states.get("H4", {"accum":0,"fail":0,"side":"none"}))
         
-        price_disp = f"{format_with_commas(tk.live_price, 1)} ({dist_str})"
-        table_lines.append(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {price_disp:>18} ")
+        price_str = format_with_commas(tk.live_price, 1)
+        dist_part = f"({dist_str})"
+        price_disp = f"{price_str:>8} {dist_part:<9}"
+        table_lines.append(f" {cfg['coin']:^4} | {m5_str:^7} | {m15_str:^7} | {m30_str:^7} | {h1_str:^7} | {h2_str:^7} | {h4_str:^7} | {price_disp} ")
 
         # BÁO CÁO PHÂN TÍCH REALTIME
         has_any_exp = False
