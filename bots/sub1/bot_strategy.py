@@ -1011,25 +1011,47 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if _is_pyramid_reconstruct:
                 # DCA Dương: Khớp từ TF lớn xuống TF nhỏ
                 tfs_order = list(reversed(valid_tfs))
+                cum_prev = Decimal("0")
+                filled_tfs = []
+                for tf in tfs_order:
+                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
+                    threshold = cum_prev + cur_vol * Decimal("0.70")
+                    if pos_vol_usdt >= threshold:
+                        filled_tfs.append(tf)
+                        cum_prev += cur_vol
+                    else:
+                        break
+                
+                # Nếu volume trên sàn nhỏ hơn ngưỡng của khung lớn nhất (ví dụ < 70% H4):
+                # Tuyệt đối KHÔNG gán bừa thành H4!
+                # Đối chiếu volume thực tế với các khung nhỏ hơn (tính từ M5 lên) để gán đúng TF:
+                if not filled_tfs:
+                    cum_small = Decimal("0")
+                    for tf in valid_tfs:  # M5 -> M15 -> M30 -> H1 -> H2
+                        cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
+                        threshold = cum_small + cur_vol * Decimal("0.70")
+                        if pos_vol_usdt >= threshold:
+                            filled_tfs.append(tf)
+                            cum_small += cur_vol
+                        else:
+                            break
+                    if not filled_tfs:
+                        filled_tfs = [valid_tfs[0]] if valid_tfs else ["M5"]
             else:
                 # DCA Âm: Khớp từ TF nhỏ lên TF lớn
                 tfs_order = list(valid_tfs)
-
-            cum_vols = {}
-            cum = Decimal("0")
-            for tf in tfs_order:
-                cum += base_vol * vol_mults.get(tf, Decimal("1.0"))
-                cum_vols[tf] = cum
-
-            filled_tfs = []
-            for tf in tfs_order:
-                if pos_vol_usdt >= cum_vols[tf] * Decimal("0.70"):
-                    filled_tfs.append(tf)
-                else:
-                    break
-
-            if not filled_tfs:
-                filled_tfs = [tfs_order[0]] if tfs_order else ["M5"]
+                cum_prev = Decimal("0")
+                filled_tfs = []
+                for tf in tfs_order:
+                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
+                    threshold = cum_prev + cur_vol * Decimal("0.70")
+                    if pos_vol_usdt >= threshold:
+                        filled_tfs.append(tf)
+                        cum_prev += cur_vol
+                    else:
+                        break
+                if not filled_tfs:
+                    filled_tfs = [tfs_order[0]] if tfs_order else ["M5"]
 
             return filled_tfs
 
@@ -2404,20 +2426,26 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
                 
                 new_target_long_tfs = []
+                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
                 if not tracker.has_long:
                     # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
-                    anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
                     if anchor_tf:
                         new_target_long_tfs.append(anchor_tf)
                 else:
-                    # Đã có vị thế: Tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
-                    for i in range(len(reversed_tfs) - 1):
-                        current_tf = reversed_tfs[i]
-                        next_tf = reversed_tfs[i+1]
-                        if current_tf in _filled_long:
-                            if next_tf in aligned_long_tfs and next_tf not in _filled_long:
-                                new_target_long_tfs.append(next_tf)
-                                break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
+                    # Đã có vị thế:
+                    # 1. Nếu khung anchor lớn nhất (ví dụ H4) CHƯA có trong _filled_long (vì vol sàn chưa đủ vol H4):
+                    #    Bắt buộc phải đặt lệnh cho anchor_tf đón tại EMA200!
+                    if anchor_tf and anchor_tf not in _filled_long:
+                        new_target_long_tfs.append(anchor_tf)
+                    else:
+                        # 2. Khung lớn nhất đã khớp, tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                        for i in range(len(reversed_tfs) - 1):
+                            current_tf = reversed_tfs[i]
+                            next_tf = reversed_tfs[i+1]
+                            if current_tf in _filled_long:
+                                if next_tf in aligned_long_tfs and next_tf not in _filled_long:
+                                    new_target_long_tfs.append(next_tf)
+                                    break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
                             
                 target_long_tfs = new_target_long_tfs
             else:
@@ -2430,20 +2458,26 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             
             if _is_pyramid:
                 new_target_short_tfs = []
+                anchor_short_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
                 if not tracker.has_short:
                     # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
-                    anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
-                    if anchor_tf:
-                        new_target_short_tfs.append(anchor_tf)
+                    if anchor_short_tf:
+                        new_target_short_tfs.append(anchor_short_tf)
                 else:
-                    # Đã có vị thế: Tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
-                    for i in range(len(reversed_tfs) - 1):
-                        current_tf = reversed_tfs[i]
-                        next_tf = reversed_tfs[i+1]
-                        if current_tf in _filled_short:
-                            if next_tf in aligned_short_tfs and next_tf not in _filled_short:
-                                new_target_short_tfs.append(next_tf)
-                                break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
+                    # Đã có vị thế:
+                    # 1. Nếu khung anchor lớn nhất (ví dụ H4) CHƯA có trong _filled_short:
+                    #    Bắt buộc phải đặt lệnh cho anchor_short_tf đón tại EMA200!
+                    if anchor_short_tf and anchor_short_tf not in _filled_short:
+                        new_target_short_tfs.append(anchor_short_tf)
+                    else:
+                        # 2. Khung lớn nhất đã khớp, tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                        for i in range(len(reversed_tfs) - 1):
+                            current_tf = reversed_tfs[i]
+                            next_tf = reversed_tfs[i+1]
+                            if current_tf in _filled_short:
+                                if next_tf in aligned_short_tfs and next_tf not in _filled_short:
+                                    new_target_short_tfs.append(next_tf)
+                                    break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
                             
                 target_short_tfs = new_target_short_tfs
             else:

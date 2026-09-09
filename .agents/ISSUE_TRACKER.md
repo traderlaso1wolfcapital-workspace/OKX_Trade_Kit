@@ -19,6 +19,15 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[09/09/2026]** - Sửa Lỗi Quy Đổi Volume Lệch Khung & Không Đặt Lệnh Anchor H4 trong Mode DCA Dương:
+  - **Hiện tượng:** Khi user bật bot với vị thế có sẵn trên sàn (ví dụ 397 U = M5 base của XAU), bot tự động gán nhầm thành `[H4]` dù H4 cần 2000 U. Sau đó do tưởng H4 đã khớp, bot không đặt lệnh Limit H4 (2000 U) tại cản EMA200 H4 dù giá đang ở sát mép và H4 đang Uptrend.
+  - **Nguyên nhân:**
+    1. Trong `reconstruct_filled_tfs_from_volume()`, vòng lặp DCA Dương duyệt từ H4 xuống. Thấy `pos_vol_usdt < 70% H4` nên break ngay và fallback mặc định lấy `tfs_order[0] = H4`, ép lệnh 397 U thành [H4].
+    2. Trong logic targeting DCA Dương, khi `has_long = True`, bot chỉ tìm `next_tf` của các khung đã có trong `_filled_long`. Vì bot tưởng H4 đã khớp nên tìm H2 (đang Downtrend) và bỏ qua việc đặt lệnh H4.
+  - **Đã fix:**
+    1. Chuẩn hóa công thức ngưỡng lũy kế `cum_prev + cur_vol * 0.70`. Nếu volume không đủ khung lớn nhất (H4), bot tự động map chính xác về các khung nhỏ hơn (397 U map chuẩn về M5).
+    2. Trong chế độ DCA Dương, nếu khung Anchor lớn nhất (`anchor_tf`, ví dụ H4) chưa nằm trong `_filled_long` (do volume trên sàn chưa đủ volume của Anchor TF), bot **bắt buộc phải đặt lệnh Limit cho Anchor TF** đón tại cản EMA200.
+
 - **[04/09/2026]** - Tôn Trọng & Bảo Lưu Tuyệt Đối TP/SL Khi Tắt/Bật Bot (TP/SL Persistence):
   - **Cơ chế an toàn:**
     1. **Khi tắt bot (đột ngột, tắt máy, tắt terminal):** Lệnh TP/SL đã được gài trực tiếp trên hệ thống đám mây của sàn OKX nên vẫn tồn tại và hoạt động 100%, bảo vệ tài khoản ngay cả khi bot tắt hoàn toàn.
