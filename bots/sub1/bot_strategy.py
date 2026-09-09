@@ -1914,6 +1914,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if not getattr(trk, "is_macro_overextended", False):
             return False, None, None, None, None, None
             
+        # ⚡ LATCH TÍN HIỆU (Bảo lưu Hedge Limit đang chờ):
+        # Nếu lệnh Hedge đã được đặt lên sàn, ta khóa (latch) trạng thái này lại.
+        # Điều này giúp lệnh không bị hủy giữa chừng nếu giá hồi sâu làm EMA34 đan chéo (gãy trend ngắn hạn).
+        hd_tf = getattr(trk, "hedge_tf", None)
+        if hd_tf:
+            p_s = getattr(trk, "placed_entry_px_short_by_tf", {})
+            p_l = getattr(trk, "placed_entry_px_long_by_tf", {})
+            is_pending = (hd_tf in p_s and p_s[hd_tf] not in ("---", "ERR")) or \
+                         (hd_tf in p_l and p_l[hd_tf] not in ("---", "ERR"))
+            
+            if is_pending and getattr(trk, "hedge_trend", None):
+                # Vẫn giữ nguyên Limit Hedge, chỉ hủy khi mất is_macro_overextended (đã bị chặn ở trên)
+                return True, trk.hedge_trend, trk.hedge_tf, getattr(trk, "hedge_entry_ema", Decimal("0")), getattr(trk, "hedge_target_ema", Decimal("0")), getattr(trk, "hedge_opp_tf", None)
+            
         tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])]
         
         def is_raw_up(tf):
