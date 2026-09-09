@@ -473,12 +473,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _is_hd = bool(coin_data.get("is_hedge_pos", coin_data.get("is_xole_pos", False)))
                             tracker.is_hedge_pos = _is_hd
                             tracker.is_xole_pos = _is_hd
-                            _hd_tf = coin_data.get("hedge_tf", coin_data.get("xole_tf", None))
-                            tracker.hedge_tf = _hd_tf
-                            tracker.xole_tf = _hd_tf
-                            _hd_side = coin_data.get("hedge_pos_side", coin_data.get("xole_pos_side", ""))
-                            tracker.hedge_pos_side = _hd_side
-                            tracker.xole_pos_side = _hd_side
+                            if _is_hd:
+                                _hd_tf = coin_data.get("hedge_tf", coin_data.get("xole_tf", None))
+                                tracker.hedge_tf = _hd_tf
+                                tracker.xole_tf = _hd_tf
+                                _hd_side = coin_data.get("hedge_pos_side", coin_data.get("xole_pos_side", ""))
+                                tracker.hedge_pos_side = _hd_side
+                                tracker.xole_pos_side = _hd_side
+                            else:
+                                tracker.hedge_tf = None
+                                tracker.xole_tf = None
+                                tracker.hedge_pos_side = ""
+                                tracker.xole_pos_side = ""
                         else:
                             tracker.mtf_states = coin_data
                         loaded = True
@@ -547,7 +553,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             return base
 
     def calculate_entry_px(tf, side):
-        _xl_tf  = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
+        is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+        _xl_tf  = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)) if is_hedge else None
         if side == "long":
             if _xl_tf and tf == _xl_tf:
                 target_ema = getattr(tracker, "hedge_entry_ema", getattr(tracker, "xole_entry_ema", Decimal("0")))
@@ -563,9 +570,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             return Decimal("0")
 
         _is_pp_pos = False
-        _is_xl_pos = (getattr(tracker, "hedge_tf", None) == tf) or (getattr(tracker, "xole_tf", None) == tf)
-
         is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+        _is_xl_pos = is_hedge and ((getattr(tracker, "hedge_tf", None) == tf) or (getattr(tracker, "xole_tf", None) == tf))
         if is_hedge:
             if hasattr(globals_ref, "HEDGE_FIXED_ENTRY_OFFSET_PCT"):
                 base_buffer = Decimal(str(globals_ref.HEDGE_FIXED_ENTRY_OFFSET_PCT))
@@ -1705,6 +1711,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     saved_data = json.load(f)
             
             # Gộp mtf_states và các thuộc tính vị thế mở rộng
+            _is_hd_save = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
             saved_data[swap_id] = {
                 "mtf_states": tracker.mtf_states,
                 "max_roi_long": str(tracker.max_roi_long),
@@ -1720,13 +1727,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 "last_closed_reason": tracker.last_closed_reason,
                 "last_closed_mode": getattr(tracker, "last_closed_mode", ""),
                 "hedge_win_streak": getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0)),
-                "is_hedge_pos": getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)),
-                "hedge_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)),
-                "hedge_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")),
+                "is_hedge_pos": _is_hd_save,
+                "hedge_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)) if _is_hd_save else None,
+                "hedge_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")) if _is_hd_save else "",
                 "xole_win_streak": getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0)),
-                "is_xole_pos": getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)),
-                "xole_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)),
-                "xole_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")),
+                "is_xole_pos": _is_hd_save,
+                "xole_tf": getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)) if _is_hd_save else None,
+                "xole_pos_side": getattr(tracker, "hedge_pos_side", getattr(tracker, "xole_pos_side", "")) if _is_hd_save else "",
                 "pos_cycle_filled_tfs": list(getattr(tracker, "pos_cycle_filled_tfs", [])),
                 "active_pos_tf": getattr(tracker, "active_pos_tf", "M5")
             }
@@ -2066,6 +2073,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             tracker.hedge_pos_side = ""
             tracker.xole_tf = None
             tracker.xole_pos_side = ""
+    else:
+        # Nếu đang có vị thế nhưng KHÔNG PHẢI là vị thế HEDGE (vị thế TREND):
+        if not getattr(tracker, "is_hedge_pos", False) and not getattr(tracker, "is_xole_pos", False):
+            tracker.hedge_tf = None
+            tracker.hedge_pos_side = ""
+            tracker.xole_tf = None
+            tracker.xole_pos_side = ""
 
     # Lọc nhiễu rụt râu
     if is_new_candle_closed and not tracker.has_long and not tracker.has_short:
@@ -2371,8 +2385,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         allowed_long = (btc_dir in ("UPTREND", "HEDGE")) and btc_h4_side != "under"
                         allowed_short = (btc_dir in ("DOWNTREND", "HEDGE")) and btc_h4_side != "above"
 
-            # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Mở lệnh ngược chiều)
-            _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
+            # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Chỉ khi thực sự là vị thế HEDGE hoặc đang rình HEDGE)
+            is_hd_active = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)) or (not tracker.has_long and not tracker.has_short and xl_found)
+            _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None)) if is_hd_active else None
             if _cur_xl_tf:
                 _xl_tf_ema200 = get_ema200_for_tf(_cur_xl_tf)
                 if _xl_tf_ema200 > 0:
@@ -2424,28 +2439,28 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if _is_pyramid:
                 TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
+                max_anchor_tf = reversed_tfs[0] if reversed_tfs else "H4"
                 
                 new_target_long_tfs = []
-                anchor_tf = next((tf for tf in reversed_tfs if tf in aligned_long_tfs), None)
                 if not tracker.has_long:
-                    # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
-                    if anchor_tf:
-                        new_target_long_tfs.append(anchor_tf)
+                    # Chưa có vị thế: BẮT BUỘC chỉ mở vị thế tại khung lớn nhất (H4) khi H4 đủ điều kiện UPTREND
+                    if max_anchor_tf in aligned_long_tfs:
+                        new_target_long_tfs.append(max_anchor_tf)
                 else:
                     # Đã có vị thế:
-                    # 1. Nếu khung anchor lớn nhất (ví dụ H4) CHƯA có trong _filled_long (vì vol sàn chưa đủ vol H4):
-                    #    Bắt buộc phải đặt lệnh cho anchor_tf đón tại EMA200!
-                    if anchor_tf and anchor_tf not in _filled_long:
-                        new_target_long_tfs.append(anchor_tf)
+                    # 1. Nếu khung lớn nhất (H4) CHƯA khớp: BẮT BUỘC chỉ đặt Limit đón tại H4, cấm mọi TF nhỏ hơn
+                    if max_anchor_tf not in _filled_long:
+                        new_target_long_tfs.append(max_anchor_tf)
                     else:
-                        # 2. Khung lớn nhất đã khớp, tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                        # 2. Khung H4 đã khớp: Tìm khung liền kề tiếp theo chưa khớp từ trên xuống dưới
                         for i in range(len(reversed_tfs) - 1):
                             current_tf = reversed_tfs[i]
                             next_tf = reversed_tfs[i+1]
-                            if current_tf in _filled_long:
-                                if next_tf in aligned_long_tfs and next_tf not in _filled_long:
+                            if current_tf in _filled_long and next_tf not in _filled_long:
+                                if next_tf in aligned_long_tfs:
                                     new_target_long_tfs.append(next_tf)
-                                    break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
+                                # Dừng lại ngay tại bậc thang tiếp theo, cấm tuyệt đối nhảy cóc xuống TF nhỏ hơn!
+                                break
                             
                 target_long_tfs = new_target_long_tfs
             else:
@@ -2458,26 +2473,25 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             
             if _is_pyramid:
                 new_target_short_tfs = []
-                anchor_short_tf = next((tf for tf in reversed_tfs if tf in aligned_short_tfs), None)
                 if not tracker.has_short:
-                    # Chưa có vị thế: Đặt duy nhất 1 lệnh anchor tại khung lớn nhất đang có xu hướng
-                    if anchor_short_tf:
-                        new_target_short_tfs.append(anchor_short_tf)
+                    # Chưa có vị thế: BẮT BUỘC chỉ mở vị thế tại khung lớn nhất (H4) khi H4 đủ điều kiện DOWNTREND
+                    if max_anchor_tf in aligned_short_tfs:
+                        new_target_short_tfs.append(max_anchor_tf)
                 else:
                     # Đã có vị thế:
-                    # 1. Nếu khung anchor lớn nhất (ví dụ H4) CHƯA có trong _filled_short:
-                    #    Bắt buộc phải đặt lệnh cho anchor_short_tf đón tại EMA200!
-                    if anchor_short_tf and anchor_short_tf not in _filled_short:
-                        new_target_short_tfs.append(anchor_short_tf)
+                    # 1. Nếu khung lớn nhất (H4) CHƯA khớp: BẮT BUỘC chỉ đặt Limit đón tại H4, cấm mọi TF nhỏ hơn
+                    if max_anchor_tf not in _filled_short:
+                        new_target_short_tfs.append(max_anchor_tf)
                     else:
-                        # 2. Khung lớn nhất đã khớp, tiến dần từ khung lớn đã khớp xuống các khung nhỏ hơn (từng bước một)
+                        # 2. Khung H4 đã khớp: Tìm khung liền kề tiếp theo chưa khớp từ trên xuống dưới
                         for i in range(len(reversed_tfs) - 1):
                             current_tf = reversed_tfs[i]
                             next_tf = reversed_tfs[i+1]
-                            if current_tf in _filled_short:
-                                if next_tf in aligned_short_tfs and next_tf not in _filled_short:
+                            if current_tf in _filled_short and next_tf not in _filled_short:
+                                if next_tf in aligned_short_tfs:
                                     new_target_short_tfs.append(next_tf)
-                                    break  # Chỉ mở duy nhất 1 bậc thang tiếp theo
+                                # Dừng lại ngay tại bậc thang tiếp theo, cấm tuyệt đối nhảy cóc xuống TF nhỏ hơn!
+                                break
                             
                 target_short_tfs = new_target_short_tfs
             else:
@@ -2492,9 +2506,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 fallback_tf = None
                 TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 if _is_pyramid:
-                    # ⚡ DCA DƯƠNG: Nếu Altcoin chưa có TF aligned nhưng được phép mở vị thế theo BTC,
-                    # BẮT BUỘC phải neo vào khung lớn nhất (anchor TF), tuyệt đối KHÔNG được rơi về TF nhỏ (như M5)
-                    fallback_tf = max(TFS, key=tf_weight) if TFS else "H4"
+                    # ⚡ DCA DƯƠNG: Lấy khung lớn nhất ĐƯỢC TÍCH CHỌN trong bảng TF trade làm điểm khởi đầu
+                    _anchor_candidate = max(TFS, key=tf_weight) if TFS else "H4"
+                    _anchor_ema = get_ema200_for_tf(_anchor_candidate)
+                    if allowed_long and _anchor_ema > 0 and tracker.live_price >= _anchor_ema:
+                        fallback_tf = _anchor_candidate
+                    elif allowed_short and _anchor_ema > 0 and tracker.live_price < _anchor_ema:
+                        fallback_tf = _anchor_candidate
+                    else:
+                        fallback_tf = None
                 else:
                     if best_tf in TFS:
                         fallback_tf = best_tf
@@ -2511,9 +2531,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 target_long_tfs = []
                 target_short_tfs = []
 
-            # Điều này giúp vượt qua bộ lọc get_aligned_tfs (nơi có thể chặn do squeeze hoặc fail limit)
-            # ⚠️ QUAN TRỌNG: Phải tôn trọng bộ lọc DCA — nếu vị thế đã tồn tại, chỉ inject TF lớn hơn active_pos_tf
-            _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
+            # ⚡ BẢO VỆ VỊ THẾ TREND & CHẾ ĐỘ DCA DƯƠNG:
+            # 1. Nếu đang ở chế độ DCA Dương (_is_pyramid): Tuyệt đối KHÔNG inject hedge_tf
+            # 2. Nếu đang có vị thế TREND (tracker.has_long hoặc tracker.has_short mà không phải is_hedge_pos): CẤM inject!
+            is_hedge_pos = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+            if (tracker.has_long or tracker.has_short) and not is_hedge_pos:
+                _cur_xl_tf = None
+            elif _is_pyramid and not is_hedge_pos:
+                _cur_xl_tf = None
+            else:
+                _cur_xl_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
             
             # Helper: kiểm tra TF có được phép inject không
             # KB1: TF không được tích chọn trong ENABLED_TFS → CẤM tuyệt đối
@@ -2611,8 +2638,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh LONG ở các TF mục tiêu
             for tf in target_long_tfs:
-                _is_xl = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
-                if _is_xl:
+                is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+                _is_this_tf_hedge = is_hedge and (getattr(tracker, "hedge_tf", None) == tf or getattr(tracker, "xole_tf", None) == tf)
+                if _is_this_tf_hedge:
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
@@ -2794,8 +2822,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh SHORT ở các TF mục tiêu
             for tf in target_short_tfs:
-                _is_xl = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", None))
-                if _is_xl:
+                is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
+                _is_this_tf_hedge = is_hedge and (getattr(tracker, "hedge_tf", None) == tf or getattr(tracker, "xole_tf", None) == tf)
+                if _is_this_tf_hedge:
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))

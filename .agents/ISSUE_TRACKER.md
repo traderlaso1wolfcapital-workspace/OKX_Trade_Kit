@@ -19,6 +19,37 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[10/09/2026]** - Rà Soát Toàn Diện, Dọn Sạch Tàn Dư Hedge & Phân Định Tách Biệt Tuyệt Đối Giữa DCA Dương và DCA Âm:
+  - **Yêu cầu của CEO:** Rà soát và dọn sạch hoàn toàn tàn dư, phân định rõ ràng giữa DCA Dương (Pyramid) và DCA Âm để bot không bao giờ bị sai logic vào lệnh.
+  - **Đã kiểm tra & Dọn sạch tàn dư Hedge:**
+    1. `bot_strategy.py` (`load_state_from_disk`): Chỉ nạp `hedge_tf` từ file JSON khi `is_hedge_pos` là True; nếu vị thế là Trend, tự động reset `hedge_tf = None`, `hedge_pos_side = ""` để xóa sạch rác file cũ khi khởi động bot.
+    2. `bot_strategy.py` (`calculate_entry_px`): Buộc biến `_is_xl_pos` phải thỏa mãn `is_hedge == True` mới được kích hoạt, tránh việc lệnh Trend bị gán nhầm offset của Hedge.
+    3. `bot_strategy.py` (`save_data_to_disk`): Chỉ ghi `hedge_tf` vào file JSON khi đang có vị thế Hedge thực sự; với vị thế Trend, luôn ghi `None` và `""`.
+    4. `bot_strategy.py` (`hedge bypass`): Chỉ bypass `allowed_long`/`allowed_short` khi đang thực sự có vị thế Hedge hoặc đang rình cơ hội Hedge (`xl_found`), tuyệt đối cấm bypass vị thế Trend.
+    5. `bot_strategy.py` (Volume Multiplier Long/Short): Chỉ nhân `HEDGE_TF_VOLUME_MULTIPLIERS` khi đúng là lệnh Hedge của khung đó (`_is_this_tf_hedge`), ngược lại luôn dùng `TF_VOLUME_MULTIPLIERS` chuẩn Trend.
+  - **Phân định rõ ràng DCA Dương và DCA Âm:**
+    1. **Khởi tạo vị thế đầu tiên:**
+       - **DCA Dương (`ENABLE_PYRAMID_DCA = True`):** Lệnh mở vị thế BẮT BUỘC chỉ được đặt tại khung lớn nhất (**H4**), chỉ khi H4 đủ điều kiện xu hướng (`aligned_tfs`). Terminal hiển thị chuẩn `chờ LONG/SHORT [TREND] tại H4`.
+       - **DCA Âm (`ENABLE_PYRAMID_DCA = False`):** Lệnh mở vị thế bắt đầu từ khung nhỏ nhất (**M5**). Terminal hiển thị chuẩn `chờ LONG/SHORT [TREND] tại M5`.
+    2. **Lưới đặt lệnh Limit:**
+       - **DCA Dương:** Bậc thang tuần tự từ trên xuống (H4 -> H2 -> H1 -> M30 -> M15 -> M5). Chỉ mở duy nhất bậc tiếp theo khi bậc trước đã khớp VÀ bậc tiếp theo đủ điều kiện xu hướng. Nếu chưa đủ điều kiện thì đứng chờ, cấm tuyệt đối nhảy cóc.
+       - **DCA Âm:** Rải lệnh ở toàn bộ các khung thời gian `aligned_tfs` chưa filled (càng lỗ càng cắn các khung lớn hơn để kéo entry lại).
+    3. **Altcoin Fallback:**
+       - **DCA Dương:** Chỉ cho phép Altcoin mở vị thế H4 nếu H4 của chính coin đó thuận chiều với hướng dự định (giá trên EMA200 H4 với Long, dưới với Short).
+       - **DCA Âm:** Mở lệnh theo khung tín hiệu khả dụng tốt nhất.
+    4. **Cơ chế TP/SL & Upgrade TF Logic:**
+       - **DCA Dương:** Chốt lời co ngắn dần theo khung nhỏ nhất vừa cắn (`min(filled)`). KHÔNG chạy Upgrade TF logic (vì lệnh DCA Dương ở chiều lãi, không làm ảnh hưởng SL ở chiều lỗ).
+       - **DCA Âm:** Dãn SL theo khung lớn nhất đã cắn (`max(filled)`). CHẠY Upgrade TF logic khi SL sát entry lệnh tiếp theo.
+    5. **Tái tạo TF từ Volume (`reconstruct_filled_tfs_from_volume`):**
+       - **DCA Dương:** Quét lũy kế từ H4 xuống M5.
+       - **DCA Âm:** Quét lũy kế từ M5 lên H4.
+
+- **[09/09/2026]** - Đổi Vị Trí 2 Tab Cấu Hình Trong Hộp Thoại Cài Đặt (Desktop & Web):
+  - **Yêu cầu:** Đổi vị trí của tab "Cấu Hình Chiến Thuật" và "Cấu Hình API Key" cho nhau để tab API Key nằm trước, Chiến Thuật nằm sau.
+  - **Đã cập nhật:**
+    - `desktop_app/gui_main.py`: Thêm `self.tab_api` trước `self.tab_strategy` trong `open_settings_dialog()`.
+    - `web_app/frontend/src/App.jsx`: Đổi thứ tự tab buttons `🔑 Cấu Hình API Key` lên trước `⚙️ Cấu Hình Chiến Thuật`.
+
 - **[09/09/2026]** - Sửa Lỗi Quy Đổi Volume Lệch Khung & Không Đặt Lệnh Anchor H4 trong Mode DCA Dương:
   - **Hiện tượng:** Khi user bật bot với vị thế có sẵn trên sàn (ví dụ 397 U = M5 base của XAU), bot tự động gán nhầm thành `[H4]` dù H4 cần 2000 U. Sau đó do tưởng H4 đã khớp, bot không đặt lệnh Limit H4 (2000 U) tại cản EMA200 H4 dù giá đang ở sát mép và H4 đang Uptrend.
   - **Nguyên nhân:**

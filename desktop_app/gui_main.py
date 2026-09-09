@@ -1075,10 +1075,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         settings_tabs = QtWidgets.QTabWidget()
         settings_tabs.setObjectName("InnerTabs")
         
-        if hasattr(self, 'tab_strategy') and self.tab_strategy:
-            settings_tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
         if hasattr(self, 'tab_api') and self.tab_api:
             settings_tabs.addTab(self.tab_api, "🔑 Cấu Hình API Key")
+        if hasattr(self, 'tab_strategy') and self.tab_strategy:
+            settings_tabs.addTab(self.tab_strategy, "⚙️ Cấu Hình Chiến Thuật")
             
         dlg_layout.addWidget(settings_tabs)
         

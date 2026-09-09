@@ -430,13 +430,15 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     def _get_waiting_str(tk):
         is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", True)
         enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+        if isinstance(enabled_tfs, dict):
+            enabled_tfs = enabled_tfs.get(getattr(tk, "symbol", ""), enabled_tfs.get(getattr(tk, "coin", ""), ["M5", "M15", "M30", "H1", "H2", "H4"]))
         best_tf = getattr(tk, "active_target_tf", "M5")
         
         # Trend entry TF phụ thuộc vào DCA Âm/Dương
         if is_pyramid:
-            entry_tf = best_tf
+            entry_tf = max(enabled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0)) if enabled_tfs else "H4"
         else:
-            entry_tf = enabled_tfs[0] if enabled_tfs else "M5"
+            entry_tf = min(enabled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0)) if enabled_tfs else "M5"
             
         trend = getattr(tk, "trend", "SIDEWAY")
         is_macro = getattr(tk, "is_macro_overextended", False)

@@ -1619,11 +1619,11 @@ function App() {
 
             {/* Tab Bar */}
             <div className="settings-tab-bar">
-              <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
-                ⚙️ Cấu Hình Chiến Thuật
-              </button>
               <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
                 🔑 Cấu Hình API Key
+              </button>
+              <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
+                ⚙️ Cấu Hình Chiến Thuật
               </button>
             </div>
 

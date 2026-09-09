@@ -286,8 +286,8 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
                 err_str = str(e2)
 
         if "51006" in err_str or "Order price is not within the price limit" in err_str:
-            print(f"💡 [FALLBACK 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá hiện tại ngon hơn giá Limit! Tự động vào Market!")
-            return place_market_entry(client, inst_id, side, pos_side, size, td_mode)
+            print(f"⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!")
+            return None
             
         print(f"🚨 [LIMIT] Lỗi kết nối: {err_str} | {inst_id} {side}@{price}")
         if "51008" in err_str:
@@ -390,8 +390,9 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         else:
             max_filled_tf = "M5"
 
-        # --- UPGRADE TF LOGIC ---
-        if tracker:
+        # --- UPGRADE TF LOGIC (Chỉ áp dụng cho DCA Âm, không áp dụng cho DCA Dương) ---
+        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        if tracker and not is_pyramid:
             try:
                 tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
                 next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}
