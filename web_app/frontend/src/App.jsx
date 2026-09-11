@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode } from "lightweight-charts";
 import "./App.css";
 
 const COIN_LIST = [
-  { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
   { label: "BTC-USDT", value: "BTC-USDT-SWAP" },
   { label: "ETH-USDT", value: "ETH-USDT-SWAP" },
+  { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
+  { label: "USDT.D", value: "USDT.D" },
   { label: "SOL-USDT", value: "SOL-USDT-SWAP" },
   { label: "XRP-USDT", value: "XRP-USDT-SWAP" },
 ];
@@ -29,13 +30,538 @@ const calculateEMA = (data, period) => {
 };
 
 // ToggleSwitch component giống Desktop App
-function ToggleSwitch({ checked, onChange, labelOn = "BẬT", labelOff = "TẮT" }) {
+function ToggleSwitch({ checked, onChange, labelOn = "ON", labelOff = "OFF" }) {
   return (
     <label className="toggle-switch">
       <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
       <span className="toggle-slider"></span>
       <span className="toggle-label">{checked ? labelOn : labelOff}</span>
     </label>
+  );
+}
+
+// SpinBox component có hậu tố (ví dụ: %) và nút tăng giảm thoáng đãng
+function NumberSpinBox({ value, onChange, min = 0, max, step = 1, suffix = "", width = "90px" }) {
+  const handleStep = (delta) => {
+    const cur = parseFloat(value || 0);
+    const stepStr = step.toString();
+    const decimals = stepStr.includes(".") ? stepStr.split(".")[1].length : 0;
+    let next = parseFloat((cur + delta).toFixed(decimals));
+    if (min !== undefined && next < min) next = min;
+    if (max !== undefined && next > max) next = max;
+    onChange(next.toString());
+  };
+
+  return (
+    <div className="spinbox-container" style={{ width }}>
+      <input
+        type="number"
+        className="spinbox-input"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        min={min}
+        max={max}
+        step={step}
+        onKeyDown={e => {
+          if (e.key === "ArrowUp") { e.preventDefault(); handleStep(step); }
+          if (e.key === "ArrowDown") { e.preventDefault(); handleStep(-step); }
+        }}
+      />
+      <span
+        className="spinbox-suffix"
+        style={{ visibility: suffix ? "visible" : "hidden" }}
+        aria-hidden={!suffix}
+      >
+        {suffix || "%"}
+      </span>
+      <div className="spinbox-stepper">
+        <button type="button" tabIndex={-1} className="spinbox-btn" onClick={() => handleStep(step)} title="Tăng">▲</button>
+        <button type="button" tabIndex={-1} className="spinbox-btn" onClick={() => handleStep(-step)} title="Giảm">▼</button>
+      </div>
+    </div>
+  );
+}
+
+// TradingView Layout Icons
+const renderLayoutIcon = (type, w = 24, h = 24) => {
+  if (type === "1") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="3" width="22" height="22" rx="3" stroke="currentColor" strokeWidth="2" />
+      </svg>
+    );
+  }
+  if (type === "2-col") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="3" width="10" height="22" rx="2" stroke="currentColor" strokeWidth="2" />
+        <rect x="15" y="3" width="10" height="22" rx="2" stroke="currentColor" strokeWidth="2" />
+      </svg>
+    );
+  }
+  if (type === "2-row") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="3" width="22" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
+        <rect x="3" y="15" width="22" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
+      </svg>
+    );
+  }
+  if (type === "3-col") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="2.5" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="10.75" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="19" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (type === "3-row") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="2.5" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3" y="10.75" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3" y="19" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  if (type === "4-grid") {
+    return (
+      <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
+        <rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="15" y="3" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3" y="15" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="15" y="15" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
+      </svg>
+    );
+  }
+  return null;
+};
+
+// Component Biểu Đồ Nến Độc Lập (SingleChartPane)
+function SingleChartPane({
+  chartIndex,
+  coin,
+  tf,
+  onChangeCoin,
+  onChangeTf,
+  isActive,
+  onActivate,
+  showToolbar = true,
+  layout
+}) {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
+  const emaSeriesRef = useRef(null);
+  const overlayRef = useRef(null);
+  const activeObsRef = useRef([]);
+  const candlesRef = useRef([]);
+  const [isAutoFit, setIsAutoFit] = useState(true);
+  const [isLogScale, setIsLogScale] = useState(false);
+
+  // Mặc định zoom nến to (khoảng 30-80 cây nến, cách viền phải 5-10 cây nến)
+  const applyDefaultZoom = () => {
+    if (!chartRef.current || !candlesRef.current || candlesRef.current.length === 0) return;
+    const total = candlesRef.current.length;
+    const candleCount = 55; // 30-80 cây nến (50-60 nến là kích thước to rõ đẹp)
+    const rightOffset = 8;  // Cách viền phải 5-10 cây nến cho thoáng
+    try {
+      // Luôn ép nến và trục giá Y (Price Scale) tự động co giãn về đúng tâm màn hình
+      chartRef.current.timeScale().fitContent();
+      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+      if (candleSeriesRef.current) {
+        candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
+      }
+      // Ép trục thời gian X hiển thị 55 cây nến mới nhất tới thời điểm hiện tại
+      chartRef.current.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, total - candleCount),
+        to: total - 1 + rightOffset,
+      });
+    } catch (e) {}
+  };
+
+  // Khi chọn bất kỳ bố cục biểu đồ nào, tự động kích hoạt zoom mặc định
+  useEffect(() => {
+    setIsAutoFit(true);
+    const timer = setTimeout(() => {
+      applyDefaultZoom();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [layout]);
+
+  // Khởi tạo Chart
+  useEffect(() => {
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = "";
+
+    const chart = createChart(containerRef.current, {
+      width: containerRef.current.clientWidth || 300,
+      height: containerRef.current.clientHeight || 200,
+      layout: { background: { type: 'solid', color: '#0c0c0c' }, textColor: '#787b86', attributionLogo: false },
+      grid: {
+        vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
+        horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(160, 165, 180, 0.45)',
+          width: 1,
+          style: 3,
+          visible: true,
+          labelVisible: true,
+          labelBackgroundColor: '#2a2e39',
+        },
+        horzLine: {
+          color: 'rgba(160, 165, 180, 0.45)',
+          width: 1,
+          style: 3,
+          visible: true,
+          labelVisible: true,
+          labelBackgroundColor: '#2a2e39',
+        },
+      },
+      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 12, minBarSpacing: 3, borderColor: '#2a2e39' },
+      rightPriceScale: { borderColor: '#2a2e39', autoScale: true },
+    });
+
+    const es = chart.addSeries(LineSeries, {
+      color: "rgba(220,220,220,0.8)", lineWidth: 2,
+      priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+    });
+
+    const cs = chart.addSeries(CandlestickSeries, {
+      upColor: "#26a69a", downColor: "#ef5350",
+      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+    });
+
+    const vs = chart.addSeries(HistogramSeries, {
+      color: '#26a69a',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '',
+    });
+    chart.priceScale('').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = cs;
+    volumeSeriesRef.current = vs;
+    emaSeriesRef.current = es;
+
+    const drawObs = () => {
+      const obs = activeObsRef.current;
+      const c = chartRef.current;
+      const s = candleSeriesRef.current;
+      const o = overlayRef.current;
+      const cont = containerRef.current;
+      if (!obs || !c || !s || !o || !cont || obs.length === 0) {
+        if (o) o.innerHTML = "";
+        return;
+      }
+      o.innerHTML = "";
+      const w = o.clientWidth || cont.clientWidth;
+      const maxRightX = w - 65;
+
+      obs.forEach(ob => {
+        const y1 = s.priceToCoordinate(ob.high);
+        const y2 = s.priceToCoordinate(ob.low);
+        if (y1 === null || y2 === null) return;
+        const topY = Math.min(y1, y2);
+        const botY = Math.max(y1, y2);
+        const h = Math.max(botY - topY, 4);
+        const isBull = ob.bias === 1;
+
+        let startX = null;
+        if (ob.time && ob.time > 0) {
+          try {
+            const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+            const xCoord = c.timeScale().timeToCoordinate(secTime);
+            if (xCoord !== null) startX = Math.floor(xCoord);
+          } catch (e) { }
+        }
+
+        if (startX === null) startX = 0;
+        if (startX < -2000) startX = -2000;
+        if (startX >= maxRightX) return;
+
+        const boxWidth = maxRightX - startX;
+        if (boxWidth <= 0) return;
+
+        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+        const box = document.createElement('div');
+        box.style.position = 'absolute';
+        box.style.top = topY + 'px';
+        box.style.left = startX + 'px';
+        box.style.width = boxWidth + 'px';
+        box.style.height = h + 'px';
+        box.style.backgroundColor = bg;
+        box.style.pointerEvents = 'none';
+        o.appendChild(box);
+      });
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(drawObs);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (chartRef.current && entries.length > 0) {
+        const { width, height } = entries[0].contentRect;
+        if (width > 0 && height > 0) {
+          chartRef.current.applyOptions({ width, height });
+          drawObs();
+          if (isAutoFit) {
+            applyDefaultZoom();
+          }
+        }
+      }
+    });
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+    };
+  }, []);
+
+  // Fetch dữ liệu nến định kỳ
+  useEffect(() => {
+    let isMounted = true;
+    const targetCoin = coin;
+    const targetTf = tf;
+
+    if (candleSeriesRef.current) {
+      try { candleSeriesRef.current.setData([]); } catch { }
+    }
+    if (volumeSeriesRef.current) {
+      try { volumeSeriesRef.current.setData([]); } catch { }
+    }
+    if (emaSeriesRef.current) {
+      try { emaSeriesRef.current.setData([]); } catch { }
+    }
+    if (overlayRef.current) {
+      overlayRef.current.innerHTML = "";
+    }
+    candlesRef.current = [];
+    activeObsRef.current = [];
+
+    const fetchCandles = async () => {
+      if (!candleSeriesRef.current) return;
+      try {
+        const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
+        const bar = tfMap[tf] || tf;
+        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=1500`);
+        if (!res.ok) return;
+        const rd = await res.json();
+        if (!isMounted || targetCoin !== coin || targetTf !== tf || rd.code !== "0" || !rd.data || rd.data.length === 0) return;
+
+        const candles = [];
+        for (let i = rd.data.length - 1; i >= 0; i--) {
+          const c = rd.data[i];
+          const t = Math.floor(parseInt(c[0]) / 1000);
+          candles.push({
+            time: t,
+            open: parseFloat(c[1]),
+            high: parseFloat(c[2]),
+            low: parseFloat(c[3]),
+            close: parseFloat(c[4]),
+            volume: parseFloat(c[5])
+          });
+        }
+        candles.sort((a, b) => a.time - b.time);
+        const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
+        candlesRef.current = unique;
+
+        candleSeriesRef.current.setData(unique);
+        if (chartRef.current) {
+          try {
+            chartRef.current.timeScale().fitContent();
+            chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+            if (candleSeriesRef.current) {
+              candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
+            }
+          } catch { }
+        }
+
+        const uniqueVolume = unique.map(c => ({
+          time: c.time,
+          value: c.volume || 0,
+          color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+        }));
+        if (volumeSeriesRef.current) {
+          volumeSeriesRef.current.setData(uniqueVolume);
+        }
+
+        if (emaSeriesRef.current) {
+          emaSeriesRef.current.setData(calculateEMA(unique, 200));
+        }
+
+        if (rd.ob_boxes) {
+          activeObsRef.current = rd.ob_boxes;
+          setTimeout(() => {
+            if (!isMounted || !chartRef.current || !candleSeriesRef.current || !overlayRef.current) return;
+            const obs = activeObsRef.current;
+            const s = candleSeriesRef.current;
+            const c = chartRef.current;
+            const o = overlayRef.current;
+            o.innerHTML = "";
+            const w = o.clientWidth || 300;
+            const maxRightX = w - 65;
+            obs.forEach(ob => {
+              const y1 = s.priceToCoordinate(ob.high);
+              const y2 = s.priceToCoordinate(ob.low);
+              if (y1 === null || y2 === null) return;
+              const topY = Math.min(y1, y2);
+              const botY = Math.max(y1, y2);
+              const h = Math.max(botY - topY, 4);
+              const isBull = ob.bias === 1;
+
+              let startX = null;
+              if (ob.time && ob.time > 0) {
+                try {
+                  const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+                  const xCoord = c.timeScale().timeToCoordinate(secTime);
+                  if (xCoord !== null) startX = Math.floor(xCoord);
+                } catch (e) { }
+              }
+              if (startX === null) startX = 0;
+              if (startX < -2000) startX = -2000;
+              if (startX >= maxRightX) return;
+
+              const boxWidth = maxRightX - startX;
+              if (boxWidth <= 0) return;
+
+              const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+              const box = document.createElement('div');
+              box.style.position = 'absolute';
+              box.style.top = topY + 'px';
+              box.style.left = startX + 'px';
+              box.style.width = boxWidth + 'px';
+              box.style.height = h + 'px';
+              box.style.backgroundColor = bg;
+              box.style.pointerEvents = 'none';
+              o.appendChild(box);
+            });
+          }, 60);
+        }
+
+        setTimeout(() => {
+          if (isMounted && chartRef.current) {
+            applyDefaultZoom();
+          }
+        }, 30);
+      } catch (e) {
+        console.warn("fetchCandles error:", e);
+      }
+    };
+
+    fetchCandles();
+    const interval = setInterval(fetchCandles, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [coin, tf]);
+
+  return (
+    <div
+      className={`single-chart-card ${isActive ? "active" : ""}`}
+      onClick={onActivate}
+    >
+      {showToolbar && (
+        <div className="single-chart-header">
+          <div className="single-chart-header-left">
+            <select
+              className="styled-select"
+              style={{ width: "105px", fontSize: "11px", padding: "1px 4px", height: "22px", border: "1px solid #333", borderRadius: "3px" }}
+              value={coin}
+              onChange={e => {
+                e.stopPropagation();
+                onChangeCoin(e.target.value);
+              }}
+            >
+              {COIN_LIST.map(c => (
+                <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>
+              ))}
+            </select>
+            <select
+              className="styled-select"
+              style={{ width: "50px", fontSize: "11px", padding: "1px 4px", fontWeight: "bold", height: "22px", border: "1px solid #333", borderRadius: "3px" }}
+              value={tf}
+              onChange={e => {
+                e.stopPropagation();
+                onChangeTf(e.target.value);
+              }}
+            >
+              {TF_LIST.map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ fontSize: "10px", color: "#888", fontWeight: "bold" }}>
+            #{chartIndex + 1}
+          </div>
+        </div>
+      )}
+
+      <div className="single-chart-body">
+        <div
+          className="single-chart-canvas"
+          ref={containerRef}
+          onWheel={() => setIsAutoFit(false)}
+          onTouchStart={() => setIsAutoFit(false)}
+          onMouseDown={() => setIsAutoFit(false)}
+        />
+        <div
+          ref={overlayRef}
+          style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            pointerEvents: 'none', zIndex: 4, overflow: 'hidden'
+          }}
+        />
+        <div style={{
+          position: "absolute", bottom: "6px", right: "52px",
+          display: "flex", gap: "4px", zIndex: 10
+        }}>
+          <button
+            title="Auto (Mặc định zoom 30-80 nến)"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = !isAutoFit;
+              setIsAutoFit(next);
+              if (next) applyDefaultZoom();
+            }}
+            style={{
+              width: "20px", height: "20px",
+              background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+              color: isAutoFit ? "#fff" : "#d1d4dc",
+              border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
+              borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
+            }}
+          >A</button>
+          <button
+            title="Log scale"
+            onClick={(e) => {
+              e.stopPropagation();
+              const next = !isLogScale;
+              setIsLogScale(next);
+              chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+            }}
+            style={{
+              width: "20px", height: "20px",
+              background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+              color: isLogScale ? "#fff" : "#d1d4dc",
+              border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
+              borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
+            }}
+          >L</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -63,6 +589,117 @@ function App() {
   const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activePairs, setActivePairs] = useState([]);
   const [selectedTf, setSelectedTf] = useState("4H");
+
+  // Multi-chart layout & configuration (TradingView Style)
+  const getLayoutDefaults = (layout) => {
+    if (layout === "1") return ["BTC-USDT-SWAP"];
+    if (layout === "2-col" || layout === "2-row") return ["BTC-USDT-SWAP", "ETH-USDT-SWAP"];
+    if (layout === "3-col" || layout === "3-row") return ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
+    if (layout === "4-grid") return ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "USDT.D"];
+    return ["BTC-USDT-SWAP"];
+  };
+
+  const DEFAULT_CHARTS = [
+    { id: 0, coin: "BTC-USDT-SWAP", tf: "1H" },
+    { id: 1, coin: "ETH-USDT-SWAP", tf: "1H" },
+    { id: 2, coin: "XAU-USDT-SWAP", tf: "1H" },
+    { id: 3, coin: "USDT.D", tf: "1H" },
+  ];
+
+  const [chartLayout, setChartLayout] = useState(() => {
+    return localStorage.getItem("tls1_chart_layout") || "1";
+  });
+
+  const [chartsConfig, setChartsConfig] = useState(() => {
+    const layout = localStorage.getItem("tls1_chart_layout") || "1";
+    try {
+      const saved = localStorage.getItem("tls1_charts_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 4) {
+          if (parsed[3]?.coin !== "USDT.D") {
+            parsed[3].coin = "USDT.D";
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    const defaultCoins = getLayoutDefaults(layout);
+    return [
+      { id: 0, coin: defaultCoins[0] || "BTC-USDT-SWAP", tf: "1H" },
+      { id: 1, coin: defaultCoins[1] || "ETH-USDT-SWAP", tf: "1H" },
+      { id: 2, coin: defaultCoins[2] || "XAU-USDT-SWAP", tf: "1H" },
+      { id: 3, coin: defaultCoins[3] || "USDT.D", tf: "1H" },
+    ];
+  });
+
+  const [activeChartIndex, setActiveChartIndex] = useState(0);
+  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const layoutSelectorRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (layoutSelectorRef.current && !layoutSelectorRef.current.contains(e.target)) {
+        setShowLayoutMenu(false);
+      }
+    };
+    if (showLayoutMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showLayoutMenu]);
+
+  const updateChartConfig = (index, updates) => {
+    setChartsConfig(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      localStorage.setItem("tls1_charts_config", JSON.stringify(next));
+      return next;
+    });
+    if (updates.coin) {
+      setSelectedCoin(updates.coin);
+    }
+    if (updates.tf && index === 0) {
+      setSelectedTf(updates.tf);
+    }
+  };
+
+  const handleSelectLayout = (layoutKey) => {
+    setChartLayout(layoutKey);
+    localStorage.setItem("tls1_chart_layout", layoutKey);
+    setShowLayoutMenu(false);
+
+    // Áp dụng các coin mặc định khi chọn số lượng biểu đồ:
+    // 1 biểu đồ: chart BTC
+    // 2 biểu đồ: chart BTC -> ETH
+    // 3 biểu đồ: XAU > BTC > ETH
+    // 4 biểu đồ: XAU > BTC > ETH > USDT.D
+    const defaultCoins = getLayoutDefaults(layoutKey);
+    setChartsConfig(prev => {
+      const next = [...prev];
+      defaultCoins.forEach((coin, idx) => {
+        next[idx] = {
+          id: idx,
+          coin: coin,
+          tf: next[idx]?.tf || "1H"
+        };
+      });
+      localStorage.setItem("tls1_charts_config", JSON.stringify(next));
+      return next;
+    });
+    setSelectedCoin(defaultCoins[0]);
+    setActiveChartIndex(0);
+  };
+
+  const getActiveChartsCount = (layout) => {
+    if (layout === "2-col" || layout === "2-row") return 2;
+    if (layout === "3-col" || layout === "3-row") return 3;
+    if (layout === "4-grid") return 4;
+    return 1;
+  };
+
   const [enabledTfs, setEnabledTfs] = useState({});
   const [botStatus, setBotStatus] = useState("STOPPED");
   const [uptime, setUptime] = useState(0);
@@ -112,7 +749,30 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("strategy");
 
+  const [accounts, setAccounts] = useState(() => {
+    try {
+      const cached = localStorage.getItem("tls1_accounts");
+      if (cached) {
+        let parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed = parsed
+            .map(a => a.id === "sub1" ? { ...a, name: "Tài khoản phụ" } : a)
+            .filter(a => !(a.id === "sub2" && (a.name === "Tài khoản phụ 2" || a.name === "Tài khoản 2")));
+          if (!parsed.some(a => a.id === "sub1")) {
+            parsed.unshift({ id: "sub1", name: "Tài khoản phụ" });
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [{ id: "sub1", name: "Tài khoản phụ" }];
+  });
   const [selectedAccount, setSelectedAccount] = useState("sub1");
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [newAccountInput, setNewAccountInput] = useState("");
   const [fadeClass, setFadeClass] = useState("tab-fade");
   const [selectedBotType, setSelectedBotType] = useState("ema200");
   const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
@@ -324,6 +984,137 @@ function App() {
       if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
       return newBlocks;
     });
+  };
+
+  // Nạp danh sách tài khoản API từ backend
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const uid = localStorage.getItem('tls1_uid') || loginUid;
+    if (!uid) return;
+    fetch(`/api/bot/accounts?uid=${uid}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAccounts(data);
+          localStorage.setItem("tls1_accounts", JSON.stringify(data));
+        }
+      })
+      .catch(err => console.error("Error loading accounts:", err));
+  }, [isAuthenticated, loginUid]);
+
+  const handleCreateAccount = () => {
+    setNewAccountInput("");
+    setShowAddAccountModal(true);
+  };
+
+  const confirmCreateAccount = async () => {
+    if (!newAccountInput || !newAccountInput.trim() || isCreatingAccount) return;
+    const cleanName = newAccountInput.trim();
+
+    if (accounts.some(a => a.name.toLowerCase() === cleanName.toLowerCase())) {
+      alert(`Tài khoản "${cleanName}" đã tồn tại!`);
+      return;
+    }
+
+    // 1. Hiệu ứng loading 1.2s (theo yêu cầu CEO tầm 1-1.5s)
+    setIsCreatingAccount(true);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    // 2. Tạo ID duy nhất cho tài khoản phụ mới
+    const newId = `sub_${Date.now()}`;
+    const newAcc = { id: newId, name: cleanName };
+    const updatedList = [...accounts, newAcc];
+
+    setAccounts(updatedList);
+    localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
+    setSelectedAccount(newId);
+    setApiKey("");
+    setSecretKey("");
+    setPassphrase("");
+    setShowAddAccountModal(false);
+    setNewAccountInput("");
+    addSystemLog(`➕ [ACCOUNT] Đã tạo tài khoản mới: "${cleanName}"`);
+
+    // 3. Đồng bộ ngầm lên Backend
+    const uid = localStorage.getItem('tls1_uid') || loginUid;
+    try {
+      fetch(`/api/bot/accounts?uid=${uid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: newId, name: cleanName })
+      }).then(async res => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.accounts && Array.isArray(data.accounts)) {
+            setAccounts(data.accounts);
+            localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
+          }
+        }
+      }).catch(err => {
+        console.warn("Background create account sync warning:", err);
+      });
+    } catch (e) {
+      console.warn("Create account error:", e);
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteAccountModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (isDeletingAccount) return;
+
+    // 1. Hiệu ứng loading 1.2s (theo yêu cầu CEO tầm 1-1.5s)
+    setIsDeletingAccount(true);
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    const targetAccountId = selectedAccount;
+    const currentAcc = accounts.find(a => a.id === targetAccountId);
+    const accName = currentAcc?.name || targetAccountId;
+    const uid = localStorage.getItem('tls1_uid') || loginUid;
+
+    if (accounts.length > 1) {
+      const updatedList = accounts.filter(a => a.id !== targetAccountId);
+      setAccounts(updatedList);
+      localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
+      const nextAcc = updatedList[0];
+      setSelectedAccount(nextAcc.id);
+      setShowDeleteAccountModal(false);
+      addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
+    } else {
+      setApiKey("");
+      setSecretKey("");
+      setPassphrase("");
+      const resetList = [{ id: "sub1", name: "Tài khoản phụ" }];
+      setAccounts(resetList);
+      localStorage.setItem("tls1_accounts", JSON.stringify(resetList));
+      setSelectedAccount("sub1");
+      setShowDeleteAccountModal(false);
+      addSystemLog(`🗑️ [ACCOUNT] Đã làm sạch toàn bộ API Key và đưa tài khoản về mặc định`);
+    }
+
+    try {
+      fetch(`/api/bot/accounts/${targetAccountId}?uid=${uid}`, { method: "DELETE" })
+        .then(async res => {
+          if (res.ok) {
+            const data = await res.json();
+            if (data.accounts && Array.isArray(data.accounts)) {
+              setAccounts(data.accounts);
+              localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
+            }
+          }
+        })
+        .catch(err => {
+          console.warn("Background delete account sync warning:", err);
+        });
+    } catch (e) {
+      console.warn("Delete account error:", e);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   // Cấu hình Điểm vào lệnh (Entry Config - EMA200)
@@ -550,6 +1341,7 @@ function App() {
           const d = await r.json();
           setApiKey(d.api_key || "");
           setSecretKey(d.secret_key || "");
+          setPassphrase(d.passphrase || "");
         }
       } catch { }
     };
@@ -569,273 +1361,7 @@ function App() {
     } catch { }
   };
 
-  // Chart init
-  useEffect(() => {
-    if (!isAuthenticated || !chartContainerRef.current) return;
-    chartContainerRef.current.innerHTML = "";
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight || 400,
-      layout: { background: { type: 'solid', color: '#0e1118' }, textColor: '#787b86' },
-      grid: {
-        vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
-        horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
-      },
-      crosshair: { mode: 1 },
-      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8, borderColor: '#2a2e39' },
-      rightPriceScale: { borderColor: '#2a2e39' },
-    });
-    const es = chart.addSeries(LineSeries, {
-      color: "rgba(220,220,220,0.8)", lineWidth: 2,
-      priceLineVisible: false, crosshairMarkerVisible: false,
-    });
-    const cs = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a", downColor: "#ef5350",
-      borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
-    });
-    const vs = chart.addSeries(HistogramSeries, {
-      color: '#26a69a',
-      priceFormat: { type: 'volume' },
-      priceScaleId: '', // Set as overlay
-    });
-    chart.priceScale('').applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-    });
-
-    chartRef.current = chart;
-    candleSeriesRef.current = cs;
-    volumeSeriesRef.current = vs;
-    emaSeriesRef.current = es;
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (chartRef.current && entries.length > 0) {
-        const { width, height } = entries[0].contentRect;
-        chartRef.current.applyOptions({ width, height });
-      }
-    });
-    resizeObserver.observe(chartContainerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-    };
-  }, [isAuthenticated, layoutMode]); // Re-init on layout change
-
-  // Fetch candles — dùng backend proxy để tránh CORS trên mobile
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let isInitialFit = true;
-    // Xóa data cũ ngay khi đổi coin/TF để không bị lag hiển thị cũ
-    if (candleSeriesRef.current) {
-      try { candleSeriesRef.current.setData([]); } catch { }
-    }
-    if (emaSeriesRef.current) {
-      try { emaSeriesRef.current.setData([]); } catch { }
-    }
-
-    const fetchCandles = async () => {
-      if (!candleSeriesRef.current) return;
-      try {
-        const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
-        const bar = tfMap[selectedTf] || selectedTf;
-        const url = `/api/market/candles?instId=${selectedCoin}&bar=${bar}&limit=1500`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const rd = await res.json();
-        if (rd.code !== "0" || !rd.data || rd.data.length === 0) return;
-        const candles = [];
-        for (let i = rd.data.length - 1; i >= 0; i--) {
-          const c = rd.data[i];
-          const t = Math.floor(parseInt(c[0]) / 1000);
-          candles.push({ time: t, open: parseFloat(c[1]), high: parseFloat(c[2]), low: parseFloat(c[3]), close: parseFloat(c[4]), volume: parseFloat(c[5]) });
-        }
-        // Sắp xếp tăng dần theo time, không trùng
-        candles.sort((a, b) => a.time - b.time);
-        const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
-        candleSeriesRef.current.setData(unique);
-
-        const uniqueVolume = unique.map(c => ({
-          time: c.time,
-          value: c.volume || 0,
-          color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
-        }));
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.setData(uniqueVolume);
-        }
-
-        emaSeriesRef.current?.setData(calculateEMA(unique, 200));
-
-        if (rd.ob_boxes) {
-          window._active_smc_obs = rd.ob_boxes;
-
-          let overlay = document.getElementById('smc_ob_shaded_overlay');
-          if (!overlay && chartContainerRef.current) {
-            overlay = document.createElement('div');
-            overlay.id = 'smc_ob_shaded_overlay';
-            overlay.style.position = 'absolute';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100%';
-            overlay.style.height = '100%';
-            overlay.style.pointerEvents = 'none';
-            overlay.style.zIndex = '4';
-            overlay.style.overflow = 'hidden';
-            if (chartContainerRef.current.style) chartContainerRef.current.style.position = 'relative';
-            chartContainerRef.current.appendChild(overlay);
-          }
-
-          const drawObShadedBands = () => {
-            const obs = window._active_smc_obs;
-            const chart = chartRef.current;
-            const series = candleSeriesRef.current;
-            const container = chartContainerRef.current;
-            if (!obs || !chart || !series || !overlay || !container) return;
-
-            overlay.innerHTML = '';
-            const w = overlay.clientWidth || container.clientWidth;
-            const maxRightX = w - 70; // 70px price scale approx
-
-            obs.forEach(ob => {
-              const y1 = series.priceToCoordinate(ob.high);
-              const y2 = series.priceToCoordinate(ob.low);
-              if (y1 === null || y2 === null) return;
-              const topY = Math.min(y1, y2);
-              const botY = Math.max(y1, y2);
-              const h = Math.max(botY - topY, 4);
-              const isBull = ob.bias === 1;
-
-              let startX = null;
-              if (ob.time && ob.time > 0) {
-                try {
-                  const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-                  const xCoord = chart.timeScale().timeToCoordinate(secTime);
-                  if (xCoord !== null) startX = Math.floor(xCoord);
-                } catch (e) { }
-              }
-
-              if (startX === null) startX = 0;
-              if (startX < -2000) startX = -2000;
-              if (startX >= maxRightX) return;
-
-              const boxWidth = maxRightX - startX;
-              if (boxWidth <= 0) return;
-
-              const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
-              const box = document.createElement('div');
-              box.style.position = 'absolute';
-              box.style.top = topY + 'px';
-              box.style.left = startX + 'px';
-              box.style.width = boxWidth + 'px';
-              box.style.height = h + 'px';
-              box.style.backgroundColor = bg;
-              box.style.border = 'none';
-              box.style.boxSizing = 'border-box';
-              box.style.pointerEvents = 'none';
-              overlay.appendChild(box);
-            });
-          };
-
-          window._drawObShadedBands = drawObShadedBands;
-
-          if (!window._smc_ob_subscribed && chartRef.current) {
-            window._smc_ob_subscribed = true;
-            chartRef.current.timeScale().subscribeVisibleLogicalRangeChange(() => {
-              if (window._drawObShadedBands) window._drawObShadedBands();
-            });
-          }
-
-          // Use setTimeout to ensure the chart is fully rendered before drawing
-          setTimeout(() => {
-            if (window._drawObShadedBands) window._drawObShadedBands();
-          }, 100);
-        }
-
-        if (isInitialFit) {
-            setTimeout(() => {
-              const timeScale = chartRef.current?.timeScale();
-              if (timeScale && unique && unique.length > 0) {
-                const maxLen = unique.length;
-                timeScale.setVisibleLogicalRange({
-                  from: maxLen - 60, // Zoom to last 60 candles
-                  to: maxLen + 5     // Leave a small gap on the right
-                });
-              } else {
-                chartRef.current?.timeScale().fitContent();
-              }
-            }, 100);
-            isInitialFit = false;
-          }
-      } catch (err) {
-        console.error("Error fetching candles:", err);
-      }
-    };
-    fetchCandles();
-    const iv = setInterval(fetchCandles, 15000);
-    return () => clearInterval(iv);
-  }, [selectedCoin, selectedTf, isAuthenticated]);
-
-  // Draw Entry, TP, SL lines on chart for the currently active coin
-  useEffect(() => {
-    if (!candleSeriesRef.current || !positions) return;
-
-    // Remove old lines
-    priceLinesRef.current.forEach(line => {
-      try {
-        candleSeriesRef.current.removePriceLine(line);
-      } catch (e) { }
-    });
-    priceLinesRef.current = [];
-
-    // TẠM THỜI ẨN (THEO YÊU CẦU CỦA USER):
-    return;
-
-    // Draw new lines for the selected coin
-    positions.forEach(pos => {
-      const posCoin = pos.instId?.split('-')[0];
-      const selCoin = selectedCoin?.split('-')[0];
-
-      if (posCoin === selCoin) {
-        // Entry line
-        if (pos.avgPx && parseFloat(pos.avgPx) > 0) {
-          const entryLine = candleSeriesRef.current.createPriceLine({
-            price: parseFloat(pos.avgPx),
-            color: pos.posSide === 'long' ? '#26a69a' : '#ef5350',
-            lineWidth: 2,
-            lineStyle: 2, // Dashed
-            axisLabelVisible: true,
-            title: `ENTRY ${pos.posSide.toUpperCase()}`,
-          });
-          priceLinesRef.current.push(entryLine);
-        }
-
-        // TP line
-        if (pos.tp && parseFloat(pos.tp) > 0) {
-          const tpLine = candleSeriesRef.current.createPriceLine({
-            price: parseFloat(pos.tp),
-            color: '#26a69a',
-            lineWidth: 2,
-            lineStyle: 1, // Solid
-            axisLabelVisible: true,
-            title: 'TP',
-          });
-          priceLinesRef.current.push(tpLine);
-        }
-
-        // SL line
-        if (pos.sl && parseFloat(pos.sl) > 0) {
-          const slLine = candleSeriesRef.current.createPriceLine({
-            price: parseFloat(pos.sl),
-            color: '#ef5350',
-            lineWidth: 2,
-            lineStyle: 1, // Solid
-            axisLabelVisible: true,
-            title: 'SL',
-          });
-          priceLinesRef.current.push(slLine);
-        }
-      }
-    });
-  }, [positions, selectedCoin]);
-
+  // Chart rendering handled inside SingleChartPane component
   const handleStartBot = async () => {
     // 1. Kiểm tra cấu hình API Key
     if (!apiKey || !secretKey || !passphrase) {
@@ -1027,7 +1553,7 @@ function App() {
       )}
 
       <div className={`content-wrapper ${fadeClass}`}>
-        {/* SIDEBAR - Nằm trọn vẹn bên trái từ mép trên cùng xuống */}
+        {/* SIDEBAR - NẰM BÊN TRÁI: TRADER LÀ SỐ 1 & QUẢN LÝ VỐN & RỦI RO (1:1 DESKTOP APP) */}
         <aside className="sidebar-left">
           <div className="sidebar-header">
             <div className="app-title">TRADER LÀ SỐ 1</div>
@@ -1036,287 +1562,282 @@ function App() {
 
           {/* Sidebar content - QUẢN LÝ VỐN & RỦI RO */}
           <div className="sidebar-content">
-            {selectedAccount === "sub1" ? (
-              <div className="group-box" style={{ position: "relative" }}>
-                <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
-                <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", backgroundColor: "#252526", padding: "0 5px" }}>
-                  <button onClick={() => setIsRiskCollapsed(!isRiskCollapsed)} style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "12px", padding: "0" }}>
-                    {isRiskCollapsed ? "˅" : "˄"}
-                  </button>
-                </div>
-                <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
+            <div className="group-box" style={{ position: "relative" }}>
+              <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
+              <div style={{ position: "absolute", top: "-10px", right: "8px", display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#252526", padding: "0 4px" }}>
+                <div style={{ display: "flex", gap: "2px" }}>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button
                     onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
                   >LOT</button>
                 </div>
-                {!isRiskCollapsed && (
-                  <div className="risk-grid">
-                    <div className="risk-row">
-                      <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                      <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
-                    </div>
-                    <div className="risk-row">
-                      <label>Mức chốt lời gốc M5 (%):</label>
-                      <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.05" />
-                    </div>
-                    <div className="risk-row">
-                      <label>Mức cắt lỗ gốc M5 (%):</label>
-                      <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.05" />
-                    </div>
+                <button
+                  onClick={() => setIsRiskCollapsed(!isRiskCollapsed)}
+                  style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "10px", padding: "0 2px" }}
+                  title={isRiskCollapsed ? "Mở rộng" : "Thu gọn"}
+                >
+                  {isRiskCollapsed ? "▼" : "▲"}
+                </button>
+              </div>
+              {!isRiskCollapsed && (
+                <div className="risk-grid">
+                  <div className="risk-row">
+                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                    <NumberSpinBox
+                      value={risk.posVol}
+                      onChange={val => setRisk(r => ({ ...r, posVol: val }))}
+                      min={risk.volUnit === "LOT" ? 0.01 : 1}
+                      step={risk.volUnit === "LOT" ? 0.01 : 10}
+                    />
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="group-box" style={{ position: "relative" }}>
-                <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
-                <div style={{ position: "absolute", top: "-10px", left: "50%", transform: "translateX(-50%)", backgroundColor: "#252526", padding: "0 5px" }}>
-                  <button onClick={() => setIsRiskCollapsed(!isRiskCollapsed)} style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "12px", padding: "0" }}>
-                    {isRiskCollapsed ? "˅" : "˄"}
-                  </button>
-                </div>
-                <div style={{ position: "absolute", top: "-10px", right: "10px", display: "flex", gap: "4px", backgroundColor: "#252526", padding: "0 5px" }}>
-                  <button
-                    onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
-                  >USDT</button>
-                  <button
-                    onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
-                    style={{ padding: "2px 8px", fontSize: "11px", borderRadius: "6px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
-                  >LOT</button>
-                </div>
-                {!isRiskCollapsed && (
-                  <div className="risk-grid">
-                    <div className="risk-row">
-                      <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
-                      <input type="number" className="styled-input num" value={risk.posVol} onChange={e => setRisk(r => ({ ...r, posVol: e.target.value }))} min={risk.volUnit === "LOT" ? "0.01" : "1"} step={risk.volUnit === "LOT" ? "0.01" : "10"} />
-                    </div>
-                    <div className="risk-row">
-                      <label>Tỷ lệ chốt lời Thuận Trend (R:R):</label>
-                      <input type="number" className="styled-input num" value={risk.tpPct} onChange={e => setRisk(r => ({ ...r, tpPct: e.target.value }))} min="0.1" step="0.5" />
-                    </div>
-                    <div className="risk-row">
-                      <label>Tỷ lệ chốt lời Ngược Trend (R:R):</label>
-                      <input type="number" className="styled-input num" value={risk.slPct} onChange={e => setRisk(r => ({ ...r, slPct: e.target.value }))} min="0.1" step="0.5" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* TÍNH NĂNG GIAO DỊCH MANUALLY (ORDER PANEL) */}
-          {false && (
-            <section className="pane-order desktop-only" style={{ width: "100%", background: "#1c1c1e", borderTop: "1px solid #333", borderBottom: "1px solid #333", display: "flex", flexDirection: "column", padding: "10px", overflowY: "auto", marginTop: "10px", marginBottom: "10px", boxSizing: "border-box" }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #333', paddingBottom: '8px', marginBottom: '10px' }}>
-                <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>Giao dịch</span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>Chéo</button>
-                <button style={{ flex: 1, background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '6px', borderRadius: '4px', fontSize: '12px', cursor: 'default' }}>100x</button>
-              </div>
-
-              <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid #333', paddingBottom: '5px', marginBottom: '15px' }}>
-                <span onClick={() => setTradeType("limit")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'limit' ? '#fff' : '#888', borderBottom: tradeType === 'limit' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Giới hạn</span>
-                <span onClick={() => setTradeType("market")} style={{ fontSize: '12px', cursor: 'pointer', color: tradeType === 'market' ? '#fff' : '#888', borderBottom: tradeType === 'market' ? '2px solid #fff' : 'none', paddingBottom: '5px' }}>Thị trường</span>
-              </div>
-
-              {tradeType === 'limit' && (
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Giá (USDT)</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ flex: 1, display: 'flex', background: '#2d2d2f', borderRadius: '4px', border: '1px solid #444', overflow: 'hidden' }}>
-                      <input type="text" value={tradePrice} onChange={e => setTradePrice(e.target.value)} className="styled-input num" style={{ flex: 1, border: 'none', background: 'transparent', padding: '0 10px', color: '#fff', outline: 'none' }} placeholder="Giá mua/bán" />
-                      <div style={{ display: 'flex', flexDirection: 'column', width: '20px', borderLeft: '1px solid #444' }}>
-                        <button onClick={() => setTradePrice(p => p ? (parseFloat(p) + 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px solid #444', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-                        </button>
-                        <button onClick={() => setTradePrice(p => p && parseFloat(p) > 0 ? (parseFloat(p) - 0.1).toFixed(2) : '0')} style={{ flex: 1, background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onMouseOver={e => e.currentTarget.style.color = '#fff'} onMouseOut={e => e.currentTarget.style.color = '#888'}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                        </button>
+                  {selectedAccount === "sub1" ? (
+                    <>
+                      <div className="risk-row">
+                        <label>Mức chốt lời gốc M5:</label>
+                        <NumberSpinBox
+                          value={risk.tpPct}
+                          onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
+                          min={0.1}
+                          step={0.05}
+                          suffix="%"
+                        />
                       </div>
-                    </div>
-                    <button onClick={handleBBO} style={{ background: '#2d2d2f', border: '1px solid #444', color: '#ccc', padding: '0 15px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.target.style.background = '#3d3d3f'} onMouseOut={e => e.target.style.background = '#2d2d2f'}>BBO</button>
-                  </div>
+                      <div className="risk-row">
+                        <label>Mức cắt lỗ gốc M5:</label>
+                        <NumberSpinBox
+                          value={risk.slPct}
+                          onChange={val => setRisk(r => ({ ...r, slPct: val }))}
+                          min={0.1}
+                          step={0.05}
+                          suffix="%"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="risk-row">
+                        <label>Tỷ lệ chốt lời Thuận Trend:</label>
+                        <NumberSpinBox
+                          value={risk.tpPct}
+                          onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
+                          min={0.1}
+                          step={0.5}
+                          suffix="R"
+                        />
+                      </div>
+                      <div className="risk-row">
+                        <label>Tỷ lệ chốt lời Ngược Trend:</label>
+                        <NumberSpinBox
+                          value={risk.slPct}
+                          onChange={val => setRisk(r => ({ ...r, slPct: val }))}
+                          min={0.1}
+                          step={0.5}
+                          suffix="R"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '11px', color: '#888', marginBottom: '4px', display: 'block' }}>Số lượng (Lô)</label>
-                <input type="text" value={tradeSize} onChange={e => { setTradeSize(e.target.value); setTradePct(0); }} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f', marginBottom: '8px' }} placeholder="Số lượng" />
-
-                {/* Slider phần trăm */}
-                <div style={{ position: 'relative', height: '24px', display: 'flex', alignItems: 'center', marginBottom: '5px' }}>
-                  {/* Background Track */}
-                  <div style={{ position: 'absolute', width: 'calc(100% - 16px)', left: '8px', height: '4px', background: '#333', borderRadius: '2px', pointerEvents: 'none' }}></div>
-
-                  {/* Active Track */}
-                  <div style={{ position: 'absolute', width: `calc(${(tradePct / 100)} * (100% - 16px))`, left: '8px', height: '4px', background: '#fff', borderRadius: '2px', pointerEvents: 'none' }}></div>
-
-                  {/* Dots */}
-                  {[0, 25, 50, 75, 100].map(pct => (
-                    <div key={pct} style={{ position: 'absolute', left: `calc(${pct}% + ${8 - (pct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '8px', height: '8px', borderRadius: '50%', background: tradePct >= pct ? '#fff' : '#1c1c1e', border: tradePct >= pct ? '2px solid #fff' : '2px solid #555', pointerEvents: 'none', zIndex: 1, transition: '0.1s' }}></div>
-                  ))}
-
-                  {/* Thumb visual */}
-                  <div style={{ position: 'absolute', left: `calc(${tradePct}% + ${8 - (tradePct / 100) * 16}px)`, transform: 'translateX(-50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', boxShadow: '0 0 4px rgba(0,0,0,0.5)', pointerEvents: 'none', zIndex: 2 }}></div>
-
-                  {/* Native Range Input overlay */}
-                  <input
-                    type="range"
-                    min="0" max="100" step="1"
-                    value={tradePct}
-                    onChange={e => handleSizePct(Number(e.target.value))}
-                    style={{ position: 'absolute', width: '100%', margin: 0, opacity: 0, cursor: 'pointer', zIndex: 3, height: '24px' }}
-                  />
-                </div>
-
-                {/* Labels */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0', marginBottom: '8px' }}>
-                  {[0, 25, 50, 75, 100].map(pct => (
-                    <span key={pct} style={{ fontSize: '10px', color: tradePct >= pct - 5 && tradePct <= pct + 5 ? '#fff' : '#888', cursor: 'pointer', width: '20%', textAlign: pct === 0 ? 'left' : pct === 100 ? 'right' : 'center' }} onClick={() => handleSizePct(pct)}>{pct}%</span>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '10px' }}>
-                <span style={{ color: '#888' }}>Khả dụng</span>
-                <span style={{ color: '#fff', fontWeight: 'bold' }}>{parseFloat(availBal).toFixed(2)} USDT</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                <input type="checkbox" checked={reduceOnly} onChange={e => setReduceOnly(e.target.checked)} id="reduceOnlyCheck" />
-                <label htmlFor="reduceOnlyCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>Reduce-only</label>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
-                <input type="checkbox" checked={hasTPSL} onChange={e => setHasTPSL(e.target.checked)} id="tpslCheck" />
-                <label htmlFor="tpslCheck" style={{ fontSize: '11px', color: '#888', cursor: 'pointer' }}>TP/SL</label>
-              </div>
-
-              {hasTPSL && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
-                  <input type="number" value={tradeTP} onChange={e => setTradeTP(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="TP - Giá kích hoạt" />
-                  <input type="number" value={tradeSL} onChange={e => setTradeSL(e.target.value)} className="styled-input num" style={{ width: '100%', boxSizing: 'border-box', background: '#2d2d2f' }} placeholder="SL - Giá kích hoạt" />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button onClick={() => handlePlaceOrder("buy")} disabled={isPlacingOrder} style={{ flex: 1, background: '#4caf50', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Mua (Long)</button>
-                <button onClick={() => handlePlaceOrder("sell")} disabled={isPlacingOrder} style={{ flex: 1, background: '#ef5350', color: '#fff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', opacity: isPlacingOrder ? 0.6 : 1 }}>Bán (Short)</button>
-              </div>
-            </section>
-          )}
-
-          <div className="sidebar-footer">
-            <button onClick={handleStartBot} disabled={isRunning} className="btn-control btn-start">▶ BẮT ĐẦU CHẠY BOT</button>
-            <button onClick={handleStopBot} disabled={!isRunning || isStoppingBot} className="btn-control btn-stop">
-              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
-            </button>
-            <button className="btn-settings" onClick={() => setShowSettings(true)}>⚙️ Cài Đặt</button>
+            </div>
           </div>
         </aside>
 
-        {/* PHÂN VÙNG BÊN PHẢI (CHỨA TAB BOT + CHART NẾN + BẢNG VỊ THẾ) */}
+        {/* PHẦN KHÔNG GIAN LÀM VIỆC CHÍNH BÊN PHẢI */}
         <div className="main-section">
-          {/* TAB BAR CÁC BOT (TÀI KHOẢN) */}
-          <div className="bot-tabs-bar">
-            {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"]].map(([sub, label]) => (
+          {/* 1. HEADER BAR: BOT TABS (1:1 DESKTOP APP) + JOIN CỘNG ĐỒNG + SLOT INDICATOR */}
+          <header className="bot-tabs-bar">
+          <div className="bot-tabs-group">
+            {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"], ["sub3", "Bot Liquidation"]].map(([sub, label]) => (
               <button
                 key={sub}
+                className={`bot-tab ${selectedAccount === sub ? "active" : ""}`}
                 onClick={() => setSelectedAccount(sub)}
-                style={{
-                  background: selectedAccount === sub ? "#2d2d2d" : "transparent",
-                  color: selectedAccount === sub ? "#ff9900" : "#a0a0a0",
-                  border: "none", borderRight: "1px solid #333", borderBottom: selectedAccount === sub ? "2px solid #ff9900" : "2px solid transparent",
-                  padding: "10px 20px", fontSize: "14px", fontWeight: "bold", cursor: "pointer", transition: "0.2s"
-                }}
               >
                 {label}
               </button>
             ))}
-            {/* Slot indicator - góc phải cùng hàng */}
-            <div style={{ display: "flex", alignItems: "center", marginLeft: "auto", paddingRight: "12px", gap: "6px", whiteSpace: "nowrap" }}>
+          </div>
+
+          {/* Slot indicator & Nút Join Cộng đồng */}
+          <div className="header-right-tools">
+            <a
+              href="https://discord.gg/8NXaSCvZ6u"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-join-community"
+              title="Tham gia cộng đồng Discord Trader TLS1"
+            >
+              💬 Join Cộng đồng
+            </a>
+            <div className="slot-indicator-wrap">
               <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
               <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
                 {slotCount}/{MAX_SLOTS}
               </span>
-              <span style={{ display: "flex", gap: "2px" }}>
+              <span style={{ display: "inline-flex", gap: "2px", alignItems: "center", marginLeft: "2px" }}>
                 {Array.from({ length: 5 }).map((_, i) => {
                   const threshold = (i + 1) * 20;
                   const active = slotCount >= threshold - 19;
                   const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
-                  return <span key={i} style={{ color: active ? barColor : "#444", fontSize: "14px" }}>▮</span>;
+                  return (
+                    <span
+                      key={i}
+                      style={{
+                        display: "inline-block",
+                        width: "3px",
+                        height: "10px",
+                        backgroundColor: active ? barColor : "#3a3a3a",
+                        borderRadius: "1px"
+                      }}
+                    />
+                  );
                 })}
               </span>
             </div>
           </div>
+        </header>
 
-          {/* WORKSPACE PHẢI - hiện trước trên mobile */}
-          <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
-            <section className="pane-chart" style={{ position: "relative" }}>
-              <div className="pane-titlebar" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "4px 10px" }}>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center", marginRight: "70px" }}>
-                  <select className="styled-select" style={{ width: "120px", fontSize: "12px", padding: "2px 6px" }} value={selectedCoin} onChange={e => setSelectedCoin(e.target.value)}>
-                    {COIN_LIST.map(c => <option key={c.value} value={c.value}>{c.label.replace("-SWAP", "")}</option>)}
-                  </select>
-                  <select className="styled-select" style={{ width: "60px", fontSize: "12px", padding: "2px 6px", fontWeight: "bold" }} value={selectedTf} onChange={e => setSelectedTf(e.target.value)}>
-                    {TF_LIST.map(tf => <option key={tf} value={tf}>{tf}</option>)}
-                  </select>
+        {/* THẺ LIỀN KHỐI BAO TRÒN TOÀN BỘ MỌI THỨ BÊN TRONG CỤM BOT (1:1 ẢNH 2) */}
+        <div className="bot-panel-card">
+          {/* Hàng nút Hành động: Bắt đầu / Dừng bot */}
+          <div className="bot-action-bar">
+            <button
+              onClick={handleStartBot}
+              disabled={isRunning}
+              className="btn-action-start"
+            >
+              ▶ BẮT ĐẦU CHẠY BOT
+            </button>
+            <button
+              onClick={handleStopBot}
+              disabled={!isRunning || isStoppingBot}
+              className="btn-action-stop"
+            >
+              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
+            </button>
+          </div>
+
+          {/* Cụm thẻ Workspace & Biểu đồ */}
+          <div className="chart-panel-card">
+            {/* Hàng điều khiển bo gọn đúng đến các nút và sát chart nến */}
+            <div className="chart-corner-toolbar">
+              <div className="chart-title-controls">
+                {/* Nút chọn Bố cục TradingView */}
+                <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
+                  <button
+                    type="button"
+                    className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
+                    title="Chọn bố cục biểu đồ (TradingView Layout)"
+                    onClick={() => setShowLayoutMenu(!showLayoutMenu)}
+                  >
+                    {renderLayoutIcon(chartLayout, 18, 18)}
+                  </button>
+
+                  {showLayoutMenu && (
+                    <div className="layout-selector-popover">
+                      {/* Row 1: 1 chart */}
+                      <div className="layout-popover-row">
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
+                          title="1 Biểu đồ đơn"
+                          onClick={() => handleSelectLayout("1")}
+                        >
+                          {renderLayoutIcon("1", 24, 24)}
+                        </button>
+                      </div>
+                      <div className="layout-popover-divider"></div>
+
+                      {/* Row 2: 2 charts */}
+                      <div className="layout-popover-row">
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
+                          title="2 Biểu đồ (Cột dọc 1x2)"
+                          onClick={() => handleSelectLayout("2-col")}
+                        >
+                          {renderLayoutIcon("2-col", 24, 24)}
+                        </button>
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
+                          title="2 Biểu đồ (Hàng ngang 2x1)"
+                          onClick={() => handleSelectLayout("2-row")}
+                        >
+                          {renderLayoutIcon("2-row", 24, 24)}
+                        </button>
+                      </div>
+                      <div className="layout-popover-divider"></div>
+
+                      {/* Row 3: 3 charts */}
+                      <div className="layout-popover-row">
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
+                          title="3 Biểu đồ (Cột dọc 1x3)"
+                          onClick={() => handleSelectLayout("3-col")}
+                        >
+                          {renderLayoutIcon("3-col", 24, 24)}
+                        </button>
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
+                          title="3 Biểu đồ (Hàng ngang 3x1)"
+                          onClick={() => handleSelectLayout("3-row")}
+                        >
+                          {renderLayoutIcon("3-row", 24, 24)}
+                        </button>
+                      </div>
+                      <div className="layout-popover-divider"></div>
+
+                      {/* Row 4: 4 charts */}
+                      <div className="layout-popover-row">
+                        <button
+                          type="button"
+                          className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
+                          title="4 Biểu đồ (Lưới 2x2)"
+                          onClick={() => handleSelectLayout("4-grid")}
+                        >
+                          {renderLayoutIcon("4-grid", 24, 24)}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <button className="btn-chart-settings" onClick={() => setShowSettings(true)}>
+                  ⚙ Cài Đặt
+                </button>
               </div>
-              <div className="chart-wrapper" ref={chartContainerRef}
-                onWheel={() => setIsAutoFit(false)}
-                onTouchStart={() => setIsAutoFit(false)}
-                onMouseDown={() => setIsAutoFit(false)} />
-              {/* Nút A và L overlay — clone TradingView */}
-              <div style={{
-                position: "absolute", bottom: "8px", right: "52px",
-                display: "flex", gap: "4px", zIndex: 10
-              }}>
-                <button
-                  title="Auto (fits data to screen)"
-                  onClick={() => {
-                    const next = !isAutoFit;
-                    setIsAutoFit(next);
-                    if (next) chartRef.current?.timeScale().fitContent();
-                  }}
-                  style={{
-                    width: "24px", height: "24px",
-                    background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                    color: isAutoFit ? "#fff" : "#d1d4dc",
-                    border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
-                    borderRadius: "3px",
-                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    lineHeight: 1
-                  }}
-                >A</button>
-                <button
-                  title="Log scale"
-                  onClick={() => {
-                    const next = !isLogScale;
-                    setIsLogScale(next);
-                    chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
-                  }}
-                  style={{
-                    width: "24px", height: "24px",
-                    background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-                    color: isLogScale ? "#fff" : "#d1d4dc",
-                    border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
-                    borderRadius: "3px",
-                    fontSize: "11px", fontWeight: "bold", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    lineHeight: 1
-                  }}
-                >L</button>
-              </div>
-            </section>
+            </div>
+
+            <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
+              <section className="pane-chart" style={{ position: "relative" }}>
+                <div className={`multi-chart-container layout-${chartLayout}`}>
+                  {chartsConfig.slice(0, getActiveChartsCount(chartLayout)).map((cfg, idx) => (
+                    <SingleChartPane
+                      key={`chart_${idx}_${chartLayout}_${cfg.coin}`}
+                      chartIndex={idx}
+                      coin={cfg.coin}
+                      tf={cfg.tf}
+                      onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
+                      onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
+                      isActive={activeChartIndex === idx}
+                      onActivate={() => {
+                        setActiveChartIndex(idx);
+                        setSelectedCoin(cfg.coin);
+                      }}
+                      showToolbar={true}
+                      layout={chartLayout}
+                    />
+                  ))}
+                </div>
+              </section>
 
             {/* Resizer */}
             <div
@@ -1335,7 +1856,8 @@ function App() {
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  <button
+                  {/* Tạm thời ẩn nút lịch sử lệnh theo yêu cầu CEO */}
+                  {/* <button
                     className={activeTab === "history" ? "active-icon-btn" : "icon-btn"}
                     onClick={() => setActiveTab("history")}
                     title={`Lịch Sử Lệnh (${closedPositions.length})`}
@@ -1352,7 +1874,7 @@ function App() {
                     }}
                   >
                     📜
-                  </button>
+                  </button> */}
                   <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
                     {isRunning ? `● ĐANG CHẠY | ${formatUptime(uptime)}` : "● ĐÃ DỪNG"}
                   </span>
@@ -1412,19 +1934,43 @@ function App() {
                     <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                       <thead>
                         <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
-                          <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Giá vào lệnh</th>
-                          <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                          <th style={{ padding: "6px 10px", textAlign: "center", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
-                          {/* <th style={{ padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TP | SL</th> */}
-                          <th style={{ padding: "6px 10px", textAlign: "left", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
+                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
+                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Điểm vào</th>
+                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
+                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
                           <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {COIN_LIST.slice(0, 3).map((coin, i) => {
-                          const posList = safePos.filter(p => p.instId === coin.value);
-                          const isChecked = activePairs.includes(coin.value);
+                        {(() => {
+                          const baseCoins = [
+                            COIN_LIST.find(c => c.value === "BTC-USDT-SWAP") || { label: "BTC-USDT", value: "BTC-USDT-SWAP" },
+                            COIN_LIST.find(c => c.value === "ETH-USDT-SWAP") || { label: "ETH-USDT", value: "ETH-USDT-SWAP" },
+                            COIN_LIST.find(c => c.value === "XAU-USDT-SWAP") || { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
+                          ];
+                          const allCoinValues = new Set([...baseCoins.map(c => c.value), ...safePos.map(p => p.instId)]);
+                          const displayCoins = Array.from(allCoinValues).map(val => {
+                            const found = COIN_LIST.find(c => c.value === val);
+                            if (found) return found;
+                            return { label: val.replace("-SWAP", ""), value: val };
+                          }).filter(c => c.value !== "USDT.D");
+
+                          const getCoinRoi = (coinValue) => {
+                            const list = safePos.filter(p => p.instId === coinValue);
+                            if (list.length === 0) return -999999999;
+                            return Math.max(...list.map(p => parseFloat(p.roi || 0)));
+                          };
+
+                          const sortedCoins = [...displayCoins].sort((a, b) => {
+                            return getCoinRoi(b.value) - getCoinRoi(a.value); // % PNL cao nhất từ trên xuống dưới
+                          });
+
+                          return sortedCoins.map((coin, i) => {
+                            const posList = safePos
+                              .filter(p => p.instId === coin.value)
+                              .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+                            const isChecked = activePairs.includes(coin.value);
 
                           if (posList.length === 0) {
                             return (
@@ -1442,8 +1988,8 @@ function App() {
                                   </div>
                                 </td>
                                 <td></td><td></td><td></td>
-                                <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
-                                  <div style={{ display: "flex", gap: "5px" }}>
+                                <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                  <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                                     {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
                                       const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
                                       const isOn = coinTfs.includes(tf);
@@ -1481,7 +2027,7 @@ function App() {
                             return (
                               <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), position: "relative", backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
                                 <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: isChild ? "32px" : "16px" }}>
-                                  {!isChild && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "4px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>}
+                                  {!isChild && <div style={{ position: "absolute", left: 0, top: "6px", bottom: "6px", width: "4px", borderRadius: "2px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>}
                                   
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
                                     {!isChild ? (
@@ -1499,8 +2045,6 @@ function App() {
                                     <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
                                       <span style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
                                       
-                                      
-                                      
                                       {!isChild && (
                                         <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
                                           {isLong ? "Long" : "Short"} {pos.lever || "100"}x
@@ -1515,8 +2059,8 @@ function App() {
                                     </span>
                                   </div>
                                 </td>
-                                <td style={{ padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString() : "0"}</td>
-                                <td style={{ padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                                <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}</td>
+                                <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
                                 <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
                                   {(() => {
                                     const roi = parseFloat(pos.roi || 0);
@@ -1528,9 +2072,9 @@ function App() {
                                     );
                                   })()}
                                 </td>
-                                <td style={{ padding: "6px 10px", textAlign: "left", whiteSpace: "nowrap" }}>
+                                <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
                                   {!isChild && ticketIndex === 0 && (
-                                    <div style={{ display: "flex", gap: "5px" }}>
+                                    <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                                       {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
                                         const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
                                         const isOn = coinTfs.includes(tf);
@@ -1596,7 +2140,8 @@ function App() {
                               </tr>
                             );
                           });
-                        })}
+                        });
+                      })()}
                       </tbody>
                     </table>
                   </div>
@@ -1604,20 +2149,22 @@ function App() {
               </div>
             </section>
           </main>
+          </div>
         </div>
       </div>
+    </div>
 
-      {/* SETTINGS MODAL — Clone 100% từ Desktop App */}
+            {/* SETTINGS MODAL — 1:1 CLONE TỪ DESKTOP APP (PyQt6 QDialog) */}
       {showSettings && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
           <div className="modal-content settings-modal">
-            {/* Header */}
+            {/* Header Dialog */}
             <div className="modal-header">
-              <h3>⚙️ Cấu Hình Hệ Thống</h3>
-              <button className="close-btn" onClick={() => setShowSettings(false)}>×</button>
+              <h3>⚙️ Cấu Hình Hệ Thống - {accounts.find(a => a.id === selectedAccount)?.name || (selectedAccount === "sub1" ? "Tài khoản phụ" : "Bot")}</h3>
+              <button className="close-btn" onClick={() => setShowSettings(false)} title="Đóng">×</button>
             </div>
 
-            {/* Tab Bar */}
+            {/* Tab Bar (InnerTabs) */}
             <div className="settings-tab-bar">
               <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
                 🔑 Cấu Hình API Key
@@ -1629,185 +2176,372 @@ function App() {
 
             <div className="modal-body settings-body">
 
-              {/* ===== TAB API KEY ===== */}
+              {/* ===== TAB 1: CẤU HÌNH API KEY ===== */}
               {settingsTab === "api" && (
-                <div>
+                <div className="settings-tab-content">
+                  <div className="settings-tab-scroll">
                   {/* Chọn tài khoản */}
-                  <div className="settings-row" style={{ marginBottom: "12px" }}>
-                    <label>Chọn tài khoản đang cấu hình:</label>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "6px" }}>
-                      <select className="styled-select" style={{ flex: 1 }} value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}>
-                        <option value="sub1">Tài khoản phụ 1</option>
-                        <option value="sub2">Tài khoản phụ 2</option>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", marginBottom: "14px" }}>
+                    <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>Chọn tài khoản đang cấu hình:</label>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <select
+                        className="styled-select"
+                        style={{ minWidth: "200px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "5px 10px", borderRadius: "4px", fontSize: "12px" }}
+                        value={selectedAccount}
+                        onChange={e => setSelectedAccount(e.target.value)}
+                      >
+                        {accounts.map(acc => (
+                          <option key={acc.id} value={acc.id}>{acc.name}</option>
+                        ))}
                       </select>
-                      <button className="btn-add-acc" title="Thêm tài khoản">+</button>
-                      <button className="btn-del-acc" title="Xóa tài khoản">−</button>
+                      <button
+                        style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        title="Tạo Tài Khoản Mới"
+                        onClick={handleCreateAccount}
+                      >+</button>
+                      <button
+                        style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        title="Xóa Tài Khoản"
+                        onClick={handleDeleteAccount}
+                      >−</button>
                     </div>
                   </div>
 
                   {/* Thông Tin API OKX */}
                   <div className="settings-group">
                     <div className="settings-group-title">Thông Tin API OKX</div>
-                    <div className="form-group">
-                      <label>Mã API (API Key):</label>
-                      <input type="text" className="styled-input" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Nhập API Key..." />
-                    </div>
-                    <div className="form-group">
-                      <label>Khóa Bí Mật (Secret):</label>
-                      <input type="password" className="styled-input" value={secretKey} onChange={e => setSecretKey(e.target.value)} placeholder="Nhập Secret Key..." />
-                    </div>
-                    <div className="form-group">
-                      <label>Cụm Mật Khẩu (Passphrase):</label>
-                      <input type="password" className="styled-input" value={passphrase} onChange={e => setPassphrase(e.target.value)} placeholder="Nhập Passphrase..." />
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                      <div className="settings-form-row">
+                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Mã API (API Key):</label>
+                        <input
+                          type="text"
+                          className="styled-input"
+                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                          value={apiKey}
+                          onChange={e => setApiKey(e.target.value)}
+                          placeholder="Nhập API Key..."
+                        />
+                      </div>
+                      <div className="settings-form-row">
+                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Khóa Bí Mật (Secret):</label>
+                        <input
+                          type="password"
+                          className="styled-input"
+                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                          value={secretKey}
+                          onChange={e => setSecretKey(e.target.value)}
+                          placeholder="Nhập Secret Key..."
+                        />
+                      </div>
+                      <div className="settings-form-row">
+                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Cụm Mật Khẩu (Pass):</label>
+                        <input
+                          type="password"
+                          className="styled-input"
+                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                          value={passphrase}
+                          onChange={e => setPassphrase(e.target.value)}
+                          placeholder="Nhập Passphrase..."
+                        />
+                      </div>
                     </div>
                   </div>
 
                   {/* Lệnh Can Thiệp Nhanh */}
                   <div className="settings-group">
                     <div className="settings-group-title">Lệnh Can Thiệp Nhanh (Audit Hệ Thống)</div>
-                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                      <button className="btn-audit" onClick={handleResetCapital}>♻️ Reset Vốn Gốc (Audit)</button>
+                    <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
+                      <button
+                        className="btn-audit"
+                        onClick={handleResetCapital}
+                      >
+                        ♻️ Reset Vốn Gốc (Audit)
+                      </button>
+                      {((localStorage.getItem('tls1_uid') || loginUid) === "admtls12021") && (
+                        <button
+                          className="btn-audit"
+                          onClick={() => alert("✅ Đã gửi lệnh Reset Đếm Nến đến Bot thành công!")}
+                        >
+                          ♻️ Reset Đếm Nến
+                        </button>
+                      )}
                     </div>
                   </div>
 
                   {/* Mã Máy HWID */}
                   <div className="settings-group">
                     <div className="settings-group-title">Mã Máy (HWID) Cá Nhân</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ color: "#888" }}>Mã Máy của bạn:</span>
-                      <span className="hwid-value">{hwid}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
+                      <span style={{ color: "#aaaaaa", fontSize: "12px" }}>Mã Máy của bạn:</span>
+                      <span
+                        className="hwid-value"
+                        style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
+                        title="Click để copy Mã Máy"
+                        onClick={() => {
+                          navigator.clipboard.writeText(hwid);
+                          alert("✅ Đã Copy Mã Máy!");
+                        }}
+                      >
+                        {hwid}
+                      </span>
                     </div>
+                  </div>
+                  </div>
+
+                  {/* Nút Lưu API Key chuẩn vị trí Tab 1 Desktop App */}
+                  <div className="api-actions-row">
+                    <button
+                      type="button"
+                      className="btn-logout-strat"
+                      onClick={() => {
+                        localStorage.removeItem("tls1_auth");
+                        localStorage.removeItem("tls1_uid");
+                        window.location.reload();
+                      }}
+                    >
+                      Đăng Xuất
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-save-strat"
+                      disabled={isSavingConfig}
+                      onClick={async () => {
+                        setIsSavingConfig(true);
+                        await new Promise(resolve => setTimeout(resolve, 1200));
+                        try {
+                          const res = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
+                          });
+
+                          if (!res.ok) {
+                            const errorData = await res.json();
+                            alert(`❌ Lỗi: ${errorData.detail || "Không thể lưu API Key"}`);
+                            setIsSavingConfig(false);
+                            return;
+                          }
+
+                          const curAccName = accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
+                          alert(`Đã lưu cấu hình API Key cho [${curAccName}]!`);
+                          addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
+                        } catch (e) {
+                          alert(`Lỗi kết nối khi lưu API Key: ${e.message}`);
+                        }
+                        setIsSavingConfig(false);
+                        setShowSettings(false);
+                      }}
+                    >
+                      {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "LƯU CẤU HÌNH API KEY"}
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* ===== TAB CHIẾN THUẬT ===== */}
+              {/* ===== TAB 2: CẤU HÌNH CHIẾN THUẬT ===== */}
               {settingsTab === "strategy" && (
-                <div>
-
+                <div className="settings-tab-content">
+                  <div className="settings-tab-scroll">
                   {selectedAccount === "sub1" ? (
                     <>
-                      {/* Công Tắc Chiến Thuật EMA200 */}
+                      {/* QUẢN LÝ VỐN & RỦI RO (Chuẩn Desktop App gui_main.py:2293) */}
+                      <div className="settings-group">
+                        <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
+                        <div className="entry-setup-list">
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Volume Size ({risk.volUnit}):</span>
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                              <button
+                                type="button"
+                                onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
+                                style={{
+                                  padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
+                                  border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
+                                  cursor: "pointer", fontWeight: "bold"
+                                }}
+                              >
+                                {risk.volUnit}
+                              </button>
+                              <NumberSpinBox
+                                value={risk.posVol}
+                                onChange={val => setRisk(r => ({ ...r, posVol: val }))}
+                                min={risk.volUnit === "LOT" ? 0.01 : 1}
+                                step={risk.volUnit === "LOT" ? 0.01 : 10}
+                                width="95px"
+                              />
+                            </div>
+                          </div>
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Mức chốt lời gốc M5:</span>
+                            </div>
+                            <NumberSpinBox
+                              value={risk.tpPct}
+                              onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
+                              min={0.1}
+                              step={0.05}
+                              suffix="%"
+                              width="95px"
+                            />
+                          </div>
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Mức cắt lỗ gốc M5:</span>
+                            </div>
+                            <NumberSpinBox
+                              value={risk.slPct}
+                              onChange={val => setRisk(r => ({ ...r, slPct: val }))}
+                              min={0.1}
+                              step={0.05}
+                              suffix="%"
+                              width="95px"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      {/* 1. Công Tắc Chiến Thuật EMA200 (Chuẩn layout Desktop: DCA Dương bên trái, Hedge & Chốt lời EMA200 cột phải) */}
                       <div className="settings-group">
                         <div className="settings-group-title">Công Tắc Chiến Thuật</div>
-                        <div className="toggle-grid">
-                          <div className="toggle-row">
+                        <div className="tactics-toggles-layout">
+                          {/* Cột trái: DCA Dương chiếm trọn chiều cao */}
+                          <div className="toggle-row tactics-left-col">
                             <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
                             <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
-                            <span className="toggle-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định)." style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
+                            <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
                           </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
-                            <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
-                            <span className="toggle-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
-                          </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
-                            <span className="toggle-name">Chốt lời bám EMA200</span>
-                            <span className="toggle-help" onClick={() => alert("Chốt lời động bám theo trục EMA200")} title="Chốt lời động bám theo trục EMA200" style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
+
+                          {/* Cột phải: Đánh Sóng Đảo Chiều ở trên, Chốt lời bám EMA200 ở dưới */}
+                          <div className="tactics-right-col">
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
+                              <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
+                              <button className="btn-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%">[?]</button>
+                            </div>
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
+                              <span className="toggle-name">Chốt lời bám EMA200</span>
+                              <button className="btn-help" onClick={() => alert("Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")} title="Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.">[?]</button>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Lớp Bảo Vệ Cục Bộ EMA200 */}
+                      {/* 2. Lớp Bảo Vệ Cục Bộ EMA200 */}
                       <div className="settings-group">
                         <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
                         <div className="toggle-grid">
-                          {[
-                            // ["sidewaySafe", "Chốt sớm khi đi ngang (Sideway)", "Chốt chủ động khi giá đi ngang + ROI ≥ 20%"],
-                            // ["squeezeEscape", "Thoát sớm khi bị nén giá", "Thoát sớm khi khung bị nén tam giác"],
-                            ["safeguardEntry", "Thoát hòa vốn khi giá hồi", "Thoát hòa khi lỗ sâu >70% SL rồi hồi về Entry"],
-                            ["trailingSl", "Khóa lời động (Trailing SL)", "Trailing SL động — tự kéo chặn lãi theo sóng"],
-                            ["maxRoi", "Chốt lời lớn (ROI ≥ 120%)", "Tự động chốt lời tối đa khi đạt mốc lợi nhuận cao"],
-                            // ["sidewayVap", "Cắt hòa khi vấp cản 2 lần", "Cắt hòa khi vấp trục cản EMA200 ≥ 2 lần"],
-                            ["h4Flip", "Cắt lệnh khi H4 đảo chiều", "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng"],
-                          ].map(([key, name, desc]) => (
-                            <div className="toggle-row" key={key}>
-                              <ToggleSwitch checked={strat[key]} onChange={v => setStrat(s => ({ ...s, [key]: v }))} />
-                              <span className="toggle-name">{name}</span>
-                              <span className="toggle-help" onClick={() => alert(desc)} title={desc} style={{ color: "#888", cursor: "pointer", marginLeft: "6px", fontSize: "11px", fontWeight: "bold" }}>[?]</span>
-                            </div>
-                          ))}
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.safeguardEntry} onChange={v => setStrat(s => ({ ...s, safeguardEntry: v }))} />
+                            <span className="toggle-name">Thoát hòa vốn khi giá hồi</span>
+                            <button className="btn-help" onClick={() => alert("Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")} title="Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.trailingSl} onChange={v => setStrat(s => ({ ...s, trailingSl: v }))} />
+                            <span className="toggle-name">Khóa lời động (Trailing SL)</span>
+                            <button className="btn-help" onClick={() => alert("Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")} title="Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.maxRoi} onChange={v => setStrat(s => ({ ...s, maxRoi: v }))} />
+                            <span className="toggle-name">Chốt lời lớn (ROI ≥ 120%)</span>
+                            <button className="btn-help" onClick={() => alert("Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")} title="Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.h4Flip} onChange={v => setStrat(s => ({ ...s, h4Flip: v }))} />
+                            <span className="toggle-name">Cắt lệnh khi H4 đảo chiều</span>
+                            <button className="btn-help" onClick={() => alert("Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")} title="Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).">[?]</button>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Điểm Vào Lệnh (Entry Setup) EMA200 */}
+
+
+                      {/* 2. Điểm Vào Lệnh (Entry Setup) EMA200 — Mỗi setting là 1 dòng riêng biệt */}
                       <div className="settings-group">
                         <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
-                        <div className="risk-grid">
-                          <div className="risk-row">
-                            <label>Đón trước cản (%):</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              step="0.01"
+                        <div className="entry-setup-list">
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Đón trước cản:</span>
+                              <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
+                            </div>
+                            <NumberSpinBox
                               value={entryCfg.entryOffset}
-                              onChange={e => setEntryCfg(prev => ({ ...prev, entryOffset: e.target.value }))}
+                              onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
+                              step={0.01}
+                              min={0}
+                              suffix="%"
+                              width="95px"
                             />
                           </div>
-                          <div className="risk-row">
-                            <label>Khoảng cách nhồi DCA (%):</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              step="0.05"
+
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Khoảng cách nhồi DCA:</span>
+                              <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
+                            </div>
+                            <NumberSpinBox
                               value={entryCfg.dcaGapPct}
-                              onChange={e => setEntryCfg(prev => ({ ...prev, dcaGapPct: e.target.value }))}
+                              onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
+                              step={0.05}
+                              min={0}
+                              suffix="%"
+                              width="95px"
                             />
                           </div>
-                          {/* Ẩn chỉ số Độ chụm đa khung (%) theo yêu cầu */}
-                          {/* <div className="risk-row">
-                            <label>Độ chụm đa khung (%):</label>
-                            <input 
-                              type="number" 
-                              className="styled-input num" 
-                              step="0.01" 
-                              value={entryCfg.confluencePct} 
-                              onChange={e => setEntryCfg(prev => ({...prev, confluencePct: e.target.value}))} 
-                            />
-                          </div> */}
-                          <div className="risk-row">
-                            <label>Số nến xu hướng tối thiểu:</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              min="1"
-                              max="200"
+
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span>Số nến xu hướng tối thiểu:</span>
+                              <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
+                            </div>
+                            <NumberSpinBox
                               value={entryCfg.accumCandles}
-                              onChange={e => setEntryCfg(prev => ({ ...prev, accumCandles: e.target.value }))}
+                              onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
+                              min={1}
+                              max={200}
+                              step={1}
+                              width="95px"
                             />
                           </div>
-                          <div className="risk-row" style={{ marginTop: "4px" }}>
-                            <span style={{ fontSize: "12px", color: "#e0e0e0", fontWeight: "bold" }}>Altcoin neo theo BTC:</span>
+
+                          <div className="entry-setup-row">
+                            <div className="entry-label-wrap">
+                              <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
+                            </div>
                             <ToggleSwitch
                               checked={entryCfg.altcoinFollowBtc}
                               onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
                             />
                           </div>
+
                           {entryCfg.altcoinFollowBtc && (
-                            <div className="risk-row">
-                              <label>Hệ số nhạy ETH (Vol Mult):</label>
-                              <input
-                                type="number"
-                                className="styled-input num"
-                                step="0.1"
+                            <div className="entry-setup-row">
+                              <div className="entry-label-wrap">
+                                <span>Hệ số nhạy ETH (Vol Mult):</span>
+                                <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
+                              </div>
+                              <NumberSpinBox
                                 value={entryCfg.ethVolMult}
-                                onChange={e => setEntryCfg(prev => ({ ...prev, ethVolMult: e.target.value }))}
+                                onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
+                                step={0.1}
+                                min={0}
+                                width="95px"
                               />
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Hệ Số Nhân Đa Khung (TF Multipliers) EMA200 */}
+                      {/* 5. Hệ Số Nhân Đa Khung (TF Multipliers) EMA200 */}
                       <div className="settings-group">
                         <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
                         <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
                           <thead>
-                            <tr style={{ color: "#aaa", borderBottom: "1px solid #444" }}>
-                              <th style={{ padding: "6px 4px", textAlign: "left" }}>Khung</th>
-                              <th style={{ padding: "6px 4px" }}>Hệ số đón trước</th>
-                              <th style={{ padding: "6px 4px" }}>Hệ số Volume</th>
+                            <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
+                              <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
+                              <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
+                              <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1819,10 +2553,10 @@ function App() {
                               ["H2", "4.7x", "3.0x"],
                               ["H4", "6.8x", "5.0x"],
                             ].map(([tf, offset, vol]) => (
-                              <tr key={tf} style={{ borderBottom: "1px solid #333" }}>
-                                <td style={{ padding: "6px 4px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
-                                <td style={{ padding: "6px 4px", color: "#e0e0e0" }}>{offset}</td>
-                                <td style={{ padding: "6px 4px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                              <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
+                                <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
+                                <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
+                                <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1831,37 +2565,45 @@ function App() {
                     </>
                   ) : (
                     <>
-                      {/* Chiến Thuật SMC */}
+                      {/* 1. Chiến Thuật Bắt Sóng SMC */}
                       <div className="settings-group">
                         <div className="settings-group-title">Chiến Thuật Bắt Sóng SMC</div>
-                        <div className="toggle-grid">
-                          
-                          <div className="toggle-row" style={{ marginTop: "10px" }}>
-                            <span className="toggle-name" style={{ flex: 1, color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc:</span>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
+                            <span className="toggle-name">Đánh SMC Order Block</span>
+                            <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")}>[?]</button>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc (Base TF):</span>
                             <select
                               className="styled-select"
-                              value={strat.timeframeBase}
+                              value={strat.timeframeBase || "1H"}
                               onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
-                              style={{ width: "100px", background: "#1e1e1e", color: "#fff", border: "1px solid #555", borderRadius: "6px", padding: "4px" }}
+                              style={{ width: "90px" }}
                             >
-                              <option value="15M">15M</option>
-                              <option value="30M">30M</option>
+                              <option value="5m">5m</option>
+                              <option value="15m">15m</option>
+                              <option value="30m">30m</option>
                               <option value="1H">1H</option>
+                              <option value="2H">2H</option>
                               <option value="4H">4H</option>
                             </select>
                           </div>
                         </div>
                       </div>
 
-                      {/* Điểm Vào Lệnh SMC */}
+
+
+                      {/* 2. Cấu Hình Bắt Sóng SMC — Mỗi setting là 1 dòng riêng biệt */}
                       <div className="settings-group">
-                        <div className="settings-group-title">Điểm Vào Lệnh SMC (Order Block)</div>
-                        <div className="risk-grid">
-                          <div className="risk-row">
-                            <label>Nguồn bắt cản (OB Source):</label>
+                        <div className="settings-group-title">Cấu Hình Bắt Sóng SMC</div>
+                        <div className="entry-setup-list">
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Nguồn bắt cản (OB Source):</span>
                             <select
                               className="styled-select"
-                              style={{ width: "120px", padding: "3px 6px", fontSize: "11px" }}
+                              style={{ width: "130px" }}
                               value={smcEntryCfg.source}
                               onChange={e => setSmcEntryCfg(s => ({ ...s, source: e.target.value }))}
                             >
@@ -1870,11 +2612,11 @@ function App() {
                               <option value="INTERNAL">Chỉ sóng nhỏ</option>
                             </select>
                           </div>
-                          <div className="risk-row">
-                            <label>Hướng vào lệnh:</label>
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Hướng vào lệnh:</span>
                             <select
                               className="styled-select"
-                              style={{ width: "120px", padding: "3px 6px", fontSize: "11px" }}
+                              style={{ width: "130px" }}
                               value={smcEntryCfg.dir}
                               onChange={e => setSmcEntryCfg(s => ({ ...s, dir: e.target.value }))}
                             >
@@ -1883,54 +2625,55 @@ function App() {
                               <option value="SHORT_ONLY">Chỉ Short</option>
                             </select>
                           </div>
-                          <div className="risk-row">
-                            <label>Lọc lực nến cản (x ATR):</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              step="0.1"
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Lọc lực nến cản (x ATR):</span>
+                            <NumberSpinBox
                               value={smcEntryCfg.obVol}
-                              onChange={e => setSmcEntryCfg(s => ({ ...s, obVol: e.target.value }))}
+                              onChange={val => setSmcEntryCfg(s => ({ ...s, obVol: val }))}
+                              step={0.1}
+                              min={0}
+                              width="95px"
                             />
                           </div>
-                          <div className="risk-row">
-                            <label>Độ dài sóng lớn (Swing nến):</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              min="10"
-                              max="200"
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng lớn (Swing nến):</span>
+                            <NumberSpinBox
                               value={smcEntryCfg.swingLength}
-                              onChange={e => setSmcEntryCfg(s => ({ ...s, swingLength: e.target.value }))}
+                              onChange={val => setSmcEntryCfg(s => ({ ...s, swingLength: val }))}
+                              min={10}
+                              max={200}
+                              step={1}
+                              width="95px"
                             />
                           </div>
-                          <div className="risk-row">
-                            <label>Độ dài sóng nhỏ (Internal nến):</label>
-                            <input
-                              type="number"
-                              className="styled-input num"
-                              min="1"
-                              max="50"
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng nhỏ (Internal nến):</span>
+                            <NumberSpinBox
                               value={smcEntryCfg.internalLength}
-                              onChange={e => setSmcEntryCfg(s => ({ ...s, internalLength: e.target.value }))}
+                              onChange={val => setSmcEntryCfg(s => ({ ...s, internalLength: val }))}
+                              min={1}
+                              max={50}
+                              step={1}
+                              width="95px"
                             />
                           </div>
-                          <div className="risk-row" style={{ marginTop: "4px" }}>
-                            <span style={{ fontSize: "12px", color: "#e0e0e0", fontWeight: "bold" }}>Ép khớp Market khi lọt cản:</span>
+                          <div className="entry-setup-row">
+                            <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", color: "#ffffff" }}>Ép khớp Market khi lọt cản:</span>
                             <ToggleSwitch
                               checked={smcEntryCfg.forceMarket}
                               onChange={v => setSmcEntryCfg(s => ({ ...s, forceMarket: v }))}
                             />
                           </div>
                           {smcEntryCfg.forceMarket && (
-                            <div className="risk-row">
-                              <label>Trượt giá Market tối đa (%):</label>
-                              <input
-                                type="number"
-                                className="styled-input num"
-                                step="0.1"
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Trượt giá Market tối đa:</span>
+                              <NumberSpinBox
                                 value={smcEntryCfg.maxSlippage}
-                                onChange={e => setSmcEntryCfg(s => ({ ...s, maxSlippage: e.target.value }))}
+                                onChange={val => setSmcEntryCfg(s => ({ ...s, maxSlippage: val }))}
+                                step={0.1}
+                                min={0}
+                                suffix="%"
+                                width="95px"
                               />
                             </div>
                           )}
@@ -1938,103 +2681,228 @@ function App() {
                       </div>
                     </>
                   )}
+
+                  </div>
+
+                  {/* Hàng 2 nút điều khiển chuẩn Desktop App bên dưới Tab 2 */}
+                  <div className="strat-actions-row">
+                    <button
+                      type="button"
+                      className="btn-reset-strat"
+                      onClick={() => {
+                        if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH của app không?")) {
+                          if (selectedAccount === "sub1") {
+                            setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+                            setStrat({
+                              main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
+                              dynamicPingpongTp: false, altcoinFollowBtc: true,
+                              sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+                              trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
+                            });
+                            setEntryCfg({
+                              entryOffset: "0.05",
+                              dcaGapPct: "0.20",
+                              confluencePct: "0.23",
+                              accumCandles: 60,
+                              altcoinFollowBtc: true,
+                              ethVolMult: "1.30",
+                            });
+                          } else if (selectedAccount === "sub2") {
+                            setRisk({ posVol: 100, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
+                            setStrat({
+                              main: true, xole: false, dynamicEma200Tp: false,
+                              dynamicPingpongTp: false, altcoinFollowBtc: false,
+                              sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
+                              trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
+                              timeframeBase: "1H",
+                            });
+                            setSmcEntryCfg({
+                              source: "ALL",
+                              dir: "BOTH",
+                              obVol: 2.0,
+                              swingLength: 50,
+                              internalLength: 5,
+                              forceMarket: true,
+                              maxSlippage: 0.8,
+                            });
+                          }
+                          alert("Đã khôi phục cài đặt về mặc định của nhà sản xuất!");
+                        }
+                      }}
+                    >
+                      KHÔI PHỤC MẶC ĐỊNH
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-save-strat"
+                      disabled={isSavingConfig}
+                      onClick={async () => {
+                        setIsSavingConfig(true);
+                        await new Promise(resolve => setTimeout(resolve, 1200));
+                        alert(`Đã lưu Cấu Hình Chiến Thuật cho [${selectedAccount === "sub1" ? "Bot EMA200" : "Bot SMC"}] thành công!`);
+                        addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho tài khoản ${selectedAccount}`);
+                        setIsSavingConfig(false);
+                        setShowSettings(false);
+                      }}
+                    >
+                      {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Footer */}
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowSettings(false)}>Đóng</button>
-              <button className="btn-secondary" style={{ background: '#ef5350', color: '#fff', border: 'none', marginRight: 'auto' }} onClick={() => { localStorage.removeItem("tls1_auth"); localStorage.removeItem("tls1_uid"); window.location.reload(); }}>🚪 Thoát Tài Khoản</button>
-              {settingsTab === "strategy" && (
-                <button
-                  className="btn-default"
-                  style={{
-                    backgroundColor: "#333333", color: "#ff9900", border: "1px solid #ff9900",
-                    borderRadius: "6px", padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "bold",
-                    transition: "0.2s"
-                  }}
-                  onClick={() => {
-                    if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình về MẶC ĐỊNH của app không?")) {
-                      if (selectedAccount === "sub1") {
-                        setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
-                        setStrat({
-                          main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
-                          dynamicPingpongTp: false, altcoinFollowBtc: true,
-                          sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
-                          trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
-                        });
-                        setEntryCfg({
-                          entryOffset: "0.05",
-                          dcaGapPct: "0.20",
-                          confluencePct: "0.23",
-                          accumCandles: 60,
-                          altcoinFollowBtc: true,
-                          ethVolMult: "1.30",
-                        });
-                      } else if (selectedAccount === "sub2") {
-                        setRisk({ posVol: 40, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
-                        setStrat({
-                          main: true, xole: false, dynamicEma200Tp: false,
-                          dynamicPingpongTp: false, altcoinFollowBtc: false,
-                          sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
-                          trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
-                          timeframeBase: "1H",
-                        });
-                        setSmcEntryCfg({
-                          source: "ALL",
-                          dir: "BOTH",
-                          obVol: 2.0,
-                          swingLength: 50,
-                          internalLength: 5,
-                          forceMarket: true,
-                          maxSlippage: 0.8,
-                        });
-                      }
-                      alert("🔄 Đã khôi phục cài đặt về mặc định của nhà sản xuất!");
-                    }
-                  }}
-                >
-                  🔄 KHÔI PHỤC MẶC ĐỊNH
-                </button>
-              )}
-              <button className="btn-primary" disabled={isSavingConfig} onClick={async () => {
-                setIsSavingConfig(true);
-                if (settingsTab === "api") {
-                  try {
-                    const res = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
-                    });
-
-                    if (!res.ok) {
-                      const errorData = await res.json();
-                      alert(`❌ Lỗi: ${errorData.detail || "Không thể lưu API Key"}`);
-                      setIsSavingConfig(false);
-                      return;
-                    }
-
-                    alert("💾 Đã lưu cấu hình API Key!");
-                    addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản ${selectedAccount}`);
-                  } catch (e) { alert(`Lỗi kết nối khi lưu API Key: ${e.message}`); }
-                } else {
-                  await new Promise(resolve => setTimeout(resolve, 800)); // Hiệu ứng delay giả lập lưu cấu hình
-                  alert("💾 Đã lưu cấu hình Chiến Thuật (Auto-Reload)!");
-                  addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho tài khoản ${selectedAccount}`);
+      {/* MODAL TẠO TÀI KHOẢN MỚI */}
+      {showAddAccountModal && (
+        <div className="account-prompt-overlay" onClick={e => e.target === e.currentTarget && setShowAddAccountModal(false)}>
+          <div className="account-prompt-card">
+            <div className="account-prompt-title">➕ Tạo Tài Khoản Mới</div>
+            <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "12px", marginTop: "4px" }}>
+              Nhập tên tài khoản bạn muốn tạo:
+            </div>
+            <input
+              type="text"
+              className="styled-input"
+              placeholder="Ví dụ: Tài khoản phụ 2, Quỹ A, v.v..."
+              value={newAccountInput}
+              onChange={e => setNewAccountInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") confirmCreateAccount();
+                if (e.key === "Escape") {
+                  setShowAddAccountModal(false);
+                  setNewAccountInput("");
                 }
-                setIsSavingConfig(false);
-                setShowSettings(false);
-              }}>
-                {isSavingConfig ? (
-                  <><span className="spinner"></span> ĐANG LƯU...</>
+              }}
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                fontSize: "13px",
+                backgroundColor: "#1e1e1e",
+                color: "#ffffff",
+                border: "1px solid #555555",
+                borderRadius: "4px",
+                boxSizing: "border-box"
+              }}
+            />
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "16px" }}>
+              <button
+                type="button"
+                disabled={isCreatingAccount}
+                onClick={() => { setShowAddAccountModal(false); setNewAccountInput(""); }}
+                style={{
+                  padding: "7px 15px",
+                  background: "#333333",
+                  border: "1px solid #555555",
+                  borderRadius: "4px",
+                  color: "#cccccc",
+                  cursor: isCreatingAccount ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  opacity: isCreatingAccount ? 0.6 : 1
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isCreatingAccount}
+                onClick={confirmCreateAccount}
+                style={{
+                  padding: "7px 18px",
+                  background: isCreatingAccount ? "#1e7e34" : "#28a745",
+                  border: "none",
+                  borderRadius: "4px",
+                  color: "#ffffff",
+                  fontWeight: "bold",
+                  cursor: isCreatingAccount ? "wait" : "pointer",
+                  fontSize: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "125px"
+                }}
+              >
+                {isCreatingAccount ? (
+                  <>
+                    <span className="spinner" style={{ width: "12px", height: "12px", marginRight: "6px" }}></span> Đang tạo...
+                  </>
                 ) : (
-                  settingsTab === "api" ? "💾 LƯU CẤU HÌNH API KEY" : "💾 LƯU CẤU HÌNH CHIẾN THUẬT"
+                  "Tạo Tài Khoản"
                 )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* MODAL XOÁ TÀI KHOẢN */}
+      {showDeleteAccountModal && (
+        <div className="account-prompt-overlay" onClick={e => e.target === e.currentTarget && !isDeletingAccount && setShowDeleteAccountModal(false)}>
+          <div className="account-prompt-card">
+            <div className="account-prompt-title" style={{ color: "#ff4d4f" }}>🗑️ Xóa Tài Khoản</div>
+            <div style={{ color: "#dddddd", fontSize: "13px", margin: "14px 0 6px 0", lineHeight: "1.5" }}>
+              Bạn có chắc chắn muốn xóa tài khoản <strong style={{ color: "#ffffff" }}>"{accounts.find(a => a.id === selectedAccount)?.name || selectedAccount}"</strong>?
+            </div>
+            <div style={{ color: "#888888", fontSize: "12px", marginBottom: "16px", lineHeight: "1.4" }}>
+              {accounts.length > 1
+                ? "Tài khoản này cùng toàn bộ API Key liên kết sẽ bị xóa khỏi hệ thống."
+                : "Đây là tài khoản duy nhất. Xác nhận xóa sẽ làm sạch toàn bộ API Key và đưa tài khoản về mặc định ban đầu."}
+            </div>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={() => setShowDeleteAccountModal(false)}
+                style={{
+                  padding: "7px 15px",
+                  background: "#333333",
+                  border: "1px solid #555555",
+                  borderRadius: "4px",
+                  color: "#cccccc",
+                  cursor: isDeletingAccount ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  opacity: isDeletingAccount ? 0.6 : 1
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingAccount}
+                onClick={confirmDeleteAccount}
+                style={{
+                  padding: "7px 18px",
+                  background: isDeletingAccount ? "#882222" : "#dc3545",
+                  border: "none",
+                  borderRadius: "4px",
+                  color: "#ffffff",
+                  fontWeight: "bold",
+                  cursor: isDeletingAccount ? "wait" : "pointer",
+                  fontSize: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: "130px"
+                }}
+              >
+                {isDeletingAccount ? (
+                  <>
+                    <span className="spinner" style={{ width: "12px", height: "12px", marginRight: "6px" }}></span> Đang xóa...
+                  </>
+                ) : (
+                  "Xác Nhận Xóa"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* FOOTER MARQUEE */}
       <div className="marquee-footer">

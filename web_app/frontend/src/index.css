@@ -8,7 +8,7 @@
 body {
   margin: 0;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  background-color: #0B1120;
+  background-color: #1e1e1e;
   color: #fff;
   overflow: hidden;
   height: 100vh;
@@ -17,9 +17,9 @@ body {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #0B1120; }
-::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #64748B; }
+::-webkit-scrollbar-track { background: #1e1e1e; }
+::-webkit-scrollbar-thumb { background: #444444; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555555; }
 
 /* ============= LAYOUT ============= */
 .app-container {
@@ -27,7 +27,7 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100%;
-  background-color: #0B1120;
+  background-color: #1e1e1e;
   padding: env(safe-area-inset-top) calc(env(safe-area-inset-right) + 3px) env(safe-area-inset-bottom) calc(env(safe-area-inset-left) + 3px);
 }
 
@@ -35,16 +35,27 @@ body {
   display: flex;
   flex: 1;
   width: 100vw;
+  height: 100vh;
   overflow: hidden;
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
-/* ============= SIDEBAR PHẢI ============= */
+.main-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100vh;
+  overflow: hidden;
+  min-width: 0;
+  background-color: #1e1e1e;
+}
+
+/* ============= SIDEBAR TRÁI ============= */
 .sidebar-left {
-  width: 340px;
-  min-width: 340px;
+  width: 285px;
+  min-width: 285px;
   background-color: #252526;
-  border-left: 1px solid #334155;
+  border-right: 1px solid #333333;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -53,7 +64,7 @@ body {
 .sidebar-header {
   padding: 12px 15px 10px;
   background-color: #222;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #333333;
   text-align: center;
   flex-shrink: 0;
 }
@@ -89,7 +100,7 @@ body {
 .group-box {
   border: 1px solid #444;
   border-radius: 4px;
-  padding: 18px 10px 10px;
+  padding: 16px 10px 10px;
   margin-bottom: 14px;
   position: relative;
   background-color: transparent;
@@ -98,14 +109,15 @@ body {
 .group-box-title {
   position: absolute;
   top: -8px;
-  left: 10px;
+  left: 8px;
   background-color: #252526;
-  padding: 0 5px;
+  padding: 0 4px;
   font-size: 10px;
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 /* ============= RISK & INPUT NUMBERS ============= */
@@ -119,13 +131,107 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .risk-row label {
   font-size: 12px;
-  color: #ccc;
+  color: #cccccc;
   white-space: nowrap;
+  flex: 1;
+}
+
+/* ============= NUMBER SPINBOX WITH SUFFIX & STEPPER ============= */
+.spinbox-container {
+  display: inline-flex;
+  align-items: center;
+  background-color: #222222;
+  border: 1px solid #444444;
+  border-radius: 4px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 4px 0 6px;
+  transition: border-color 0.2s;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.spinbox-container:focus-within {
+  border-color: #26a69a;
+}
+
+.spinbox-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-family: Consolas, 'Courier New', 'Roboto Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  padding: 0;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.spinbox-input::-webkit-outer-spin-button,
+.spinbox-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.spinbox-suffix {
+  font-size: 12px;
+  font-weight: bold;
+  color: #ffffff;
+  padding-left: 3px;
+  padding-right: 5px;
+  user-select: none;
+  opacity: 0.9;
+  display: inline-block;
+  min-width: 14px;
+  text-align: center;
+  box-sizing: content-box;
+}
+
+.spinbox-stepper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 22px;
+  width: 14px;
+  border-left: 1px solid #383838;
+  padding-left: 2px;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.spinbox-btn {
+  background: transparent;
+  border: none;
+  color: #888888;
+  cursor: pointer;
+  padding: 0;
+  width: 12px;
+  height: 10px;
+  font-size: 8px;
+  line-height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.spinbox-btn:hover {
+  color: #ff9900;
+}
+
+.spinbox-btn:active {
+  color: #26a69a;
 }
 
 .styled-input.num {
@@ -181,7 +287,7 @@ body {
   font-size: 11px;
   font-weight: bold;
   color: #94A3B8;
-  border: 1px solid #334155;
+  border: 1px solid #333333;
   border-radius: 3px;
   padding: 4px 2px;
   background-color: #161616;
@@ -192,13 +298,13 @@ body {
 }
 
 .tf-badge-btn:hover {
-  border-color: #64748B;
+  border-color: #555555;
   background-color: #222;
   color: #fff;
 }
 
 .tf-badge-btn.checked {
-  border-color: #64748B;
+  border-color: #555555;
   background-color: #1a3a1a;
   color: #4CAF50;
 }
@@ -259,9 +365,9 @@ body {
 }
 
 .btn-start:disabled {
-  background-color: #475569;
+  background-color: #444444;
   color: #888;
-  border-color: #475569;
+  border-color: #444444;
   cursor: not-allowed;
 }
 
@@ -275,9 +381,9 @@ body {
 }
 
 .btn-stop:disabled {
-  background-color: #475569;
+  background-color: #444444;
   color: #888;
-  border-color: #475569;
+  border-color: #444444;
   cursor: not-allowed;
 }
 
@@ -313,22 +419,244 @@ body {
 
 .bot-tabs-bar {
   display: flex;
-  background-color: #0B1120;
-  border-bottom: 1px solid #334155;
-  width: 100%;
-  padding-left: 10px;
+  background-color: transparent;
+  width: calc(100% - 20px);
+  margin: 6px 10px 0 10px;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 38px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+}
+
+.bot-tabs-group {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+
+.bot-tab {
+  background-color: #141414;
+  color: #888888;
+  border: 1px solid #333333;
+  border-bottom: 1px solid #333333;
+  border-radius: 4px 4px 0 0;
+  padding: 6px 20px;
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  height: 34px;
+  display: inline-flex;
   align-items: center;
-  height: 42px;
+  justify-content: center;
+  font-family: "Segoe UI", sans-serif;
+  outline: none;
+  position: relative;
+}
+
+.bot-tab:hover {
+  background-color: #222222;
+  color: #ffffff;
+}
+
+.bot-tab.active {
+  background-color: #222222; /* Trùng với màu nền .bot-panel-card để tạo thể liền khối */
+  color: #ff9900;
+  border-top: 3px solid #ff9900;
+  border-left: 1px solid #333333;
+  border-right: 1px solid #333333;
+  border-bottom: 1px solid #222222; /* Che đường viền trên của thẻ card bên dưới */
+  margin-bottom: -1px;
+  padding-top: 4px;
+  z-index: 12;
+}
+
+.header-right-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.slot-indicator-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* ============= THẺ LIỀN KHỐI CỤM BOT (1:1 ẢNH 2) ============= */
+.bot-panel-card {
+  background-color: #222222;
+  border: 1px solid #333333;
+  border-radius: 0 4px 4px 4px;
+  margin: 0 10px 10px 10px;
+  padding: 10px 12px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+/* Hàng nút Hành động nằm ngay trong thẻ bot */
+.bot-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
-/* ============= WORKSPACE PHẢI ============= */
+.btn-action-start {
+  background-color: #2E7D32;
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-action-start:hover:not(:disabled) {
+  background-color: #388E3C;
+  border-color: #ffaa00;
+}
+
+.btn-action-start:disabled {
+  background-color: #3a3a3a;
+  color: #888888;
+  border-color: #444444;
+  cursor: not-allowed;
+}
+
+.btn-action-stop {
+  background-color: #C62828;
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-action-stop:hover:not(:disabled) {
+  background-color: #D32F2F;
+  border-color: #ffaa00;
+}
+
+.btn-action-stop:disabled {
+  background-color: #3a3a3a;
+  color: #888888;
+  border-color: #444444;
+  cursor: not-allowed;
+}
+
+/* Cụm thẻ Workspace & Biểu đồ */
+.chart-panel-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Hàng điều khiển góc trên chart — nền trong suốt hoàn toàn, không có dải đen thừa */
+.chart-corner-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  background: transparent;
+  padding: 0;
+  margin-bottom: 0;
+  position: relative;
+  z-index: 4;
+}
+
+/* Bo đúng đến các phần BTC-USDT 4H Cài đặt và sát liền vào chart nến */
+.chart-title-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #1e1e1e;
+  border: 1px solid #333333;
+  border-bottom: 1px solid #1e1e1e;
+  border-radius: 4px 4px 0 0;
+  padding: 2px 8px;
+  margin-bottom: -1px;
+}
+
+.btn-chart-settings {
+  background-color: #2d2d2d;
+  color: #ffffff;
+  border: 1px solid #555555;
+  border-radius: 3px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  height: 26px;
+}
+
+.btn-chart-settings:hover {
+  background-color: #ff9900;
+  color: #000000;
+  border-color: #ff9900;
+}
+
+/* Ẩn hoàn toàn logo TradingView ở góc dưới bên trái biểu đồ */
+a#tv-attr-logo,
+#tv-attr-logo,
+.chart-wrapper a[href*="tradingview.com"],
+.pane-chart a[href*="tradingview.com"],
+.tv-attr-logo {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ============= WORKSPACE (CHART + TABS) ============= */
 .main-workspace {
   display: flex;
   flex: 1;
-  height: calc(100% - 42px);
+  height: calc(100% - 31px);
   min-height: 0;
   overflow: hidden;
+  width: 100%;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  background-color: #0c0c0c;
+  position: relative;
+  z-index: 2;
 }
 .main-workspace.vertical { flex-direction: column; }
 .main-workspace.horizontal { flex-direction: row; }
@@ -344,12 +672,12 @@ body {
 
 .main-workspace.vertical .pane-chart {
   height: var(--chart-ratio, 50%);
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #333333;
 }
 
 .main-workspace.horizontal .pane-chart {
   width: var(--chart-ratio, 50%);
-  border-right: 1px solid #334155;
+  border-right: 1px solid #333333;
 }
 
 .resizer {
@@ -407,18 +735,58 @@ body {
 }
 
 .pane-titlebar {
-  height: 26px;
-  background-color: #1a1a2e;
-  border-bottom: 1px solid #334155;
-  padding: 0 12px;
+  height: 32px;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #333333;
+  padding: 0 10px;
   display: flex;
   align-items: center;
-  font-size: 11px;
-  font-weight: bold;
-  color: #8e8e93;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  justify-content: space-between;
   flex-shrink: 0;
+}
+
+.chart-tab-title {
+  background-color: #1e1e1e;
+  border: 1px solid #333333;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 4px 14px;
+  color: #ff9900;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 3px;
+  font-family: "Segoe UI", sans-serif;
+}
+
+.chart-title-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-chart-settings {
+  background-color: #2d2d2d;
+  color: #ffffff;
+  border: 1px solid #555555;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-chart-settings:hover {
+  background-color: #ff9900;
+  color: #000000;
+  border-color: #ff9900;
 }
 
 .chart-wrapper {
@@ -448,8 +816,8 @@ body {
 
 .tab-bar-header {
   height: 30px;
-  background-color: #0B1120;
-  border-bottom: 1px solid #334155;
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #333333;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -460,9 +828,9 @@ body {
 .tab-buttons { display: flex; height: 100%; flex-shrink: 0; }
 
 .tab-btn {
-  background: #0B1120;
+  background: #1a1a1a;
   border: none;
-  border-right: 1px solid #334155;
+  border-right: 1px solid #333333;
   color: #a0a0a0;
   font-size: 12px;
   font-weight: bold;
@@ -526,7 +894,7 @@ body {
 
 /* ============= POSITIONS TABLE ============= */
 .positions-table-wrapper {
-  background-color: #0B1120;
+  background-color: #1a1a1a;
   overflow-y: auto;
   height: 100%;
 }
@@ -534,31 +902,47 @@ body {
 .positions-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
+  font-size: 15px;
+  text-align: right;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
 
 .positions-table th {
-  background-color: #2b2b2b;
+  background-color: #252526;
   color: #fff;
   font-weight: bold;
   padding: 6px 10px;
-  border: 1px solid #334155;
-  font-size: 13px;
+  border: 1px solid #333333;
+  font-size: 14px;
   position: sticky;
   top: 0;
+  z-index: 2;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
 
 .positions-table td {
-  padding: 7px 10px;
-  border: 1px solid #334155;
+  padding: 6px 10px;
+  border: 1px solid #333333;
   color: #fff;
-  background-color: #0B1120;
+  background-color: #1a1a1a;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
 
 .positions-table tr:hover td {
-  background-color: #162e3b;
+  background-color: #2d2d2d;
 }
+
+/* Flush the outer borders of the table with the container to eliminate double-border gaps */
+.positions-table th:first-child,
+.positions-table td:first-child {
+  border-left: none !important;
+}
+
+.positions-table th:last-child,
+.positions-table td:last-child {
+  border-right: none !important;
+}
+
 
 /* ============= UTILITIES ============= */
 .flex { display: flex; }
@@ -571,131 +955,148 @@ body {
 .font-bold { font-weight: bold; }
 .text-center { text-align: center; }
 
-/* ============= SETTINGS MODAL ============= */
+/* ============= SETTINGS MODAL — 1:1 CLONE TỪ DESKTOP APP ============= */
 .modal-overlay {
-  position: fixed; inset: 0;
-  background-color: rgb(0 0 0 / 70%);
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(2px);
 }
 
-.modal-content {
-  background-color: #222;
-  border: 1px solid #444;
+.modal-content.settings-modal {
+  width: 680px;
+  max-width: 95vw;
+  max-height: 88vh;
+  background-color: #1e1e1e;
+  border: 1px solid #333333;
   border-radius: 6px;
-  width: 420px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgb(0 0 0 / 70%);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif;
   animation: fadeIn 0.15s ease-out;
 }
 
 .modal-header {
-  background-color: #252526;
-  border-bottom: 1px solid #334155;
-  padding: 12px 16px;
+  background-color: #242424;
+  border-bottom: 1px solid #333333;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.modal-header h3 { font-size: 13px; font-weight: bold; color: #fff; }
+
+.modal-header h3 {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
 
 .close-btn {
-  background: transparent; border: none;
-  color: #888; font-size: 20px; cursor: pointer; line-height: 1;
-}
-.close-btn:hover { color: #fff; }
-.modal-body { padding: 16px; }
-.form-group { margin-bottom: 12px; }
-
-.form-group label {
-  display: block; font-size: 11px; color: #888; margin-bottom: 4px;
-}
-
-.styled-input {
-  background-color: #222; color: #fff;
-  border: 1px solid #444; border-radius: 4px;
-  padding: 6px 10px; font-size: 12px; outline: none; width: 100%;
-  font-family: Consolas, monospace;
+  background: transparent;
+  border: none;
+  color: #888888;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.15s;
 }
 
-.styled-input::placeholder,
-input::placeholder {
-  color: #888 !important;
-  opacity: 1 !important;
-  font-style: normal;
-  font-size: 11px;
+.close-btn:hover {
+  color: #ffffff;
 }
 
-.modal-footer {
-  background-color: #0B1120;
-  border-top: 1px solid #333;
-  padding: 10px 16px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.btn-primary {
-  background-color: #f90; color: #000;
-  font-weight: bold; border: none; border-radius: 4px;
-  padding: 6px 14px; font-size: 12px; cursor: pointer;
-}
-.btn-primary:hover { background-color: #e08800; }
-
-.btn-secondary {
-  background-color: #222; color: #fff;
-  border: 1px solid #444; border-radius: 4px;
-  padding: 6px 14px; font-size: 12px; cursor: pointer;
-}
-.btn-secondary:hover { background-color: #222; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-/* ============= CẤU HÌNH CHIẾN THUẬT & API (SETTINGS) ============= */
-.settings-modal {
-  width: 650px;
-  max-width: 95vw;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden !important;
-  box-sizing: border-box;
-}
-
+/* Tab Bar styled like InnerTabs in PyQt */
 .settings-tab-bar {
   display: flex;
-  background-color: #0B1120;
-  border-bottom: 1px solid #334155;
-  flex-direction: row-reverse;
+  background-color: #121212;
+  border-bottom: 1px solid #3d3d3d;
+  padding: 8px 14px 0 14px;
 }
 
 .settings-tab-btn {
-  flex: 1;
-  background: transparent;
-  color: #a0a0a0;
-  border: none;
-  padding: 10px;
+  background-color: #121212;
+  color: #888888;
+  border: 1px solid #2d2d2d;
+  border-bottom: none;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  padding: 8px 18px;
+  margin-right: 4px;
   font-size: 13px;
   font-weight: bold;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.settings-tab-btn:hover { background-color: #252526; color: #fff; }
-.settings-tab-btn.active { color: #f90; border-bottom: 2px solid #f90; }
 
+.settings-tab-btn:hover:not(.active) {
+  background-color: #2a2a2a;
+  color: #ffffff;
+}
+
+.settings-tab-btn.active {
+  background-color: #1e1e1e;
+  color: #ff9900;
+  border: 1px solid #3d3d3d;
+  border-top: 2px solid #ff9900;
+  border-bottom: 1px solid #1e1e1e;
+  margin-bottom: -1px;
+  z-index: 2;
+}
+
+/* Modal Body / Scroll area */
 .settings-body {
-  overflow: hidden auto !important;
-  overscroll-behavior: none contain !important;
-  touch-action: pan-y !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  padding: 16px;
-  background-color: #222;
+  padding: 14px 18px 16px;
+  background-color: #1e1e1e;
   box-sizing: border-box;
+}
+
+.settings-tab-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.settings-tab-scroll {
+  flex: 1;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 4px;
+}
+
+.settings-tab-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-tab-scroll::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.settings-tab-scroll::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 3px;
+}
+
+.settings-tab-scroll::-webkit-scrollbar-thumb:hover {
+  background: #555555;
 }
 
 .settings-body::-webkit-scrollbar {
@@ -703,134 +1104,295 @@ input::placeholder {
 }
 
 .settings-body::-webkit-scrollbar-track {
-  background: #0B1120;
+  background: #1e1e1e;
 }
 
 .settings-body::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #3d3d3d;
   border-radius: 3px;
 }
 
 .settings-body::-webkit-scrollbar-thumb:hover {
-  background: #64748B;
+  background: #555555;
 }
 
+/* GroupBox styling 1:1 with PyQt QGroupBox */
 .settings-group {
-  border: 1px solid #444;
+  border: 1px solid #333333;
   border-radius: 4px;
-  padding: 18px 12px 12px;
-  margin-bottom: 16px;
+  padding: 22px 20px 18px;
+  margin-top: 24px;
+  margin-bottom: 26px;
   position: relative;
-  background-color: #252526;
+  background-color: transparent;
 }
 
 .settings-group-title {
   position: absolute;
-  top: -8px;
-  left: 10px;
-  background-color: #222;
-  padding: 0 5px;
-  font-size: 11px;
+  top: -10px;
+  left: 14px;
+  background-color: #1e1e1e;
+  padding: 0 6px;
+  font-size: 13px;
   font-weight: bold;
-  color: #888;
-  text-transform: uppercase;
+  color: #ff9900;
+  text-transform: none;
+  letter-spacing: 0.3px;
 }
 
-.btn-add-acc, .btn-del-acc {
-  width: 32px;
-  height: 30px;
-  color: white;
-  font-size: 18px;
-  font-weight: bold;
-  border: none;
+/* Input elements in Settings */
+.settings-modal .styled-input,
+.settings-modal .styled-select {
+  background-color: #252525;
+  color: #ffffff;
+  border: 1px solid #444444;
   border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+  font-family: Consolas, monospace;
+}
+
+.settings-modal .styled-input:focus,
+.settings-modal .styled-select:focus {
+  border-color: #ff9900;
+}
+
+.settings-form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  gap: 10px;
+}
+
+.settings-form-row label {
+  color: #e0e0e0;
+  font-size: 12px;
+  min-width: 150px;
+}
+
+/* Help button [?] */
+.toggle-help,
+.btn-help {
+  color: #888888;
+  font-size: 10px;
+  background: transparent;
+  border: none;
+  padding: 0 3px;
   cursor: pointer;
+  font-weight: normal;
+  transition: color 0.15s;
+}
+
+.toggle-help:hover,
+.btn-help:hover {
+  color: #ff9900;
+}
+
+/* Buttons in Tab 1 */
+.api-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+
+.btn-save-api-full {
+  background-color: #2E7D32;
+  color: #ffffff;
+  min-height: 38px;
+  padding: 6px 20px;
+  border-radius: 4px;
+  border: none;
+  outline: none;
+  font-weight: bold;
+  font-size: 13px;
+  width: 100%;
+  cursor: pointer;
+  margin-top: 14px;
+  transition: background-color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
 }
-.btn-add-acc { background-color: #10B981; }
-.btn-del-acc { background-color: #EF4444; }
 
-.btn-audit {
-  background-color: #222;
-  color: #fff;
-  border: 1px solid #444;
+.btn-save-api-full:hover {
+  background-color: #388E3C;
+}
+
+.btn-save-api-full:disabled {
+  background-color: #555555;
+  color: #888888;
+  cursor: not-allowed;
+}
+
+/* Buttons in Tab 2 */
+.strat-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px; margin-bottom: 4px;
+  align-items: center;
+}
+
+.btn-logout-strat {
+  background-color: #d32f2f;
+  color: #ffffff;
+  min-height: 40px;
+  font-weight: bold;
+  font-size: 13px;
   border-radius: 4px;
-  padding: 8px 12px;
-  font-weight: bold;
+  padding: 0 16px;
+  border: none;
   cursor: pointer;
-}
-.btn-audit:hover { background-color: #475569; }
-
-.hwid-value {
-  color: #38BDF8;
-  font-weight: bold;
-  font-size: 14px;
-  cursor: pointer;
+  transition: background-color 0.15s;
+  white-space: nowrap;
 }
 
-/* Toggle Switch Clone */
+.btn-logout-strat:hover {
+  background-color: #b71c1c;
+}
+
+.btn-reset-strat {
+  background-color: #333333;
+  color: #ff9900;
+  border: 1px solid #ff9900;
+  min-height: 40px;
+  font-weight: bold;
+  font-size: 13px;
+  border-radius: 4px;
+  padding: 0 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-reset-strat:hover {
+  background-color: #444444;
+}
+
+.btn-save-strat {
+  background-color: #2E7D32;
+  color: #ffffff;
+  min-height: 40px;
+  font-weight: bold;
+  font-size: 13px;
+  border: none;
+  outline: none;
+  border-radius: 4px;
+  flex: 1;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-save-strat:hover {
+  background-color: #388E3C;
+}
+
+.btn-save-strat:disabled {
+  background-color: #555555;
+  color: #888888;
+  cursor: not-allowed;
+}
+
+/* Toggle Switch Clone — 1:1 Desktop PyQt Style */
 .toggle-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px 24px;
 }
 
 .toggle-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .toggle-switch {
   position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 20px;
-  margin-right: 6px;
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 22px;
+  margin-right: 4px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
 }
-.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
 
 .toggle-slider {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background-color: #475569;
+  background-color: #555555;
   transition: .2s;
-  border-radius: 10px;
+  border-radius: 11px;
 }
 
 .toggle-slider::before {
   position: absolute;
   content: "";
   height: 16px; width: 16px;
-  left: 2px; bottom: 2px;
+  left: 3px; bottom: 3px;
   background-color: white;
   transition: .2s;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
 }
-.toggle-switch input:checked + .toggle-slider { background-color: #4CAF50; }
-.toggle-switch input:checked + .toggle-slider::before { transform: translateX(30px); }
+.toggle-switch input:checked + .toggle-slider { background-color: #00b050; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(26px); }
 
 .toggle-label {
   position: absolute;
-  right: 6px;
-  top: 3px;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   color: white;
   pointer-events: none;
+  line-height: 1;
+  top: 6px;
 }
 
 .toggle-switch input:checked ~ .toggle-label {
-  left: 6px;
+  left: 7px;
   right: auto;
 }
-.toggle-name { font-weight: bold; color: #fff; font-size: 12px;}
+.toggle-switch input:not(:checked) ~ .toggle-label {
+  right: 7px;
+  left: auto;
+}
+.toggle-name { font-weight: bold; color: #ffffff; font-size: 12px; }
 .toggle-desc { display: none; }
 
+.btn-audit {
+  background-color: #252525;
+  color: #ffffff;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+  padding: 8px 18px;
+  min-height: 40px;
+  font-weight: bold;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.btn-audit:hover {
+  background-color: #333333;
+  border-color: #555555;
+}
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 /* ============= TABLET/IPAD LANDSCAPE ============= */
 @media (width >= 1001px) and (width <= 1200px) {
@@ -877,7 +1439,7 @@ input::placeholder {
     width: 100% !important;
     height: var(--chart-ratio, 50%) !important;
     border-right: none;
-    border-bottom: 1px solid #334155;
+    border-bottom: 1px solid #333333;
     flex-shrink: 0;
   }
 
@@ -1020,7 +1582,7 @@ body.is-resizing-vertical {
 /* ============= MARQUEE FOOTER ============= */
 .marquee-footer {
   width: 100%;
-  background-color: #0B1120;
+  background-color: #1e1e1e;
   color: #F59E0B;
   padding: 4px 0;
   font-size: 12px;
@@ -1065,32 +1627,326 @@ body.is-resizing-vertical {
   appearance: textfield;
 }
 
-/* Custom Checkbox */
+/* Custom Circular Checkbox with Green LED Dot */
 input[type="checkbox"] {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1px solid #777;
-  border-radius: 4px;
-  background-color: transparent;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #555555;
+  border-radius: 50%;
+  background-color: #181818;
   cursor: pointer;
   position: relative;
   vertical-align: middle;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+input[type="checkbox"]:hover {
+  border-color: #888888;
+  background-color: #222222;
 }
 
 input[type="checkbox"]:checked {
-  background-color: transparent;
-  border-color: #777;
+  border-color: #10B981;
+  background-color: rgba(16, 185, 129, 0.12);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.35);
 }
 
 input[type="checkbox"]:checked::after {
-  content: '✔';
-  color: #10B981;
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10B981;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px #10B981;
+}
+
+
+/* Tactics Toggles 1:1 Desktop Layout */
+.tactics-toggles-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  align-items: center;
+}
+
+.tactics-left-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tactics-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Entry Setup full-row list */
+.entry-setup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.entry-setup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+
+.entry-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+/* Join Cộng Đồng Button */
+.btn-join-community {
+  background-color: #333333;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 3px 10px;
   font-size: 11px;
   font-weight: bold;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid #444;
+  white-space: nowrap;
+}
+
+.btn-join-community:hover {
+  background-color: #ff9900;
+  color: #000000;
+  border-color: #ff9900;
+}
+
+/* Account Prompt Modal */
+.account-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.account-prompt-card {
+  background-color: #222222;
+  border: 1px solid #444444;
+  border-radius: 8px;
+  padding: 18px 22px;
+  width: 380px;
+  max-width: 90vw;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  box-sizing: border-box;
+}
+
+.account-prompt-title {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+/* ============= MULTI-CHART GRID & TRADINGVIEW LAYOUT SELECTOR ============= */
+.layout-selector-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-layout-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  background-color: #1e1e1e;
+  border: 1px solid #444444;
+  border-radius: 3px;
+  color: #a0a5b5;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-layout-selector:hover,
+.btn-layout-selector.active {
+  background-color: #2a2e39;
+  border-color: #2962ff;
+  color: #ffffff;
+}
+
+.layout-selector-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background-color: #1e222d;
+  border: 1px solid #363c4e;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 105px;
+}
+
+.layout-popover-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.layout-popover-divider {
+  height: 1px;
+  background-color: #2a2e39;
+  margin: 1px 0;
+}
+
+.layout-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 38px;
+  background-color: #181b24;
+  border: 1px solid #2e3344;
+  border-radius: 4px;
+  color: #787b86;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.layout-option-btn:hover {
+  background-color: #242938;
+  border-color: #4a5268;
+  color: #ffffff;
+}
+
+.layout-option-btn.selected {
+  background-color: rgba(41, 98, 255, 0.2);
+  border-color: #2962ff;
+  color: #2962ff;
+}
+
+/* Multi-chart container styles */
+.multi-chart-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  gap: 3px;
+  background-color: #12141a;
+  overflow: hidden;
+  position: relative;
+}
+
+.multi-chart-container.layout-1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.multi-chart-container.layout-2-col {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.multi-chart-container.layout-2-row {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.multi-chart-container.layout-3-col {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.multi-chart-container.layout-3-row {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+}
+
+.multi-chart-container.layout-4-grid {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.single-chart-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background-color: #0c0c0c;
+  overflow: hidden;
+  border: 1px solid #1c202b;
+  border-radius: 2px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.single-chart-card.active {
+  border-color: #1c202b;
+}
+
+.single-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  background-color: #141722;
+  border-bottom: 1px solid #222634;
+  height: 28px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.single-chart-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.single-chart-body {
+  flex: 1;
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.single-chart-canvas {
+  width: 100%;
+  height: 100%;
 }

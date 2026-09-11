@@ -99,3 +99,7 @@ node_modules/
 dist/
 */dist/
 web_frontend/
+
+# Sandbox Test (Local experimental environment)
+web_app1/
+xRun_Web1.py

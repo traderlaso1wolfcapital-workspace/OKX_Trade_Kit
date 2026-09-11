@@ -21,7 +21,7 @@ from pydantic import BaseModel
 app = FastAPI(title="TLS1 Trading Web Backend", version="1.0.0")
 
 @app.get("/api/auth/verify")
-async def verify_uid(uid: str):
+def verify_uid(uid: str):
     if uid == "admtls12021":
         return {"status": "success", "message": "Admin login successful", "uid": uid}
     try:
@@ -104,6 +104,10 @@ class CredentialsUpdate(BaseModel):
     secret_key: str
     passphrase: str
 
+class AccountCreate(BaseModel):
+    name: str
+    id: Optional[str] = None
+
 class LoginRequest(BaseModel):
     uid: str
     password: str = None
@@ -118,7 +122,7 @@ class CloseTicketRequest(BaseModel):
     exitPx: Optional[str] = None
 
 @app.post("/api/auth/login")
-async def login_with_password(req: LoginRequest):
+def login_with_password(req: LoginRequest):
     uid = req.uid
     pwd = req.password
     if uid == "admtls12021":
@@ -196,93 +200,219 @@ async def log_reader_task(stream, uid, strategy):
     except Exception as e:
         await queue.put(f"[SYSTEM ERROR] Log reader task failed: {e}")
 
+# Cache for USDT.D candles to avoid spamming websocket
+_tv_cache = {}
+
+def fetch_tradingview_candles(symbol: str = "CRYPTOCAP:USDT.D", bar: str = "1H", limit: int = 300):
+    now = time.time()
+    cache_key = f"{symbol}_{bar}_{limit}"
+    cached = _tv_cache.get(cache_key)
+    if cached and (now - cached["time"] < 15):
+        return cached["data"]
+        
+    try:
+        import websocket
+        import ssl
+        import re
+        import random
+        import string
+
+        tf_map = {
+            '1m': '1', '5m': '5', '15m': '15', '30m': '30',
+            '1H': '60', '2H': '120', '4H': '240', '1D': '1D'
+        }
+        res_bar = tf_map.get(bar, '60')
+        session_id = 'cs_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        chart_id = 'sds_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        
+        ws = websocket.create_connection(
+            'wss://data.tradingview.com/socket.io/websocket',
+            sslopt={'cert_reqs': ssl.CERT_NONE},
+            headers={'Origin': 'https://www.tradingview.com'},
+            timeout=5
+        )
+        def send(m): ws.send('~m~' + str(len(m)) + '~m~' + m)
+        send(json.dumps({'m': 'set_auth_token', 'p': ['unauthorized_user_token']}))
+        send(json.dumps({'m': 'chart_create_session', 'p': [session_id, '']}))
+        send(json.dumps({'m': 'resolve_symbol', 'p': [session_id, chart_id, symbol]}))
+        send(json.dumps({'m': 'create_series', 'p': [session_id, 's1', 's1', chart_id, res_bar, limit]}))
+        
+        raw_candles = []
+        for _ in range(25):
+            try:
+                res = ws.recv()
+                if '~h~' in res:
+                    ws.send(res)
+                    continue
+                msgs = re.split(r'~m~\d+~m~', res)
+                for m in msgs:
+                    if not m: continue
+                    d = json.loads(m)
+                    if d.get('m') == 'timescale_update':
+                        s1 = d['p'][1].get('s1')
+                        if s1 and 's' in s1:
+                            raw_candles = s1['s']
+                            break
+                if raw_candles: break
+            except Exception: break
+        ws.close()
+        
+        out = []
+        for item in reversed(raw_candles):
+            v = item.get('v', [])
+            if len(v) >= 5:
+                ts_ms = str(int(v[0] * 1000))
+                o = str(v[1])
+                h = str(v[2])
+                l = str(v[3])
+                c = str(v[4])
+                vol = str(v[5]) if len(v) > 5 else '0'
+                out.append([ts_ms, o, h, l, c, vol])
+                
+        if out:
+            _tv_cache[cache_key] = {"time": now, "data": out}
+            return out
+    except Exception as e:
+        print(f"[TV CANDLES ERROR] {e}")
+        
+    if cached:
+        return cached["data"]
+_okx_session = requests.Session()
+_okx_cache = {}
+_historical_pool = {}
+
+def compute_ob_boxes(all_candles):
+    """Tính toán Order Blocks từ dữ liệu nến."""
+    ob_boxes = []
+    if not all_candles:
+        return ob_boxes
+    try:
+        candles = all_candles.copy()
+        candles.reverse()  # Newest to oldest -> oldest to newest
+        import bots.sub2.bot_strategy as sub2_strat
+        from bots.sub2.bot_models import AssetTracker
+        from decimal import Decimal
+        tk = AssetTracker()
+        times = [int(c[0]) for c in candles]
+        opens = [Decimal(c[1]) for c in candles]
+        highs = [Decimal(c[2]) for c in candles]
+        lows = [Decimal(c[3]) for c in candles]
+        closes = [Decimal(c[4]) for c in candles]
+        vol = sub2_strat.get_volatility_measure(closes, highs, lows)
+        sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
+        
+        raw_obs = []
+        for ob in (tk.swing_obs + tk.internal_obs):
+            if not ob.crossed:
+                raw_obs.append({
+                    "high": float(ob.bar_high),
+                    "low": float(ob.bar_low),
+                    "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
+                    "bias": int(ob.bias),
+                    "source": str(ob.source)
+                })
+        
+        for bias in [1, -1]:
+            b_obs = [o for o in raw_obs if o["bias"] == bias]
+            if not b_obs: continue
+            b_obs.sort(key=lambda x: x["low"])
+            merged = []
+            for o in b_obs:
+                if not merged:
+                    merged.append(o)
+                else:
+                    last = merged[-1]
+                    if last["high"] >= o["low"]:
+                        last["high"] = max(last["high"], o["high"])
+                        if o["time"] > 0 and last["time"] > 0:
+                            last["time"] = min(last["time"], o["time"])
+                        elif o["time"] > 0:
+                            last["time"] = o["time"]
+                    else:
+                        merged.append(o)
+            ob_boxes.extend(merged)
+    except Exception as e:
+        pass
+    return ob_boxes
+
 @app.get("/api/market/candles")
-async def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 300):
-    """Proxy OKX candle API để tránh CORS trên mobile browser."""
+def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 1500):
+    """Proxy OKX candle API với cơ chế Sliding Window Pool 1500 nến & Cache siêu tốc."""
     try:
         limit = int(limit)
-        # Fetch first batch from market/candles (max 300)
-        first_limit = min(limit, 300)
-        url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={first_limit}"
-        resp = requests.get(url, timeout=10)
-        data = resp.json()
-        
+        now = time.time()
+        cache_key = f"{instId}_{bar}_{limit}"
+        cached = _okx_cache.get(cache_key)
+        if cached and (now - cached["time"] < 6):
+            return cached["data"]
+
+        # Hỗ trợ USDT.D từ TradingView
+        if "USDT.D" in instId.upper() or "USDTD" in instId.upper():
+            candles = fetch_tradingview_candles("CRYPTOCAP:USDT.D", bar=bar, limit=min(limit, 300))
+            res_obj = {
+                "code": "0",
+                "data": candles,
+                "msg": "",
+                "ob_boxes": []
+            }
+            _okx_cache[cache_key] = {"time": now, "data": res_obj}
+            return res_obj
+
+        pool_key = (instId, bar)
+        cached_pool = _historical_pool.get(pool_key)
         all_candles = []
-        if data.get("code") == "0" and data.get("data"):
-            all_candles.extend(data["data"])
-            
-            # If we need more, fetch from history-candles
-            while len(all_candles) < limit:
-                remain = limit - len(all_candles)
-                fetch_count = min(remain, 100) # history-candles max is 100
-                last_ts = all_candles[-1][0]
-                h_url = f"https://www.okx.com/api/v5/market/history-candles?instId={instId}&bar={bar}&limit={fetch_count}&after={last_ts}"
-                h_resp = requests.get(h_url, timeout=10)
-                h_data = h_resp.json()
-                if h_data.get("code") == "0" and h_data.get("data"):
-                    all_candles.extend(h_data["data"])
-                else:
-                    break
-        
-        data["data"] = all_candles
-        
-        ob_boxes = []
-        if data.get("code") == "0" and all_candles:
-            candles = all_candles.copy()
-            candles.reverse()  # Newest to oldest -> oldest to newest
+
+        # Nếu đã có sẵn pool nến lịch sử trong RAM: chỉ cần fetch 100 nến mới nhất để update (cực nhanh ~0.08s)
+        if cached_pool and len(cached_pool) >= min(limit, 1000):
             try:
-                import bots.sub2.bot_strategy as sub2_strat
-                from bots.sub2.bot_models import AssetTracker
-                from decimal import Decimal
-                tk = AssetTracker()
-                times = [int(c[0]) for c in candles]
-                opens = [Decimal(c[1]) for c in candles]
-                highs = [Decimal(c[2]) for c in candles]
-                lows = [Decimal(c[3]) for c in candles]
-                closes = [Decimal(c[4]) for c in candles]
-                vol = sub2_strat.get_volatility_measure(closes, highs, lows)
-                sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
-                
-                raw_obs = []
-                for ob in (tk.swing_obs + tk.internal_obs):
-                    if not ob.crossed:
-                        raw_obs.append({
-                            "high": float(ob.bar_high),
-                            "low": float(ob.bar_low),
-                            "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
-                            "bias": int(ob.bias),
-                            "source": str(ob.source)
-                        })
-                
-                for bias in [1, -1]:
-                    b_obs = [o for o in raw_obs if o["bias"] == bias]
-                    if not b_obs: continue
-                    b_obs.sort(key=lambda x: x["low"])
-                    merged = []
-                    for o in b_obs:
-                        if not merged:
-                            merged.append(o)
-                        else:
-                            last = merged[-1]
-                            if last["high"] >= o["low"]:
-                                last["high"] = max(last["high"], o["high"])
-                                if o["time"] > 0 and last["time"] > 0:
-                                    last["time"] = min(last["time"], o["time"])
-                                elif o["time"] > 0:
-                                    last["time"] = o["time"]
-                            else:
-                                merged.append(o)
-                    ob_boxes.extend(merged)
-            except Exception as e:
-                print(f"Error computing OBs: {e}")
-        
-        data['ob_boxes'] = ob_boxes
-        return data
+                url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit=100"
+                resp = _okx_session.get(url, timeout=5)
+                d = resp.json()
+                if d.get("code") == "0" and d.get("data"):
+                    new_candles = d["data"]
+                    merged_dict = {c[0]: c for c in cached_pool}
+                    for c in new_candles:
+                        merged_dict[c[0]] = c
+                    all_candles = sorted(merged_dict.values(), key=lambda x: int(x[0]), reverse=True)[:limit]
+                    _historical_pool[pool_key] = all_candles
+            except Exception:
+                all_candles = cached_pool[:limit]
+
+        # Nếu chưa có trong pool: fetch toàn bộ lịch sử nến với Session tái sử dụng kết nối
+        if not all_candles:
+            first_limit = min(limit, 300)
+            url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={first_limit}"
+            resp = _okx_session.get(url, timeout=6)
+            data = resp.json()
+            if data.get("code") == "0" and data.get("data"):
+                all_candles.extend(data["data"])
+                while len(all_candles) < limit:
+                    remain = limit - len(all_candles)
+                    fetch_count = min(remain, 100)
+                    last_ts = all_candles[-1][0]
+                    h_url = f"https://www.okx.com/api/v5/market/history-candles?instId={instId}&bar={bar}&limit={fetch_count}&after={last_ts}"
+                    h_resp = _okx_session.get(h_url, timeout=6)
+                    h_data = h_resp.json()
+                    if h_data.get("code") == "0" and h_data.get("data"):
+                        all_candles.extend(h_data["data"])
+                    else:
+                        break
+            _historical_pool[pool_key] = all_candles
+
+        ob_boxes = compute_ob_boxes(all_candles)
+        res_data = {
+            "code": "0",
+            "msg": "",
+            "data": all_candles,
+            "ob_boxes": ob_boxes
+        }
+        _okx_cache[cache_key] = {"time": now, "data": res_data}
+        return res_data
     except Exception as e:
         return {"code": "-1", "msg": str(e), "data": []}
 
 @app.get("/api/market/ticker")
-async def proxy_market_ticker(instId: str):
+def proxy_market_ticker(instId: str):
     """Proxy OKX ticker API để lấy giá BBO."""
     try:
         url = f"https://www.okx.com/api/v5/market/ticker?instId={instId}"
@@ -314,7 +444,7 @@ def get_running_pid(uid: str, strategy: str) -> int:
     return 0
 
 @app.get("/api/bot/status")
-async def get_bot_status(uid: str, strategy: str = "sub1"):
+def get_bot_status(uid: str, strategy: str = "sub1"):
     proc = get_nested(bot_processes, uid, strategy)
     is_running = False
     uptime = 0
@@ -383,7 +513,7 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bot/reset_capital")
-async def reset_capital(uid: str, strategy: str = "sub1"):
+def reset_capital(uid: str, strategy: str = "sub1"):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
     
     flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
@@ -443,7 +573,7 @@ async def stop_bot(uid: str, strategy: str = "sub1"):
     return {"message": f"Bot {strategy} stopped successfully.", "status": "STOPPED"}
 
 @app.get("/api/bot/config")
-async def get_bot_config(uid: str, strategy: str = "sub1"):
+def get_bot_config(uid: str, strategy: str = "sub1"):
     # Đọc cấu hình JSON
     config_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
@@ -461,7 +591,7 @@ async def get_bot_config(uid: str, strategy: str = "sub1"):
         raise HTTPException(status_code=500, detail=f"Failed to read config: {e}")
 
 @app.post("/api/bot/config")
-async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1"):
+def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1"):
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
@@ -492,8 +622,98 @@ async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str =
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
 
+@app.get("/api/bot/accounts")
+def get_bot_accounts(uid: str):
+    data_dir = get_user_data_dir(uid)
+    acc_file = os.path.join(data_dir, "accounts.json")
+    default_accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                accounts = json.load(f)
+                if isinstance(accounts, list) and len(accounts) > 0:
+                    cleaned = [
+                        {"id": "sub1", "name": "Tài khoản phụ"} if a.get("id") == "sub1" else a
+                        for a in accounts
+                        if not (a.get("id") == "sub2" and a.get("name") in ["Tài khoản phụ 2", "Tài khoản 2"])
+                    ]
+                    if not any(a.get("id") == "sub1" for a in cleaned):
+                        cleaned.insert(0, {"id": "sub1", "name": "Tài khoản phụ"})
+                    return cleaned
+        except Exception:
+            pass
+    return default_accounts
+
+@app.post("/api/bot/accounts")
+def create_bot_account(req: AccountCreate, uid: str):
+    clean_name = req.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Tên tài khoản không được để trống!")
+    
+    data_dir = get_user_data_dir(uid)
+    os.makedirs(data_dir, exist_ok=True)
+    acc_file = os.path.join(data_dir, "accounts.json")
+    
+    accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, list) and len(loaded) > 0:
+                    accounts = loaded
+        except Exception:
+            pass
+            
+    if any(a.get("name", "").lower() == clean_name.lower() for a in accounts):
+        raise HTTPException(status_code=400, detail=f"Tài khoản '{clean_name}' đã tồn tại!")
+        
+    acc_id = req.id if req.id else f"sub_{int(time.time() * 1000)}"
+    new_acc = {"id": acc_id, "name": clean_name}
+    accounts.append(new_acc)
+    
+    bot_dir = os.path.join(data_dir, f"bots/{acc_id}")
+    os.makedirs(bot_dir, exist_ok=True)
+    
+    with open(acc_file, "w", encoding="utf-8") as f:
+        json.dump(accounts, f, indent=4, ensure_ascii=False)
+        
+    return {"message": "Account created successfully", "account": new_acc, "accounts": accounts}
+
+@app.delete("/api/bot/accounts/{account_id}")
+def delete_bot_account(account_id: str, uid: str):
+    data_dir = get_user_data_dir(uid)
+    acc_file = os.path.join(data_dir, "accounts.json")
+    
+    accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, list) and len(loaded) > 0:
+                    accounts = loaded
+        except Exception:
+            pass
+            
+    # Xoá file .api nếu có
+    env_path = os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}")
+    if os.path.exists(env_path):
+        try: os.remove(env_path)
+        except Exception: pass
+        
+    # Lọc bỏ account
+    remaining = [a for a in accounts if a.get("id") != account_id]
+    if len(remaining) == 0:
+        accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    else:
+        accounts = remaining
+        
+    with open(acc_file, "w", encoding="utf-8") as f:
+        json.dump(accounts, f, indent=4, ensure_ascii=False)
+        
+    return {"message": "Account deleted successfully", "accounts": accounts}
+
 @app.get("/api/bot/credentials")
-async def get_bot_credentials(uid: str, strategy: str = "sub1"):
+def get_bot_credentials(uid: str, strategy: str = "sub1"):
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
     env_path = os.path.join(config_dir, env_file)
@@ -514,7 +734,8 @@ async def get_bot_credentials(uid: str, strategy: str = "sub1"):
     return creds
 
 @app.post("/api/bot/credentials")
-async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: str = "sub1"):
+def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "sub1"):
+    creds = req
     # Xác thực API Key với OKX
     try:
         domain = "www.okx.com"
@@ -606,6 +827,7 @@ async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: s
             new_lines.append(f"{k}={v}\n")
             
     try:
+        os.makedirs(config_dir, exist_ok=True)
         with open(env_path, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
         return {"message": "Credentials updated successfully."}
@@ -613,7 +835,7 @@ async def update_bot_credentials(creds: CredentialsUpdate, uid: str, strategy: s
         raise HTTPException(status_code=500, detail=f"Failed to write credentials: {e}")
 
 @app.get("/api/bot/positions")
-async def get_bot_positions(uid: str, strategy: str = "sub1"):
+def get_bot_positions(uid: str, strategy: str = "sub1"):
     # 1. Thử đọc Credentials từ file cấu hình .env (.api_sub1, .api_sub2...)
     api_key = ""
     secret_key = ""
@@ -935,7 +1157,7 @@ async def get_bot_positions(uid: str, strategy: str = "sub1"):
         return []
 
 @app.get("/api/bot/closed_positions")
-async def get_closed_positions(uid: str, strategy: str = "sub1"):
+def get_closed_positions(uid: str, strategy: str = "sub1"):
     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
     if not os.path.exists(positions_path):
         return []
@@ -985,7 +1207,7 @@ async def get_closed_positions(uid: str, strategy: str = "sub1"):
         return []
 
 @app.post("/api/bot/positions/close_ticket")
-async def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
+def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
     # 1. Call OKX API to execute close position on exchange FIRST
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
     env_file = f".api_{strategy}"
@@ -1236,7 +1458,7 @@ def _okx_signed_request(method, path, body_str, api_key, secret_key, passphrase,
         return requests.post(base_url + path, headers=headers, data=body_str, timeout=5)
 
 @app.get("/api/account/balance")
-async def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT"):
+def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT"):
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
     if not api_key:
         return {"status": "error", "message": "No OKX Credentials"}
@@ -1256,7 +1478,7 @@ async def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/trade/order")
-async def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1"):
+def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1"):
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
     if not api_key:
         return {"status": "error", "message": "No OKX Credentials"}
