@@ -19,6 +19,19 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Ấn Định Cố Định Duy Nhất Tài Khoản Admin `admtls12021` với Mật Khẩu `admtls12021@` (`web_app`, `web_app1`, `desktop_app`):
+  - **Yêu cầu của CEO:** "thôi tôi nghĩ là tạo ấn định riêng tài khoản admtls12021 với mật khẩu là admtls12021@ nhé, ko cần phải admtls12021_bao hay admtls12021_nam lằng nhằng đâu, nếu sau này cần cấp cho adm nào tôi sẽ chủ động bảo bạn tạo thêm".
+  - **Đã thực hiện:**
+    1. **Ấn định thông tin đăng nhập Admin duy nhất:**
+       - UID Quản trị: `admtls12021`.
+       - Mật khẩu Quản trị: `admtls12021@`.
+       - Loại bỏ các hậu tố `_bao`, `_nam` và bỏ nút copy ID theo mã máy trong Cài Đặt.
+    2. **Luồng đăng nhập cực chuẩn & bảo mật:**
+       - Bước 1: Gõ `admtls12021` ➔ Bấm Đăng Nhập.
+       - Bước 2: Web / App hiện ô nhập mật khẩu: `Nhập Mật Khẩu (admtls12021):`.
+       - Bước 3: Gõ đúng `admtls12021@` ➔ Vào thẳng Dashboard Admin với đầy đủ quyền (Reset Đếm Nến, miễn trừ kiểm tra API OKX). Nếu gõ sai sẽ báo "Mật khẩu Admin không chính xác!".
+    3. **Đã kiểm thử thực tế:** Chạy test tự động cả 3 bước (không pass ➔ sai pass ➔ đúng pass) trên live backend đều thành công 100%. Đã biên dịch và build production xong.
+
 - **[11/09/2026]** - Thiết Lập Mật Khẩu Bảo Vệ Cho Tất Cả Người Dùng (Regular User UID) Khi Đăng Nhập Web App (`web_app`, `web_app1`):
   - **Yêu cầu của CEO:** "vậy thì khi nhập UID của user cũng nên cho họ tạo mật khẩu luôn để đảm bảo an toàn".
   - **Nguyên nhân & Nhu cầu thực tế:** Trên môi trường web công khai (`autotrader.fun`), nếu người dùng chỉ nhập dãy số UID OKX (vốn là thông tin dễ bị lộ hoặc chia sẻ), bất kỳ ai biết số UID đó đều có thể đăng nhập, xem cấu hình và can thiệp bot của họ. Cơ chế cũ kiểm tra Passphrase OKX chỉ kích hoạt sau khi đã lưu API key, hoàn toàn hở sườn khi người dùng mới tạo tài khoản.

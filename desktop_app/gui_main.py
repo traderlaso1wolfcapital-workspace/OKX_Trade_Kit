@@ -4075,7 +4075,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
                 # --- KIỂM TRA BẢO MẬT UID CHÍNH/PHỤ ---
                 global CURRENT_UID
-                is_admin_user = str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")
+                is_admin_user = str(CURRENT_UID).strip().lower() == "admtls12021"
                 if not is_admin_user:
                     data_arr = res.get("data", [])
                     if data_arr:
@@ -4266,7 +4266,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def _verify_env_security(self, env_path):
         global CURRENT_UID
-        if str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_"):
+        if str(CURRENT_UID).strip().lower() == "admtls12021":
             return True
         try:
             import hmac, base64, urllib.request, json, datetime
@@ -4371,7 +4371,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def reset_nen(self):
         global CURRENT_UID
-        if not (str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")):
+        if str(CURRENT_UID).strip().lower() != "admtls12021":
             QtWidgets.QMessageBox.warning(self, "Từ chối quyền truy cập", "Chức năng Reset Đếm Nến chỉ dành riêng cho Quản trị viên (Admin)!")
             return
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
@@ -4531,7 +4531,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def verify_license_background(self):
         global CURRENT_UID
-        if not CURRENT_UID or (str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")):
+        if not CURRENT_UID or str(CURRENT_UID).strip().lower() == "admtls12021":
             return
 
         try:
@@ -5348,8 +5348,8 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
         """)
 
     def update_admin_permissions(self, uid):
-        """Phân quyền: Chỉ duy nhất Admin admtls12021_xxx mới được hiển thị nút Reset Đếm Nến"""
-        is_admin = (str(uid).strip().lower().startswith("admtls12021_") and len(str(uid).strip()) > len("admtls12021_"))
+        """Phân quyền: Chỉ duy nhất Admin admtls12021 mới được hiển thị nút Reset Đếm Nến"""
+        is_admin = (str(uid).strip().lower() == "admtls12021")
         for panel in [getattr(self, 'panel_main', None), getattr(self, 'panel_sub1', None), getattr(self, 'panel_sub2', None), getattr(self, 'panel_sub3', None)]:
             if panel and hasattr(panel, 'btn_reset_nen'):
                 panel.btn_reset_nen.setVisible(is_admin)
@@ -5815,7 +5815,7 @@ class LoginDialog(QtWidgets.QDialog):
         layout.addWidget(self.lbl_info)
         
         self.input_uid = QtWidgets.QLineEdit()
-        self.input_uid.setPlaceholderText("Ví dụ: 12345678 hoặc admtls12021_bao")
+        self.input_uid.setPlaceholderText("Ví dụ: 12345678")
         self.input_uid.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.input_uid.setFixedWidth(260)
         self.input_uid.returnPressed.connect(self.check_login)
@@ -5924,56 +5924,17 @@ class LoginDialog(QtWidgets.QDialog):
         # --- Backdoor dành riêng cho Admin ---
         clean_uid = uid.lower()
         if clean_uid == "admtls12021":
-            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
-            QtWidgets.QMessageBox.warning(self, "Sai Cú Pháp Admin", "Vui lòng nhập đầy đủ cú pháp Admin:\nadmtls12021_tên (Ví dụ: admtls12021_bao)!")
-            return
-        if clean_uid.startswith("admtls12021_") and len(clean_uid) > len("admtls12021_"):
-            auth_file = os.path.join(USER_DATA_DIR, f"admin_auth_{clean_uid}.json")
-            if not os.path.exists(auth_file):
-                pwd, ok = QtWidgets.QInputDialog.getText(
-                    self, "Thiết Lập Mật Khẩu Admin",
-                    f"Tài khoản Admin mới [{uid}]!\nVui lòng tạo mật khẩu bảo vệ tài khoản (tối thiểu 4 ký tự):",
-                    QtWidgets.QLineEdit.EchoMode.Password
-                )
-                if not ok or not pwd or len(pwd.strip()) < 4:
-                    QtWidgets.QMessageBox.warning(self, "Chưa Đặt Mật Khẩu", "Mật khẩu Admin phải có tối thiểu 4 ký tự!")
-                    return
-                pwd_confirm, ok2 = QtWidgets.QInputDialog.getText(
-                    self, "Xác Nhận Mật Khẩu Admin",
-                    "Nhập lại mật khẩu Admin để xác nhận:",
-                    QtWidgets.QLineEdit.EchoMode.Password
-                )
-                if not ok2 or pwd_confirm.strip() != pwd.strip():
-                    QtWidgets.QMessageBox.warning(self, "Lỗi Xác Nhận", "Mật khẩu xác nhận không khớp!")
-                    return
-                import hashlib, json
-                auth_data = {
-                    "uid": clean_uid,
-                    "password_hash": hashlib.sha256(pwd.strip().encode("utf-8")).hexdigest()
-                }
-                with open(auth_file, "w", encoding="utf-8") as f:
-                    json.dump(auth_data, f, indent=2)
-                QtWidgets.QMessageBox.information(self, "Thành Công", "Đã thiết lập mật khẩu Admin thành công!")
-            else:
-                pwd, ok = QtWidgets.QInputDialog.getText(
-                    self, "Xác Thực Admin",
-                    f"Nhập mật khẩu Admin cho [{uid}]:",
-                    QtWidgets.QLineEdit.EchoMode.Password
-                )
-                if not ok or not pwd:
-                    return
-                import hashlib, json
-                try:
-                    with open(auth_file, "r", encoding="utf-8") as f:
-                        auth_data = json.load(f)
-                    saved_hash = auth_data.get("password_hash", "")
-                    if hashlib.sha256(pwd.strip().encode("utf-8")).hexdigest() != saved_hash:
-                        play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
-                        QtWidgets.QMessageBox.warning(self, "Sai Mật Khẩu", "Mật khẩu Admin không chính xác! Vui lòng thử lại.")
-                        return
-                except Exception as e:
-                    QtWidgets.QMessageBox.warning(self, "Lỗi", f"Không thể đọc file xác thực: {e}")
-                    return
+            pwd, ok = QtWidgets.QInputDialog.getText(
+                self, "Xác Thực Admin",
+                f"Nhập mật khẩu Admin cho [{uid}]:",
+                QtWidgets.QLineEdit.EchoMode.Password
+            )
+            if not ok or not pwd:
+                return
+            if pwd != "admtls12021@":
+                play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                QtWidgets.QMessageBox.warning(self, "Sai Mật Khẩu", "Mật khẩu Admin không chính xác! Vui lòng thử lại.")
+                return
 
             IS_LOGGED_IN = True
             CURRENT_USER = f"Admin TLS1 ({uid})"

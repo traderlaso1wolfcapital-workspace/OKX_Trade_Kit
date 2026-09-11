@@ -969,7 +969,7 @@ function App() {
 
   const handleResetNen = async () => {
     const currentUid = (localStorage.getItem("tls1_uid") || loginUid || "").trim();
-    const isAdm = currentUid.toLowerCase().startsWith("admtls12021_") && currentUid.length > "admtls12021_".length;
+    const isAdm = currentUid.toLowerCase() === "admtls12021";
     if (!isAdm) {
       alert("⚠️ Chức năng này chỉ dành riêng cho Quản trị viên (Admin)!");
       return;
@@ -1372,10 +1372,6 @@ function App() {
     e.preventDefault();
     if (audioRef.current) audioRef.current.play().catch(e => console.log(e));
     const cleanUid = (loginUid || "").trim().toLowerCase();
-    if (cleanUid === "admtls12021") {
-      setLoginError("Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!");
-      return;
-    }
 
     if (authStep === "create_password") {
       if (!adminPassword || adminPassword.length < 4) {
@@ -1715,14 +1711,11 @@ function App() {
                 <>
                   <input
                     type="text"
-                    placeholder="Ví dụ: 12345678 hoặc admtls12021_bao"
+                    placeholder="Ví dụ: 12345678"
                     value={loginUid}
                     onChange={e => setLoginUid(e.target.value)}
-                    style={{ width: "260px", padding: "10px", marginBottom: "8px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
+                    style={{ width: "260px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
                   />
-                  <div style={{ fontSize: "11px", color: "#888", marginBottom: "12px" }}>
-                    Admin: <code>admtls12021_&lt;tên_hoặc_mã_máy&gt;</code>
-                  </div>
                 </>
               ) : authStep === "create_password" ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
@@ -2561,7 +2554,7 @@ function App() {
                       >
                         ♻️ Reset Vốn Gốc (Audit)
                       </button>
-                      {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase().startsWith("admtls12021_")) && (
+                      {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
                         <button
                           className="btn-audit"
                           onClick={handleResetNen}
@@ -2588,26 +2581,6 @@ function App() {
                       >
                         {hwid}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const admFormat = `admtls12021_${hwid.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
-                          navigator.clipboard.writeText(admFormat);
-                          alert(`✅ Đã copy ID Admin theo mã máy:\n${admFormat}`);
-                        }}
-                        style={{
-                          background: "#333",
-                          border: "1px solid #555",
-                          color: "#ff9900",
-                          borderRadius: "4px",
-                          padding: "2px 8px",
-                          fontSize: "11px",
-                          cursor: "pointer"
-                        }}
-                        title="Copy ID Admin kèm Mã Máy"
-                      >
-                        Copy Admin ID theo Mã Máy
-                      </button>
                       <button
                         type="button"
                         onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}

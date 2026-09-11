@@ -23,13 +23,11 @@ app = FastAPI(title="TLS1 Trading Web Backend", version="1.0.0")
 def is_admin_uid(uid: str) -> bool:
     if not uid: return False
     clean = str(uid).strip().lower()
-    return clean.startswith("admtls12021_") and len(clean) > len("admtls12021_")
+    return clean == "admtls12021"
 
 @app.get("/api/auth/verify")
 def verify_uid(uid: str):
     clean = str(uid).strip().lower() if uid else ""
-    if clean == "admtls12021":
-        return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
     if is_admin_uid(clean):
         return {"status": "success", "message": "Admin login successful", "uid": uid}
     try:
@@ -187,9 +185,14 @@ def login_with_password(req: LoginRequest):
     uid = req.uid.strip() if req.uid else ""
     clean = uid.lower()
     if clean == "admtls12021":
-        return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
-    if is_admin_uid(clean):
-        return check_or_set_account_password(uid, req.password, is_admin=True)
+        if not req.password:
+            return {
+                "status": "require_password",
+                "message": "Vui lòng nhập mật khẩu cho Admin [admtls12021]:"
+            }
+        if req.password == "admtls12021@":
+            return {"status": "success", "message": "Đăng nhập Admin thành công!", "uid": uid}
+        return {"status": "error", "message": "Mật khẩu Admin không chính xác! Vui lòng thử lại."}
 
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
@@ -1670,7 +1673,7 @@ if os.path.exists(frontend_dist_path):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 
