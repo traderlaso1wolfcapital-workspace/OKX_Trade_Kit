@@ -138,6 +138,9 @@ const renderLayoutIcon = (type, w = 24, h = 24) => {
   return null;
 };
 
+// Module-level global candle cache across all chart panes and layout transitions
+const _webCandlesCache = new Map(); // key: `${coin}_${bar}` -> { candles, volume, ema, ob_boxes, timestamp }
+
 // Component Biểu Đồ Nến Độc Lập (SingleChartPane)
 function SingleChartPane({
   chartIndex,
@@ -148,7 +151,8 @@ function SingleChartPane({
   isActive,
   onActivate,
   showToolbar = true,
-  layout
+  layout,
+  isVisible = true,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -182,14 +186,58 @@ function SingleChartPane({
     } catch (e) {}
   };
 
-  // Khi chọn bất kỳ bố cục biểu đồ nào, tự động kích hoạt zoom mặc định
-  useEffect(() => {
-    setIsAutoFit(true);
-    const timer = setTimeout(() => {
-      applyDefaultZoom();
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [layout]);
+  const drawObs = () => {
+    const obs = activeObsRef.current;
+    const c = chartRef.current;
+    const s = candleSeriesRef.current;
+    const o = overlayRef.current;
+    const cont = containerRef.current;
+    if (!obs || !c || !s || !o || !cont || obs.length === 0) {
+      if (o) o.innerHTML = "";
+      return;
+    }
+    o.innerHTML = "";
+    const w = o.clientWidth || cont.clientWidth;
+    if (w <= 0) return;
+    const maxRightX = w - 65;
+
+    obs.forEach(ob => {
+      const y1 = s.priceToCoordinate(ob.high);
+      const y2 = s.priceToCoordinate(ob.low);
+      if (y1 === null || y2 === null) return;
+      const topY = Math.min(y1, y2);
+      const botY = Math.max(y1, y2);
+      const h = Math.max(botY - topY, 4);
+      const isBull = ob.bias === 1;
+
+      let startX = null;
+      if (ob.time && ob.time > 0) {
+        try {
+          const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+          const xCoord = c.timeScale().timeToCoordinate(secTime);
+          if (xCoord !== null) startX = Math.floor(xCoord);
+        } catch (e) { }
+      }
+
+      if (startX === null) startX = 0;
+      if (startX < -2000) startX = -2000;
+      if (startX >= maxRightX) return;
+
+      const boxWidth = maxRightX - startX;
+      if (boxWidth <= 0) return;
+
+      const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+      const box = document.createElement('div');
+      box.style.position = 'absolute';
+      box.style.top = topY + 'px';
+      box.style.left = startX + 'px';
+      box.style.width = boxWidth + 'px';
+      box.style.height = h + 'px';
+      box.style.backgroundColor = bg;
+      box.style.pointerEvents = 'none';
+      o.appendChild(box);
+    });
+  };
 
   // Khởi tạo Chart
   useEffect(() => {
@@ -251,59 +299,7 @@ function SingleChartPane({
     volumeSeriesRef.current = vs;
     emaSeriesRef.current = es;
 
-    const drawObs = () => {
-      const obs = activeObsRef.current;
-      const c = chartRef.current;
-      const s = candleSeriesRef.current;
-      const o = overlayRef.current;
-      const cont = containerRef.current;
-      if (!obs || !c || !s || !o || !cont || obs.length === 0) {
-        if (o) o.innerHTML = "";
-        return;
-      }
-      o.innerHTML = "";
-      const w = o.clientWidth || cont.clientWidth;
-      const maxRightX = w - 65;
-
-      obs.forEach(ob => {
-        const y1 = s.priceToCoordinate(ob.high);
-        const y2 = s.priceToCoordinate(ob.low);
-        if (y1 === null || y2 === null) return;
-        const topY = Math.min(y1, y2);
-        const botY = Math.max(y1, y2);
-        const h = Math.max(botY - topY, 4);
-        const isBull = ob.bias === 1;
-
-        let startX = null;
-        if (ob.time && ob.time > 0) {
-          try {
-            const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-            const xCoord = c.timeScale().timeToCoordinate(secTime);
-            if (xCoord !== null) startX = Math.floor(xCoord);
-          } catch (e) { }
-        }
-
-        if (startX === null) startX = 0;
-        if (startX < -2000) startX = -2000;
-        if (startX >= maxRightX) return;
-
-        const boxWidth = maxRightX - startX;
-        if (boxWidth <= 0) return;
-
-        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
-        const box = document.createElement('div');
-        box.style.position = 'absolute';
-        box.style.top = topY + 'px';
-        box.style.left = startX + 'px';
-        box.style.width = boxWidth + 'px';
-        box.style.height = h + 'px';
-        box.style.backgroundColor = bg;
-        box.style.pointerEvents = 'none';
-        o.appendChild(box);
-      });
-    };
-
-    chart.timeScale().subscribeVisibleLogicalRangeChange(drawObs);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawObs());
 
     const resizeObserver = new ResizeObserver((entries) => {
       if (chartRef.current && entries.length > 0) {
@@ -325,32 +321,78 @@ function SingleChartPane({
     };
   }, []);
 
-  // Fetch dữ liệu nến định kỳ
+  // Tự động căn chỉnh lại kích thước và zoom khi bố cục hoặc trạng thái hiển thị thay đổi
   useEffect(() => {
+    if (!isVisible) return;
+    setIsAutoFit(true);
+    const timer = setTimeout(() => {
+      if (chartRef.current && containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        const h = containerRef.current.clientHeight;
+        if (w > 0 && h > 0) {
+          chartRef.current.applyOptions({ width: w, height: h });
+        }
+        applyDefaultZoom();
+        drawObs();
+      }
+    }, 40);
+    return () => clearTimeout(timer);
+  }, [isVisible, layout]);
+
+  // Quản lý dữ liệu nến: Khôi phục tức thì từ cache RAM (0ms) + Fetch ngầm cập nhật
+  useEffect(() => {
+    if (!isVisible) return;
+
     let isMounted = true;
     const targetCoin = coin;
     const targetTf = tf;
+    const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
+    const bar = tfMap[tf] || tf;
+    const cacheKey = `${coin}_${bar}`;
 
-    if (candleSeriesRef.current) {
-      try { candleSeriesRef.current.setData([]); } catch { }
+    // 1. Tức thì khôi phục nến từ RAM cache nếu có (0ms - không bị nhấp nháy/trắng xoá biểu đồ)
+    const cached = _webCandlesCache.get(cacheKey);
+    if (cached && cached.candles && cached.candles.length > 0) {
+      candlesRef.current = cached.candles;
+      activeObsRef.current = cached.ob_boxes || [];
+      if (candleSeriesRef.current) {
+        try { candleSeriesRef.current.setData(cached.candles); } catch {}
+      }
+      if (volumeSeriesRef.current && cached.volume) {
+        try { volumeSeriesRef.current.setData(cached.volume); } catch {}
+      }
+      if (emaSeriesRef.current && cached.ema) {
+        try { emaSeriesRef.current.setData(cached.ema); } catch {}
+      }
+      if (isAutoFit) {
+        setTimeout(() => {
+          if (isMounted) {
+            applyDefaultZoom();
+            drawObs();
+          }
+        }, 15);
+      }
+    } else {
+      // Chỉ xoá trắng khi chưa từng có dữ liệu cho coin/tf này
+      if (candleSeriesRef.current) {
+        try { candleSeriesRef.current.setData([]); } catch { }
+      }
+      if (volumeSeriesRef.current) {
+        try { volumeSeriesRef.current.setData([]); } catch { }
+      }
+      if (emaSeriesRef.current) {
+        try { emaSeriesRef.current.setData([]); } catch { }
+      }
+      if (overlayRef.current) {
+        overlayRef.current.innerHTML = "";
+      }
+      candlesRef.current = [];
+      activeObsRef.current = [];
     }
-    if (volumeSeriesRef.current) {
-      try { volumeSeriesRef.current.setData([]); } catch { }
-    }
-    if (emaSeriesRef.current) {
-      try { emaSeriesRef.current.setData([]); } catch { }
-    }
-    if (overlayRef.current) {
-      overlayRef.current.innerHTML = "";
-    }
-    candlesRef.current = [];
-    activeObsRef.current = [];
 
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
       try {
-        const tfMap = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
-        const bar = tfMap[tf] || tf;
         const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=1500`);
         if (!res.ok) return;
         const rd = await res.json();
@@ -371,83 +413,38 @@ function SingleChartPane({
         }
         candles.sort((a, b) => a.time - b.time);
         const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
-        candlesRef.current = unique;
-
-        candleSeriesRef.current.setData(unique);
-        if (chartRef.current) {
-          try {
-            chartRef.current.timeScale().fitContent();
-            chartRef.current.priceScale('right').applyOptions({ autoScale: true });
-            if (candleSeriesRef.current) {
-              candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
-            }
-          } catch { }
-        }
-
         const uniqueVolume = unique.map(c => ({
           time: c.time,
           value: c.volume || 0,
           color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
         }));
+        const emaData = calculateEMA(unique, 200);
+
+        // Lưu vào RAM Cache cho toàn app
+        _webCandlesCache.set(cacheKey, {
+          candles: unique,
+          volume: uniqueVolume,
+          ema: emaData,
+          ob_boxes: rd.ob_boxes || [],
+          timestamp: Date.now()
+        });
+
+        candlesRef.current = unique;
+        candleSeriesRef.current.setData(unique);
         if (volumeSeriesRef.current) {
           volumeSeriesRef.current.setData(uniqueVolume);
         }
-
         if (emaSeriesRef.current) {
-          emaSeriesRef.current.setData(calculateEMA(unique, 200));
+          emaSeriesRef.current.setData(emaData);
         }
-
         if (rd.ob_boxes) {
           activeObsRef.current = rd.ob_boxes;
-          setTimeout(() => {
-            if (!isMounted || !chartRef.current || !candleSeriesRef.current || !overlayRef.current) return;
-            const obs = activeObsRef.current;
-            const s = candleSeriesRef.current;
-            const c = chartRef.current;
-            const o = overlayRef.current;
-            o.innerHTML = "";
-            const w = o.clientWidth || 300;
-            const maxRightX = w - 65;
-            obs.forEach(ob => {
-              const y1 = s.priceToCoordinate(ob.high);
-              const y2 = s.priceToCoordinate(ob.low);
-              if (y1 === null || y2 === null) return;
-              const topY = Math.min(y1, y2);
-              const botY = Math.max(y1, y2);
-              const h = Math.max(botY - topY, 4);
-              const isBull = ob.bias === 1;
-
-              let startX = null;
-              if (ob.time && ob.time > 0) {
-                try {
-                  const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-                  const xCoord = c.timeScale().timeToCoordinate(secTime);
-                  if (xCoord !== null) startX = Math.floor(xCoord);
-                } catch (e) { }
-              }
-              if (startX === null) startX = 0;
-              if (startX < -2000) startX = -2000;
-              if (startX >= maxRightX) return;
-
-              const boxWidth = maxRightX - startX;
-              if (boxWidth <= 0) return;
-
-              const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
-              const box = document.createElement('div');
-              box.style.position = 'absolute';
-              box.style.top = topY + 'px';
-              box.style.left = startX + 'px';
-              box.style.width = boxWidth + 'px';
-              box.style.height = h + 'px';
-              box.style.backgroundColor = bg;
-              box.style.pointerEvents = 'none';
-              o.appendChild(box);
-            });
-          }, 60);
         }
 
         setTimeout(() => {
-          if (isMounted && chartRef.current) {
+          if (!isMounted) return;
+          drawObs();
+          if (isAutoFit) {
             applyDefaultZoom();
           }
         }, 30);
@@ -463,11 +460,12 @@ function SingleChartPane({
       isMounted = false;
       clearInterval(interval);
     };
-  }, [coin, tf]);
+  }, [coin, tf, isVisible]);
 
   return (
     <div
       className={`single-chart-card ${isActive ? "active" : ""}`}
+      style={{ display: isVisible ? "flex" : "none" }}
       onClick={onActivate}
     >
       {showToolbar && (
@@ -651,6 +649,55 @@ function App() {
     };
   }, [showLayoutMenu]);
 
+  // Pre-warm client-side candles cache cho các coin mặc định ngay khi mở Web App
+  useEffect(() => {
+    const warmupItems = [
+      { coin: "BTC-USDT-SWAP", tf: "1H" },
+      { coin: "ETH-USDT-SWAP", tf: "1H" },
+      { coin: "XAU-USDT-SWAP", tf: "1H" },
+      { coin: "USDT.D", tf: "1H" },
+    ];
+    warmupItems.forEach(async ({ coin, tf }) => {
+      const cacheKey = `${coin}_${tf}`;
+      if (_webCandlesCache.has(cacheKey)) return;
+      try {
+        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${tf}&limit=1500`);
+        if (!res.ok) return;
+        const rd = await res.json();
+        if (rd.code === "0" && rd.data && rd.data.length > 0) {
+          const candles = [];
+          for (let i = rd.data.length - 1; i >= 0; i--) {
+            const c = rd.data[i];
+            const t = Math.floor(parseInt(c[0]) / 1000);
+            candles.push({
+              time: t,
+              open: parseFloat(c[1]),
+              high: parseFloat(c[2]),
+              low: parseFloat(c[3]),
+              close: parseFloat(c[4]),
+              volume: parseFloat(c[5])
+            });
+          }
+          candles.sort((a, b) => a.time - b.time);
+          const unique = candles.filter((c, i) => i === 0 || c.time !== candles[i - 1].time);
+          const uniqueVolume = unique.map(c => ({
+            time: c.time,
+            value: c.volume || 0,
+            color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+          }));
+          const emaData = calculateEMA(unique, 200);
+          _webCandlesCache.set(cacheKey, {
+            candles: unique,
+            volume: uniqueVolume,
+            ema: emaData,
+            ob_boxes: rd.ob_boxes || [],
+            timestamp: Date.now()
+          });
+        }
+      } catch (e) {}
+    });
+  }, []);
+
   const updateChartConfig = (index, updates) => {
     setChartsConfig(prev => {
       const next = [...prev];
@@ -816,6 +863,27 @@ function App() {
       const data = await resp.json();
       if (resp.ok) {
         alert("✅ Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot thành công!");
+      } else {
+        alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+      }
+    } catch (e) {
+      alert("❌ Lỗi kết nối đến Server: " + e.message);
+    }
+  };
+
+  const handleResetNen = async () => {
+    const currentUid = (localStorage.getItem("tls1_uid") || loginUid || "").trim();
+    if (currentUid !== "admtls12021") {
+      alert("⚠️ Chức năng này chỉ dành riêng cho Quản trị viên (Admin)!");
+      return;
+    }
+    if (!window.confirm("Bạn có chắc chắn muốn gửi lệnh Reset Đếm Nến đến Bot?")) return;
+
+    try {
+      const resp = await fetch(`/api/bot/reset_nen?uid=${currentUid}&strategy=sub1`, { method: "POST" });
+      const data = await resp.json();
+      if (resp.ok) {
+        alert("✅ Đã kích hoạt lệnh Reset Đếm Nến thành công!");
       } else {
         alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
       }
@@ -1819,9 +1887,9 @@ function App() {
             <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
               <section className="pane-chart" style={{ position: "relative" }}>
                 <div className={`multi-chart-container layout-${chartLayout}`}>
-                  {chartsConfig.slice(0, getActiveChartsCount(chartLayout)).map((cfg, idx) => (
+                  {chartsConfig.slice(0, 4).map((cfg, idx) => (
                     <SingleChartPane
-                      key={`chart_${idx}_${chartLayout}_${cfg.coin}`}
+                      key={`chart_slot_${idx}`}
                       chartIndex={idx}
                       coin={cfg.coin}
                       tf={cfg.tf}
@@ -1834,6 +1902,7 @@ function App() {
                       }}
                       showToolbar={true}
                       layout={chartLayout}
+                      isVisible={idx < getActiveChartsCount(chartLayout)}
                     />
                   ))}
                 </div>
@@ -2260,7 +2329,7 @@ function App() {
                       {((localStorage.getItem('tls1_uid') || loginUid) === "admtls12021") && (
                         <button
                           className="btn-audit"
-                          onClick={() => alert("✅ Đã gửi lệnh Reset Đếm Nến đến Bot thành công!")}
+                          onClick={handleResetNen}
                         >
                           ♻️ Reset Đếm Nến
                         </button>

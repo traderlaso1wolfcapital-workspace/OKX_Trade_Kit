@@ -439,16 +439,100 @@ class BotSubprocessWorker(QtCore.QThread):
                 try: self.process.kill()
                 except: pass
 
+_tv_cache = {}
+
+def fetch_tradingview_candles(symbol: str = "CRYPTOCAP:USDT.D", bar: str = "1H", limit: int = 300):
+    import time
+    now = time.time()
+    cache_key = f"{symbol}_{bar}_{limit}"
+    cached = _tv_cache.get(cache_key)
+    if cached and (now - cached["time"] < 15):
+        return cached["data"]
+        
+    try:
+        import websocket
+        import ssl
+        import re
+        import random
+        import string
+        import json
+
+        tf_map = {
+            '1m': '1', '5m': '5', '15m': '15', '30m': '30',
+            '1H': '60', '2H': '120', '4H': '240', '1D': '1D'
+        }
+        res_bar = tf_map.get(bar, '60')
+        session_id = 'cs_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        chart_id = 'sds_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        
+        ws = websocket.create_connection(
+            'wss://data.tradingview.com/socket.io/websocket',
+            sslopt={'cert_reqs': ssl.CERT_NONE},
+            headers={'Origin': 'https://www.tradingview.com'},
+            timeout=5
+        )
+        def send(m): ws.send('~m~' + str(len(m)) + '~m~' + m)
+        send(json.dumps({'m': 'set_auth_token', 'p': ['unauthorized_user_token']}))
+        send(json.dumps({'m': 'chart_create_session', 'p': [session_id, '']}))
+        send(json.dumps({'m': 'resolve_symbol', 'p': [session_id, chart_id, symbol]}))
+        send(json.dumps({'m': 'create_series', 'p': [session_id, 's1', 's1', chart_id, res_bar, limit]}))
+        
+        raw_candles = []
+        for _ in range(25):
+            try:
+                res = ws.recv()
+                if '~h~' in res:
+                    ws.send(res)
+                    continue
+                msgs = re.split(r'~m~\d+~m~', res)
+                for m in msgs:
+                    if not m: continue
+                    d = json.loads(m)
+                    if d.get('m') == 'timescale_update':
+                        s1 = d['p'][1].get('s1')
+                        if s1 and 's' in s1:
+                            raw_candles = s1['s']
+                            break
+                if raw_candles: break
+            except Exception: break
+        ws.close()
+        
+        out = []
+        for item in reversed(raw_candles):
+            v = item.get('v', [])
+            if len(v) >= 5:
+                ts_ms = str(int(v[0] * 1000))
+                o = str(v[1])
+                h = str(v[2])
+                l = str(v[3])
+                c = str(v[4])
+                vol = str(v[5]) if len(v) > 5 else '0'
+                out.append([ts_ms, o, h, l, c, vol])
+                
+        if out:
+            _tv_cache[cache_key] = {"time": now, "data": out}
+            return out
+    except Exception as e:
+        print(f"[TV CANDLES ERROR] {e}")
+        
+    if cached:
+        return cached["data"]
+    return []
+
+
 class LiveChartWorker(QtCore.QThread):
     chart_data_signal = QtCore.pyqtSignal(dict)
     
     def __init__(self, inst_id="BTC-USDT-SWAP", bar="5m", parent=None):
         super().__init__(parent)
         import threading
+        import requests
         self.inst_id = inst_id
         self.bar = bar
         self._is_running = True
         self._trigger = threading.Event()
+        self._session = requests.Session()
+        self._historical_pool = {}
 
     def trigger_fetch(self):
         self._trigger.set()
@@ -459,118 +543,166 @@ class LiveChartWorker(QtCore.QThread):
         while self._is_running:
             self._trigger.clear()
             try:
-                # Dynamically get okx_domain from parent's pos_worker if available
+                # Dynamically get okx_domain from parent or parent_instance if available
                 domain = "www.okx.com"
                 p = self.parent()
-                if p and hasattr(p, 'pos_worker') and p.pos_worker and hasattr(p.pos_worker, 'okx_domain'):
-                    domain = p.pos_worker.okx_domain
-                resp = requests.get(f"https://{domain}/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300", timeout=5)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get("code") == "0":
-                        candles = data.get("data", [])
-                        if candles:
-                            candles.reverse()
-                            chart_data = {
-                                "type": "chart_data",
-                                "candles": [c[:6] for c in candles]
-                            }
-                            
-                            # Đọc markers từ cả Sub1 và Sub2
-                            import os
-                            import json
-                            local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
-                            for sub_dir in ["bots/sub1", "bots/sub2"]:
-                                marker_file = os.path.join(local_app_data, 'TLS1_Trading', sub_dir, 'json_data', 'trade_markers.json')
-                                if os.path.exists(marker_file):
-                                    try:
-                                        with open(marker_file, 'r', encoding='utf-8') as f:
-                                            markers = json.load(f)
-                                            if self.inst_id in markers:
-                                                if "markers" not in chart_data: chart_data["markers"] = []
-                                                chart_data["markers"].extend(markers[self.inst_id])
-                                    except Exception:
-                                        pass
+                bot_inst = getattr(p, 'parent_instance', p)
+                if bot_inst and hasattr(bot_inst, 'pos_worker') and bot_inst.pos_worker and hasattr(bot_inst.pos_worker, 'okx_domain'):
+                    domain = bot_inst.pos_worker.okx_domain
 
-                            # Tính toán Order Blocks cho Bot Sub2 SMC
-                            try:
-                                import bots.sub2.bot_strategy as sub2_strat
-                                from bots.sub2.bot_models import AssetTracker
-                                from decimal import Decimal
-                                tk = AssetTracker()
-                                times = [int(c[0]) for c in candles]
-                                opens = [Decimal(c[1]) for c in candles]
-                                highs = [Decimal(c[2]) for c in candles]
-                                lows = [Decimal(c[3]) for c in candles]
-                                closes = [Decimal(c[4]) for c in candles]
-                                vol = sub2_strat.get_volatility_measure(closes, highs, lows)
-                                sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
-                                
-                                raw_obs = []
-                                for ob in (tk.swing_obs + tk.internal_obs):
-                                    if not ob.crossed:
-                                        raw_obs.append({
-                                            "high": float(ob.bar_high),
-                                            "low": float(ob.bar_low),
-                                            "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
-                                            "bias": int(ob.bias),
-                                            "source": str(ob.source)
-                                        })
-                                
-                                # Gom các vùng OB trùng lấp thành 1 vùng
-                                ob_boxes = []
-                                for bias in [1, -1]:
-                                    b_obs = [o for o in raw_obs if o["bias"] == bias]
-                                    if not b_obs: continue
-                                    # Sắp xếp theo giá low tăng dần
-                                    b_obs.sort(key=lambda x: x["low"])
-                                    merged = []
-                                    for o in b_obs:
-                                        if not merged:
-                                            merged.append(o)
-                                        else:
-                                            last = merged[-1]
-                                            # Kiểm tra xem có giao nhau không (last.high >= o.low)
-                                            if last["high"] >= o["low"]:
-                                                # Hợp nhất
-                                                last["high"] = max(last["high"], o["high"])
-                                                if o["time"] > 0 and last["time"] > 0:
-                                                    last["time"] = min(last["time"], o["time"])
-                                                elif o["time"] > 0:
-                                                    last["time"] = o["time"]
+                pool_key = (self.inst_id, self.bar)
+                cached_pool = self._historical_pool.get(pool_key)
+                all_candles = []
+
+                # Hỗ trợ USDT.D từ TradingView
+                if self.inst_id in ["USDT.D", "CRYPTOCAP:USDT.D"]:
+                    candles = fetch_tradingview_candles("CRYPTOCAP:USDT.D", bar=self.bar, limit=min(1500, 300))
+                    all_candles = list(candles)
+                else:
+                    # Nếu đã có sẵn pool nến trong RAM: chỉ cần fetch 100 nến mới nhất để update siêu tốc (~0.08s)
+                    if cached_pool and len(cached_pool) >= 1000:
+                        try:
+                            url = f"https://{domain}/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=100"
+                            resp = self._session.get(url, timeout=5)
+                            if resp.status_code == 200:
+                                d = resp.json()
+                                if d.get("code") == "0" and d.get("data"):
+                                    new_candles = d["data"]
+                                    merged_dict = {c[0]: c for c in cached_pool}
+                                    for c in new_candles:
+                                        merged_dict[c[0]] = c
+                                    all_candles = sorted(merged_dict.values(), key=lambda x: int(x[0]), reverse=True)[:1500]
+                                    self._historical_pool[pool_key] = all_candles
+                        except Exception:
+                            all_candles = cached_pool[:1500]
+
+                    # Nếu chưa có trong pool: fetch toàn bộ lịch sử 1500 nến bằng Session
+                    if not all_candles:
+                        try:
+                            first_url = f"https://{domain}/api/v5/market/candles?instId={self.inst_id}&bar={self.bar}&limit=300"
+                            resp = self._session.get(first_url, timeout=6)
+                            if resp.status_code == 200:
+                                d = resp.json()
+                                if d.get("code") == "0" and d.get("data"):
+                                    all_candles.extend(d["data"])
+                                    while len(all_candles) < 1500:
+                                        remain = 1500 - len(all_candles)
+                                        fetch_count = min(remain, 100)
+                                        last_ts = all_candles[-1][0]
+                                        h_url = f"https://{domain}/api/v5/market/history-candles?instId={self.inst_id}&bar={self.bar}&limit={fetch_count}&after={last_ts}"
+                                        h_resp = self._session.get(h_url, timeout=6)
+                                        if h_resp.status_code == 200:
+                                            h_data = h_resp.json()
+                                            if h_data.get("code") == "0" and h_data.get("data"):
+                                                all_candles.extend(h_data["data"])
                                             else:
-                                                merged.append(o)
-                                    ob_boxes.extend(merged)
-                                chart_data["ob_boxes"] = ob_boxes
-                                # print(f"DEBUG: Found {len(ob_boxes)} OBs for {self.inst_id}")
-                                
-                                # Add trade setups as markers
-                                if "markers" not in chart_data:
-                                    chart_data["markers"] = []
-                                
-                                BULLISH = 1
-                                for setup in tk.trade_setups:
-                                    t_ms = 0
-                                    if setup.created_bar < len(times):
-                                        t_ms = times[setup.created_bar]
-                                    if t_ms > 0:
-                                        chart_data["markers"].append({
-                                            "time": int(t_ms) * 1000 if t_ms < 100000000000 else int(t_ms),
-                                            "side": "LONG" if setup.bias == BULLISH else "SHORT",
-                                            "price": float(setup.entry_price),
-                                            "tp": float(setup.take_profit) if hasattr(setup, 'take_profit') else None,
-                                            "sl": float(setup.stop_loss) if hasattr(setup, 'stop_loss') else None,
-                                            "status": "inactive" if setup.triggered else "active",
-                                            "type": "SETUP"
-                                        })
+                                                break
+                                        else:
+                                            break
+                                    self._historical_pool[pool_key] = all_candles
+                        except Exception:
+                            pass
+
+                candles = list(all_candles)
+                if candles:
+                    candles.reverse()
+                    chart_data = {
+                        "type": "chart_data",
+                        "candles": [c[:6] for c in candles]
+                    }
+                            
+                    # Đọc markers từ cả Sub1 và Sub2
+                    import os
+                    import json
+                    local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+                    for sub_dir in ["bots/sub1", "bots/sub2"]:
+                        marker_file = os.path.join(local_app_data, 'TLS1_Trading', sub_dir, 'json_data', 'trade_markers.json')
+                        if os.path.exists(marker_file):
+                            try:
+                                with open(marker_file, 'r', encoding='utf-8') as f:
+                                    markers = json.load(f)
+                                    target_keys = [self.inst_id, self.inst_id.replace("-SWAP", "")]
+                                    for tk_key in target_keys:
+                                        if tk_key in markers:
+                                            if "markers" not in chart_data: chart_data["markers"] = []
+                                            chart_data["markers"].extend(markers[tk_key])
                             except Exception:
                                 pass
 
-                            self.chart_data_signal.emit(chart_data)
-                        else:
-                            self.chart_data_signal.emit({"type": "chart_data", "candles": []})
-                    else:
-                        self.chart_data_signal.emit({"type": "chart_data", "candles": []})
+                    # Tính toán Order Blocks cho Bot Sub2 SMC
+                    try:
+                        import bots.sub2.bot_strategy as sub2_strat
+                        from bots.sub2.bot_models import AssetTracker
+                        from decimal import Decimal
+                        tk = AssetTracker()
+                        times = [int(c[0]) for c in candles]
+                        opens = [Decimal(c[1]) for c in candles]
+                        highs = [Decimal(c[2]) for c in candles]
+                        lows = [Decimal(c[3]) for c in candles]
+                        closes = [Decimal(c[4]) for c in candles]
+                        vol = sub2_strat.get_volatility_measure(closes, highs, lows)
+                        sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
+                        
+                        raw_obs = []
+                        for ob in (tk.swing_obs + tk.internal_obs):
+                            if not ob.crossed:
+                                raw_obs.append({
+                                    "high": float(ob.bar_high),
+                                    "low": float(ob.bar_low),
+                                    "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
+                                    "bias": int(ob.bias),
+                                    "source": str(ob.source)
+                                })
+                        
+                        # Gom các vùng OB trùng lấp thành 1 vùng
+                        ob_boxes = []
+                        for bias in [1, -1]:
+                            b_obs = [o for o in raw_obs if o["bias"] == bias]
+                            if not b_obs: continue
+                            # Sắp xếp theo giá low tăng dần
+                            b_obs.sort(key=lambda x: x["low"])
+                            merged = []
+                            for o in b_obs:
+                                if not merged:
+                                    merged.append(o)
+                                else:
+                                    last = merged[-1]
+                                    # Kiểm tra xem có giao nhau không (last.high >= o.low)
+                                    if last["high"] >= o["low"]:
+                                        # Hợp nhất
+                                        last["high"] = max(last["high"], o["high"])
+                                        if o["time"] > 0 and last["time"] > 0:
+                                            last["time"] = min(last["time"], o["time"])
+                                        elif o["time"] > 0:
+                                            last["time"] = o["time"]
+                                    else:
+                                        merged.append(o)
+                            ob_boxes.extend(merged)
+                        chart_data["ob_boxes"] = ob_boxes
+                        
+                        # Add trade setups as markers
+                        if "markers" not in chart_data:
+                            chart_data["markers"] = []
+                        
+                        BULLISH = 1
+                        for setup in tk.trade_setups:
+                            t_ms = 0
+                            if setup.created_bar < len(times):
+                                t_ms = times[setup.created_bar]
+                            if t_ms > 0:
+                                chart_data["markers"].append({
+                                    "time": int(t_ms) * 1000 if t_ms < 100000000000 else int(t_ms),
+                                    "side": "LONG" if setup.bias == BULLISH else "SHORT",
+                                    "price": float(setup.entry_price),
+                                    "tp": float(setup.take_profit) if hasattr(setup, 'take_profit') else None,
+                                    "sl": float(setup.stop_loss) if hasattr(setup, 'stop_loss') else None,
+                                    "status": "inactive" if setup.triggered else "active",
+                                    "type": "SETUP"
+                                })
+                    except Exception:
+                        pass
+
+                    self.chart_data_signal.emit(chart_data)
                 else:
                     self.chart_data_signal.emit({"type": "chart_data", "candles": []})
             except Exception:
@@ -760,11 +892,675 @@ class FirebaseChatWorker(QtCore.QThread):
                         pass
         except Exception as e:
             print("Firebase chat connection error:", e)
+
+
+def create_layout_icon(layout_type, selected=False, w=24, h=24):
+    """Vẽ icon bố cục dạng vector TradingView bằng QPainter"""
+    pixmap = QtGui.QPixmap(w, h)
+    pixmap.fill(QtCore.Qt.GlobalColor.transparent)
+    painter = QtGui.QPainter(pixmap)
+    painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+    
+    stroke_color = QtGui.QColor("#2962ff") if selected else QtGui.QColor("#a0a5b5")
+    pen = QtGui.QPen(stroke_color, 1.5)
+    painter.setPen(pen)
+    painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+    
+    t = str(layout_type)
+    if t == "1":
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 2.5, w - 5, h - 5), 2, 2)
+    elif t in ["2-col", "2"]:
+        half_w = (w - 7) / 2
+        painter.drawRoundedRect(QtCore.QRectF(2, 2.5, half_w, h - 5), 1.5, 1.5)
+        painter.drawRoundedRect(QtCore.QRectF(2 + half_w + 3, 2.5, half_w, h - 5), 1.5, 1.5)
+    elif t == "2-row":
+        half_h = (h - 7) / 2
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 2, w - 5, half_h), 1.5, 1.5)
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 2 + half_h + 3, w - 5, half_h), 1.5, 1.5)
+    elif t in ["3-col", "3"]:
+        third_w = (w - 8) / 3
+        for i in range(3):
+            painter.drawRoundedRect(QtCore.QRectF(2 + i * (third_w + 2), 2.5, third_w, h - 5), 1, 1)
+    elif t == "3-row":
+        third_h = (h - 8) / 3
+        for i in range(3):
+            painter.drawRoundedRect(QtCore.QRectF(2.5, 2 + i * (third_h + 2), w - 5, third_h), 1, 1)
+    elif t in ["4-grid", "4"]:
+        half_w = (w - 7) / 2
+        half_h = (h - 7) / 2
+        painter.drawRoundedRect(QtCore.QRectF(2, 2, half_w, half_h), 1.5, 1.5)
+        painter.drawRoundedRect(QtCore.QRectF(2 + half_w + 3, 2, half_w, half_h), 1.5, 1.5)
+        painter.drawRoundedRect(QtCore.QRectF(2, 2 + half_h + 3, half_w, half_h), 1.5, 1.5)
+        painter.drawRoundedRect(QtCore.QRectF(2 + half_w + 3, 2 + half_h + 3, half_w, half_h), 1.5, 1.5)
+    else:
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 2.5, w - 5, h - 5), 2, 2)
+        
+    painter.end()
+    return QtGui.QIcon(pixmap)
+
+
+class LayoutSelectorPopup(QtWidgets.QFrame):
+    """Popup hiển thị lưới icon chọn bố cục biểu đồ y hệt bản Web (TradingView)"""
+    def __init__(self, parent=None, on_select=None):
+        super().__init__(parent, QtCore.Qt.WindowType.Popup | QtCore.Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.on_select = on_select
+        self.selected_layout = "1"
+        self.option_buttons = {}
+        
+        self.setObjectName("layoutSelectorPopup")
+        self.setStyleSheet("""
+            #layoutSelectorPopup {
+                background-color: #1e222d;
+                border: 1px solid #363c4e;
+                border-radius: 6px;
+            }
+            QPushButton[class="layout-option-btn"] {
+                background-color: #181b24;
+                border: 1px solid #2e3344;
+                border-radius: 4px;
+                min-width: 44px;
+                max-width: 44px;
+                min-height: 38px;
+                max-height: 38px;
+                padding: 0px;
+            }
+            QPushButton[class="layout-option-btn"]:hover {
+                background-color: #242938;
+                border: 1px solid #4a5268;
+            }
+            QPushButton[class="layout-option-btn"][selected="true"] {
+                background-color: rgba(41, 98, 255, 0.22);
+                border: 1px solid #2962ff;
+            }
+            QFrame[class="layout-divider"] {
+                background-color: #2a2e39;
+                max-height: 1px;
+                min-height: 1px;
+                border: none;
+            }
+        """)
+        
+        vbox = QtWidgets.QVBoxLayout(self)
+        vbox.setContentsMargins(8, 8, 8, 8)
+        vbox.setSpacing(6)
+        
+        def make_btn(mode_key, tooltip):
+            btn = QtWidgets.QPushButton()
+            btn.setProperty("class", "layout-option-btn")
+            btn.setToolTip(tooltip)
+            btn.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            btn.setIconSize(QtCore.QSize(24, 24))
+            btn.setIcon(create_layout_icon(mode_key, selected=False, w=24, h=24))
+            btn.clicked.connect(lambda: self._select_mode(mode_key))
+            self.option_buttons[mode_key] = btn
+            return btn
             
-    def stop(self):
-        self.is_running = False
-        self.quit()
-        self.wait()
+        def make_divider():
+            div = QtWidgets.QFrame()
+            div.setProperty("class", "layout-divider")
+            div.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+            return div
+
+        # Row 1: 1 Biểu đồ đơn
+        row1 = QtWidgets.QHBoxLayout()
+        row1.setContentsMargins(0, 0, 0, 0)
+        row1.setSpacing(8)
+        row1.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        row1.addWidget(make_btn("1", "1 Biểu đồ đơn"))
+        vbox.addLayout(row1)
+        
+        vbox.addWidget(make_divider())
+        
+        # Row 2: 2 Biểu đồ (Cột dọc | Hàng ngang)
+        row2 = QtWidgets.QHBoxLayout()
+        row2.setContentsMargins(0, 0, 0, 0)
+        row2.setSpacing(8)
+        row2.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        row2.addWidget(make_btn("2-col", "2 Biểu đồ (Cột dọc 1x2)"))
+        row2.addWidget(make_btn("2-row", "2 Biểu đồ (Hàng ngang 2x1)"))
+        vbox.addLayout(row2)
+        
+        vbox.addWidget(make_divider())
+        
+        # Row 3: 3 Biểu đồ (Cột dọc | Hàng ngang)
+        row3 = QtWidgets.QHBoxLayout()
+        row3.setContentsMargins(0, 0, 0, 0)
+        row3.setSpacing(8)
+        row3.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        row3.addWidget(make_btn("3-col", "3 Biểu đồ (Cột dọc 1x3)"))
+        row3.addWidget(make_btn("3-row", "3 Biểu đồ (Hàng ngang 3x1)"))
+        vbox.addLayout(row3)
+        
+        vbox.addWidget(make_divider())
+        
+        # Row 4: 4 Biểu đồ (Lưới 2x2)
+        row4 = QtWidgets.QHBoxLayout()
+        row4.setContentsMargins(0, 0, 0, 0)
+        row4.setSpacing(8)
+        row4.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        row4.addWidget(make_btn("4-grid", "4 Biểu đồ (Lưới 2x2)"))
+        vbox.addLayout(row4)
+
+    def update_selected(self, current_mode):
+        self.selected_layout = str(current_mode)
+        for k, btn in self.option_buttons.items():
+            is_sel = (k == self.selected_layout)
+            btn.setProperty("selected", "true" if is_sel else "false")
+            btn.setIcon(create_layout_icon(k, selected=is_sel, w=24, h=24))
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+
+    def _select_mode(self, mode_key):
+        self.close()
+        if self.on_select:
+            self.on_select(mode_key)
+
+    def show_below(self, target_widget):
+        self.adjustSize()
+        pos = target_widget.mapToGlobal(QtCore.QPoint(0, target_widget.height() + 4))
+        # Căn lề phải popup thẳng với cạnh phải target_widget
+        pos.setX(pos.x() + target_widget.width() - self.width())
+        self.move(pos)
+        self.show()
+
+
+class SingleChartPane(QtWidgets.QFrame):
+    def __init__(self, pane_id=0, default_coin="BTC-USDT-SWAP", default_tf="4H", parent_instance=None):
+        super().__init__()
+        self.pane_id = pane_id
+        self.parent_instance = parent_instance
+        self._chart_initialized = False
+        self._last_markers_hash = None
+        self._last_pos_lines_hash = None
+        
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #0c0c0c;
+                border: 1px solid #282828;
+                border-radius: 4px;
+            }
+        """)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(1, 1, 1, 1)
+        layout.setSpacing(0)
+        
+        # Mini Header Toolbar bên trong từng biểu đồ
+        self.pane_header = QtWidgets.QWidget()
+        self.pane_header.setStyleSheet("""
+            background-color: #161616;
+            border-bottom: 1px solid #282828;
+        """)
+        self.pane_header.setFixedHeight(28)
+        header_layout = QtWidgets.QHBoxLayout(self.pane_header)
+        header_layout.setContentsMargins(4, 2, 4, 2)
+        header_layout.setSpacing(6)
+        
+        self.combo_coin = QtWidgets.QComboBox()
+        coin_list = [
+            ("BTC-USDT", "BTC-USDT-SWAP"),
+            ("ETH-USDT", "ETH-USDT-SWAP"),
+            ("XAU-USDT", "XAU-USDT-SWAP"),
+            ("SOL-USDT", "SOL-USDT-SWAP"),
+            ("XRP-USDT", "XRP-USDT-SWAP"),
+            ("USDT.D", "USDT.D"),
+        ]
+        for label, val in coin_list:
+            self.combo_coin.addItem(label, val)
+            
+        for i in range(self.combo_coin.count()):
+            data_val = self.combo_coin.itemData(i)
+            text_val = self.combo_coin.itemText(i)
+            if data_val == default_coin or text_val == default_coin or text_val == default_coin.replace("-SWAP", ""):
+                self.combo_coin.setCurrentIndex(i)
+                break
+                
+        combo_dropdown_view_style = """
+            QAbstractItemView {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                selection-background-color: #333333;
+                selection-color: #ff9900;
+                border: 1px solid #444444;
+                outline: none;
+                padding: 2px;
+            }
+            QAbstractItemView::item {
+                color: #ffffff;
+                min-height: 22px;
+                padding: 2px 6px;
+            }
+            QAbstractItemView::item:hover {
+                background-color: #333333;
+                color: #ff9900;
+            }
+            QAbstractItemView::item:selected {
+                background-color: #333333;
+                color: #ff9900;
+                font-weight: bold;
+            }
+        """
+        self.combo_coin.setView(QtWidgets.QListView())
+        self.combo_coin.setItemDelegate(QtWidgets.QStyledItemDelegate(self.combo_coin))
+        self.combo_coin.view().setStyleSheet(combo_dropdown_view_style)
+        self.combo_coin.setStyleSheet("""
+            QComboBox {
+                background-color: #222222;
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 1px 6px;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+                min-width: 75px;
+            }
+            QComboBox:hover {
+                border-color: #ff9900;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                selection-background-color: #333333;
+                selection-color: #ff9900;
+                border: 1px solid #444444;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                color: #ffffff;
+                min-height: 22px;
+                padding: 2px 6px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #333333;
+                color: #ff9900;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #333333;
+                color: #ff9900;
+                font-weight: bold;
+            }
+        """)
+        header_layout.addWidget(self.combo_coin)
+        
+        self.combo_tf = QtWidgets.QComboBox()
+        self.combo_tf.addItems(["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"])
+        self.combo_tf.setCurrentText(default_tf)
+        self.combo_tf.setFixedWidth(48)
+        self.combo_tf.setView(QtWidgets.QListView())
+        self.combo_tf.setItemDelegate(QtWidgets.QStyledItemDelegate(self.combo_tf))
+        self.combo_tf.view().setStyleSheet(combo_dropdown_view_style)
+        self.combo_tf.setStyleSheet("""
+            QComboBox {
+                background-color: #222222;
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 11px;
+                padding: 1px 4px;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+                min-width: 0px;
+            }
+            QComboBox:hover {
+                border-color: #ff9900;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                selection-background-color: #333333;
+                selection-color: #ff9900;
+                border: 1px solid #444444;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                color: #ffffff;
+                min-height: 22px;
+                padding: 2px 4px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #333333;
+                color: #ff9900;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #333333;
+                color: #ff9900;
+                font-weight: bold;
+            }
+        """)
+        header_layout.addWidget(self.combo_tf)
+        
+        header_layout.addStretch(1)
+        
+        # Nút Fit căn vừa biểu đồ
+        self.btn_fit = QtWidgets.QPushButton("⛶")
+        self.btn_fit.setToolTip("Căn vừa nến vào khung nhìn")
+        self.btn_fit.setFixedSize(22, 20)
+        self.btn_fit.setStyleSheet("""
+            QPushButton {
+                background-color: #252525;
+                color: #aaaaaa;
+                border: 1px solid #3a3a3a;
+                border-radius: 3px;
+                font-size: 12px;
+                padding: 0;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+                color: #ffffff;
+                border-color: #ff9900;
+            }
+        """)
+        self.btn_fit.clicked.connect(self.fit_content)
+        header_layout.addWidget(self.btn_fit)
+        
+        layout.addWidget(self.pane_header)
+        
+        # Khởi tạo QtChart
+        try:
+            self.chart_widget = QtChart()
+            self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2, price_line=False, price_label=False)
+            webview = self.chart_widget.get_webview()
+            
+            fix_bridge_js = """
+            if (typeof window.pythonObject === 'undefined') {
+                let q = [], real = null;
+                Object.defineProperty(window, 'pythonObject', {
+                    get: function() {
+                        return { callback: function(m) {
+                            if (real && real.callback) { real.callback(m); } else { q.push(m); }
+                        }};
+                    },
+                    set: function(v) {
+                        real = v;
+                        if (real && real.callback) {
+                            while (q.length > 0) {
+                                try { real.callback(q.shift()); } catch(e) {}
+                            }
+                        }
+                    },
+                    configurable: true
+                });
+            }
+            """
+            webview.loadFinished.connect(lambda: webview.page().runJavaScript(fix_bridge_js))
+            webview.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+            layout.addWidget(webview, 1)
+            
+            self.chart_widget.layout(background_color='#0c0c0c', text_color='#e0e0e0', font_size=11)
+            self.chart_widget.candle_style(up_color='#26a69a', down_color='#ef5350',
+                                    border_up_color='#26a69a', border_down_color='#ef5350',
+                                    wick_up_color='#26a69a', wick_down_color='#ef5350')
+            self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
+            self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.combo_tf.currentText()})', color='rgba(255, 153, 0, 0.1)')
+            self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='rgba(42, 42, 42, 0.3)')
+            self.chart_widget.time_scale(right_offset=8)
+            
+            coin_code = self.combo_coin.currentData() or self.combo_coin.currentText()
+            self.live_chart_worker = LiveChartWorker(inst_id=coin_code, bar=self.combo_tf.currentText(), parent=self)
+            self.live_chart_worker.chart_data_signal.connect(self.update_live_chart)
+            
+            self.combo_coin.currentTextChanged.connect(self.on_chart_config_changed)
+            self.combo_tf.currentTextChanged.connect(self.on_chart_config_changed)
+            
+            self.live_chart_worker.start()
+        except Exception as e:
+            lbl_err = QtWidgets.QLabel(f"Lỗi khởi tạo biểu đồ: {str(e)}")
+            lbl_err.setStyleSheet("color: #ff5555; padding: 10px;")
+            layout.addWidget(lbl_err)
+            self.chart_widget = None
+            self.live_chart_worker = None
+
+    def fit_content(self):
+        if getattr(self, 'chart_widget', None):
+            try:
+                js = f"""
+                (function() {{
+                    try {{
+                        let chartObj = window['{self.chart_widget.id}'];
+                        if (!chartObj && window.pythonObject) {{
+                            for (let key in window) {{
+                                if (window[key] && window[key].chart) {{ chartObj = window[key]; break; }}
+                            }}
+                        }}
+                        if (chartObj && chartObj.chart) {{
+                            chartObj.chart.timeScale().fitContent();
+                        }}
+                    }} catch(e) {{}}
+                }})();
+                """
+                self.chart_widget.win.run_script(js)
+            except Exception:
+                pass
+
+    def on_chart_config_changed(self):
+        if getattr(self, 'live_chart_worker', None):
+            coin_code = self.combo_coin.currentData() or f"{self.combo_coin.currentText()}-USDT-SWAP"
+            self.live_chart_worker.inst_id = coin_code
+            self.live_chart_worker.bar = self.combo_tf.currentText()
+            self._chart_initialized = False
+            if getattr(self, 'chart_widget', None):
+                self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
+            self.live_chart_worker.trigger_fetch()
+
+    def set_coin(self, coin_id):
+        for i in range(self.combo_coin.count()):
+            data_val = self.combo_coin.itemData(i)
+            text_val = self.combo_coin.itemText(i)
+            if data_val == coin_id or text_val == coin_id or text_val == coin_id.replace("-SWAP", ""):
+                if self.combo_coin.currentIndex() != i:
+                    self.combo_coin.setCurrentIndex(i)
+                return
+
+    def update_live_chart(self, data):
+        if getattr(self, 'chart_widget', None):
+            try:
+                import pandas as pd
+                candles = data.get("candles", [])
+                if candles:
+                    df = pd.DataFrame(candles, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
+                    df['time'] = pd.to_numeric(df['time'])
+                    df['time'] = pd.to_datetime(df['time'], unit='ms').astype('datetime64[ns]')
+                    
+                    for col in ['open', 'high', 'low', 'close', 'volume']:
+                        df[col] = pd.to_numeric(df[col])
+                    
+                    df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
+                    
+                    if not getattr(self, '_chart_initialized', False):
+                        self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
+                        self.ema_line.set(df[['time', 'EMA 200']].dropna())
+                        
+                        init_ob_js = f'''
+                        (function() {{
+                            try {{
+                                let chartObj = window['{self.chart_widget.id}'];
+                                if (!chartObj && window.pythonObject) {{
+                                    for (let key in window) {{
+                                        try {{
+                                            if (window[key] && window[key].series) {{
+                                                chartObj = window[key];
+                                                break;
+                                            }}
+                                        }} catch(e){{}}
+                                    }}
+                                }}
+                                if (!chartObj || !chartObj.series) return;
+                                const series = chartObj.series;
+                                const chart = chartObj.chart;
+                                
+                                const container = chartObj.container || (chartObj.div ? chartObj.div : document.body);
+                                let overlay = document.getElementById('smc_ob_shaded_overlay_{self.pane_id}');
+                                if (!overlay) {{
+                                    overlay = document.createElement('div');
+                                    overlay.id = 'smc_ob_shaded_overlay_{self.pane_id}';
+                                    overlay.style.position = 'absolute';
+                                    overlay.style.top = '0';
+                                    overlay.style.left = '0';
+                                    overlay.style.width = '100%';
+                                    overlay.style.height = '100%';
+                                    overlay.style.pointerEvents = 'none';
+                                    overlay.style.zIndex = '4';
+                                    overlay.style.overflow = 'hidden';
+                                    if (container && container.style) container.style.position = 'relative';
+                                    (container || document.body).appendChild(overlay);
+                                }}
+
+                                window._active_smc_obs_{self.pane_id} = [];
+
+                                function drawObShadedBands() {{
+                                    const obs = window._active_smc_obs_{self.pane_id};
+                                    if (!obs || !overlay) return;
+                                    overlay.innerHTML = '';
+                                    const w = overlay.clientWidth || (container ? container.clientWidth : 800);
+                                    
+                                    const PRICE_SCALE_WIDTH = 70;
+                                    const maxRightX = w - PRICE_SCALE_WIDTH;
+
+                                    obs.forEach(ob => {{
+                                        if (typeof series.priceToCoordinate !== 'function') return;
+                                        
+                                        const y1 = series.priceToCoordinate(ob.high);
+                                        const y2 = series.priceToCoordinate(ob.low);
+                                        if (y1 === null || y2 === null) return;
+
+                                        const topY = Math.min(y1, y2);
+                                        const botY = Math.max(y1, y2);
+                                        const h = Math.max(botY - topY, 4);
+                                        const isBull = (ob.bias === 1);
+
+                                        let startX = null;
+                                        if (chart && chart.timeScale && ob.time && ob.time > 0) {{
+                                            try {{
+                                                const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+                                                const xCoord = chart.timeScale().timeToCoordinate(secTime);
+                                                if (xCoord !== null) {{
+                                                    startX = Math.floor(xCoord);
+                                                }}
+                                            }} catch(e) {{}}
+                                        }}
+
+                                        if (startX === null) startX = 0;
+                                        if (startX < -2000) startX = -2000;
+                                        if (startX >= maxRightX) return;
+
+                                        const boxWidth = maxRightX - startX;
+                                        if (boxWidth <= 0) return;
+
+                                        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+
+                                        const box = document.createElement('div');
+                                        box.style.position = 'absolute';
+                                        box.style.top = topY + 'px';
+                                        box.style.left = startX + 'px';
+                                        box.style.width = boxWidth + 'px';
+                                        box.style.height = h + 'px';
+                                        box.style.backgroundColor = bg;
+                                        box.style.border = 'none';
+                                        box.style.boxSizing = 'border-box';
+                                        box.style.pointerEvents = 'none';
+
+                                        overlay.appendChild(box);
+                                    }});
+                                }}
+
+                                window._drawObShadedBands_{self.pane_id} = drawObShadedBands;
+
+                                if (!window._smc_ob_subscribed_{self.pane_id} && chart && chart.timeScale) {{
+                                    window._smc_ob_subscribed_{self.pane_id} = true;
+                                    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {{
+                                        if (window._drawObShadedBands_{self.pane_id}) window._drawObShadedBands_{self.pane_id}();
+                                    }});
+                                }}
+
+                                if (chart) {{
+                                    try {{
+                                        chart.applyOptions({{
+                                            crosshair: {{
+                                                mode: 0,
+                                                vertLine: {{
+                                                    color: 'rgba(160, 165, 180, 0.45)',
+                                                    width: 1,
+                                                    style: 2,
+                                                    labelBackgroundColor: '#2a2e39',
+                                                }},
+                                                horzLine: {{
+                                                    color: 'rgba(160, 165, 180, 0.45)',
+                                                    width: 1,
+                                                    style: 2,
+                                                    labelBackgroundColor: '#2a2e39',
+                                                }},
+                                            }},
+                                            rightPriceScale: {{
+                                                autoScale: true,
+                                            }},
+                                            timeScale: {{
+                                                rightOffset: 8,
+                                            }}
+                                        }});
+                                        chart.timeScale().fitContent();
+                                        setTimeout(() => {{
+                                            try {{
+                                                const totalBars = {len(df)};
+                                                if (totalBars > 60) {{
+                                                    chart.timeScale().setVisibleLogicalRange({{
+                                                        from: totalBars - 55,
+                                                        to: totalBars - 1 + 8
+                                                    }});
+                                                }}
+                                            }} catch(e) {{}}
+                                        }}, 50);
+                                    }} catch(e) {{}}
+                                }}
+                            }} catch(err) {{}}
+                        }})();
+                        '''
+                        self.chart_widget.win.run_script(init_ob_js)
+                        self._chart_initialized = True
+                    else:
+                        self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
+                        self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
+
+                # Markers
+                if "markers" in data and getattr(self, '_chart_initialized', False):
+                    markers = data["markers"]
+                    import hashlib
+                    m_str = json.dumps(markers, sort_keys=True)
+                    m_hash = hashlib.md5(m_str.encode()).hexdigest()
+                    if getattr(self, '_last_markers_hash', None) != m_hash:
+                        self.chart_widget.clear_markers()
+                        import datetime
+                        for m in markers:
+                            if m.get("status") == "active":
+                                color = '#00FF00' if m["side"] == "LONG" else '#FF0000'
+                            else:
+                                color = '#005500' if m["side"] == "LONG" else '#8B0000'
+                            shape = 'arrow_up' if m["side"] == "LONG" else 'arrow_down'
+                            pos = 'below' if m["side"] == "LONG" else 'above'
+                            text = 'B' if m["side"] == "LONG" else 'S'
+                            try:
+                                dt = datetime.datetime.fromtimestamp(m["time"] / 1000)
+                                self.chart_widget.marker(time=dt, position=pos, shape=shape, color=color, text=text)
+                            except:
+                                pass
+                        self._last_markers_hash = m_hash
+
+                # Vẽ Vùng Order Block SMC
+                if "ob_boxes" in data:
+                    ob_boxes = data["ob_boxes"]
+                    js_code = f'''
+                    if (window._drawObShadedBands_{self.pane_id}) {{
+                        window._active_smc_obs_{self.pane_id} = {json.dumps(ob_boxes)};
+                        window._drawObShadedBands_{self.pane_id}();
+                    }}
+                    '''
+                    try:
+                        self.chart_widget.win.run_script(js_code)
+                    except Exception:
+                        pass
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+
 
 class BotInstanceWidget(QtWidgets.QWidget):
     def __init__(self, strategy_id, strategy_name, env_files):
@@ -1113,8 +1909,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def setup_tab_dashboard(self):
         dash_layout = QtWidgets.QVBoxLayout(self.tab_dashboard)
-        dash_layout.setContentsMargins(10, 10, 10, 10)
-        dash_layout.setSpacing(15)
+        dash_layout.setContentsMargins(8, 4, 8, 6)
+        dash_layout.setSpacing(4)
 
         # Hàng trên: Hành động
         top_panel = QtWidgets.QHBoxLayout()
@@ -1239,24 +2035,167 @@ class BotInstanceWidget(QtWidgets.QWidget):
         dash_layout.addLayout(top_panel, 0)
 
 
-        # Khung phân vùng Tab Live View
-        self.tab_live_view = QtWidgets.QTabWidget()
+        # Khởi tạo Khung thời gian giao dịch ở Dashboard dưới dạng container
+        self.dash_tfs_container = QtWidgets.QWidget()
+        self.dash_tfs_container.setStyleSheet("background-color: transparent;")
+        l_tfs = QtWidgets.QHBoxLayout(self.dash_tfs_container)
+        l_tfs.setContentsMargins(5, 0, 5, 0)
+        l_tfs.setSpacing(8)
+        
+        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style); self.chk_tf_m5.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style); self.chk_tf_m15.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style); self.chk_tf_m30.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style); self.chk_tf_h1.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style); self.chk_tf_h2.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style); self.chk_tf_h4.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        
+        l_tfs.addWidget(self.chk_tf_m5)
+        l_tfs.addWidget(self.chk_tf_m15)
+        l_tfs.addWidget(self.chk_tf_m30)
+        l_tfs.addWidget(self.chk_tf_h1)
+        l_tfs.addWidget(self.chk_tf_h2)
+        l_tfs.addWidget(self.chk_tf_h4)
+        
+        for chk in [self.chk_tf_m5, self.chk_tf_m15, self.chk_tf_m30, self.chk_tf_h1, self.chk_tf_h2, self.chk_tf_h4]:
+            chk.stateChanged.connect(self._on_dash_tf_changed)
+            
+        self.dash_tfs_container.hide()
 
-        self.tab_live_view.tabBar().setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.tab_live_view.tabBar().setExpanding(False)
-        self.tab_live_view.tabBar().setUsesScrollButtons(False)
-        self.tab_live_view.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #333333; background-color: #1e1e1e; border-radius: 4px; margin-top: -1px; }
-            QTabBar::tab { background: #1a1a1a; color: #a0a0a0; padding: 6px 14px; border: 1px solid #333333; border-top-left-radius: 4px; border-top-right-radius: 4px; font-size: 12px; font-weight: bold; }
-            QTabBar::tab:selected { background: #2d2d2d; color: #FF9900; font-weight: bold; border: 1px solid #444444; border-bottom: 2px solid #2d2d2d; }
-            QTabBar::tab:hover { background: #333333; color: #ffffff; }
+        # Header Bar biểu đồ (Đồng bộ Web App & TradingView style)
+        self.chart_header_bar = QtWidgets.QWidget()
+        self.chart_header_bar.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border: none;
+            }
         """)
+        header_bar_layout = QtWidgets.QHBoxLayout(self.chart_header_bar)
+        header_bar_layout.setContentsMargins(0, 0, 0, 0)
+        header_bar_layout.setSpacing(0)
+        
+        header_bar_layout.addStretch(1)
+        
+        if hasattr(self, 'dash_tfs_container'):
+            header_bar_layout.addWidget(self.dash_tfs_container)
+            
+        # Cụm điều khiển góc phải biểu đồ (y hệt .chart-title-controls của bản Web)
+        self.chart_title_controls = QtWidgets.QFrame()
+        self.chart_title_controls.setStyleSheet("""
+            QFrame {
+                background-color: #1e1e1e;
+                border: 1px solid #333333;
+                border-bottom: 1px solid #1e1e1e;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                border-bottom-left-radius: 0px;
+                border-bottom-right-radius: 0px;
+            }
+        """)
+        controls_layout = QtWidgets.QHBoxLayout(self.chart_title_controls)
+        controls_layout.setContentsMargins(6, 2, 6, 2)
+        controls_layout.setSpacing(6)
+        
+        # Nút icon chọn Bố cục biểu đồ (chuẩn kích thước & kiểu dáng Web App)
+        self.btn_layout_selector = QtWidgets.QPushButton()
+        self.btn_layout_selector.setToolTip("Chọn bố cục biểu đồ (TradingView Layout)")
+        self.btn_layout_selector.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self.btn_layout_selector.setFixedSize(28, 26)
+        self.btn_layout_selector.setIconSize(QtCore.QSize(18, 18))
+        self.btn_layout_selector.setIcon(create_layout_icon("1", selected=False, w=18, h=18))
+        self.btn_layout_selector.setStyleSheet("""
+            QPushButton {
+                background-color: #1e1e1e;
+                border: 1px solid #444444;
+                border-radius: 3px;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: #2a2e39;
+                border: 1px solid #2962ff;
+            }
+        """)
+        
+        # Popup chọn bố cục (dạng lưới icon trực quan y hệt Web App)
+        self.layout_popup = LayoutSelectorPopup(self, on_select=self.set_chart_layout)
+        self.btn_layout_selector.clicked.connect(lambda: (
+            self.layout_popup.update_selected(getattr(self, 'current_chart_layout', '1')),
+            self.layout_popup.show_below(self.btn_layout_selector)
+        ))
+        controls_layout.addWidget(self.btn_layout_selector)
+        
+        if hasattr(self, 'btn_open_settings'):
+            self.btn_open_settings.setText("⚙ Cài Đặt")
+            self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
+            self.btn_open_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.btn_open_settings.setFixedHeight(26)
+            self.btn_open_settings.setStyleSheet("""
+                QPushButton {
+                    background-color: #2d2d2d;
+                    color: #ffffff;
+                    border: 1px solid #555555;
+                    border-radius: 3px;
+                    padding: 2px 10px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    font-family: "Segoe UI";
+                }
+                QPushButton:hover {
+                    background-color: #ff9900;
+                    color: #000000;
+                    font-weight: bold;
+                    border-color: #ff9900;
+                }
+            """)
+            controls_layout.addWidget(self.btn_open_settings)
+            
+        header_bar_layout.addWidget(self.chart_title_controls)
+            
+        self.status_led.hide()
+        self.tab_live_view = self.chart_header_bar
 
         # Khởi tạo ô chế độ layout Chế độ dọc/ngang trước để chèn vào log_header
         self.combo_layout_mode = QtWidgets.QComboBox()
         self.combo_layout_mode.addItems(["Chế độ dọc", "Chế độ ngang"])
         self.combo_layout_mode.setCurrentText("Chế độ dọc")
-        self.combo_layout_mode.setStyleSheet("QComboBox { padding: 2px 5px; font-weight: bold; font-size: 11px; min-width: 100px; }")
+        self.combo_layout_mode.setView(QtWidgets.QListView())
+        self.combo_layout_mode.setItemDelegate(QtWidgets.QStyledItemDelegate(self.combo_layout_mode))
+        self.combo_layout_mode.setStyleSheet("""
+            QComboBox { 
+                background-color: #222222;
+                color: #ffffff;
+                padding: 2px 5px; 
+                font-weight: bold; 
+                font-size: 11px; 
+                min-width: 100px; 
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+            }
+            QComboBox:hover {
+                border-color: #ff9900;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                selection-background-color: #333333;
+                selection-color: #ff9900;
+                border: 1px solid #444444;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                color: #ffffff;
+                min-height: 22px;
+                padding: 2px 6px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #333333;
+                color: #ff9900;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #333333;
+                color: #ff9900;
+                font-weight: bold;
+            }
+        """)
         self.combo_layout_mode.setFixedWidth(110)
 
         # Tab 1: Logs
@@ -1274,7 +2213,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         log_header.addWidget(self.lbl_uptime)
         
         log_header.addStretch(1)
-        log_header.addWidget(self.combo_layout_mode) # Đặt ô Dọc/Ngang ở bên phải cùng hàng Terminal Logs
+        log_header.addWidget(self.combo_layout_mode)
         
         btn_clear_log = QtWidgets.QPushButton("🗑️ Clear Logs")
         btn_clear_log.setStyleSheet("max-width: 100px; padding: 5px;")
@@ -1295,94 +2234,40 @@ class BotInstanceWidget(QtWidgets.QWidget):
         console_layout.addLayout(log_header)
         console_layout.addWidget(self.log_display, 1)
 
-
         # Tab 2: Chart
         self.tab_chart = QtWidgets.QWidget()
         chart_layout = QtWidgets.QVBoxLayout(self.tab_chart)
-        chart_layout.setContentsMargins(5, 5, 5, 5)
+        chart_layout.setContentsMargins(0, 0, 0, 0)
+        chart_layout.setSpacing(0)
         
-        control_layout = QtWidgets.QHBoxLayout()
-        control_layout.setContentsMargins(0, 0, 0, 0)
+        # Đưa thanh điều khiển Bố cục + Cài đặt vào sát đỉnh biểu đồ (không có khoảng trống thừa)
+        chart_layout.addWidget(self.chart_header_bar, 0)
         
-        self.combo_coin = QtWidgets.QComboBox()
-        for p in ["BTC-USDT-SWAP", "XAU-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "XRP-USDT-SWAP"]:
-            self.combo_coin.addItem(p.replace("-SWAP", ""), p)
-        self.combo_coin.setCurrentText("BTC-USDT")
-        self.combo_coin.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px;")
+        # Khung Grid đa biểu đồ chứa 4 SingleChartPane
+        self.charts_grid_widget = QtWidgets.QWidget()
+        self.charts_grid_layout = QtWidgets.QGridLayout(self.charts_grid_widget)
+        self.charts_grid_layout.setContentsMargins(0, 0, 0, 0)
+        self.charts_grid_layout.setSpacing(4)
         
-        self.combo_tf = QtWidgets.QComboBox()
-        self.combo_tf.setFixedWidth(50)
-        self.combo_tf.addItems(["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"])
-        self.combo_tf.setCurrentText("4H")
-        self.combo_tf.setStyleSheet("padding: 2px; font-weight: bold; font-size: 11px; min-width: 0px;")
+        self.chart_panes = [
+            SingleChartPane(pane_id=0, default_coin="BTC-USDT-SWAP", default_tf="4H", parent_instance=self),
+            SingleChartPane(pane_id=1, default_coin="ETH-USDT-SWAP", default_tf="4H", parent_instance=self),
+            SingleChartPane(pane_id=2, default_coin="XAU-USDT-SWAP", default_tf="4H", parent_instance=self),
+            SingleChartPane(pane_id=3, default_coin="USDT.D", default_tf="4H", parent_instance=self),
+        ]
         
+        # Backward compatibility aliases
+        self.chart_widget = self.chart_panes[0].chart_widget
+        self.combo_coin = self.chart_panes[0].combo_coin
+        self.combo_tf = self.chart_panes[0].combo_tf
+        self.live_chart_worker = self.chart_panes[0].live_chart_worker
         self.chk_show_ob = QtWidgets.QCheckBox("Vùng OB")
         self.chk_show_ob.setChecked(True)
-        self.chk_show_ob.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
-        self.chk_show_ob.hide()
-        
         self.chk_show_positions = QtWidgets.QCheckBox("Vị thế")
         self.chk_show_positions.setChecked(True)
-        self.chk_show_positions.setStyleSheet("color: #e0e0e0; font-weight: bold; font-size: 11px;")
-        self.chk_show_positions.hide()
         self.chk_show_positions.toggled.connect(lambda checked: self.tab_positions.setVisible(checked) if hasattr(self, 'tab_positions') else None)
         
-        # Control layout widgets (combo_coin, combo_tf, chk_show_ob, chk_show_positions, status_led)
-        # will be added directly into tab_live_view Corner Widget!
-        
-        try:
-            self.chart_widget = QtChart()
-            self.ema_line = self.chart_widget.create_line('EMA 200', color='rgba(220, 220, 220, 0.8)', width=2, price_line=False, price_label=False)
-            webview = self.chart_widget.get_webview()
-            
-            # Fix race condition cho QWebChannel/lightweight_charts để tránh lỗi undefined callback
-            fix_bridge_js = """
-            if (typeof window.pythonObject === 'undefined') {
-                let q = [], real = null;
-                Object.defineProperty(window, 'pythonObject', {
-                    get: function() {
-                        return { callback: function(m) {
-                            if (real && real.callback) { real.callback(m); } else { q.push(m); }
-                        }};
-                    },
-                    set: function(v) {
-                        real = v;
-                        if (real && real.callback) {
-                            while (q.length > 0) {
-                                try { real.callback(q.shift()); } catch(e) {}
-                            }
-                        }
-                    },
-                    configurable: true
-                });
-            }
-            """
-            webview.loadFinished.connect(lambda: webview.page().runJavaScript(fix_bridge_js))
-            
-            webview.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-            chart_layout.addWidget(webview, 1)
-            
-            self.chart_widget.layout(background_color='#0c0c0c', text_color='#e0e0e0', font_size=12)
-            self.chart_widget.candle_style(up_color='#26a69a', down_color='#ef5350',
-                                    border_up_color='#26a69a', border_down_color='#ef5350',
-                                    wick_up_color='#26a69a', wick_down_color='#ef5350')
-            self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
-            self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.combo_tf.currentText()})', color='rgba(255, 153, 0, 0.1)')
-            self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='rgba(42, 42, 42, 0.3)')
-            self.chart_widget.time_scale(right_offset=30)
-            pass
-            # Khởi chạy luồng lấy dữ liệu chart auto
-            self._chart_initialized = False
-            self.live_chart_worker = LiveChartWorker(inst_id=self.combo_coin.currentData(), bar=self.combo_tf.currentText(), parent=self)
-            self.live_chart_worker.chart_data_signal.connect(self.update_live_chart)
-            
-            self.combo_coin.currentTextChanged.connect(self.on_chart_config_changed)
-            self.combo_tf.currentTextChanged.connect(self.on_chart_config_changed)
-            
-            self.live_chart_worker.start()
-        except Exception as e:
-            chart_layout.addWidget(QtWidgets.QLabel(f"Lỗi khởi tạo biểu đồ: {str(e)}"))
-            self.chart_widget = None
+        chart_layout.addWidget(self.charts_grid_widget, 1)
 
         # Khởi tạo bảng Vị thế OKX
         self.tab_positions = QtWidgets.QWidget()
@@ -1414,40 +2299,11 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.pos_worker = OKXPositionsWorker(self)
         self.pos_worker.positions_signal.connect(self.update_positions_table)
-        # Sẽ load data ngay khi user chọn account (sự kiện load_selected_account sẽ được sửa lại để gọi apply_current_api_to_worker)
         self.pos_worker.start()
         self.update_positions_table([])
         
-        # Chèn bảng vị thế trực tiếp vào chart_layout (phía dưới chart, không dùng splitter riêng giữa chart và bảng vị thế)
         self.pos_table.verticalHeader().setDefaultSectionSize(32)
         chart_layout.addWidget(self.tab_positions)
-
-        # Khởi tạo Khung thời gian giao dịch ở Dashboard dưới dạng container để nhét vào TopRightCorner
-        self.dash_tfs_container = QtWidgets.QWidget()
-        self.dash_tfs_container.setStyleSheet("background-color: transparent;")
-        l_tfs = QtWidgets.QHBoxLayout(self.dash_tfs_container)
-        l_tfs.setContentsMargins(5, 0, 5, 0)
-        l_tfs.setSpacing(8)
-        
-        self.chk_tf_m5 = QtWidgets.QCheckBox("M5"); self.chk_tf_m5.setStyleSheet(cb_style); self.chk_tf_m5.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.chk_tf_m15 = QtWidgets.QCheckBox("M15"); self.chk_tf_m15.setStyleSheet(cb_style); self.chk_tf_m15.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.chk_tf_m30 = QtWidgets.QCheckBox("M30"); self.chk_tf_m30.setStyleSheet(cb_style); self.chk_tf_m30.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.chk_tf_h1 = QtWidgets.QCheckBox("H1"); self.chk_tf_h1.setStyleSheet(cb_style); self.chk_tf_h1.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.chk_tf_h2 = QtWidgets.QCheckBox("H2"); self.chk_tf_h2.setStyleSheet(cb_style); self.chk_tf_h2.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        self.chk_tf_h4 = QtWidgets.QCheckBox("H4"); self.chk_tf_h4.setStyleSheet(cb_style); self.chk_tf_h4.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
-        
-        l_tfs.addWidget(self.chk_tf_m5)
-        l_tfs.addWidget(self.chk_tf_m15)
-        l_tfs.addWidget(self.chk_tf_m30)
-        l_tfs.addWidget(self.chk_tf_h1)
-        l_tfs.addWidget(self.chk_tf_h2)
-        l_tfs.addWidget(self.chk_tf_h4)
-        
-        # Kết nối sự kiện lưu ngầm khi check/uncheck
-        for chk in [self.chk_tf_m5, self.chk_tf_m15, self.chk_tf_m30, self.chk_tf_h1, self.chk_tf_h2, self.chk_tf_h4]:
-            chk.stateChanged.connect(self._on_dash_tf_changed)
-            
-        self.dash_tfs_container.hide()
 
         self.split_view = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.split_view.addWidget(self.tab_chart)
@@ -1455,8 +2311,6 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.split_view.setSizes([500, 500])
         self.split_view.setStretchFactor(0, 1)
         self.split_view.setStretchFactor(1, 1)
-
-        self.tab_live_view.addTab(self.split_view, "Tổng quan (chart_logs)")
 
         def on_layout_mode_changed(text):
             if not hasattr(self, 'split_view') or self.split_view is None:
@@ -1473,37 +2327,116 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 self.tab_positions.setVisible(self.chk_show_positions.isChecked())
                 
         self.combo_layout_mode.currentTextChanged.connect(on_layout_mode_changed)
+
+        dash_layout.addWidget(self.split_view, 1)
+        self.set_chart_layout("1")
+
+
+
+    def set_chart_layout(self, mode):
+        mode_str = str(mode)
+        self.current_chart_layout = mode_str
         
-        # Phục hồi Tab chủ Native của QTabWidget để bo liền khung với pane bên dưới
-        self.tab_live_view.tabBar().show()
+        if hasattr(self, 'btn_layout_selector'):
+            self.btn_layout_selector.setIcon(create_layout_icon(mode_str, selected=False, w=18, h=18))
         
-        # Đưa tất cả công cụ vào TopRightCorner
-        right_corner = QtWidgets.QWidget()
-        rc_layout = QtWidgets.QHBoxLayout(right_corner)
-        rc_layout.setContentsMargins(0, 0, 8, 2)
-        rc_layout.setSpacing(14)
+        # Định nghĩa các coin mặc định đồng bộ y hệt bản Web:
+        # 1: BTC
+        # 2: BTC, ETH
+        # 3: XAU, BTC, ETH
+        # 4: XAU, BTC, ETH, USDT.D
+        defaults = {
+            "1": ["BTC-USDT-SWAP"],
+            "2-col": ["BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "2-row": ["BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "2": ["BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "3-grid": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "3-col": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "3-row": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "3": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"],
+            "4-grid": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "USDT.D"],
+            "4": ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP", "USDT.D"]
+        }
+        coin_list = defaults.get(mode_str, ["BTC-USDT-SWAP"])
         
-        rc_layout.addWidget(self.combo_coin)
-        rc_layout.addWidget(self.combo_tf)
-        
-        # Nhét thanh checkbox Khung thời gian vào trước
-        if hasattr(self, 'dash_tfs_container'):
-            rc_layout.addWidget(self.dash_tfs_container)
+        # Tháo toàn bộ pane khỏi grid và ẩn đi
+        for pane in self.chart_panes:
+            self.charts_grid_layout.removeWidget(pane)
+            pane.hide()
             
-        if hasattr(self, 'btn_open_settings'):
-            self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
-            self.btn_open_settings.setStyleSheet("""
-                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
-                QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
-            """)
-            rc_layout.addWidget(self.btn_open_settings)
-        
-        self.status_led.hide()
-        self.tab_live_view.setCornerWidget(right_corner, QtCore.Qt.Corner.TopRightCorner)
-
-        dash_layout.addWidget(self.tab_live_view, 1)
-
-
+        for i in range(3):
+            self.charts_grid_layout.setRowStretch(i, 0)
+            self.charts_grid_layout.setColumnStretch(i, 0)
+            
+        if mode_str == "1":
+            self.chart_panes[0].set_coin(coin_list[0])
+            self.charts_grid_layout.addWidget(self.chart_panes[0], 0, 0, 1, 1)
+            self.charts_grid_layout.setRowStretch(0, 1)
+            self.charts_grid_layout.setColumnStretch(0, 1)
+            self.chart_panes[0].show()
+            QtCore.QTimer.singleShot(150, self.chart_panes[0].fit_content)
+        elif mode_str in ["2-col", "2"]:
+            for idx in range(2):
+                self.chart_panes[idx].set_coin(coin_list[idx])
+                self.charts_grid_layout.addWidget(self.chart_panes[idx], 0, idx, 1, 1)
+                self.charts_grid_layout.setColumnStretch(idx, 1)
+                self.chart_panes[idx].show()
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
+            self.charts_grid_layout.setRowStretch(0, 1)
+        elif mode_str == "2-row":
+            for idx in range(2):
+                self.chart_panes[idx].set_coin(coin_list[idx])
+                self.charts_grid_layout.addWidget(self.chart_panes[idx], idx, 0, 1, 1)
+                self.charts_grid_layout.setRowStretch(idx, 1)
+                self.chart_panes[idx].show()
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
+            self.charts_grid_layout.setColumnStretch(0, 1)
+        elif mode_str in ["3-grid", "3"]:
+            # 1 pane lớn bên trái (chiếm 2 hàng), 2 pane bên phải (xếp chồng)
+            self.chart_panes[0].set_coin(coin_list[0])
+            self.charts_grid_layout.addWidget(self.chart_panes[0], 0, 0, 2, 1)
+            self.charts_grid_layout.setColumnStretch(0, 1)
+            self.chart_panes[0].show()
+            
+            self.chart_panes[1].set_coin(coin_list[1])
+            self.charts_grid_layout.addWidget(self.chart_panes[1], 0, 1, 1, 1)
+            self.charts_grid_layout.setColumnStretch(1, 1)
+            self.chart_panes[1].show()
+            
+            self.chart_panes[2].set_coin(coin_list[2])
+            self.charts_grid_layout.addWidget(self.chart_panes[2], 1, 1, 1, 1)
+            self.chart_panes[2].show()
+            
+            self.charts_grid_layout.setRowStretch(0, 1)
+            self.charts_grid_layout.setRowStretch(1, 1)
+            for idx in range(3):
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
+        elif mode_str == "3-col":
+            for idx in range(3):
+                self.chart_panes[idx].set_coin(coin_list[idx])
+                self.charts_grid_layout.addWidget(self.chart_panes[idx], 0, idx, 1, 1)
+                self.charts_grid_layout.setColumnStretch(idx, 1)
+                self.chart_panes[idx].show()
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
+            self.charts_grid_layout.setRowStretch(0, 1)
+        elif mode_str == "3-row":
+            for idx in range(3):
+                self.chart_panes[idx].set_coin(coin_list[idx])
+                self.charts_grid_layout.addWidget(self.chart_panes[idx], idx, 0, 1, 1)
+                self.charts_grid_layout.setRowStretch(idx, 1)
+                self.chart_panes[idx].show()
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
+            self.charts_grid_layout.setColumnStretch(0, 1)
+        elif mode_str in ["4-grid", "4"]:
+            # Grid 2x2
+            coords = [(0, 0), (0, 1), (1, 0), (1, 1)]
+            for idx, (r, c) in enumerate(coords):
+                self.chart_panes[idx].set_coin(coin_list[idx])
+                self.charts_grid_layout.addWidget(self.chart_panes[idx], r, c, 1, 1)
+                self.charts_grid_layout.setColumnStretch(c, 1)
+                self.charts_grid_layout.setRowStretch(r, 1)
+                self.chart_panes[idx].show()
+                QtCore.QTimer.singleShot(150, self.chart_panes[idx].fit_content)
 
     def close_position(self, inst_id, mgn_mode, pos_side):
         """Đóng vị thế trên OKX bằng Market Order thông qua API."""
@@ -1636,26 +2569,27 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if c not in display_coins:
                 display_coins.append(c)
 
-        # Phân loại vị thế theo coin
-        pos_by_coin = {}
+        # Xây dựng danh sách dòng:
+        # Nhóm 1: Vị thế đang mở, sort theo % PNL từ cao nhất xuống thấp nhất
+        active_rows = []
+        active_coin_keys = set()
         for pos in positions:
-            inst = str(pos.get("instId", "")).upper()
-            coin_key = inst.split("-")[0]
-            pos_by_coin.setdefault(coin_key, []).append(pos)
-            if coin_key not in display_coins:
-                display_coins.append(coin_key)
+            inst_id = str(pos.get("instId", "")).replace("-SWAP", "")
+            coin_key = inst_id.split("-")[0].upper()
+            active_coin_keys.add(coin_key)
+            upl_ratio = _safe_float(pos.get("uplRatio", 0)) * 100
+            active_rows.append((coin_key, inst_id, pos, upl_ratio))
+        
+        # Sắp xếp theo % PNL giảm dần (cao nhất xếp trên cùng)
+        active_rows.sort(key=lambda x: x[3], reverse=True)
+        
+        rows_data = [(r[0], r[1], r[2]) for r in active_rows]
 
-        # Xây dựng danh sách dòng
-        rows_data = []
+        # Nhóm 2: Các cặp coin chưa có lệnh mở, xếp bên dưới theo thứ tự ưu tiên
         for coin_key in display_coins:
-            default_inst = f"{coin_key}-USDT"
-            coin_positions = pos_by_coin.get(coin_key, [])
-            if not coin_positions:
+            if coin_key not in active_coin_keys:
+                default_inst = f"{coin_key}-USDT"
                 rows_data.append((coin_key, default_inst, None))
-            else:
-                for pos in coin_positions:
-                    inst_id = str(pos.get("instId", "")).replace("-SWAP", "")
-                    rows_data.append((coin_key, inst_id, pos))
 
         self.pos_table.setRowCount(len(rows_data))
         
@@ -1708,9 +2642,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
             lbl_sym.setStyleSheet("color: #ffffff; font-weight: normal; font-size: 15px;")
 
             border_line = QtWidgets.QFrame()
-            border_line.setFixedWidth(3)
+            border_line.setFixedWidth(4)
+            border_line.setFixedHeight(20)
             if is_active:
-                border_line.setStyleSheet("background-color: #4caf50;" if side == "Long" else "background-color: #ff5252;")
+                border_line.setStyleSheet("background-color: #4caf50; border-radius: 2px;" if side == "Long" else "background-color: #ff5252; border-radius: 2px;")
             else:
                 border_line.setStyleSheet("background-color: transparent;")
 
@@ -1718,7 +2653,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             l0 = QtWidgets.QHBoxLayout(w0)
             l0.setContentsMargins(0, 0, 6, 0)
             l0.setSpacing(6)
-            l0.addWidget(border_line)
+            l0.addWidget(border_line, alignment=QtCore.Qt.AlignmentFlag.AlignVCenter)
             l0.addSpacing(6)
             l0.addWidget(chk)
             l0.addWidget(lbl_sym)
@@ -1943,6 +2878,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.btn_reset_nen = HoverSoundButton("♻️ Reset Đếm Nến")
         self.btn_reset_nen.setStyleSheet("min-height: 40px; min-width: 150px; color: #ffffff; background-color: #2d2d2d; border: 1px solid #555; border-radius: 4px; font-weight: bold;")
         self.btn_reset_nen.clicked.connect(self.reset_nen)
+        self.btn_reset_nen.setVisible(False) # Mặc định khóa/ẩn, chỉ mở khi là Admin admtls12021
 
         actions_layout.addWidget(self.btn_reset_wallet)
         actions_layout.addWidget(self.btn_reset_nen)
@@ -3392,6 +4328,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         QtWidgets.QMessageBox.information(self, "Thông báo", "Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 
     def reset_nen(self):
+        global CURRENT_UID
+        if str(CURRENT_UID).strip() != "admtls12021":
+            QtWidgets.QMessageBox.warning(self, "Từ chối quyền truy cập", "Chức năng Reset Đếm Nến chỉ dành riêng cho Quản trị viên (Admin)!")
+            return
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
         flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
@@ -3411,292 +4351,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.worker = None
 
     def on_chart_config_changed(self):
-        if getattr(self, 'live_chart_worker', None):
-            coin_code = self.combo_coin.currentData() or f"{self.combo_coin.currentText()}-USDT-SWAP"
-            self.live_chart_worker.inst_id = coin_code
-            self.live_chart_worker.bar = self.combo_tf.currentText()
-            self._chart_initialized = False
-            if getattr(self, 'chart_widget', None):
-                self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.live_chart_worker.bar})', color='rgba(255, 153, 0, 0.1)')
-                pass
-            self.live_chart_worker.trigger_fetch()
+        if hasattr(self, 'chart_panes') and self.chart_panes:
+            self.chart_panes[0].on_chart_config_changed()
 
     def update_live_chart(self, data):
-        if getattr(self, 'chart_widget', None):
-            try:
-                import pandas as pd
-                candles = data.get("candles", [])
-                if candles:
-                    df = pd.DataFrame(candles, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
-                    df['time'] = pd.to_numeric(df['time'])
-                    df['time'] = pd.to_datetime(df['time'], unit='ms').astype('datetime64[ns]')
-                    
-                    # Also need to cast float columns
-                    for col in ['open', 'high', 'low', 'close', 'volume']:
-                        df[col] = pd.to_numeric(df[col])
-                    
-                    df['EMA 200'] = df['close'].ewm(span=200, adjust=False).mean()
-                    
-                    if not getattr(self, '_chart_initialized', False):
-                        self.chart_widget.set(df[['time', 'open', 'high', 'low', 'close', 'volume']])
-                        self.ema_line.set(df[['time', 'EMA 200']].dropna())
-                        
-                        init_ob_js = f'''
-                        (function() {{
-                            try {{
-                                let chartObj = window['{self.chart_widget.id}'];
-                                if (!chartObj && window.pythonObject) {{
-                                    for (let key in window) {{
-                                        try {{
-                                            if (window[key] && window[key].series) {{
-                                                chartObj = window[key];
-                                                break;
-                                            }}
-                                        }} catch(e){{}}
-                                    }}
-                                }}
-                                if (!chartObj || !chartObj.series) return;
-                                const series = chartObj.series;
-                                const chart = chartObj.chart;
-                                
-                                const container = chartObj.container || (chartObj.div ? chartObj.div : document.body);
-                                let overlay = document.getElementById('smc_ob_shaded_overlay');
-                                if (!overlay) {{
-                                    overlay = document.createElement('div');
-                                    overlay.id = 'smc_ob_shaded_overlay';
-                                    overlay.style.position = 'absolute';
-                                    overlay.style.top = '0';
-                                    overlay.style.left = '0';
-                                    overlay.style.width = '100%';
-                                    overlay.style.height = '100%';
-                                    overlay.style.pointerEvents = 'none';
-                                    overlay.style.zIndex = '4';
-                                    overlay.style.overflow = 'hidden';
-                                    if (container && container.style) container.style.position = 'relative';
-                                    (container || document.body).appendChild(overlay);
-                                }}
-
-                                window._active_smc_obs = [];
-
-                                function drawObShadedBands() {{
-                                    const obs = window._active_smc_obs;
-                                    if (!obs || !overlay) return;
-                                    overlay.innerHTML = '';
-                                    const w = overlay.clientWidth || (container ? container.clientWidth : 800);
-                                    
-                                    const PRICE_SCALE_WIDTH = 70;
-                                    const maxRightX = w - PRICE_SCALE_WIDTH;
-
-                                    obs.forEach(ob => {{
-                                        if (typeof series.priceToCoordinate !== 'function') return;
-                                        
-                                        const y1 = series.priceToCoordinate(ob.high);
-                                        const y2 = series.priceToCoordinate(ob.low);
-                                        if (y1 === null || y2 === null) return;
-
-                                        const topY = Math.min(y1, y2);
-                                        const botY = Math.max(y1, y2);
-                                        const h = Math.max(botY - topY, 4);
-                                        const isBull = (ob.bias === 1);
-
-                                        let startX = null;
-                                        if (chart && chart.timeScale && ob.time && ob.time > 0) {{
-                                            try {{
-                                                const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-                                                const xCoord = chart.timeScale().timeToCoordinate(secTime);
-                                                if (xCoord !== null) {{
-                                                    startX = Math.floor(xCoord);
-                                                }}
-                                            }} catch(e) {{}}
-                                        }}
-
-                                        if (startX === null) startX = 0;
-                                        if (startX < -2000) startX = -2000;
-                                        if (startX >= maxRightX) return;
-
-                                        const boxWidth = maxRightX - startX;
-                                        if (boxWidth <= 0) return;
-
-                                        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
-
-                                        const box = document.createElement('div');
-                                        box.style.position = 'absolute';
-                                        box.style.top = topY + 'px';
-                                        box.style.left = startX + 'px';
-                                        box.style.width = boxWidth + 'px';
-                                        box.style.height = h + 'px';
-                                        box.style.backgroundColor = bg;
-                                        box.style.border = 'none';
-                                        box.style.boxSizing = 'border-box';
-                                        box.style.pointerEvents = 'none';
-
-                                        overlay.appendChild(box);
-                                    }});
-                                }}
-
-                                window._drawObShadedBands = drawObShadedBands;
-
-                                if (!window._smc_ob_subscribed && chart && chart.timeScale) {{
-                                    window._smc_ob_subscribed = true;
-                                    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {{
-                                        if (window._drawObShadedBands) window._drawObShadedBands();
-                                    }});
-                                }}
-                            }} catch(err) {{}}
-                        }})();
-                        '''
-                        self.chart_widget.win.run_script(init_ob_js)
-                        
-                        self._chart_initialized = True
-                    else:
-                        self.chart_widget.update(df.iloc[-1][['time', 'open', 'high', 'low', 'close', 'volume']])
-                        self.ema_line.update(df.iloc[-1][['time', 'EMA 200']])
-                else:
-                    pass
-                        
-                # Vẽ markers
-                if "markers" in data and getattr(self, '_chart_initialized', False):
-                    markers = data["markers"]
-                    import hashlib
-                    m_str = json.dumps(markers, sort_keys=True)
-                    m_hash = hashlib.md5(m_str.encode()).hexdigest()
-                    
-                    if getattr(self, '_last_markers_hash', None) != m_hash:
-                        self.chart_widget.clear_markers()
-                        import datetime
-                        for m in markers:
-                            if m.get("status") == "active":
-                                color = '#00FF00' if m["side"] == "LONG" else '#FF0000'
-                            else:
-                                color = '#005500' if m["side"] == "LONG" else '#8B0000'
-                                
-                            shape = 'arrow_up' if m["side"] == "LONG" else 'arrow_down'
-                            pos = 'below' if m["side"] == "LONG" else 'above'
-                            text = 'B' if m["side"] == "LONG" else 'S'
-                            
-                            try:
-                                dt = datetime.datetime.fromtimestamp(m["time"] / 1000)
-                                self.chart_widget.marker(time=dt, position=pos, shape=shape, color=color, text=text)
-                            except:
-                                pass
-                        self._last_markers_hash = m_hash
-
-                # Vẽ Vùng Order Block SMC (Dải bôi Xanh/Đỏ nhạt, bắt đầu từ nến OB, KHÔNG chữ, KHÔNG đường kẻ ngang)
-                if "ob_boxes" in data and getattr(self, 'chk_show_ob', None) and self.chk_show_ob.isChecked():
-                        ob_boxes = data["ob_boxes"]
-                        js_code = f'''
-                        if (window._drawObShadedBands) {{
-                            window._active_smc_obs = {json.dumps(ob_boxes)};
-                            window._drawObShadedBands();
-                        }}
-                        '''
-                        try:
-                            self.chart_widget.win.run_script(js_code)
-                        except Exception:
-                            pass
-                        
-                        
-                            
-                        # Vẽ Price Lines cho ENTRY, TP, SL
-                        try:
-                            if getattr(self, 'show_chart_pos_lines', True):
-                                current_coin = self.combo_coin.currentData()
-                                chart_positions = []
-                                
-                                # 1. Lấy lệnh Limit (Pending Setups) từ OB
-                                if "markers" in data:
-                                    for m in data["markers"]:
-                                        if m.get("type") == "SETUP" and m.get("status") == "active":
-                                            tp_list = []
-                                            if m.get("tp"): tp_list.append(float(m.get("tp")))
-                                            sl_list = []
-                                            if m.get("sl"): sl_list.append(float(m.get("sl")))
-                                            
-                                            chart_positions.append({
-                                                "entry": float(m.get("price", 0)),
-                                                "tp_list": tp_list,
-                                                "sl_list": sl_list,
-                                                "title": f"Limit {m.get('side', '')}"
-                                            })
-                                
-                                # 2. Lấy vị thế thực tế
-                                if hasattr(self, '_current_positions'):
-                                    for pos in self._current_positions:
-                                        if pos.get("instId") == current_coin:
-                                            try:
-                                                if float(pos.get("pos", 0)) != 0:
-                                                    entry_px = float(pos.get("avgPx", 0))
-                                                    tp_list = [float(x) for x in pos.get("tp_list", []) if x]
-                                                    sl_list = [float(x) for x in pos.get("sl_list", []) if x]
-                                                    
-                                                    # Fallback to RR system (OB Setup) if API doesn't have TP/SL
-                                                    if not tp_list or not sl_list:
-                                                        if "markers" in data:
-                                                            is_long = float(pos.get("pos", 0)) > 0
-                                                            cands = [m for m in data["markers"] if m.get("type") == "SETUP" and ((m.get("side") == "LONG" and is_long) or (m.get("side") == "SHORT" and not is_long))]
-                                                            if cands:
-                                                                best = min(cands, key=lambda m: abs(float(m.get("price", 0)) - entry_px))
-                                                                b_px = float(best.get("price", 0))
-                                                                if b_px > 0 and abs(entry_px - b_px) / b_px <= 0.05: # Sai số 5%
-                                                                    if not tp_list and best.get("tp"): tp_list.append(float(best.get("tp")))
-                                                                    if not sl_list and best.get("sl"): sl_list.append(float(best.get("sl")))
-                                                    
-                                                    chart_positions.append({
-                                                        "entry": entry_px,
-                                                        "tp_list": tp_list,
-                                                        "sl_list": sl_list
-                                                    })
-                                            except: pass
-                                
-                                import hashlib
-                                pos_str = json.dumps(chart_positions)
-                                pos_hash = hashlib.md5(pos_str.encode()).hexdigest()
-                                
-                                if getattr(self, '_last_pos_lines_hash', None) != pos_hash:
-                                    js_lines = f"""
-                                    (function() {{
-                                        try {{
-                                            let chartObj = window['{self.chart_widget.id}'];
-                                            if (!chartObj && window.pythonObject) {{
-                                                for (let key in window) {{
-                                                    try {{
-                                                        if (window[key] && window[key].series) {{ chartObj = window[key]; break; }}
-                                                    }} catch(e){{}}
-                                                }}
-                                            }}
-                                            if (!chartObj || !chartObj.series) return;
-                                            const series = chartObj.series;
-                                            
-                                            if (window._my_price_lines) {{
-                                                window._my_price_lines.forEach(l => {{ try {{ series.removePriceLine(l); }} catch(e){{}} }});
-                                            }}
-                                            window._my_price_lines = [];
-                                            
-                                            const positions = {json.dumps(chart_positions)};
-                                            positions.forEach(p => {{
-                                                /* TẠM ẨN THEO YÊU CẦU USER
-                                                if (p.entry) {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: p.entry, color: '#FFFFFF', lineStyle: 2, lineWidth: 1, title: p.title || 'ENTRY' }}));
-                                                }}
-                                                p.tp_list.forEach(tp => {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: tp, color: '#00B894', lineStyle: 0, lineWidth: 1, title: 'TP' }}));
-                                                }});
-                                                p.sl_list.forEach(sl => {{
-                                                    window._my_price_lines.push(series.createPriceLine({{ price: sl, color: '#FF4757', lineStyle: 0, lineWidth: 1, title: 'SL' }}));
-                                                }});
-                                                */
-                                            }});
-                                        }} catch(err) {{}}
-                                    }})();
-                                    """
-                                    self.chart_widget.win.run_script(js_lines)
-                                    self._last_pos_lines_hash = pos_hash
-                        except Exception as e:
-                            pass
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print(f"Chart error: {e}")
+        if hasattr(self, 'chart_panes') and self.chart_panes:
+            self.chart_panes[0].update_live_chart(data)
 
     def clear_logs(self):
         self._log_blocks = []
@@ -4442,7 +5102,14 @@ del /f /q "%~f0"
                         if hasattr(panel, 'pos_worker') and panel.pos_worker:
                             panel.pos_worker.stop()
                             panel.pos_worker.wait(1000)
-                        if hasattr(panel, 'live_chart_worker') and panel.live_chart_worker:
+                        if hasattr(panel, 'chart_panes'):
+                            for cp in panel.chart_panes:
+                                if getattr(cp, 'live_chart_worker', None):
+                                    try:
+                                        cp.live_chart_worker.stop()
+                                        cp.live_chart_worker.wait(500)
+                                    except: pass
+                        elif hasattr(panel, 'live_chart_worker') and panel.live_chart_worker:
                             panel.live_chart_worker.stop()
                             panel.live_chart_worker.wait(1000)
                         if hasattr(panel, 'worker') and panel.worker:
@@ -4598,16 +5265,30 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
                 padding: 4px;
             }
             QComboBox QAbstractItemView, QComboBox QListView {
-                background-color: #ffffff;
-                color: #000000;
+                background-color: #1e1e1e;
+                color: #ffffff;
                 selection-background-color: #333333;
                 selection-color: #ff9900;
                 border: 1px solid #444444;
                 outline: none;
             }
+            QComboBox QAbstractItemView::item {
+                color: #ffffff;
+                min-height: 22px;
+                padding: 2px 6px;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #333333;
+                color: #ff9900;
+            }
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #333333;
+                color: #ff9900;
+                font-weight: bold;
+            }
             QListView {
-                background-color: #ffffff;
-                color: #000000;
+                background-color: #1e1e1e;
+                color: #ffffff;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button {
                 background-color: #333333;
@@ -4623,6 +5304,13 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
             }
             QPushButton:hover { background-color: #444444; border: 1px solid #ff9900; }
         """)
+
+    def update_admin_permissions(self, uid):
+        """Phân quyền: Chỉ duy nhất Admin admtls12021 mới được hiển thị nút Reset Đếm Nến"""
+        is_admin = (str(uid).strip() == "admtls12021")
+        for panel in [getattr(self, 'panel_main', None), getattr(self, 'panel_sub1', None), getattr(self, 'panel_sub2', None), getattr(self, 'panel_sub3', None)]:
+            if panel and hasattr(panel, 'btn_reset_nen'):
+                panel.btn_reset_nen.setVisible(is_admin)
 
 import subprocess
 import hashlib
@@ -5361,13 +6049,29 @@ def main():
     app.setStyleSheet("""
         /* Global UI Elements */
         QComboBox QAbstractItemView, QComboBox QListView {
-            background-color: #ffffff;
-            color: #000000;
-            selection-background-color: #4caf50;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            selection-background-color: #333333;
+            selection-color: #ff9900;
+            border: 1px solid #444444;
+        }
+        QComboBox QAbstractItemView::item {
+            color: #ffffff;
+            min-height: 22px;
+            padding: 2px 6px;
+        }
+        QComboBox QAbstractItemView::item:hover {
+            background-color: #333333;
+            color: #ff9900;
+        }
+        QComboBox QAbstractItemView::item:selected {
+            background-color: #333333;
+            color: #ff9900;
+            font-weight: bold;
         }
         QListView {
-            background-color: #ffffff;
-            color: #000000;
+            background-color: #1e1e1e;
+            color: #ffffff;
         }
         QToolTip {
             background-color: #2e2e2e;
@@ -5563,6 +6267,9 @@ def main():
                 window.set_welcome_name(name)
                 # Kích hoạt hệ thống Presence (theo dõi online)
                 window.start_presence(CURRENT_UID or "unknown", name)
+                
+            # Phân quyền: Cập nhật hiển thị nút Reset Đếm Nến cho Admin
+            window.update_admin_permissions(CURRENT_UID)
                 
             if hasattr(login, 'logged_in_status') and login.logged_in_status == 'PENDING 24H':
                 window.trigger_humane_warning("Tài khoản của bạn đã bị khóa (hoặc dị thường).")

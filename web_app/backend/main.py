@@ -411,6 +411,19 @@ def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 1500):
     except Exception as e:
         return {"code": "-1", "msg": str(e), "data": []}
 
+def _warmup_backend_candles():
+    import time
+    import threading
+    time.sleep(1.5)
+    for p, b in [("BTC-USDT-SWAP", "1H"), ("ETH-USDT-SWAP", "1H"), ("XAU-USDT-SWAP", "1H"), ("CRYPTOCAP:USDT.D", "1H")]:
+        try:
+            proxy_market_candles(instId=p, bar=b, limit=1500)
+        except Exception:
+            pass
+
+import threading
+threading.Thread(target=_warmup_backend_candles, daemon=True).start()
+
 @app.get("/api/market/ticker")
 def proxy_market_ticker(instId: str):
     """Proxy OKX ticker API để lấy giá BBO."""
@@ -529,6 +542,22 @@ def reset_capital(uid: str, strategy: str = "sub1"):
         return {"status": "success", "message": "Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi tạo cờ reset: {e}")
+
+@app.post("/api/bot/reset_nen")
+def reset_nen(uid: str, strategy: str = "sub1"):
+    if not uid: raise HTTPException(status_code=400, detail="uid is required")
+    if uid.strip() != "admtls12021":
+        raise HTTPException(status_code=403, detail="Chức năng này chỉ dành riêng cho Quản trị viên (Admin)!")
+    
+    flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
+    os.makedirs(flag_dir, exist_ok=True)
+    flag_path = os.path.join(flag_dir, f"reset_nen_{strategy}.flag")
+    try:
+        with open(flag_path, "w") as f:
+            f.write("1")
+        return {"status": "success", "message": "Đã gửi lệnh Reset Đếm Nến thành công!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi tạo cờ reset nến: {e}")
 
 @app.post("/api/bot/stop")
 async def stop_bot(uid: str, strategy: str = "sub1"):
@@ -1568,7 +1597,7 @@ if os.path.exists(frontend_dist_path):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8081)
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 
