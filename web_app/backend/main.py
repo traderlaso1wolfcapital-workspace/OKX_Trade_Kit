@@ -488,6 +488,32 @@ def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
                 
     return "", "", "", False
 
+def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, timeout: int = 10):
+    base_url = "https://www.okx.com"
+    ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    method_upper = method.upper()
+    body = body_str if (body_str and method_upper == "POST") else ""
+    message = ts + method_upper + path + body
+    mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+    signature = base64.b64encode(mac.digest()).decode('utf-8')
+    headers = {
+        "OK-ACCESS-KEY": api_key,
+        "OK-ACCESS-SIGN": signature,
+        "OK-ACCESS-TIMESTAMP": ts,
+        "OK-ACCESS-PASSPHRASE": passphrase,
+        "x-simulated-trading": "1" if is_demo else "0",
+        "Content-Type": "application/json"
+    }
+    if method_upper == "GET":
+        return requests.get(base_url + path, headers=headers, timeout=timeout)
+    elif method_upper == "POST":
+        return requests.post(base_url + path, headers=headers, data=body, timeout=timeout)
+    elif method_upper == "DELETE":
+        return requests.delete(base_url + path, headers=headers, data=body, timeout=timeout)
+    else:
+        return requests.request(method_upper, base_url + path, headers=headers, data=body, timeout=timeout)
+
+
 def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False):
     os.makedirs(os.path.dirname(fpath), exist_ok=True)
     lines = []
@@ -1541,8 +1567,27 @@ def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1", acco
             data = resp.json()
             if data.get("code") == "0":
                 return {"status": "success", "data": data.get("data")}
-            else:
-                return {"status": "error", "message": data.get("msg")}
+            
+            # Tự động xử lý tài khoản ở chế độ Long/Short mode (yêu cầu posSide)
+            err_msg = str(data.get("msg", ""))
+            err_code = str(data.get("code", ""))
+            if "posside" in err_msg.lower() or err_code in ["51000", "51008", "51023", "51119", "51167"]:
+                if req.reduceOnly:
+                    fallback_pos_side = "short" if req.side.lower() == "buy" else "long"
+                else:
+                    fallback_pos_side = "long" if req.side.lower() == "buy" else "short"
+                
+                order_data["posSide"] = fallback_pos_side
+                body_str2 = json.dumps(order_data)
+                resp2 = _okx_signed_request("POST", path, body_str2, api_key, secret_key, passphrase, is_demo)
+                if resp2.status_code == 200:
+                    data2 = resp2.json()
+                    if data2.get("code") == "0":
+                        return {"status": "success", "data": data2.get("data")}
+                    else:
+                        return {"status": "error", "message": data2.get("msg")}
+            
+            return {"status": "error", "message": data.get("msg")}
         return {"status": "error", "message": resp.text}
     except Exception as e:
         return {"status": "error", "message": str(e)}

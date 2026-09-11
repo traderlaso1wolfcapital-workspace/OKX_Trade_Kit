@@ -19,6 +19,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Sửa Lỗi Hàm `_okx_signed_request` Chưa Định Nghĩa & Thêm Nút "Hướng Dẫn Sử Dụng" Trong Cài Đặt API KEY (`web_app`, `web_app1`):
+  - **Hiện tượng & Báo cáo của CEO:**
+    1. Gặp lỗi tại `_okx_signed_request`: `resp = _okx_signed_request("POST", path, body_str, api_key, secret_key, passphrase, is_demo)`.
+    2. Yêu cầu thêm một nút "Hướng dẫn sử dụng" trong phần Cấu hình API KEY (trong mục Mã máy cá nhân), liên kết đến: `https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2`.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    - Trong `web_app/backend/main.py`, các endpoint `/api/account/balance` và `/api/trade/order` gọi hàm `_okx_signed_request(...)` để ký chữ ký số HMAC-SHA256 gửi sang sàn OKX, nhưng trước đó hàm `_okx_signed_request` chưa được định nghĩa trong file, dẫn đến lỗi `NameError: name '_okx_signed_request' is not defined`.
+    - Ngoài ra, khi đặt lệnh SWAP trên OKX đối với tài khoản ở chế độ Long/Short mode (Hedge mode), nếu thiếu tham số `posSide` thì OKX sẽ từ chối với lỗi 51000 ("posSide does not match position mode").
+  - **Đã thực hiện:**
+    1. **Backend (`web_app/backend/main.py` & `web_app1/backend/main.py`):**
+       - Định nghĩa hoàn chỉnh hàm `_okx_signed_request(method, path, body_str, api_key, secret_key, passphrase, is_demo, timeout=10)` chuẩn hóa việc tạo timestamp UTC ISO-8601, mã hóa chữ ký HMAC-SHA256 base64 và gửi request kèm header `OK-ACCESS-*`.
+       - Nâng cấp endpoint `/api/trade/order`: Bổ sung cơ chế tự động nhận diện và retry với `posSide` ("long"/"short") nếu tài khoản người dùng đang cài đặt chế độ Long/Short mode trên OKX.
+    2. **Frontend (`web_app/frontend/src/App.jsx` & `web_app1/frontend/src/App.jsx`):**
+       - Thêm nút **"📺 Hướng Dẫn Sử Dụng"** nổi bật (nền đỏ YouTube, icon tivi) ngay trong mục "Mã Máy (HWID) Cá Nhân" tại Tab 1 (Cấu hình API Key).
+       - Khi bấm vào nút, hệ thống sẽ mở trực tiếp playlist/video YouTube hướng dẫn sử dụng trong tab mới (`target="_blank"`, `rel="noopener noreferrer"`).
+    3. **Kiểm thử:** Đã biên dịch `py_compile` thành công cả 2 backend và build production `npm run build` cả 2 frontend không lỗi.
+
 - **[11/09/2026]** - Bắt Buộc Cú Pháp Admin `admtls12021_xxx` Để Tách Biệt Dữ Liệu & Tiến Trình Bot Theo Quản Trị Viên / Mã Máy (`web_app`, `web_app1`, `desktop_app`):
   - **Yêu cầu của CEO:** Phê duyệt phương án tách tài khoản các Admin theo Tên/Mã máy (Device ID); bắt buộc cú pháp `admtls12021_xxx` (ví dụ: `admtls12021_bao`) khi tạo/đăng nhập lần đầu thay vì `admtls12021` như trước đây để máy chủ nắm được Admin nào đang thao tác. Chặn hoàn toàn việc nhập chuỗi gốc `admtls12021`.
   - **Nguyên nhân & Nhu cầu thực tế:** Trước đây khi nhiều Admin cùng đăng nhập chuỗi dùng chung `admtls12021`, họ dùng chung một thư mục AppData/Local `TLS1_Trading_Users/admtls12021`, dẫn đến việc ghi đè file `accounts.json`, đè API Key phụ của nhau, và khi một Admin bấm dừng bot thì bot của Admin khác cũng bị tắt theo.

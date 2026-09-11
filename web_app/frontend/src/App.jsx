@@ -2534,6 +2534,26 @@ function App() {
                       >
                         Copy Admin ID theo Mã Máy
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
+                        style={{
+                          background: "#e50914",
+                          border: "1px solid #ff4d4d",
+                          color: "#ffffff",
+                          borderRadius: "4px",
+                          padding: "2px 10px",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        title="Xem video Hướng Dẫn Sử Dụng trên YouTube"
+                      >
+                        📺 Hướng Dẫn Sử Dụng
+                      </button>
                     </div>
                   </div>
                   </div>
