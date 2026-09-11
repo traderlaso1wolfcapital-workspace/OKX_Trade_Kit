@@ -136,7 +136,54 @@ def login_with_password(req: LoginRequest):
     if clean == "admtls12021":
         return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
     if is_admin_uid(clean):
-        return {"status": "success", "message": "Admin login successful", "uid": uid}
+        auth_dir = get_user_base_dir(clean)
+        auth_file = os.path.join(auth_dir, "admin_auth.json")
+        
+        # 1. Chưa từng tạo mật khẩu: yêu cầu thiết lập mật khẩu bảo vệ
+        if not os.path.exists(auth_file):
+            if not req.password:
+                return {
+                    "status": "require_create_password",
+                    "message": f"Tài khoản Admin mới [{uid}]! Vui lòng thiết lập mật khẩu bảo vệ để có thể đăng nhập trên mọi thiết bị."
+                }
+            
+            pwd = req.password.strip()
+            if len(pwd) < 4:
+                return {"status": "error", "message": "Mật khẩu Admin phải có tối thiểu 4 ký tự!"}
+            
+            pwd_hash = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
+            os.makedirs(auth_dir, exist_ok=True)
+            auth_data = {
+                "uid": clean,
+                "password_hash": pwd_hash,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            with open(auth_file, "w", encoding="utf-8") as f:
+                json.dump(auth_data, f, indent=2)
+            
+            return {"status": "success", "message": "Thiết lập mật khẩu Admin thành công!", "uid": uid}
+        
+        # 2. Đã có mật khẩu: yêu cầu nhập đúng mật khẩu
+        else:
+            if not req.password:
+                return {
+                    "status": "require_password",
+                    "message": f"Vui lòng nhập mật khẩu cho tài khoản Admin [{uid}]:"
+                }
+            
+            try:
+                with open(auth_file, "r", encoding="utf-8") as f:
+                    auth_data = json.load(f)
+            except Exception as e:
+                return {"status": "error", "message": f"Lỗi đọc file xác thực Admin: {str(e)}"}
+            
+            saved_hash = auth_data.get("password_hash", "")
+            input_hash = hashlib.sha256(req.password.strip().encode("utf-8")).hexdigest()
+            
+            if input_hash != saved_hash:
+                return {"status": "error", "message": "Mật khẩu Admin không chính xác! Vui lòng thử lại."}
+            
+            return {"status": "success", "message": "Đăng nhập Admin thành công!", "uid": uid}
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
         resp = requests.get(url, timeout=10)

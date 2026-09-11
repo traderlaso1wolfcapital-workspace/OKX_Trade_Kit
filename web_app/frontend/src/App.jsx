@@ -1364,6 +1364,8 @@ function App() {
   const [authStep, setAuthStep] = useState("uid");
   const [level2Password, setLevel2Password] = useState("");
   const [loginPassphrase, setLoginPassphrase] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
 
   // Login handler — lưu vào localStorage
   const handleLogin = async (e) => {
@@ -1374,11 +1376,32 @@ function App() {
       setLoginError("Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!");
       return;
     }
+
+    if (authStep === "create_password") {
+      if (!adminPassword || adminPassword.length < 4) {
+        setLoginError("Mật khẩu Admin phải có tối thiểu 4 ký tự!");
+        return;
+      }
+      if (adminPassword !== adminConfirmPassword) {
+        setLoginError("Mật khẩu xác nhận không khớp! Vui lòng kiểm tra lại.");
+        return;
+      }
+    }
+
     setIsLoggingIn(true);
     setLoginError("");
     try {
-      const payload = { uid: loginUid, password: "", passphrase: authStep === "uid" ? "" : loginPassphrase };
-      console.log("[AUTH] Sending login request:", { uid: loginUid, authStep, hasPassphrase: !!payload.passphrase });
+      let pwdToSend = "";
+      if (authStep === "require_password" || authStep === "create_password") {
+        pwdToSend = adminPassword;
+      }
+
+      const payload = {
+        uid: loginUid,
+        password: pwdToSend,
+        passphrase: authStep === "require_passphrase" ? loginPassphrase : ""
+      };
+      console.log("[AUTH] Sending login request:", { uid: loginUid, authStep, hasPassword: !!pwdToSend });
       const res = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1392,10 +1415,18 @@ function App() {
         localStorage.setItem("tls1_uid", loginUid);
         // Reset login state for clean next login
         setAuthStep("uid");
+        setAdminPassword("");
+        setAdminConfirmPassword("");
         setLoginPassphrase("");
+        setLoginError("");
+      } else if (data.status === "require_create_password") {
+        setAuthStep("create_password");
+        setAdminPassword("");
+        setAdminConfirmPassword("");
         setLoginError("");
       } else if (data.status === "require_password") {
         setAuthStep("require_password");
+        setAdminPassword("");
         setLoginError("");
       } else if (data.status === "locked" || data.status === "pending") {
         setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
@@ -1671,7 +1702,13 @@ function App() {
 
           <div style={{ padding: "0 20px" }}>
             <h3 style={{ color: "#e0e0e0", marginBottom: "15px", fontSize: "16px" }}>
-              {authStep === "uid" ? "Nhập OKX UID của bạn:" : "Nhập OKX API/Secret Key:"}
+              {authStep === "uid"
+                ? "Nhập OKX UID của bạn:"
+                : authStep === "create_password"
+                ? `Thiết Lập Mật Khẩu Admin (${loginUid}):`
+                : authStep === "require_password"
+                ? `Nhập Mật Khẩu Admin (${loginUid}):`
+                : "Nhập Mật Khẩu Passphrase:"}
             </h3>
             <form onSubmit={handleLogin}>
               {authStep === "uid" ? (
@@ -1687,6 +1724,43 @@ function App() {
                     Admin: <code>admtls12021_&lt;tên_hoặc_mã_máy&gt;</code>
                   </div>
                 </>
+              ) : authStep === "create_password" ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
+                  <div style={{ fontSize: "12px", color: "#00ffff", maxWidth: "340px", lineHeight: "1.4", textAlign: "center" }}>
+                    🛡️ Tài khoản Admin mới! Vui lòng đặt mật khẩu bảo vệ để đăng nhập được trên mọi thiết bị.
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu Admin mới (tối thiểu 4 ký tự)"
+                    value={adminPassword}
+                    onChange={e => setAdminPassword(e.target.value)}
+                    autoFocus
+                    style={{ width: "260px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Xác nhận lại mật khẩu Admin"
+                    value={adminConfirmPassword}
+                    onChange={e => setAdminConfirmPassword(e.target.value)}
+                    style={{ width: "260px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <button type="button" onClick={() => { setAuthStep("uid"); setAdminPassword(""); setAdminConfirmPassword(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                </div>
+              ) : authStep === "require_password" ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
+                  <div style={{ fontSize: "12px", color: "#aaaaaa", marginBottom: "2px" }}>
+                    Nhập mật khẩu Admin đã tạo để tiếp tục:
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu Admin"
+                    value={adminPassword}
+                    onChange={e => setAdminPassword(e.target.value)}
+                    autoFocus
+                    style={{ width: "260px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <button type="button" onClick={() => { setAuthStep("uid"); setAdminPassword(""); setLoginError(""); }} style={{ background: "transparent", border: "none", color: "#58a6ff", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Quay lại</button>
+                </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                   <input
@@ -1702,10 +1776,10 @@ function App() {
               {loginError && <div style={{ color: "#ff3333", fontSize: "14px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>{loginError}</div>}
               <button
                 type="submit"
-                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : !loginPassphrase)}
+                disabled={isLoggingIn || (authStep === "uid" ? !loginUid : authStep === "create_password" ? (!adminPassword || !adminConfirmPassword) : authStep === "require_password" ? !adminPassword : !loginPassphrase)}
                 style={{ width: "100%", padding: "12px", background: "#ff9900", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer", color: "#000", fontSize: "16px", transition: "0.2s" }}
               >
-                {isLoggingIn ? "Đang kiểm tra..." : "Đăng Nhập"}
+                {isLoggingIn ? "Đang kiểm tra..." : authStep === "create_password" ? "Thiết Lập Mật Khẩu & Đăng Nhập" : "Đăng Nhập"}
               </button>
             </form>
 

@@ -19,6 +19,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Thiết Lập Mật Khẩu Riêng Cho Từng Admin `admtls12021_xxx`: Bảo Mật Đa Thiết Bị, Chống Chiếm Dụng Tài Khoản (`web_app`, `web_app1`, `desktop_app`):
+  - **Vấn đề đặt ra & Yêu cầu của CEO:**
+    - Khi Admin đăng nhập `admtls12021_bao` ở Máy A, nếu người khác ở máy khác cũng gõ `admtls12021_bao` thì có thể xâm nhập hoặc ghi đè dữ liệu. Ngược lại, nếu khóa cứng vào mã máy của Máy A thì chính Admin Bảo khi sang máy tính khác hoặc dùng điện thoại cũng không thể vào được. Cần giải pháp thay thế linh hoạt và an toàn.
+    - CEO đã phê duyệt giải pháp: **Thiết lập mật khẩu riêng cho từng Admin khi tạo lần đầu**. Sang máy khác chỉ cần nhập đúng mật khẩu là vào được dữ liệu của mình, người lạ không thể vào trộm.
+  - **Đã thực hiện:**
+    1. **Backend (`web_app/backend/main.py` & `web_app1/backend/main.py`):**
+       - Khi nhập UID dạng `admtls12021_xxx`:
+         - Nếu tài khoản Admin này chưa từng đặt mật khẩu (lần đầu): Trả về trạng thái `require_create_password` yêu cầu thiết lập mật khẩu tối thiểu 4 ký tự. Khi nhận mật khẩu, hash bằng SHA256 và lưu vào `admin_auth.json` trong thư mục người dùng `TLS1_Trading_Users/admtls12021_xxx/`.
+         - Nếu tài khoản Admin đã có mật khẩu: Trả về trạng thái `require_password`. Kiểm tra khớp mã băm SHA256 với mật khẩu đã lưu, sai mật khẩu sẽ từ chối đăng nhập.
+    2. **Frontend (`web_app/frontend/src/App.jsx` & `web_app1/frontend/src/App.jsx`):**
+       - Thêm state `adminPassword` và `adminConfirmPassword`.
+       - Bước tạo mật khẩu lần đầu (`create_password`): Hiển thị ô tạo mật khẩu mới và xác nhận lại mật khẩu với ghi chú bảo vệ tài khoản, có nút Quay lại.
+       - Bước đăng nhập các lần sau (`require_password`): Hiển thị ô nhập mật khẩu Admin đã tạo.
+       - Lưu trữ phiên đăng nhập sau khi xác thực thành công.
+    3. **Desktop App (`desktop_app/gui_main.py`):**
+       - Khi gõ `admtls12021_xxx` tại hộp thoại đăng nhập:
+         - Lần đầu: Bật `QInputDialog` yêu cầu tạo và xác nhận mật khẩu Admin, lưu hash vào `admin_auth_<clean_uid>.json`.
+         - Lần sau: Bật `QInputDialog` yêu cầu nhập mật khẩu Admin, kiểm tra khớp hash trước khi mở app.
+    4. **Kiểm thử:** Đã biên dịch `py_compile` thành công tất cả file Python và build production `npm run build` cả 2 frontend 0 lỗi.
+
 - **[11/09/2026]** - Sửa Lỗi Hàm `_okx_signed_request` Chưa Định Nghĩa & Thêm Nút "Hướng Dẫn Sử Dụng" Trong Cài Đặt API KEY (`web_app`, `web_app1`):
   - **Hiện tượng & Báo cáo của CEO:**
     1. Gặp lỗi tại `_okx_signed_request`: `resp = _okx_signed_request("POST", path, body_str, api_key, secret_key, passphrase, is_demo)`.

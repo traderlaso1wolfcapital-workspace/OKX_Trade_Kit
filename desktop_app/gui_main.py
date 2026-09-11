@@ -5928,6 +5928,53 @@ class LoginDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.warning(self, "Sai Cú Pháp Admin", "Vui lòng nhập đầy đủ cú pháp Admin:\nadmtls12021_tên (Ví dụ: admtls12021_bao)!")
             return
         if clean_uid.startswith("admtls12021_") and len(clean_uid) > len("admtls12021_"):
+            auth_file = os.path.join(USER_DATA_DIR, f"admin_auth_{clean_uid}.json")
+            if not os.path.exists(auth_file):
+                pwd, ok = QtWidgets.QInputDialog.getText(
+                    self, "Thiết Lập Mật Khẩu Admin",
+                    f"Tài khoản Admin mới [{uid}]!\nVui lòng tạo mật khẩu bảo vệ tài khoản (tối thiểu 4 ký tự):",
+                    QtWidgets.QLineEdit.EchoMode.Password
+                )
+                if not ok or not pwd or len(pwd.strip()) < 4:
+                    QtWidgets.QMessageBox.warning(self, "Chưa Đặt Mật Khẩu", "Mật khẩu Admin phải có tối thiểu 4 ký tự!")
+                    return
+                pwd_confirm, ok2 = QtWidgets.QInputDialog.getText(
+                    self, "Xác Nhận Mật Khẩu Admin",
+                    "Nhập lại mật khẩu Admin để xác nhận:",
+                    QtWidgets.QLineEdit.EchoMode.Password
+                )
+                if not ok2 or pwd_confirm.strip() != pwd.strip():
+                    QtWidgets.QMessageBox.warning(self, "Lỗi Xác Nhận", "Mật khẩu xác nhận không khớp!")
+                    return
+                import hashlib, json
+                auth_data = {
+                    "uid": clean_uid,
+                    "password_hash": hashlib.sha256(pwd.strip().encode("utf-8")).hexdigest()
+                }
+                with open(auth_file, "w", encoding="utf-8") as f:
+                    json.dump(auth_data, f, indent=2)
+                QtWidgets.QMessageBox.information(self, "Thành Công", "Đã thiết lập mật khẩu Admin thành công!")
+            else:
+                pwd, ok = QtWidgets.QInputDialog.getText(
+                    self, "Xác Thực Admin",
+                    f"Nhập mật khẩu Admin cho [{uid}]:",
+                    QtWidgets.QLineEdit.EchoMode.Password
+                )
+                if not ok or not pwd:
+                    return
+                import hashlib, json
+                try:
+                    with open(auth_file, "r", encoding="utf-8") as f:
+                        auth_data = json.load(f)
+                    saved_hash = auth_data.get("password_hash", "")
+                    if hashlib.sha256(pwd.strip().encode("utf-8")).hexdigest() != saved_hash:
+                        play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+                        QtWidgets.QMessageBox.warning(self, "Sai Mật Khẩu", "Mật khẩu Admin không chính xác! Vui lòng thử lại.")
+                        return
+                except Exception as e:
+                    QtWidgets.QMessageBox.warning(self, "Lỗi", f"Không thể đọc file xác thực: {e}")
+                    return
+
             IS_LOGGED_IN = True
             CURRENT_USER = f"Admin TLS1 ({uid})"
             CURRENT_UID = uid
