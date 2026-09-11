@@ -1492,11 +1492,51 @@ class SingleChartPane(QtWidgets.QFrame):
                                             }},
                                             rightPriceScale: {{
                                                 autoScale: true,
+                                                scaleMargins: {{
+                                                    top: 0.1,
+                                                    bottom: 0.1,
+                                                }},
                                             }},
                                             timeScale: {{
                                                 rightOffset: 8,
                                             }}
                                         }});
+                                        if (chartObj.series) {{
+                                            try {{
+                                                chartObj.series.applyOptions({{
+                                                    autoscaleInfoProvider: function(original) {{
+                                                        let res = original();
+                                                        if (!res || !res.priceRange) return res;
+                                                        let min = res.priceRange.minValue;
+                                                        let max = res.priceRange.maxValue;
+                                                        if (typeof min !== 'number' || typeof max !== 'number' || max <= min) return res;
+                                                        let currentPrice = {float(df.iloc[-1]['close'])};
+                                                        if (typeof currentPrice !== 'number' || isNaN(currentPrice)) return res;
+                                                        
+                                                        let range = max - min;
+                                                        let pos = (currentPrice - min) / range;
+                                                        if (pos < 0.38) {{
+                                                            min = currentPrice - (max - currentPrice);
+                                                        }} else if (pos > 0.62) {{
+                                                            max = currentPrice + (currentPrice - min);
+                                                        }}
+                                                        return {{
+                                                            priceRange: {{ minValue: min, maxValue: max }},
+                                                            margins: res.margins
+                                                        }};
+                                                    }}
+                                                }});
+                                            }} catch(e) {{}}
+                                        }}
+                                        if (chartObj.lines) {{
+                                            for (let lk in chartObj.lines) {{
+                                                try {{
+                                                    chartObj.lines[lk].applyOptions({{
+                                                        autoscaleInfoProvider: function() {{ return null; }}
+                                                    }});
+                                                }} catch(e) {{}}
+                                            }}
+                                        }}
                                         chart.timeScale().fitContent();
                                         setTimeout(() => {{
                                             try {{

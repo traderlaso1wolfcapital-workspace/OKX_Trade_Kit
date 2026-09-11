@@ -272,17 +272,72 @@ function SingleChartPane({
         },
       },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 12, minBarSpacing: 3, borderColor: '#2a2e39' },
-      rightPriceScale: { borderColor: '#2a2e39', autoScale: true },
+      rightPriceScale: {
+        borderColor: '#2a2e39',
+        autoScale: true,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      },
     });
 
     const es = chart.addSeries(LineSeries, {
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+      autoscaleInfoProvider: () => null,
     });
 
     const cs = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a", downColor: "#ef5350",
       borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+      autoscaleInfoProvider: (original) => {
+        const res = original();
+        if (!res || !res.priceRange) return res;
+
+        let min = res.priceRange.minValue;
+        let max = res.priceRange.maxValue;
+        if (typeof min !== 'number' || typeof max !== 'number' || max <= min) return res;
+
+        const candles = candlesRef.current;
+        if (!candles || candles.length === 0) return res;
+
+        const lastCandle = candles[candles.length - 1];
+        const currentPrice = lastCandle ? lastCandle.close : null;
+        if (typeof currentPrice !== 'number' || isNaN(currentPrice)) return res;
+
+        // Chỉ áp dụng khi người dùng đang xem nến hiện tại (không scroll sâu về quá khứ)
+        try {
+          const lr = chartRef.current ? chartRef.current.timeScale().getVisibleLogicalRange() : null;
+          if (lr && lr.to < (candles.length - 15)) {
+            return res; // Đang soi lịch sử nến xa thì hiển thị co giãn tự nhiên
+          }
+        } catch (e) {}
+
+        const range = max - min;
+        const pos = (currentPrice - min) / range; // 0.0 (đáy) -> 1.0 (đỉnh), 0.50 là tâm chính giữa
+
+        // Vùng giữa: Giữ đường giá hiện tại luôn ở khoảng giữa chart (biên xê dịch 0% - 20% từ tâm)
+        // Vùng dao động tự nhiên cho phép: từ 38% đến 62% chiều cao chart (tương ứng tâm 50% ± 12%)
+        const minAllowedPos = 0.38;
+        const maxAllowedPos = 0.62;
+
+        if (pos < minAllowedPos) {
+          // Giá tụt xuống dưới 38%, mở rộng đáy đối diện để đưa giá hiện tại về tâm 50%
+          min = currentPrice - (max - currentPrice);
+        } else if (pos > maxAllowedPos) {
+          // Giá đẩy lên trên 62%, mở rộng đỉnh đối diện để đưa giá hiện tại về tâm 50%
+          max = currentPrice + (currentPrice - min);
+        }
+
+        return {
+          priceRange: {
+            minValue: min,
+            maxValue: max,
+          },
+          margins: res.margins,
+        };
+      },
     });
 
     const vs = chart.addSeries(HistogramSeries, {

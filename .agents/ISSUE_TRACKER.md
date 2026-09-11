@@ -19,6 +19,24 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Cố Định Đường Chỉ Giá Nến Hiện Tại Luôn Nằm Ở Khoảng Giữa Biểu Đồ (Biên Xê Dịch 0% - 20% Từ Tâm) (`web_app`, `web_app1`, `desktop_app`):
+  - **Yêu cầu của CEO:** "có thể fix đường chỉ giá nến hiện tại bao giờ cũng nằm ở khoảng giữa chart như này có đc ko, có thể đc xê dịch biên từ giữa ra khoảng 0% - 20% tuỳ" (kèm ảnh chụp cả 3 biểu đồ XAU, BTC, ETH đều có đường giá nến hiện tại nằm ngay tâm 50% trục dọc của chart).
+  - **Nguyên lý giải quyết:**
+    1. Trong thư viện TradingView `lightweight-charts`, mặc định trục giá (`rightPriceScale`) tự động co giãn (`autoScale: true`) theo giá cao nhất và thấp nhất của các cây nến hiển thị trong khung nhìn. Khi thị trường sập mạnh (downtrend) hoặc bơm mạnh (uptrend), đường giá hiện tại bị ép dạt sát đáy hoặc sát đỉnh màn hình.
+    2. Sử dụng API chính thức `autoscaleInfoProvider` của `lightweight-charts` trên chuỗi nến `CandlestickSeries`:
+       - Tính toán vị trí tương đối `pos = (currentPrice - min) / (max - min)`.
+       - Thiết lập vùng đệm tự nhiên cho phép: từ 38% đến 62% chiều cao biểu đồ (tương ứng vùng trung tâm 50% ± 12%, chuẩn biên 0% - 20% theo yêu cầu CEO).
+       - Khi nến nằm trong vùng 38% - 62%: Giữ nguyên tỷ lệ hiển thị tự nhiên của các cây nến.
+       - Khi giá tụt xuống dưới 38%: Tự động mở rộng đáy trục giá đối diện để kéo đường giá hiện tại về tâm 50%, tuyệt đối không để giá đè lên cột Volume hay trục thời gian.
+       - Khi giá vượt lên trên 62%: Tự động mở rộng đỉnh trục giá đối diện để kéo đường giá hiện tại về tâm 50%, giữ khoảng trống thoáng phía trên.
+       - Đường EMA 200 được cấu hình `autoscaleInfoProvider: () => null` để đảm bảo chuỗi nến luôn là nhân tố điều phối chính của trục giá.
+       - Đồng bộ `scaleMargins: { top: 0.1, bottom: 0.1 }` đối xứng hoàn hảo 10% trên dưới.
+    3. Đã đồng bộ triệt để trên cả 3 nền tảng:
+       - `web_app/frontend/src/App.jsx`
+       - `web_app1/frontend/src/App.jsx`
+       - `desktop_app/gui_main.py`
+  - **Kiểm thử:** Đã biên dịch Vite build production của `web_app1` và `web_app` thành công 100% trong 166ms; `py_compile` desktop app thành công 0 lỗi.
+
 - **[11/09/2026]** - Sửa Lỗi Text Màu Đen Khó Đọc Trong Dropdown Chọn Cặp Coin & Khung Thời Gian (TF) Của Biểu Đồ Desktop App (`desktop_app/gui_main.py`):
   - **Yêu cầu của CEO:** "check lại toàn bộ lỗi khi chọn chart và tf của cặp coin như trong hình bị text màu đen rất khó đọc, hãy đưa về màu trắng như ban đầu" (hình ảnh đính kèm cho thấy danh sách popup của `combo_coin` và `combo_tf` hiển thị chữ đen trên nền tối xám).
   - **Nguyên nhân gốc rễ (Root Cause):**
