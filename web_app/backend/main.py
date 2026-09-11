@@ -1166,73 +1166,11 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                             "children_count": len(items_okx) if len(items_okx) > 1 else 0
                         })
                         
-                        # Add Child Rows (Synthesize from bot's trade_markers.json if OKX returns aggregated)
-                        if len(items_okx) == 1 and len(active_items) > 1:
-                            # Update parent children count
-                            formatted_positions[-1]["children_count"] = len(active_items)
-                            
-                            for idx, item in enumerate(active_items):
-                                c_pos = abs(float(item.get("sz", 0)))
-                                c_avg_px = float(item.get("px", 0))
-                                # Estimate margin based on proportion of total_pos
-                                c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
-                                
-                                if c_avg_px > 0:
-                                    if pos_side == "long":
-                                        c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
-                                    else:
-                                        c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
-                                    c_upl = c_margin * (c_roi / 100)
-                                else:
-                                    c_roi = 0
-                                    c_upl = 0
-                                
-                                formatted_positions.append({
-                                    "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
-                                    "is_child": True,
-                                    "parent_id": parent_id,
-                                    "instId": inst_id,
-                                    "posSide": pos_side,
-                                    "pos": str(c_pos),
-                                    "margin": f"{c_margin:.2f}",
-                                    "avgPx": str(c_avg_px),
-                                    "lastPx": str(last_px),
-                                    "roi": f"{c_roi:.2f}",
-                                    "upl": f"{c_upl:.4f}",
-                                    "tp": tp_px,
-                                    "sl": sl_px,
-                                    "lever": str(int(leverage)),
-                                    "tf": item.get("tf", "").upper()
-                                })
-
-                        # Add Child Rows (Native Split Positions)
-                        if len(items_okx) > 1:
-                            for idx, i_okx in enumerate(items_okx):
-                                c_pos = abs(float(i_okx.get("pos", 0)))
-                                c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
-                                c_avg_px = float(i_okx.get("avgPx", 0))
-                                
-                                # Use OKX native values directly
-                                c_upl = float(i_okx.get("upl", 0))
-                                c_roi = float(i_okx.get("uplRatio", 0)) * 100
-                                
-                                formatted_positions.append({
-                                    "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
-                                    "is_child": True,
-                                    "parent_id": parent_id,
-                                    "instId": inst_id,
-                                    "posSide": pos_side,
-                                    "pos": str(c_pos),
-                                    "margin": f"{c_margin:.2f}",
-                                    "avgPx": str(c_avg_px),
-                                    "lastPx": str(last_px),
-                                    "roi": f"{c_roi:.2f}",
-                                    "upl": f"{c_upl:.4f}",
-                                    "tp": tp_px,
-                                    "sl": sl_px,
-                                    "lever": str(int(leverage)),
-                                    "tf": ""
-                                })
+                        # Tạm thời ẩn các dòng lệnh tách theo yêu cầu CEO, chỉ để dòng lệnh gộp
+                        # if len(items_okx) == 1 and len(active_items) > 1:
+                        #     ...
+                        # if len(items_okx) > 1:
+                        #     ...
 
                     return formatted_positions
                 else:
@@ -1286,25 +1224,10 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                     "children_count": len(active_items) if len(active_items) > 1 else 0
                 })
                 
-                if len(active_items) > 1:
-                    for idx, item in enumerate(active_items):
-                        mock_positions.append({
-                            "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
-                            "is_child": True,
-                            "parent_id": parent_id,
-                            "instId": inst_id,
-                            "posSide": side,
-                            "pos": str(item.get("volume", "1.0")),
-                            "margin": "0.00",
-                            "avgPx": str(item.get("price")),
-                            "lastPx": str(item.get("price")),
-                            "roi": "0.00",
-                            "upl": "0.00",
-                            "tp": "---",
-                            "sl": "---",
-                            "lever": "100",
-                            "tf": item.get("tf", "").upper()
-                        })
+                # Tạm thời ẩn các dòng lệnh tách theo yêu cầu CEO, chỉ để dòng lệnh gộp
+                # if len(active_items) > 1:
+                #     for idx, item in enumerate(active_items):
+                #         ...
         return mock_positions
     except Exception:
         return []

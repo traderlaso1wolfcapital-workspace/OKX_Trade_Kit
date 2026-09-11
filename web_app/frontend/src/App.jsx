@@ -1761,7 +1761,8 @@ function App() {
     return `${h}:${m}:${sec}`;
   };
 
-  const safePos = Array.isArray(positions) ? positions : [];
+  // Tạm thời ẩn các dòng lệnh tách theo yêu cầu CEO, chỉ để dòng lệnh gộp
+  const safePos = (Array.isArray(positions) ? positions : []).filter(p => !p.is_child);
   const togglePair = (pair) => {
     setActivePairs(prev => {
       const updated = prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair];
