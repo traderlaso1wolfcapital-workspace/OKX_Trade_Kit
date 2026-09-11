@@ -2232,9 +2232,9 @@ function App() {
                   >
                     📜
                   </button> */}
-                  <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
+                  {/* <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
                     {isRunning ? `● ĐANG CHẠY | ${formatUptime(uptime)}` : "● ĐÃ DỪNG"}
-                  </span>
+                  </span> */}
                 </div>
               </div>
               <div className="tab-content">
