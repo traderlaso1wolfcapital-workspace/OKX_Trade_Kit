@@ -19,6 +19,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Phân Quyền Admin `admtls12021`: Miễn Trừ Kiểm Tra Trùng Khớp UID Chủ Sở Hữu Khi Lưu API Key (`web_app`, `web_app1`):
+  - **Hiện tượng:** Khi đăng nhập tài khoản quản trị `admtls12021` trên Web App (`autotrader.fun`) và lưu API Key của tài khoản phụ OKX, hệ thống sẽ báo lỗi `API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: ..., UID đăng nhập: admtls12021)`.
+  - **Nguyên nhân:** `admtls12021` là chuỗi định danh Admin hệ thống, không phải dãy số UID của sàn OKX. Khi backend kiểm tra `str(main_uid) != str(uid)`, điều kiện luôn trả về True và chặn nhầm Admin. Trong khi đó, Desktop App (`gui_main.py:4078`) đã có sẵn logic `if CURRENT_UID != "admtls12021":` để miễn trừ kiểm tra này.
+  - **Đã xử lý:** Bổ sung điều kiện miễn trừ đặc quyền Admin `if str(uid).strip() != "admtls12021":` trong endpoint `update_bot_credentials()` trên backend `web_app/backend/main.py` và `web_app1/backend/main.py`. Giúp Admin tự do cấu hình và kiểm thử bất kỳ Sub-account OKX nào, trong khi người dùng thường vẫn được bảo vệ nghiêm ngặt 100%.
+  - **Kiểm thử:** Đã biên dịch `py_compile` thành công cả 2 backend 0 lỗi.
+
 - **[11/09/2026]** - Tách Biệt Độc Lập Quản Lý Tài Khoản & Chiến Thuật Từng Tab Bot, Triệt Tiêu Lỗi Tự Nhảy Bot & Lỗi Thiếu API Key (`web_app`, `web_app1`):
   - **Hiện tượng & Báo cáo của CEO:**
     1. Khi đang ở tab **Bot EMA200**, vào Cài Đặt tạo tài khoản mới và thêm API Key thành công, nhưng khi chọn lại tài khoản đó thì giao diện tự động nhảy sang bot khác (Bot SMC) và không ở lại bot hiện tại.
