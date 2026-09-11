@@ -19,6 +19,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Tách Biệt Râu Nến Khỏi Volume (Thoáng Đẹp) & Khóa Chống Tự Reset Zoom Khi Kéo Nến (`web_app`, `web_app1`, `desktop_app`):
+  - **Yêu cầu của CEO:**
+    1. "hiện tại chart râu nến hay bị dính vào nến volume bên dưới... hãy để thoáng như ảnh 2 là đẹp nhất".
+    2. "thi thoảng nó lại auto reset về vị trí mặc định, tôi muốn khi tôi đã zoom in zoom out kéo to nhỏ nến chart ra thì nó ko đc tự ý reset nữa".
+    3. "luôn luôn chạy cách viền bên phải 1 khoảng bằng 5-10 nến".
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. `scaleMargins` của `rightPriceScale` (nến) đặt `bottom: 0.1` (chiếm tới 90% chiều cao), trong khi `priceScale` của Volume đặt `top: 0.8` (chiếm từ 80% đến 100%). Khoảng không gian 80%-90% bị đè chồng lấn lên nhau, khiến râu nến đâm xuyên qua các cột volume.
+    2. Trong `App.jsx`, hàm `fetchCandles()` định kỳ mỗi 15 giây tự động gọi `applyDefaultZoom()` vì `isAutoFit` luôn là `true`. Mỗi lần nến mới cập nhật, biểu đồ lại tự ý bị kéo về vị trí mặc định và co lại, đè mất vị trí zoom mà người dùng vừa kéo.
+  - **Đã thực hiện:**
+    1. **Tách biệt hoàn toàn nến và volume:**
+       - Đặt `scaleMargins` cho `rightPriceScale`: `top: 0.08, bottom: 0.25` (nến chỉ xuất hiện tối đa ở 75% chiều cao biểu đồ).
+       - Đặt `scaleMargins` cho Volume: `top: 0.82, bottom: 0` (volume chỉ xuất hiện tối đa ở 18% dưới đáy).
+       - Kết quả: Có vùng đệm trống 7% ngăn cách, râu nến không bao giờ chạm vào volume, hiển thị thoáng đãng 100% như Ảnh 2.
+    2. **Khóa chống tự reset zoom khi người dùng tương tác:**
+       - Bắt sự kiện thao tác chuột/touch (`wheel`, `pointerdown`, `touchstart`) trên biểu đồ. Khi người dùng zoom/pan, cờ `userInteractedRef.current` được bật và `isAutoFit` chuyển thành `false` (nút 'A' chuyển sang màu xám).
+       - Hàm cập nhật định kỳ (`fetchCandles` mỗi 15s) lưu lại `visibleLogicalRange` và TUYỆT ĐỐI KHÔNG gọi `applyDefaultZoom()`. Nếu người dùng đã zoom thì giữ nguyên vẹn mức zoom và vị trí đó.
+       - Khi người dùng muốn quay lại chế độ xem chuẩn, bấm vào nút 'A' (Auto) màu xanh, biểu đồ mới tự động căn chỉnh lại.
+    3. **Khoảng cách lề phải 8 nến:** Cấu hình `rightOffset: 8` và khi ở chế độ Auto, biểu đồ luôn tự động canh nến mới nhất cách viền phải đúng 8 nến.
+    4. **Kiểm thử:** Đã test trực quan bằng browser subagent, chụp ảnh màn hình xác nhận khoảng cách nến - volume thoáng đẹp, zoom in giữ nguyên vị trí, build production thành công 0 lỗi.
+
 - **[11/09/2026]** - Ấn Định Cố Định Duy Nhất Tài Khoản Admin `admtls12021` với Mật Khẩu `admtls12021@` (`web_app`, `web_app1`, `desktop_app`):
   - **Yêu cầu của CEO:** "thôi tôi nghĩ là tạo ấn định riêng tài khoản admtls12021 với mật khẩu là admtls12021@ nhé, ko cần phải admtls12021_bao hay admtls12021_nam lằng nhằng đâu, nếu sau này cần cấp cho adm nào tôi sẽ chủ động bảo bạn tạo thêm".
   - **Đã thực hiện:**

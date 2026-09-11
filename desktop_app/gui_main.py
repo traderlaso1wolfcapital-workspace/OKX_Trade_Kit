@@ -1290,7 +1290,7 @@ class SingleChartPane(QtWidgets.QFrame):
             self.chart_widget.candle_style(up_color='#26a69a', down_color='#ef5350',
                                     border_up_color='#26a69a', border_down_color='#ef5350',
                                     wick_up_color='#26a69a', wick_down_color='#ef5350')
-            self.chart_widget.volume_config(up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
+            self.chart_widget.volume_config(scale_margin_top=0.82, scale_margin_bottom=0.0, up_color='rgba(38, 166, 154, 0.5)', down_color='rgba(239, 83, 80, 0.5)')
             self.chart_widget.watermark(f'{self.combo_coin.currentText()} ({self.combo_tf.currentText()})', color='rgba(255, 153, 0, 0.1)')
             self.chart_widget.grid(vert_enabled=True, horz_enabled=True, color='rgba(42, 42, 42, 0.3)')
             self.chart_widget.time_scale(right_offset=8)
@@ -1323,7 +1323,16 @@ class SingleChartPane(QtWidgets.QFrame):
                             }}
                         }}
                         if (chartObj && chartObj.chart) {{
-                            chartObj.chart.timeScale().fitContent();
+                            const c = chartObj.chart;
+                            const totalBars = chartObj.series && chartObj.series.data ? chartObj.series.data().length : 0;
+                            if (totalBars > 60) {{
+                                c.timeScale().setVisibleLogicalRange({{
+                                    from: totalBars - 55,
+                                    to: totalBars - 1 + 8
+                                }});
+                            }} else {{
+                                c.timeScale().fitContent();
+                            }}
                         }}
                     }} catch(e) {{}}
                 }})();
@@ -1493,14 +1502,22 @@ class SingleChartPane(QtWidgets.QFrame):
                                             rightPriceScale: {{
                                                 autoScale: true,
                                                 scaleMargins: {{
-                                                    top: 0.1,
-                                                    bottom: 0.1,
+                                                    top: 0.08,
+                                                    bottom: 0.25,
                                                 }},
                                             }},
                                             timeScale: {{
                                                 rightOffset: 8,
                                             }}
                                         }});
+                                        try {{
+                                            chart.priceScale('').applyOptions({{
+                                                scaleMargins: {{
+                                                    top: 0.82,
+                                                    bottom: 0,
+                                                }}
+                                            }});
+                                        }} catch(e) {{}}
                                         if (chartObj.series) {{
                                             try {{
                                                 chartObj.series.applyOptions({{
@@ -1537,7 +1554,6 @@ class SingleChartPane(QtWidgets.QFrame):
                                                 }} catch(e) {{}}
                                             }}
                                         }}
-                                        chart.timeScale().fitContent();
                                         setTimeout(() => {{
                                             try {{
                                                 const totalBars = {len(df)};
@@ -1546,6 +1562,8 @@ class SingleChartPane(QtWidgets.QFrame):
                                                         from: totalBars - 55,
                                                         to: totalBars - 1 + 8
                                                     }});
+                                                }} else {{
+                                                    chart.timeScale().fitContent();
                                                 }}
                                             }} catch(e) {{}}
                                         }}, 50);

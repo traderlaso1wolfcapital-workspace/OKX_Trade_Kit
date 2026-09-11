@@ -164,6 +164,8 @@ function SingleChartPane({
   const candlesRef = useRef([]);
   const [isAutoFit, setIsAutoFit] = useState(true);
   const [isLogScale, setIsLogScale] = useState(false);
+  const userInteractedRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // Mặc định zoom nến to (khoảng 30-80 cây nến, cách viền phải 5-10 cây nến)
   const applyDefaultZoom = () => {
@@ -172,13 +174,11 @@ function SingleChartPane({
     const candleCount = 55; // 30-80 cây nến (50-60 nến là kích thước to rõ đẹp)
     const rightOffset = 8;  // Cách viền phải 5-10 cây nến cho thoáng
     try {
-      // Luôn ép nến và trục giá Y (Price Scale) tự động co giãn về đúng tâm màn hình
-      chartRef.current.timeScale().fitContent();
       chartRef.current.priceScale('right').applyOptions({ autoScale: true });
       if (candleSeriesRef.current) {
         candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
       }
-      // Ép trục thời gian X hiển thị 55 cây nến mới nhất tới thời điểm hiện tại
+      // Ép trục thời gian X hiển thị 55 cây nến mới nhất tới thời điểm hiện tại, cách viền phải 8 nến
       chartRef.current.timeScale().setVisibleLogicalRange({
         from: Math.max(0, total - candleCount),
         to: total - 1 + rightOffset,
@@ -205,6 +205,7 @@ function SingleChartPane({
       const y1 = s.priceToCoordinate(ob.high);
       const y2 = s.priceToCoordinate(ob.low);
       if (y1 === null || y2 === null) return;
+
       const topY = Math.min(y1, y2);
       const botY = Math.max(y1, y2);
       const h = Math.max(botY - topY, 4);
@@ -271,13 +272,21 @@ function SingleChartPane({
           labelBackgroundColor: '#2a2e39',
         },
       },
-      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 12, minBarSpacing: 3, borderColor: '#2a2e39' },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 8,
+        barSpacing: 12,
+        minBarSpacing: 3,
+        borderColor: '#2a2e39',
+        shiftVisibleRangeOnNewBar: true,
+      },
       rightPriceScale: {
         borderColor: '#2a2e39',
         autoScale: true,
         scaleMargins: {
-          top: 0.1,
-          bottom: 0.1,
+          top: 0.08,
+          bottom: 0.25, // Thoáng đãng, nến không bao giờ chạm volume bên dưới
         },
       },
     });
@@ -318,15 +327,12 @@ function SingleChartPane({
         const pos = (currentPrice - min) / range; // 0.0 (đáy) -> 1.0 (đỉnh), 0.50 là tâm chính giữa
 
         // Vùng giữa: Giữ đường giá hiện tại luôn ở khoảng giữa chart (biên xê dịch 0% - 20% từ tâm)
-        // Vùng dao động tự nhiên cho phép: từ 38% đến 62% chiều cao chart (tương ứng tâm 50% ± 12%)
         const minAllowedPos = 0.38;
         const maxAllowedPos = 0.62;
 
         if (pos < minAllowedPos) {
-          // Giá tụt xuống dưới 38%, mở rộng đáy đối diện để đưa giá hiện tại về tâm 50%
           min = currentPrice - (max - currentPrice);
         } else if (pos > maxAllowedPos) {
-          // Giá đẩy lên trên 62%, mở rộng đỉnh đối diện để đưa giá hiện tại về tâm 50%
           max = currentPrice + (currentPrice - min);
         }
 
@@ -346,7 +352,7 @@ function SingleChartPane({
       priceScaleId: '',
     });
     chart.priceScale('').applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
+      scaleMargins: { top: 0.82, bottom: 0 }, // Giữ volume gọn gàng 18% dưới đáy
     });
 
     chartRef.current = chart;
@@ -356,21 +362,37 @@ function SingleChartPane({
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawObs());
 
+    // Bắt tương tác chuột/touch của người dùng để khóa zoom, không tự ý reset
+    const handleUserInteraction = () => {
+      if (!userInteractedRef.current) {
+        userInteractedRef.current = true;
+        setIsAutoFit(false);
+      }
+    };
+
+    const containerEl = containerRef.current;
+    containerEl.addEventListener('wheel', handleUserInteraction, { passive: true });
+    containerEl.addEventListener('pointerdown', handleUserInteraction, { passive: true });
+    containerEl.addEventListener('touchstart', handleUserInteraction, { passive: true });
+
     const resizeObserver = new ResizeObserver((entries) => {
       if (chartRef.current && entries.length > 0) {
         const { width, height } = entries[0].contentRect;
         if (width > 0 && height > 0) {
           chartRef.current.applyOptions({ width, height });
           drawObs();
-          if (isAutoFit) {
+          if (isAutoFit && !userInteractedRef.current) {
             applyDefaultZoom();
           }
         }
       }
     });
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(containerEl);
 
     return () => {
+      containerEl.removeEventListener('wheel', handleUserInteraction);
+      containerEl.removeEventListener('pointerdown', handleUserInteraction);
+      containerEl.removeEventListener('touchstart', handleUserInteraction);
       resizeObserver.disconnect();
       chart.remove();
     };
@@ -379,7 +401,6 @@ function SingleChartPane({
   // Tự động căn chỉnh lại kích thước và zoom khi bố cục hoặc trạng thái hiển thị thay đổi
   useEffect(() => {
     if (!isVisible) return;
-    setIsAutoFit(true);
     const timer = setTimeout(() => {
       if (chartRef.current && containerRef.current) {
         const w = containerRef.current.clientWidth;
@@ -387,7 +408,9 @@ function SingleChartPane({
         if (w > 0 && h > 0) {
           chartRef.current.applyOptions({ width: w, height: h });
         }
-        applyDefaultZoom();
+        if (!userInteractedRef.current) {
+          applyDefaultZoom();
+        }
         drawObs();
       }
     }, 40);
@@ -397,6 +420,10 @@ function SingleChartPane({
   // Quản lý dữ liệu nến: Khôi phục tức thì từ cache RAM (0ms) + Fetch ngầm cập nhật
   useEffect(() => {
     if (!isVisible) return;
+
+    hasInitializedRef.current = false;
+    userInteractedRef.current = false;
+    setIsAutoFit(true);
 
     let isMounted = true;
     const targetCoin = coin;
@@ -419,7 +446,8 @@ function SingleChartPane({
       if (emaSeriesRef.current && cached.ema) {
         try { emaSeriesRef.current.setData(cached.ema); } catch {}
       }
-      if (isAutoFit) {
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
         setTimeout(() => {
           if (isMounted) {
             applyDefaultZoom();
@@ -484,6 +512,14 @@ function SingleChartPane({
           timestamp: Date.now()
         });
 
+        // Lưu lại visibleLogicalRange trước khi update để tránh giật/reset tầm nhìn
+        let prevRange = null;
+        if (chartRef.current && hasInitializedRef.current) {
+          try {
+            prevRange = chartRef.current.timeScale().getVisibleLogicalRange();
+          } catch (e) {}
+        }
+
         candlesRef.current = unique;
         candleSeriesRef.current.setData(unique);
         if (volumeSeriesRef.current) {
@@ -496,13 +532,36 @@ function SingleChartPane({
           activeObsRef.current = rd.ob_boxes;
         }
 
-        setTimeout(() => {
-          if (!isMounted) return;
-          drawObs();
-          if (isAutoFit) {
+        if (!hasInitializedRef.current) {
+          hasInitializedRef.current = true;
+          setTimeout(() => {
+            if (!isMounted) return;
             applyDefaultZoom();
+            drawObs();
+          }, 30);
+        } else {
+          // Khi cập nhật nến định kỳ:
+          if (userInteractedRef.current && prevRange) {
+            // User đã tự zoom/drag: TUYỆT ĐỐI GIỮ NGUYÊN tầm nhìn hiện tại, không reset!
+            try {
+              chartRef.current.timeScale().setVisibleLogicalRange(prevRange);
+            } catch (e) {}
+          } else if (!userInteractedRef.current) {
+            // Chưa thao tác (chế độ Auto): bám theo nến mới nhất và luôn cách viền phải 8 nến
+            try {
+              const lr = prevRange || chartRef.current.timeScale().getVisibleLogicalRange();
+              const span = lr ? (lr.to - lr.from) : 55;
+              chartRef.current.timeScale().setVisibleLogicalRange({
+                from: unique.length - 1 + 8 - span,
+                to: unique.length - 1 + 8,
+              });
+            } catch (e) {}
           }
-        }, 30);
+          setTimeout(() => {
+            if (!isMounted) return;
+            drawObs();
+          }, 30);
+        }
       } catch (e) {
         console.warn("fetchCandles error:", e);
       }
@@ -584,7 +643,10 @@ function SingleChartPane({
               e.stopPropagation();
               const next = !isAutoFit;
               setIsAutoFit(next);
-              if (next) applyDefaultZoom();
+              if (next) {
+                userInteractedRef.current = false;
+                applyDefaultZoom();
+              }
             }}
             style={{
               width: "20px", height: "20px",
