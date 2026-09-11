@@ -20,9 +20,17 @@ from pydantic import BaseModel
 
 app = FastAPI(title="TLS1 Trading Web Backend", version="1.0.0")
 
+def is_admin_uid(uid: str) -> bool:
+    if not uid: return False
+    clean = str(uid).strip().lower()
+    return clean.startswith("admtls12021_") and len(clean) > len("admtls12021_")
+
 @app.get("/api/auth/verify")
 def verify_uid(uid: str):
-    if uid == "admtls12021":
+    clean = str(uid).strip().lower() if uid else ""
+    if clean == "admtls12021":
+        return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
+    if is_admin_uid(clean):
         return {"status": "success", "message": "Admin login successful", "uid": uid}
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
@@ -123,9 +131,11 @@ class CloseTicketRequest(BaseModel):
 
 @app.post("/api/auth/login")
 def login_with_password(req: LoginRequest):
-    uid = req.uid
-    pwd = req.password
-    if uid == "admtls12021":
+    uid = req.uid.strip() if req.uid else ""
+    clean = uid.lower()
+    if clean == "admtls12021":
+        return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
+    if is_admin_uid(clean):
         return {"status": "success", "message": "Admin login successful", "uid": uid}
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
@@ -638,7 +648,7 @@ def reset_capital(uid: str, strategy: str = "sub1"):
 @app.post("/api/bot/reset_nen")
 def reset_nen(uid: str, strategy: str = "sub1"):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
-    if uid.strip() != "admtls12021":
+    if not is_admin_uid(uid):
         raise HTTPException(status_code=403, detail="Chức năng này chỉ dành riêng cho Quản trị viên (Admin)!")
     
     flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
@@ -871,8 +881,8 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                 api_uid = res_data["data"][0].get("uid")
                 main_uid = res_data["data"][0].get("mainUid")
                 print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, login UID={uid}", flush=True)
-                # Phân quyền Admin admtls12021: Miễn trừ kiểm tra khớp UID chủ sở hữu (giống Desktop App gui_main.py:4078)
-                if str(uid).strip() != "admtls12021":
+                # Phân quyền Admin: Miễn trừ kiểm tra khớp UID chủ sở hữu (cho mọi Admin có cú pháp admtls12021_xxx)
+                if not is_admin_uid(uid):
                     # 1. Chặn tuyệt đối không cho dùng API Key của tài khoản chính (api_uid == uid)
                     if str(api_uid) == str(uid):
                         raise HTTPException(status_code=400, detail=f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {uid}). Vui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để kết nối!")

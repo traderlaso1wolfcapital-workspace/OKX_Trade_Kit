@@ -4075,7 +4075,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 
                 # --- KIỂM TRA BẢO MẬT UID CHÍNH/PHỤ ---
                 global CURRENT_UID
-                if CURRENT_UID != "admtls12021":
+                is_admin_user = str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")
+                if not is_admin_user:
                     data_arr = res.get("data", [])
                     if data_arr:
                         main_uid = data_arr[0].get("mainUid", "")
@@ -4265,7 +4266,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def _verify_env_security(self, env_path):
         global CURRENT_UID
-        if CURRENT_UID == "admtls12021": return True
+        if str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_"):
+            return True
         try:
             import hmac, base64, urllib.request, json, datetime
             api_key, secret_key, passphrase, is_demo = "", "", "", False
@@ -4369,7 +4371,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
     def reset_nen(self):
         global CURRENT_UID
-        if str(CURRENT_UID).strip() != "admtls12021":
+        if not (str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")):
             QtWidgets.QMessageBox.warning(self, "Từ chối quyền truy cập", "Chức năng Reset Đếm Nến chỉ dành riêng cho Quản trị viên (Admin)!")
             return
         self.play_sound("universfield-bubble-pop-04-323580.mp3", 0.6)
@@ -4529,7 +4531,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def verify_license_background(self):
         global CURRENT_UID
-        if not CURRENT_UID or CURRENT_UID == "admtls12021":
+        if not CURRENT_UID or (str(CURRENT_UID).strip().lower().startswith("admtls12021_") and len(str(CURRENT_UID).strip()) > len("admtls12021_")):
             return
 
         try:
@@ -5346,8 +5348,8 @@ QToolTip { background-color: #111111; color: #ff8c00; border: 1px solid #ff8c00;
         """)
 
     def update_admin_permissions(self, uid):
-        """Phân quyền: Chỉ duy nhất Admin admtls12021 mới được hiển thị nút Reset Đếm Nến"""
-        is_admin = (str(uid).strip() == "admtls12021")
+        """Phân quyền: Chỉ duy nhất Admin admtls12021_xxx mới được hiển thị nút Reset Đếm Nến"""
+        is_admin = (str(uid).strip().lower().startswith("admtls12021_") and len(str(uid).strip()) > len("admtls12021_"))
         for panel in [getattr(self, 'panel_main', None), getattr(self, 'panel_sub1', None), getattr(self, 'panel_sub2', None), getattr(self, 'panel_sub3', None)]:
             if panel and hasattr(panel, 'btn_reset_nen'):
                 panel.btn_reset_nen.setVisible(is_admin)
@@ -5813,9 +5815,9 @@ class LoginDialog(QtWidgets.QDialog):
         layout.addWidget(self.lbl_info)
         
         self.input_uid = QtWidgets.QLineEdit()
-        self.input_uid.setPlaceholderText("Ví dụ: 12345678")
+        self.input_uid.setPlaceholderText("Ví dụ: 12345678 hoặc admtls12021_bao")
         self.input_uid.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.input_uid.setFixedWidth(200)
+        self.input_uid.setFixedWidth(260)
         self.input_uid.returnPressed.connect(self.check_login)
         layout.addWidget(self.input_uid, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
         
@@ -5920,10 +5922,15 @@ class LoginDialog(QtWidgets.QDialog):
         uid = self.input_uid.text().strip()
         
         # --- Backdoor dành riêng cho Admin ---
-        if uid == "admtls12021":
+        clean_uid = uid.lower()
+        if clean_uid == "admtls12021":
+            play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
+            QtWidgets.QMessageBox.warning(self, "Sai Cú Pháp Admin", "Vui lòng nhập đầy đủ cú pháp Admin:\nadmtls12021_tên (Ví dụ: admtls12021_bao)!")
+            return
+        if clean_uid.startswith("admtls12021_") and len(clean_uid) > len("admtls12021_"):
             IS_LOGGED_IN = True
-            CURRENT_USER = "Admin TLS1"
-            CURRENT_UID = "admtls12021"
+            CURRENT_USER = f"Admin TLS1 ({uid})"
+            CURRENT_UID = uid
             self.logged_in_name = CURRENT_USER
             self.accept()
             return

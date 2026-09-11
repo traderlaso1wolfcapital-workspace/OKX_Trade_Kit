@@ -19,6 +19,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Bắt Buộc Cú Pháp Admin `admtls12021_xxx` Để Tách Biệt Dữ Liệu & Tiến Trình Bot Theo Quản Trị Viên / Mã Máy (`web_app`, `web_app1`, `desktop_app`):
+  - **Yêu cầu của CEO:** Phê duyệt phương án tách tài khoản các Admin theo Tên/Mã máy (Device ID); bắt buộc cú pháp `admtls12021_xxx` (ví dụ: `admtls12021_bao`) khi tạo/đăng nhập lần đầu thay vì `admtls12021` như trước đây để máy chủ nắm được Admin nào đang thao tác. Chặn hoàn toàn việc nhập chuỗi gốc `admtls12021`.
+  - **Nguyên nhân & Nhu cầu thực tế:** Trước đây khi nhiều Admin cùng đăng nhập chuỗi dùng chung `admtls12021`, họ dùng chung một thư mục AppData/Local `TLS1_Trading_Users/admtls12021`, dẫn đến việc ghi đè file `accounts.json`, đè API Key phụ của nhau, và khi một Admin bấm dừng bot thì bot của Admin khác cũng bị tắt theo.
+  - **Đã thực hiện:**
+    1. **Backend (`web_app/backend/main.py` & `web_app1/backend/main.py`):**
+       - Hàm helper `is_admin_uid(uid)`: Kiểm tra `clean.startswith("admtls12021_") and len(clean) > len("admtls12021_")`.
+       - Chặn đăng nhập `admtls12021`: Trả về lỗi 400 yêu cầu nhập đúng định dạng `admtls12021_tên (Ví dụ: admtls12021_bao)`.
+       - Khi Admin đăng nhập `admtls12021_xxx`, backend tự sinh thư mục độc lập `TLS1_Trading_Users/admtls12021_xxx/TLS1_Trading` và map tiến trình bot vào `bot_processes["admtls12021_xxx"][strategy]`, tách biệt 100% tài khoản, bot và credentials giữa các Admin.
+       - Cấp đặc quyền Admin (bỏ qua kiểm tra khớp UID sàn OKX, cho phép Reset Đếm Nến) cho tất cả các Admin có tiền tố hợp lệ `admtls12021_`.
+    2. **Frontend (`web_app/frontend/src/App.jsx` & `web_app1/frontend/src/App.jsx`):**
+       - Khởi tạo persistent HWID ngẫu nhiên lưu tại `localStorage.getItem('tls1_hwid')` cho từng trình duyệt/thiết bị.
+       - Cập nhật placeholder: `Ví dụ: 12345678 hoặc admtls12021_bao` kèm dòng ghi chú hướng dẫn cú pháp Admin.
+       - Chặn client-side nếu nhập nguyên mẫu `admtls12021`.
+       - Thêm nút "Copy Admin ID theo Mã Máy" tại phần Mã Máy (HWID) Cá Nhân trong tab Cài Đặt.
+       - Điều kiện hiển thị nút "Reset Đếm Nến" và kiểm tra quyền được nâng cấp sang `startsWith("admtls12021_")`.
+    3. **Desktop App (`desktop_app/gui_main.py`):**
+       - Nâng cấp logic đăng nhập: Cảnh báo nếu nhập `admtls12021`, chấp nhận `admtls12021_xxx`.
+       - Cập nhật placeholder input UID và mở rộng chiều rộng input lên 260px.
+       - Miễn trừ bảo vệ UID phụ (`_verify_env_security`, `reset_nen`, `verify_license_background`, `update_admin_permissions`) cho các Admin có cú pháp `admtls12021_xxx`.
+    4. **Kiểm thử:** Đã biên dịch `py_compile` tất cả file Python và `npm run build` tất cả frontend thành công 100%.
+
 - **[11/09/2026]** - Phân Quyền Admin `admtls12021`: Miễn Trừ Kiểm Tra Trùng Khớp UID Chủ Sở Hữu Khi Lưu API Key (`web_app`, `web_app1`):
   - **Hiện tượng:** Khi đăng nhập tài khoản quản trị `admtls12021` trên Web App (`autotrader.fun`) và lưu API Key của tài khoản phụ OKX, hệ thống sẽ báo lỗi `API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: ..., UID đăng nhập: admtls12021)`.
   - **Nguyên nhân:** `admtls12021` là chuỗi định danh Admin hệ thống, không phải dãy số UID của sàn OKX. Khi backend kiểm tra `str(main_uid) != str(uid)`, điều kiện luôn trả về True và chặn nhầm Admin. Trong khi đó, Desktop App (`gui_main.py:4078`) đã có sẵn logic `if CURRENT_UID != "admtls12021":` để miễn trừ kiểm tra này.

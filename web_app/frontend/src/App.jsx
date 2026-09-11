@@ -633,7 +633,15 @@ function App() {
   const [botWinrate, setBotWinrate] = useState("");
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [botUptime, setBotUptime] = useState("00:00:00");
-  const [hwid] = useState(() => `WEB-DEVICE-${navigator.userAgent.length}-TLS1`);
+  const [hwid] = useState(() => {
+    let saved = localStorage.getItem('tls1_hwid');
+    if (!saved) {
+      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+      saved = `WEB-${rand}`;
+      localStorage.setItem('tls1_hwid', saved);
+    }
+    return saved;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Focus Log
@@ -961,7 +969,8 @@ function App() {
 
   const handleResetNen = async () => {
     const currentUid = (localStorage.getItem("tls1_uid") || loginUid || "").trim();
-    if (currentUid !== "admtls12021") {
+    const isAdm = currentUid.toLowerCase().startsWith("admtls12021_") && currentUid.length > "admtls12021_".length;
+    if (!isAdm) {
       alert("⚠️ Chức năng này chỉ dành riêng cho Quản trị viên (Admin)!");
       return;
     }
@@ -1360,6 +1369,11 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (audioRef.current) audioRef.current.play().catch(e => console.log(e));
+    const cleanUid = (loginUid || "").trim().toLowerCase();
+    if (cleanUid === "admtls12021") {
+      setLoginError("Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!");
+      return;
+    }
     setIsLoggingIn(true);
     setLoginError("");
     try {
@@ -1661,13 +1675,18 @@ function App() {
             </h3>
             <form onSubmit={handleLogin}>
               {authStep === "uid" ? (
-                <input
-                  type="text"
-                  placeholder="Ví dụ: 12345678"
-                  value={loginUid}
-                  onChange={e => setLoginUid(e.target.value)}
-                  style={{ width: "200px", padding: "10px", marginBottom: "15px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "15px", textAlign: "center" }}
-                />
+                <>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: 12345678 hoặc admtls12021_bao"
+                    value={loginUid}
+                    onChange={e => setLoginUid(e.target.value)}
+                    style={{ width: "260px", padding: "10px", marginBottom: "8px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
+                  />
+                  <div style={{ fontSize: "11px", color: "#888", marginBottom: "12px" }}>
+                    Admin: <code>admtls12021_&lt;tên_hoặc_mã_máy&gt;</code>
+                  </div>
+                </>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                   <input
@@ -2468,7 +2487,7 @@ function App() {
                       >
                         ♻️ Reset Vốn Gốc (Audit)
                       </button>
-                      {((localStorage.getItem('tls1_uid') || loginUid) === "admtls12021") && (
+                      {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase().startsWith("admtls12021_")) && (
                         <button
                           className="btn-audit"
                           onClick={handleResetNen}
@@ -2482,7 +2501,7 @@ function App() {
                   {/* Mã Máy HWID */}
                   <div className="settings-group">
                     <div className="settings-group-title">Mã Máy (HWID) Cá Nhân</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
                       <span style={{ color: "#aaaaaa", fontSize: "12px" }}>Mã Máy của bạn:</span>
                       <span
                         className="hwid-value"
@@ -2490,11 +2509,31 @@ function App() {
                         title="Click để copy Mã Máy"
                         onClick={() => {
                           navigator.clipboard.writeText(hwid);
-                          alert("✅ Đã Copy Mã Máy!");
+                          alert("✅ Đã Copy Mã Máy: " + hwid);
                         }}
                       >
                         {hwid}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const admFormat = `admtls12021_${hwid.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
+                          navigator.clipboard.writeText(admFormat);
+                          alert(`✅ Đã copy ID Admin theo mã máy:\n${admFormat}`);
+                        }}
+                        style={{
+                          background: "#333",
+                          border: "1px solid #555",
+                          color: "#ff9900",
+                          borderRadius: "4px",
+                          padding: "2px 8px",
+                          fontSize: "11px",
+                          cursor: "pointer"
+                        }}
+                        title="Copy ID Admin kèm Mã Máy"
+                      >
+                        Copy Admin ID theo Mã Máy
+                      </button>
                     </div>
                   </div>
                   </div>
