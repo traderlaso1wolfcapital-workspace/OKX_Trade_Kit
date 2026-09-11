@@ -869,7 +869,40 @@ function App() {
     } catch (e) {}
     return [{ id: "sub1", name: "Tài khoản phụ" }];
   });
-  const [selectedAccount, setSelectedAccount] = useState("sub1");
+
+  // Quản lý tab Bot chiến thuật độc lập (sub1: Bot EMA200, sub2: Bot SMC, sub3: Bot Liquidation)
+  const [activeBotTab, setActiveBotTab] = useState(() => {
+    return localStorage.getItem("tls1_active_bot_tab") || "sub1";
+  });
+
+  // Ánh xạ tài khoản cho từng tab bot { sub1: "accA", sub2: "accB", sub3: "accA" }
+  const [botAccountMap, setBotAccountMap] = useState(() => {
+    const saved = localStorage.getItem("tls1_bot_accounts");
+    if (saved) {
+      try { return JSON.parse(saved); } catch {}
+    }
+    return { sub1: "sub1", sub2: "sub1", sub3: "sub1" };
+  });
+
+  const currentAccount = botAccountMap[activeBotTab] || "sub1";
+  const [selectedAccount, setSelectedAccount] = useState(currentAccount);
+
+  // Khi chuyển bot tab hoặc cập nhật botAccountMap, đồng bộ selectedAccount
+  useEffect(() => {
+    const acc = botAccountMap[activeBotTab] || "sub1";
+    setSelectedAccount(acc);
+    localStorage.setItem("tls1_active_bot_tab", activeBotTab);
+  }, [activeBotTab]);
+
+  const handleAssignAccountToActiveBot = (accId) => {
+    setSelectedAccount(accId);
+    setBotAccountMap(prev => {
+      const next = { ...prev, [activeBotTab]: accId };
+      localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+      return next;
+    });
+  };
+
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
@@ -913,8 +946,8 @@ function App() {
     if (!window.confirm("Bạn có chắc chắn muốn Reset Vốn Gốc (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?")) return;
 
     try {
-      const uid = localStorage.getItem("authUid") || "default";
-      const resp = await fetch(`/api/bot/reset_capital?uid=${uid}&strategy=sub1`, { method: "POST" });
+      const uid = localStorage.getItem("tls1_uid") || loginUid || "default";
+      const resp = await fetch(`/api/bot/reset_capital?uid=${uid}&strategy=${activeBotTab}`, { method: "POST" });
       const data = await resp.json();
       if (resp.ok) {
         alert("✅ Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot thành công!");
@@ -935,7 +968,7 @@ function App() {
     if (!window.confirm("Bạn có chắc chắn muốn gửi lệnh Reset Đếm Nến đến Bot?")) return;
 
     try {
-      const resp = await fetch(`/api/bot/reset_nen?uid=${currentUid}&strategy=sub1`, { method: "POST" });
+      const resp = await fetch(`/api/bot/reset_nen?uid=${currentUid}&strategy=${activeBotTab}`, { method: "POST" });
       const data = await resp.json();
       if (resp.ok) {
         alert("✅ Đã kích hoạt lệnh Reset Đếm Nến thành công!");
@@ -963,7 +996,8 @@ function App() {
     if (!isAuthenticated) return;
     const fetchBalance = async () => {
       try {
-        const r = await fetch(`/api/account/balance?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}`);
+        const acc = botAccountMap[activeBotTab] || "sub1";
+        const r = await fetch(`/api/account/balance?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${acc}`);
         if (r.ok) {
           const d = await r.json();
           if (d.status === "success") setAvailBal(d.availBal);
@@ -973,7 +1007,7 @@ function App() {
     fetchBalance();
     const interval = setInterval(fetchBalance, 10000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, selectedAccount]);
+  }, [isAuthenticated, activeBotTab, botAccountMap, loginUid]);
 
   const handlePlaceOrder = async (side) => {
     if (tradeType === "limit" && !tradePrice) return alert("Vui lòng nhập giá Limit");
@@ -1036,7 +1070,8 @@ function App() {
         slTriggerPx: hasTPSL && tradeSL ? tradeSL.toString() : "",
         tpTriggerPx: hasTPSL && tradeTP ? tradeTP.toString() : ""
       };
-      const r = await fetch(`/api/trade/order?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}`, {
+      const acc = botAccountMap[activeBotTab] || "sub1";
+      const r = await fetch(`/api/trade/order?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${acc}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -1083,7 +1118,7 @@ function App() {
       try {
         const u = localStorage.getItem('tls1_uid') || loginUid;
         if (!u) return;
-        fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${u}`, {
+        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${u}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             position_volume: Number(risk.posVol),
@@ -1092,13 +1127,13 @@ function App() {
           }),
         }).then(res => {
           if (res.ok) {
-            addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
+            addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình cho ${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
           }
         });
       } catch { }
     }, 500);
     return () => clearTimeout(timer);
-  }, [risk, selectedAccount, loginUid]);
+  }, [risk, activeBotTab, loginUid]);
 
   const addSystemLog = (msg) => {
     setLogs(prev => {
@@ -1151,12 +1186,17 @@ function App() {
     setAccounts(updatedList);
     localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
     setSelectedAccount(newId);
+    setBotAccountMap(prev => {
+      const next = { ...prev, [activeBotTab]: newId };
+      localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+      return next;
+    });
     setApiKey("");
     setSecretKey("");
     setPassphrase("");
     setShowAddAccountModal(false);
     setNewAccountInput("");
-    addSystemLog(`➕ [ACCOUNT] Đã tạo tài khoản mới: "${cleanName}"`);
+    addSystemLog(`➕ [ACCOUNT] Đã tạo tài khoản mới: "${cleanName}" và gán cho ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"}`);
 
     // 3. Đồng bộ ngầm lên Backend
     const uid = localStorage.getItem('tls1_uid') || loginUid;
@@ -1205,6 +1245,14 @@ function App() {
       localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
       const nextAcc = updatedList[0];
       setSelectedAccount(nextAcc.id);
+      setBotAccountMap(prev => {
+        const next = { ...prev };
+        for (const k in next) {
+          if (next[k] === targetAccountId) next[k] = nextAcc.id;
+        }
+        localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+        return next;
+      });
       setShowDeleteAccountModal(false);
       addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
     } else {
@@ -1215,6 +1263,8 @@ function App() {
       setAccounts(resetList);
       localStorage.setItem("tls1_accounts", JSON.stringify(resetList));
       setSelectedAccount("sub1");
+      setBotAccountMap({ sub1: "sub1", sub2: "sub1", sub3: "sub1" });
+      localStorage.setItem("tls1_bot_accounts", JSON.stringify({ sub1: "sub1", sub2: "sub1", sub3: "sub1" }));
       setShowDeleteAccountModal(false);
       addSystemLog(`🗑️ [ACCOUNT] Đã làm sạch toàn bộ API Key và đưa tài khoản về mặc định`);
     }
@@ -1266,7 +1316,7 @@ function App() {
     setFadeClass("");
     setTimeout(() => setFadeClass("tab-fade"), 10);
 
-    if (selectedAccount === "sub1") {
+    if (activeBotTab === "sub1") {
       // Defaults for Bot EMA200
       setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
@@ -1276,7 +1326,7 @@ function App() {
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
       });
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
-    } else if (selectedAccount === "sub2") {
+    } else if (activeBotTab === "sub2") {
       // Defaults for Bot SMC
       setRisk({ posVol: 500, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
       setStrat({
@@ -1288,7 +1338,7 @@ function App() {
       });
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
     }
-  }, [selectedAccount]);
+  }, [activeBotTab]);
 
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -1376,7 +1426,7 @@ function App() {
 
     const connectWS = () => {
       if (!isMounted) return;
-      ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${selectedAccount}`);
+      ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${activeBotTab}`);
       wsRef.current = ws;
       ws.onmessage = (e) => {
         const now = Date.now();
@@ -1426,7 +1476,7 @@ function App() {
         ws.close();
       }
     };
-  }, [isAuthenticated, selectedAccount]);
+  }, [isAuthenticated, activeBotTab, loginUid]);
 
   useEffect(() => {
     if (terminalRef.current) {
@@ -1443,13 +1493,13 @@ function App() {
     if (!isAuthenticated) return;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(`/api/bot/status?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { const d = await r.json(); setBotStatus(d.status); setUptime(d.uptime); }
       } catch { }
     };
     const fetchConfig = async () => {
       try {
-        const r = await fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const r = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
           if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
@@ -1459,7 +1509,8 @@ function App() {
     };
     const fetchCreds = async () => {
       try {
-        const r = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const targetAcc = selectedAccount || botAccountMap[activeBotTab] || "sub1";
+        const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
           setApiKey(d.api_key || "");
@@ -1472,23 +1523,25 @@ function App() {
     const s = setInterval(fetchStatus, 2000);
     const p = setInterval(fetchPositions, 5000);
     return () => { clearInterval(s); clearInterval(p); };
-  }, [isAuthenticated, selectedAccount]);
+  }, [isAuthenticated, activeBotTab, selectedAccount, botAccountMap, loginUid]);
 
   const fetchPositions = async () => {
     try {
-      const r = await fetch(`/api/bot/positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      const acc = botAccountMap[activeBotTab] || "sub1";
+      const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
       if (r.ok) setPositions(await r.json());
 
-      const r2 = await fetch(`/api/bot/closed_positions?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
       if (r2.ok) setClosedPositions(await r2.json());
     } catch { }
   };
 
   // Chart rendering handled inside SingleChartPane component
   const handleStartBot = async () => {
+    const currentAcc = botAccountMap[activeBotTab] || "sub1";
     // 1. Kiểm tra cấu hình API Key
     if (!apiKey || !secretKey || !passphrase) {
-      alert("⚠️ Vui lòng cấu hình API Key OKX trước khi bắt đầu chạy bot!");
+      alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
       setShowSettings(true);
       setSettingsTab("api");
       return;
@@ -1511,9 +1564,16 @@ function App() {
     }
 
     try {
-      const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${selectedAccount}&env_file=.api_${selectedAccount}`, { method: "POST" });
-      if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
-    } catch { alert("Lỗi khởi động bot!"); }
+      const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
+      if (r.ok) { 
+        const d = await r.json(); 
+        setBotStatus(d.status); 
+        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}`);
+      } else {
+        const err = await r.json();
+        alert(`❌ Lỗi khởi động bot: ${err.detail || "Không rõ nguyên nhân"}`);
+      }
+    } catch { alert("Lỗi kết nối khi khởi động bot!"); }
   };
   const handleStopBot = async () => {
     const currentUid = localStorage.getItem('tls1_uid') || loginUid;
@@ -1525,7 +1585,7 @@ function App() {
 
     try {
       setIsStoppingBot(true);
-      const r = await fetch(`/api/bot/stop?strategy=${selectedAccount}&uid=${currentUid}`, { method: "POST" });
+      const r = await fetch(`/api/bot/stop?strategy=${activeBotTab}&uid=${currentUid}`, { method: "POST" });
       if (r.ok) { const d = await r.json(); setBotStatus(d.status); }
     } catch { alert("Lỗi dừng bot!"); }
     finally { setIsStoppingBot(false); }
@@ -1544,7 +1604,7 @@ function App() {
     const updatedTfs = { ...safeDict, [coin]: updatedCoinTfs };
     setEnabledTfs(updatedTfs);
     try {
-      fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+      fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tfs: updatedTfs }),
       }).then(res => {
@@ -1567,7 +1627,7 @@ function App() {
     setActivePairs(prev => {
       const updated = prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair];
       try {
-        fetch(`/api/bot/config?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled_coins: updated.map(p => p.split("-")[0]) }),
         }).then(res => {
@@ -1685,6 +1745,31 @@ function App() {
 
           {/* Sidebar content - QUẢN LÝ VỐN & RỦI RO */}
           <div className="sidebar-content">
+            {/* Account selector per Bot */}
+            <div style={{ marginBottom: "10px", padding: "8px 10px", background: "#1e1e1e", borderRadius: "6px", border: "1px solid #333" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                <span style={{ fontSize: "11px", color: "#aaa", fontWeight: "bold" }}>
+                  Tài khoản ({activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}):
+                </span>
+                <button
+                  onClick={() => { setShowSettings(true); setSettingsTab("api"); }}
+                  style={{ background: "transparent", border: "none", color: "#58a6ff", cursor: "pointer", fontSize: "11px", textDecoration: "underline" }}
+                >
+                  ⚙️ Cài đặt
+                </button>
+              </div>
+              <select
+                className="styled-select"
+                style={{ width: "100%", background: "#2a2a2a", border: "1px solid #444", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", outline: "none" }}
+                value={botAccountMap[activeBotTab] || "sub1"}
+                onChange={e => handleAssignAccountToActiveBot(e.target.value)}
+              >
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="group-box" style={{ position: "relative" }}>
               <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
               <div style={{ position: "absolute", top: "-10px", right: "8px", display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#252526", padding: "0 4px" }}>
@@ -1717,7 +1802,7 @@ function App() {
                       step={risk.volUnit === "LOT" ? 0.01 : 10}
                     />
                   </div>
-                  {selectedAccount === "sub1" ? (
+                  {activeBotTab === "sub1" ? (
                     <>
                       <div className="risk-row">
                         <label>Mức chốt lời gốc M5:</label>
@@ -1778,8 +1863,8 @@ function App() {
             {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"], ["sub3", "Bot Liquidation"]].map(([sub, label]) => (
               <button
                 key={sub}
-                className={`bot-tab ${selectedAccount === sub ? "active" : ""}`}
-                onClick={() => setSelectedAccount(sub)}
+                className={`bot-tab ${activeBotTab === sub ? "active" : ""}`}
+                onClick={() => setActiveBotTab(sub)}
               >
                 {label}
               </button>
@@ -2284,7 +2369,7 @@ function App() {
           <div className="modal-content settings-modal">
             {/* Header Dialog */}
             <div className="modal-header">
-              <h3>⚙️ Cấu Hình Hệ Thống - {accounts.find(a => a.id === selectedAccount)?.name || (selectedAccount === "sub1" ? "Tài khoản phụ" : "Bot")}</h3>
+              <h3>⚙️ Cấu Hình Hệ Thống - {activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}</h3>
               <button className="close-btn" onClick={() => setShowSettings(false)} title="Đóng">×</button>
             </div>
 
@@ -2306,13 +2391,15 @@ function App() {
                   <div className="settings-tab-scroll">
                   {/* Chọn tài khoản */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", marginBottom: "14px" }}>
-                    <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>Chọn tài khoản đang cấu hình:</label>
+                    <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                      Tài khoản gán cho [{activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"}]:
+                    </label>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <select
                         className="styled-select"
                         style={{ minWidth: "200px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "5px 10px", borderRadius: "4px", fontSize: "12px" }}
                         value={selectedAccount}
-                        onChange={e => setSelectedAccount(e.target.value)}
+                        onChange={e => handleAssignAccountToActiveBot(e.target.value)}
                       >
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>{acc.name}</option>
@@ -2433,7 +2520,7 @@ function App() {
                         setIsSavingConfig(true);
                         await new Promise(resolve => setTimeout(resolve, 1200));
                         try {
-                          const res = await fetch(`/api/bot/credentials?strategy=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
+                          const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${selectedAccount}&uid=${localStorage.getItem('tls1_uid') || loginUid}`, {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
                           });
@@ -2445,8 +2532,9 @@ function App() {
                             return;
                           }
 
+                          handleAssignAccountToActiveBot(selectedAccount);
                           const curAccName = accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
-                          alert(`Đã lưu cấu hình API Key cho [${curAccName}]!`);
+                          alert(`Đã lưu cấu hình API Key cho [${curAccName}] và gán cho [${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}]!`);
                           addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
                         } catch (e) {
                           alert(`Lỗi kết nối khi lưu API Key: ${e.message}`);
@@ -2465,7 +2553,7 @@ function App() {
               {settingsTab === "strategy" && (
                 <div className="settings-tab-content">
                   <div className="settings-tab-scroll">
-                  {selectedAccount === "sub1" ? (
+                  {activeBotTab === "sub1" ? (
                     <>
                       {/* QUẢN LÝ VỐN & RỦI RO (Chuẩn Desktop App gui_main.py:2293) */}
                       <div className="settings-group">
@@ -2815,7 +2903,7 @@ function App() {
                       className="btn-reset-strat"
                       onClick={() => {
                         if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH của app không?")) {
-                          if (selectedAccount === "sub1") {
+                          if (activeBotTab === "sub1") {
                             setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
                             setStrat({
                               main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
@@ -2831,7 +2919,7 @@ function App() {
                               altcoinFollowBtc: true,
                               ethVolMult: "1.30",
                             });
-                          } else if (selectedAccount === "sub2") {
+                          } else if (activeBotTab === "sub2") {
                             setRisk({ posVol: 100, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
                             setStrat({
                               main: true, xole: false, dynamicEma200Tp: false,
@@ -2863,8 +2951,8 @@ function App() {
                       onClick={async () => {
                         setIsSavingConfig(true);
                         await new Promise(resolve => setTimeout(resolve, 1200));
-                        alert(`Đã lưu Cấu Hình Chiến Thuật cho [${selectedAccount === "sub1" ? "Bot EMA200" : "Bot SMC"}] thành công!`);
-                        addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho tài khoản ${selectedAccount}`);
+                        alert(`Đã lưu Cấu Hình Chiến Thuật cho [${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}] thành công!`);
+                        addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho ${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}`);
                         setIsSavingConfig(false);
                         setShowSettings(false);
                       }}

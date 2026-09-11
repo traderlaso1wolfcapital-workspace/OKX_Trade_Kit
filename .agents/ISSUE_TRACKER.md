@@ -19,6 +19,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Tách Biệt Độc Lập Quản Lý Tài Khoản & Chiến Thuật Từng Tab Bot, Triệt Tiêu Lỗi Tự Nhảy Bot & Lỗi Thiếu API Key (`web_app`, `web_app1`):
+  - **Hiện tượng & Báo cáo của CEO:**
+    1. Khi đang ở tab **Bot EMA200**, vào Cài Đặt tạo tài khoản mới và thêm API Key thành công, nhưng khi chọn lại tài khoản đó thì giao diện tự động nhảy sang bot khác (Bot SMC) và không ở lại bot hiện tại.
+    2. Khi bấm Bắt đầu Bot EMA200 thì hệ thống báo lỗi cần cấu hình API Key.
+    3. Mong muốn: Mỗi tab bot có một cấu hình API Key và chiến thuật riêng, và có thể chọn chung các cấu hình tài khoản đã lưu.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. Trộn lẫn state Frontend: Biến `selectedAccount` trước đây vừa dùng để xác định Tab Bot ở Header (`selectedAccount === "sub1"`), vừa dùng để lưu ID tài khoản (`sub_xxx`). Khi tạo tài khoản mới, `selectedAccount` nhận ID tài khoản mới khiến Header Bot tab bị mất active và modal Cài đặt tự rơi vào nhánh fallback (Bot SMC).
+    2. Start bot sai định danh & thiếu credentials: Frontend gọi `/api/bot/start?strategy=${selectedAccount}`. Khi `selectedAccount` là tài khoản mới, backend cố khởi động `sys_bot_{acc}.py` không tồn tại; hoặc nếu là `sub1` thì file API Key lưu ở thư mục tài khoản mới chưa được đồng bộ vào `bots/sub1/.api_sub1`, khiến bot văng lỗi thiếu API Key.
+    3. Cấu hình chiến thuật bị đè chéo: Logic lưu chiến thuật và thông số rủi ro trước đây gắn với `selectedAccount` thay vì tab chiến thuật `activeBotTab`.
+  - **Giải pháp đã thực hiện:**
+    1. **Frontend (`App.jsx` trên `web_app` & `web_app1`):**
+       - Khởi tạo state độc lập: `activeBotTab` (`"sub1"`, `"sub2"`, `"sub3"`) quản lý bot hiện tại; `botAccountMap` (`{ sub1: accId, sub2: accId, sub3: accId }`) lưu ánh xạ tài khoản của từng bot vào `localStorage` (`tls1_bot_accounts`).
+       - Header Bot Tabs chỉ đổi `activeBotTab`, không bao giờ đụng đến hoặc reset tài khoản đang chọn.
+       - Thêm bộ chọn tài khoản trực quan cho từng bot ngay trên Sidebar trái và trong Cài Đặt Tab 1. Khi chọn/tạo tài khoản, hệ thống gán tài khoản đó cho bot hiện tại mà vẫn giữ nguyên tab bot.
+       - Tab 2 (Chiến Thuật) liên kết chặt chẽ với `activeBotTab`: Bot EMA200 lưu và đọc cấu hình EMA200; Bot SMC lưu và đọc cấu hình SMC.
+       - Nút Bắt đầu bot gọi: `/api/bot/start?strategy=${activeBotTab}&account_id=${currentAcc}`.
+    2. **Backend (`main.py` trên `web_app` & `web_app1`):**
+       - Viết lại hàm `_get_okx_creds(uid, strategy, account_id)`: Quét linh hoạt theo `account_id` trong các thư mục `bots/{target_acc}`, `accounts/{target_acc}`, `.api_{target_acc}`, và fallback `bots/{strategy}`.
+       - `/api/bot/start`: Tìm credentials theo `account_id` được chọn, tự động sao chép/đồng bộ vào `bots/{strategy}/.api_{strategy}` trước khi spawn tiến trình `sys_bot_{strategy}.py`. Đảm bảo bot luôn có credentials hợp lệ và khởi động thành công ngay lập tức.
+       - Cập nhật `/api/bot/credentials`, `/api/account/balance`, `/api/bot/positions`, `/api/trade/order` hỗ trợ tham số `account_id`.
+  - **Kiểm thử:**
+    - Cả 2 backend `web_app` và `web_app1` được `python -m py_compile` thành công 100%.
+    - Cả 2 frontend Vite build production thành công 100% trong < 200ms.
+
 - **[11/09/2026]** - Cố Định Đường Chỉ Giá Nến Hiện Tại Luôn Nằm Ở Khoảng Giữa Biểu Đồ (Biên Xê Dịch 0% - 20% Từ Tâm) (`web_app`, `web_app1`, `desktop_app`):
   - **Yêu cầu của CEO:** "có thể fix đường chỉ giá nến hiện tại bao giờ cũng nằm ở khoảng giữa chart như này có đc ko, có thể đc xê dịch biên từ giữa ra khoảng 0% - 20% tuỳ" (kèm ảnh chụp cả 3 biểu đồ XAU, BTC, ETH đều có đường giá nến hiện tại nằm ngay tâm 50% trục dọc của chart).
   - **Nguyên lý giải quyết:**

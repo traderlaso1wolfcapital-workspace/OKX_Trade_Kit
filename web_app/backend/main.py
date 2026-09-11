@@ -434,6 +434,85 @@ def proxy_market_ticker(instId: str):
     except Exception as e:
         return {"code": "-1", "msg": str(e), "data": []}
 
+def _parse_env_file(fpath: str):
+    creds = {"api_key": "", "secret_key": "", "passphrase": "", "is_demo": False}
+    if os.path.exists(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
+                        v = v.strip("\"'")
+                        if k == "OKX_API_KEY": creds["api_key"] = v
+                        elif k == "OKX_SECRET_KEY": creds["secret_key"] = v
+                        elif k == "OKX_PASSPHRASE": creds["passphrase"] = v
+                        elif k == "OKX_IS_DEMO": creds["is_demo"] = (v.lower() == "true")
+        except Exception:
+            pass
+    return creds
+
+def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
+    data_dir = get_user_data_dir(uid)
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    
+    candidate_paths = [
+        os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"),
+        os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
+        os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"),
+        os.path.join(data_dir, f".api_{target_acc}"),
+        os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"),
+        os.path.join(data_dir, f".api_{strategy}"),
+        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{strategy}"),
+        os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"),
+        os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"),
+    ]
+    if strategy == "sub1" or target_acc == "sub1":
+        candidate_paths.append(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"))
+        candidate_paths.append(os.path.join(data_dir, ".api_botEMA200"))
+        
+    for p in candidate_paths:
+        if os.path.exists(p):
+            c = _parse_env_file(p)
+            if c["api_key"] and c["secret_key"] and c["passphrase"]:
+                return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
+                
+    return "", "", "", False
+
+def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False):
+    os.makedirs(os.path.dirname(fpath), exist_ok=True)
+    lines = []
+    if os.path.exists(fpath):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception:
+            pass
+    keys = {
+        "OKX_API_KEY": api_key,
+        "OKX_SECRET_KEY": secret_key,
+        "OKX_PASSPHRASE": passphrase,
+        "OKX_IS_DEMO": "True" if is_demo else "False",
+    }
+    new_lines = []
+    found_keys = set()
+    for line in lines:
+        stripped = line.strip()
+        if "=" in stripped:
+            k, _ = stripped.split("=", 1)
+            if k in keys:
+                new_lines.append(f"{k}=\"{keys[k]}\"\n")
+                found_keys.add(k)
+                continue
+        new_lines.append(line)
+    for k, v in keys.items():
+        if k not in found_keys:
+            new_lines.append(f"{k}=\"{v}\"\n")
+    try:
+        with open(fpath, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        print(f"[ENV SAVE ERROR] Failed to save {fpath}: {e}", flush=True)
+
 def get_running_pid(uid: str, strategy: str) -> int:
     pid_file = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}.pid")
     if os.path.exists(pid_file):
@@ -479,7 +558,7 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
     }
 
 @app.post("/api/bot/start")
-async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1"):
+async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, account_id: str = None):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
     if get_running_pid(uid, strategy) > 0:
         raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running in background.")
@@ -488,7 +567,20 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = ".api_sub1
     if proc and proc.poll() is None:
         raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running.")
         
-    cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, env_file]
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
+    if not (api_key and secret_key and passphrase):
+        raise HTTPException(status_code=400, detail=f"Cần cấu hình API Key cho tài khoản '{target_acc}' trước khi khởi động Bot {strategy}!")
+        
+    # Đồng bộ API key đã chọn vào các file env của bot để sys_bot_{strategy}.py đọc được ngay
+    data_dir = get_user_data_dir(uid)
+    strat_env_file = f".api_{strategy}"
+    strat_env_path = os.path.join(data_dir, f"bots/{strategy}", strat_env_file)
+    _save_env_file(strat_env_path, api_key, secret_key, passphrase, is_demo)
+    _save_env_file(os.path.join(data_dir, strat_env_file), api_key, secret_key, passphrase, is_demo)
+    _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo)
+
+    cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
     
     try:
         flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
@@ -742,29 +834,15 @@ def delete_bot_account(account_id: str, uid: str):
     return {"message": "Account deleted successfully", "accounts": accounts}
 
 @app.get("/api/bot/credentials")
-def get_bot_credentials(uid: str, strategy: str = "sub1"):
-    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
-    env_file = f".api_{strategy}"
-    env_path = os.path.join(config_dir, env_file)
-    
-    creds = {"api_key": "", "secret_key": "", "passphrase": ""}
-    if os.path.exists(env_path):
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if "=" in line:
-                        k, v = line.strip().split("=", 1)
-                        v = v.strip("\"'")
-                        if k == "OKX_API_KEY": creds["api_key"] = v
-                        elif k == "OKX_SECRET_KEY": creds["secret_key"] = v
-                        elif k == "OKX_PASSPHRASE": creds["passphrase"] = v
-        except Exception:
-            pass
-    return creds
+def get_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None):
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
+    return {"api_key": api_key, "secret_key": secret_key, "passphrase": passphrase}
 
 @app.post("/api/bot/credentials")
-def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "sub1"):
+def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "sub1", account_id: str = None):
     creds = req
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     # Xác thực API Key với OKX
     try:
         domain = "www.okx.com"
@@ -782,7 +860,7 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
             "OK-ACCESS-PASSPHRASE": creds.passphrase,
         }
 
-        print(f"[API CHECK] Validating API Key for UID={uid}, strategy={strategy}", flush=True)
+        print(f"[API CHECK] Validating API Key for UID={uid}, strategy={strategy}, account={target_acc}", flush=True)
         resp = requests.get(base_url + path_cfg, headers=headers, timeout=10)
         print(f"[API CHECK] OKX Response status={resp.status_code}", flush=True)
         
@@ -823,71 +901,20 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         print(f"[API CHECK] Unexpected error: {type(e).__name__}: {e}", flush=True)
         raise HTTPException(status_code=400, detail=f"Lỗi hệ thống khi kiểm tra API Key: {str(e)}")
 
-    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
-    os.makedirs(config_dir, exist_ok=True)
-    env_path = os.path.join(config_dir, f".api_{strategy}")
-    
-    lines = []
-    if os.path.exists(env_path):
-        with open(env_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            
-    # Modify or add keys
-    keys = {
-        "OKX_API_KEY": creds.api_key,
-        "OKX_SECRET_KEY": creds.secret_key,
-        "OKX_PASSPHRASE": creds.passphrase,
-    }
-    
-    new_lines = []
-    found_keys = set()
-    for line in lines:
-        stripped = line.strip()
-        if "=" in stripped:
-            k, _ = stripped.split("=", 1)
-            if k in keys:
-                new_lines.append(f"{k}={keys[k]}\n")
-                found_keys.add(k)
-                continue
-        new_lines.append(line)
+    data_dir = get_user_data_dir(uid)
+    _save_env_file(os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+    _save_env_file(os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+    _save_env_file(os.path.join(data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+    _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+    if strategy:
+        _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
         
-    for k, v in keys.items():
-        if k not in found_keys:
-            new_lines.append(f"{k}={v}\n")
-            
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        return {"message": "Credentials updated successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to write credentials: {e}")
+    return {"message": "Credentials updated successfully."}
 
 @app.get("/api/bot/positions")
-def get_bot_positions(uid: str, strategy: str = "sub1"):
-    # 1. Thử đọc Credentials từ file cấu hình .env (.api_sub1, .api_sub2...)
-    api_key = ""
-    secret_key = ""
-    passphrase = ""
-    is_demo = False
-    
-    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
-    env_file = f".api_{strategy}"
-    env_path = os.path.join(config_dir, env_file)
-    
-    if os.path.exists(env_path):
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if "=" in line:
-                        k, v = line.strip().split("=", 1)
-                        v = v.strip("\"'")
-                        if k == "OKX_API_KEY": api_key = v
-                        elif k == "OKX_SECRET_KEY": secret_key = v
-                        elif k == "OKX_PASSPHRASE": passphrase = v
-                        elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
-        except Exception:
-            pass
+def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
 
     # Nếu chưa nhập API Key, trả về rỗng (tránh hiển thị rác từ trade_markers cũ)
     if not (api_key and secret_key and passphrase):
@@ -1444,51 +1471,10 @@ class OrderRequest(BaseModel):
     tpTriggerPx: str = ""
     reduceOnly: bool = False
 
-def _get_okx_creds(uid: str, strategy: str):
-    import os
-    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
-    env_path = os.path.join(config_dir, f".api_{strategy}")
-    api_key, secret_key, passphrase, is_demo = "", "", "", False
-    if os.path.exists(env_path):
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if "=" in line:
-                        k, v = line.strip().split("=", 1)
-                        v = v.strip("\"'")
-                        if k == "OKX_API_KEY": api_key = v
-                        elif k == "OKX_SECRET_KEY": secret_key = v
-                        elif k == "OKX_PASSPHRASE": passphrase = v
-                        elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
-        except Exception:
-            pass
-    return api_key, secret_key, passphrase, is_demo
-
-def _okx_signed_request(method, path, body_str, api_key, secret_key, passphrase, is_demo):
-    domain = "www.okx.com"
-    base_url = f"https://{domain}"
-    ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-    message = ts + method + path + body_str
-    mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
-    signature = base64.b64encode(mac.digest()).decode('utf-8')
-    headers = {
-        "OK-ACCESS-KEY": api_key,
-        "OK-ACCESS-SIGN": signature,
-        "OK-ACCESS-TIMESTAMP": ts,
-        "OK-ACCESS-PASSPHRASE": passphrase,
-        "Content-Type": "application/json"
-    }
-    if is_demo:
-        headers["x-simulated-trading"] = "1"
-    
-    if method == "GET":
-        return requests.get(base_url + path, headers=headers, timeout=5)
-    else:
-        return requests.post(base_url + path, headers=headers, data=body_str, timeout=5)
-
 @app.get("/api/account/balance")
-def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT"):
-    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
+def get_account_balance(uid: str, strategy: str = "sub1", account_id: str = None, ccy: str = "USDT"):
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not api_key:
         return {"status": "error", "message": "No OKX Credentials"}
     
@@ -1507,8 +1493,9 @@ def get_account_balance(uid: str, strategy: str = "sub1", ccy: str = "USDT"):
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/trade/order")
-def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1"):
-    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy)
+def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1", account_id: str = None):
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not api_key:
         return {"status": "error", "message": "No OKX Credentials"}
     
