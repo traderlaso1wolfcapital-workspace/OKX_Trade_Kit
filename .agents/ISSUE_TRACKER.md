@@ -19,6 +19,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[11/09/2026]** - Thiết Lập Mật Khẩu Bảo Vệ Cho Tất Cả Người Dùng (Regular User UID) Khi Đăng Nhập Web App (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "vậy thì khi nhập UID của user cũng nên cho họ tạo mật khẩu luôn để đảm bảo an toàn".
+  - **Nguyên nhân & Nhu cầu thực tế:** Trên môi trường web công khai (`autotrader.fun`), nếu người dùng chỉ nhập dãy số UID OKX (vốn là thông tin dễ bị lộ hoặc chia sẻ), bất kỳ ai biết số UID đó đều có thể đăng nhập, xem cấu hình và can thiệp bot của họ. Cơ chế cũ kiểm tra Passphrase OKX chỉ kích hoạt sau khi đã lưu API key, hoàn toàn hở sườn khi người dùng mới tạo tài khoản.
+  - **Đã thực hiện:**
+    1. **Backend (`web_app/backend/main.py` & `web_app1/backend/main.py`):**
+       - Viết hàm hợp nhất `check_or_set_account_password(uid, password, is_admin)` phục vụ cho cả Admin và User thường.
+       - Khi User nhập số UID:
+         - Trước tiên xác thực điều kiện tiên quyết: UID phải tồn tại và có trạng thái `ACTIVE` / `ON` trong Google Sheet cộng đồng TLS1.
+         - Nếu hợp lệ: Kiểm tra file `user_auth.json` trong thư mục `TLS1_Trading_Users/<safe_uid>/`.
+         - Lần đầu: Trả về `require_create_password` yêu cầu User tạo mật khẩu bảo vệ riêng (tối thiểu 4 ký tự), lưu mã băm SHA-256 an toàn.
+         - Các lần sau: Trả về `require_password` yêu cầu nhập đúng mật khẩu đã tạo mới cho phép đăng nhập.
+    2. **Frontend (`web_app/frontend/src/App.jsx` & `web_app1/frontend/src/App.jsx`):**
+       - Điều chỉnh giao diện và thông báo: Phù hợp đồng bộ cho cả User thường lẫn Admin.
+       - Hỗ trợ đầy đủ các bước: Nhập UID ➔ Tạo & xác nhận mật khẩu (nếu là lần đầu) ➔ Nhập mật khẩu (nếu đã tạo trước đó).
+    3. **Kiểm thử:** Đã biên dịch `py_compile` thành công và build `npm run build` cả 2 frontend 0 lỗi.
+
 - **[11/09/2026]** - Thiết Lập Mật Khẩu Riêng Cho Từng Admin `admtls12021_xxx`: Bảo Mật Đa Thiết Bị, Chống Chiếm Dụng Tài Khoản (`web_app`, `web_app1`, `desktop_app`):
   - **Vấn đề đặt ra & Yêu cầu của CEO:**
     - Khi Admin đăng nhập `admtls12021_bao` ở Máy A, nếu người khác ở máy khác cũng gõ `admtls12021_bao` thì có thể xâm nhập hoặc ghi đè dữ liệu. Ngược lại, nếu khóa cứng vào mã máy của Máy A thì chính Admin Bảo khi sang máy tính khác hoặc dùng điện thoại cũng không thể vào được. Cần giải pháp thay thế linh hoạt và an toàn.

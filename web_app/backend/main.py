@@ -129,6 +129,59 @@ class CloseTicketRequest(BaseModel):
     upl: Optional[str] = None
     exitPx: Optional[str] = None
 
+def check_or_set_account_password(uid: str, password: Optional[str], is_admin: bool):
+    clean = uid.lower()
+    auth_dir = get_user_base_dir(clean)
+    auth_file = os.path.join(auth_dir, "admin_auth.json" if is_admin else "user_auth.json")
+    
+    # 1. Chưa từng tạo mật khẩu: yêu cầu thiết lập mật khẩu bảo vệ
+    if not os.path.exists(auth_file):
+        if not password:
+            account_type = "Admin" if is_admin else "tài khoản"
+            return {
+                "status": "require_create_password",
+                "message": f"Lần đầu đăng nhập {account_type} [{uid}]! Vui lòng thiết lập mật khẩu bảo vệ để đăng nhập an toàn trên mọi thiết bị."
+            }
+        
+        pwd = password.strip()
+        if len(pwd) < 4:
+            return {"status": "error", "message": "Mật khẩu phải có tối thiểu 4 ký tự!"}
+        
+        pwd_hash = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
+        os.makedirs(auth_dir, exist_ok=True)
+        auth_data = {
+            "uid": clean,
+            "password_hash": pwd_hash,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        with open(auth_file, "w", encoding="utf-8") as f:
+            json.dump(auth_data, f, indent=2)
+        
+        return {"status": "success", "message": "Thiết lập mật khẩu bảo vệ thành công!", "uid": uid}
+    
+    # 2. Đã có mật khẩu: yêu cầu nhập đúng mật khẩu
+    else:
+        if not password:
+            account_type = "Admin" if is_admin else "tài khoản"
+            return {
+                "status": "require_password",
+                "message": f"Vui lòng nhập mật khẩu cho {account_type} [{uid}]:"
+            }
+        
+        try:
+            with open(auth_file, "r", encoding="utf-8") as f:
+                auth_data = json.load(f)
+        except Exception as e:
+            return {"status": "error", "message": f"Lỗi đọc file xác thực: {str(e)}"}
+        
+        saved_hash = auth_data.get("password_hash", "")
+        input_hash = hashlib.sha256(password.strip().encode("utf-8")).hexdigest()
+        
+        if input_hash != saved_hash:
+            return {"status": "error", "message": "Mật khẩu không chính xác! Vui lòng thử lại."}
+        
+        return {"status": "success", "message": "Đăng nhập thành công!", "uid": uid}
+
 @app.post("/api/auth/login")
 def login_with_password(req: LoginRequest):
     uid = req.uid.strip() if req.uid else ""
@@ -136,54 +189,8 @@ def login_with_password(req: LoginRequest):
     if clean == "admtls12021":
         return {"status": "error", "message": "Vui lòng nhập đầy đủ cú pháp Admin: admtls12021_tên (Ví dụ: admtls12021_bao)!"}
     if is_admin_uid(clean):
-        auth_dir = get_user_base_dir(clean)
-        auth_file = os.path.join(auth_dir, "admin_auth.json")
-        
-        # 1. Chưa từng tạo mật khẩu: yêu cầu thiết lập mật khẩu bảo vệ
-        if not os.path.exists(auth_file):
-            if not req.password:
-                return {
-                    "status": "require_create_password",
-                    "message": f"Tài khoản Admin mới [{uid}]! Vui lòng thiết lập mật khẩu bảo vệ để có thể đăng nhập trên mọi thiết bị."
-                }
-            
-            pwd = req.password.strip()
-            if len(pwd) < 4:
-                return {"status": "error", "message": "Mật khẩu Admin phải có tối thiểu 4 ký tự!"}
-            
-            pwd_hash = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
-            os.makedirs(auth_dir, exist_ok=True)
-            auth_data = {
-                "uid": clean,
-                "password_hash": pwd_hash,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            with open(auth_file, "w", encoding="utf-8") as f:
-                json.dump(auth_data, f, indent=2)
-            
-            return {"status": "success", "message": "Thiết lập mật khẩu Admin thành công!", "uid": uid}
-        
-        # 2. Đã có mật khẩu: yêu cầu nhập đúng mật khẩu
-        else:
-            if not req.password:
-                return {
-                    "status": "require_password",
-                    "message": f"Vui lòng nhập mật khẩu cho tài khoản Admin [{uid}]:"
-                }
-            
-            try:
-                with open(auth_file, "r", encoding="utf-8") as f:
-                    auth_data = json.load(f)
-            except Exception as e:
-                return {"status": "error", "message": f"Lỗi đọc file xác thực Admin: {str(e)}"}
-            
-            saved_hash = auth_data.get("password_hash", "")
-            input_hash = hashlib.sha256(req.password.strip().encode("utf-8")).hexdigest()
-            
-            if input_hash != saved_hash:
-                return {"status": "error", "message": "Mật khẩu Admin không chính xác! Vui lòng thử lại."}
-            
-            return {"status": "success", "message": "Đăng nhập Admin thành công!", "uid": uid}
+        return check_or_set_account_password(uid, req.password, is_admin=True)
+
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
         resp = requests.get(url, timeout=10)
@@ -208,33 +215,8 @@ def login_with_password(req: LoginRequest):
         if user_status not in ["ACTIVE", "ON"]:
             return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
             
-        # Check if user has saved API keys
-        user_dir = get_user_data_dir(uid)
-        saved_keys = []
-        saved_phrases = []
-        for strategy in ["sub1", "sub2"]:
-            env_path = os.path.join(user_dir, f"bots/{strategy}/.api_{strategy}")
-            if os.path.exists(env_path):
-                try:
-                    with open(env_path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if "OKX_API_KEY=" in line or "OKX_SECRET_KEY=" in line:
-                                val = line.strip().split("=", 1)[1].strip("\"'")
-                                if val: saved_keys.append(val)
-                            elif "OKX_PASSPHRASE=" in line:
-                                val = line.strip().split("=", 1)[1].strip("\"'")
-                                if val: saved_phrases.append(val)
-                except:
-                    pass
-                    
-        if saved_keys or saved_phrases:
-            phrase = req.passphrase
-            if not phrase:
-                return {"status": "require_password"}
-            if phrase not in saved_phrases:
-                return {"status": "error", "message": "Sai Passphrase!"}
-
-        return {"status": "success", "uid": uid}
+        # Xác thực hoặc thiết lập mật khẩu bảo vệ tài khoản User
+        return check_or_set_account_password(uid, req.password, is_admin=False)
                 
     except Exception as e:
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}

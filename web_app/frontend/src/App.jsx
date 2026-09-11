@@ -1379,7 +1379,7 @@ function App() {
 
     if (authStep === "create_password") {
       if (!adminPassword || adminPassword.length < 4) {
-        setLoginError("Mật khẩu Admin phải có tối thiểu 4 ký tự!");
+        setLoginError("Mật khẩu phải có tối thiểu 4 ký tự!");
         return;
       }
       if (adminPassword !== adminConfirmPassword) {
@@ -1705,9 +1705,9 @@ function App() {
               {authStep === "uid"
                 ? "Nhập OKX UID của bạn:"
                 : authStep === "create_password"
-                ? `Thiết Lập Mật Khẩu Admin (${loginUid}):`
+                ? `Thiết Lập Mật Khẩu (${loginUid}):`
                 : authStep === "require_password"
-                ? `Nhập Mật Khẩu Admin (${loginUid}):`
+                ? `Nhập Mật Khẩu (${loginUid}):`
                 : "Nhập Mật Khẩu Passphrase:"}
             </h3>
             <form onSubmit={handleLogin}>
@@ -1727,11 +1727,11 @@ function App() {
               ) : authStep === "create_password" ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                   <div style={{ fontSize: "12px", color: "#00ffff", maxWidth: "340px", lineHeight: "1.4", textAlign: "center" }}>
-                    🛡️ Tài khoản Admin mới! Vui lòng đặt mật khẩu bảo vệ để đăng nhập được trên mọi thiết bị.
+                    🛡️ Lần đầu đăng nhập! Vui lòng đặt mật khẩu bảo vệ để đăng nhập an toàn trên mọi thiết bị.
                   </div>
                   <input
                     type="password"
-                    placeholder="Mật khẩu Admin mới (tối thiểu 4 ký tự)"
+                    placeholder="Mật khẩu mới (tối thiểu 4 ký tự)"
                     value={adminPassword}
                     onChange={e => setAdminPassword(e.target.value)}
                     autoFocus
@@ -1739,7 +1739,7 @@ function App() {
                   />
                   <input
                     type="password"
-                    placeholder="Xác nhận lại mật khẩu Admin"
+                    placeholder="Xác nhận lại mật khẩu"
                     value={adminConfirmPassword}
                     onChange={e => setAdminConfirmPassword(e.target.value)}
                     style={{ width: "260px", padding: "10px", background: "#1e1e1e", border: "1px solid #555", color: "#fff", borderRadius: "6px", fontSize: "14px", textAlign: "center" }}
@@ -1749,11 +1749,11 @@ function App() {
               ) : authStep === "require_password" ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                   <div style={{ fontSize: "12px", color: "#aaaaaa", marginBottom: "2px" }}>
-                    Nhập mật khẩu Admin đã tạo để tiếp tục:
+                    Nhập mật khẩu tài khoản đã tạo để tiếp tục:
                   </div>
                   <input
                     type="password"
-                    placeholder="Mật khẩu Admin"
+                    placeholder="Nhập mật khẩu của bạn"
                     value={adminPassword}
                     onChange={e => setAdminPassword(e.target.value)}
                     autoFocus
