@@ -124,10 +124,21 @@ AI_CONFIDENCE_SCORE = Decimal("0")
 #              "forex"  = kim loại, cổ phiếu, cặp tiền tệ (giao dịch độc lập, không neo BTC)
 COIN_PORTFOLIO = [
     {"coin": "XAU", "swap": "XAU-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0"), "asset_class": "forex"},
+    {"coin": "CL", "swap": "CL-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.0"), "asset_class": "forex"},
     {"coin": "BTC", "swap": "BTC-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.0"), "asset_class": "crypto"},
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.3"), "asset_class": "crypto"},
+    {"coin": "SOL", "swap": "SOL-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.4"), "asset_class": "crypto"},
+    {"coin": "XRP", "swap": "XRP-USDT-SWAP", "leverage": 100, "vol_mult": Decimal("1.5"), "asset_class": "crypto"},
+    {"coin": "DOGE", "swap": "DOGE-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.6"), "asset_class": "crypto"},
+    {"coin": "SUI", "swap": "SUI-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.5"), "asset_class": "crypto"},
+    {"coin": "NEAR", "swap": "NEAR-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.5"), "asset_class": "crypto"},
+    {"coin": "ADA", "swap": "ADA-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.4"), "asset_class": "crypto"},
+    {"coin": "LTC", "swap": "LTC-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.3"), "asset_class": "crypto"},
+    {"coin": "TRX", "swap": "TRX-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.2"), "asset_class": "crypto"},
+    {"coin": "HYPE", "swap": "HYPE-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.8"), "asset_class": "crypto"},
+    {"coin": "ZEC", "swap": "ZEC-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.5"), "asset_class": "crypto"},
 ]
-ENABLED_COINS = ["XAU", "BTC", "ETH"]
+ENABLED_COINS = ["XAU", "CL", "BTC", "ETH"]
 
 import sys
 globals_ref = sys.modules[__name__]

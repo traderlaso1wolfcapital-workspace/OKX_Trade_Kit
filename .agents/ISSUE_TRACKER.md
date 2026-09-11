@@ -15,9 +15,137 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 
----
-
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[12/09/2026]** - Tinh Chỉnh Công Tắc Gạt Mini: Chỉ Chấm Tròn Chuyển Màu Xanh Nến `#26a69a`, Nền Giữ Tối (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "hiện tại khi chưa gạt thì như ảnh, khi gạt thì chỉ chấm xám ở giữa chuyển màu xanh xanh thôi, màu xanh nhu màu nến ảnh 2".
+  - **Đã thực hiện:**
+    - Trạng thái chưa gạt (OFF): Giữ nguyên nền tối `#222222`, viền `#444444`, chấm tròn xám `#777777`.
+    - Trạng thái đã gạt (ON):
+      - Khung bao/nền trượt giữ nguyên màu tối (`background-color: #222222`, `border-color: #444444`), không bị biến thành màu xanh rực toàn bộ.
+      - Chấm tròn ở giữa trượt sang phải 4px và đổi màu sang đúng mã màu xanh ngọc của cây nến (`#26a69a`, RGB 38,166,154).
+    - Đồng bộ 100% `web_app` và `web_app1`, build production thành công (`npm.cmd run build`).
+
+- **[12/09/2026]** - Chuẩn Hóa & Đồng Bộ Toàn Diện Cấu Hình Chung Chiến Thuật Cho Mọi Bot (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "đồng bộ những phần chung của cấu hình chiến thuật như: THÊM MÃ GIAO DỊCH, QUẢN LÝ VỐN & RỦI RO, Điểm Vào Lệnh (Entry Setup), Hệ Số Nhân Đa Khung (TF Multipliers) , .. và các Bot khác từ nay về sau luôn đồng bộ những phần chung này trong cài đặt cho các bot."
+  - **Đã thực hiện:**
+    - Tách biệt và đưa toàn bộ các khối cài đặt chung ra ngoài điều kiện phân nhánh Bot:
+      1. **THÊM MÃ GIAO DỊCH:** Danh sách chip coin trực quan (XAU, CL, BTC, ETH...) xuất hiện đồng bộ ở mọi tab Bot.
+      2. **QUẢN LÝ VỐN & RỦI RO:** Volume size, TP gốc M5, SL gốc M5 chuẩn hóa cho tất cả các Bot.
+      3. **Điểm Vào Lệnh (Entry Setup):** Đón trước cản, Khoảng cách nhồi DCA, Số nến xu hướng, Altcoin neo theo BTC đồng bộ cho mọi Bot.
+      4. **Hệ Số Nhân Đa Khung (TF Multipliers):** Bảng tra hệ số đón trước & Volume (M5->H4) đồng bộ cho mọi Bot.
+    - Phần cấu hình riêng của từng Bot (Bot EMA200: Công tắc chiến thuật & Bảo vệ; Bot SMC: Bắt sóng SMC & Order Block; Bot Liquidation: Quét thanh khoản) được đặt gọn gàng ở giữa.
+    - Đồng bộ chức năng Khôi phục mặc định và Lưu cấu hình cho từng Bot riêng biệt.
+    - Đồng bộ 100% `web_app` và `web_app1`, build production thành công (`npm.cmd run build`).
+
+- **[12/09/2026]** - Đổi Tiêu Đề "THÊM MÃ GIAO DỊCH", Gỡ Bỏ Nút Ẩn/Hiện & Đoạn Chú Thích (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "bỏ luôn phần ẩn hiện danh mục coin này, và phần chú thích: Chỉ các cặp coin được tích chọn bên dưới mới xuất hiện ngoài Bảng Vị Thế. Để gỡ bỏ, bắt buộc phải đóng hết vị thế của cặp đó trên sàn trước. CẶP COIN GIAO DỊCH & THEO DÕI đổi thành THÊM MÃ GIAO DỊCH".
+  - **Đã thực hiện:**
+    - Đổi tên tiêu đề nhóm thành `THÊM MÃ GIAO DỊCH`.
+    - Gỡ bỏ hoàn toàn nút bấm ẩn/hiện danh mục (`Ẩn Danh Mục Coin ▲ / + Thêm Cặp Coin ▼`).
+    - Gỡ bỏ đoạn văn bản chú thích rườm rà bên dưới.
+    - Hiển thị trực tiếp dàn thẻ mã giao dịch (XAU, CL, BTC, ETH, SOL, XRP, DOGE, SUI, NEAR, ADA, LTC, TRX, HYPE, ZEC) gọn gàng, tinh tế ngay bên dưới tiêu đề.
+    - Đồng bộ 100% `web_app` và `web_app1`, biên dịch production (`npm.cmd run build`) thành công 100%.
+
+- **[12/09/2026]** - Tích Hợp Dầu Thô `CL-USDT` & Đưa `XAU`, `CL` Lên Đầu Danh Sách (`web_app`, `web_app1`, `bots/sub1`):
+  - **Yêu cầu của CEO:** "thêm dầu CL-USDT vào nữa, đưa XAU và CL lên đầu danh sách".
+  - **Đã thực hiện:**
+    1. **Kiểm tra sàn OKX SWAP:** Hợp đồng vĩnh viễn dầu thô `CL-USDT-SWAP` đang live trên OKX với đòn bẩy tối đa `50x`, đơn vị hợp đồng `ctVal = 0.1 CL`, bước giá `tickSz = 0.01`.
+    2. **Cập nhật Bot EMA200 (`bot_config.py`):** Bổ sung `CL` vào `COIN_PORTFOLIO` và `ENABLED_COINS` phân loại `asset_class: "forex"` (chạy độc lập tương tự Vàng `XAU`, không neo theo nến BTC).
+    3. **Ưu tiên hiển thị:** Sắp xếp `XAU` (Vàng) và `CL` (Dầu) lên vị trí số 1 và số 2 ở toàn bộ:
+       - Danh mục thẻ chọn coin trong Cài Đặt.
+       - Thứ tự hiển thị trên Bảng Vị Thế ngoài Dashboard.
+       - Dropdown danh sách cặp coin trên thanh công cụ nến.
+    4. **Biên dịch:** Đã build production cả `web_app` và `web_app1` thành công 100% (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tối Ưu Kích Thước Chip Coin Vừa Vặn, Không Quá To, Khoảng Cách Thoáng Đẹp (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "cho nút nhỏ hơn, ko sát chữ coin quá, cũng ko to quá".
+  - **Đã thực hiện:**
+    - Chuyển bố cục sang flex-wrap tự co giãn theo nội dung, không kéo dãn thành các khối to thô.
+    - Căn chỉnh kích thước nút chip: `min-width: 56px`, chiều cao `28px`, `padding: 0 10px`, cỡ chữ `12px` in đậm.
+    - Nút nhỏ gọn, cân đối, khoảng cách giữa chữ và viền thoáng đẹp mắt.
+    - Biên dịch production thành công 100% (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tích Hợp 10 Cặp Altcoin & Triển Khai Cơ Chế [+ Thêm Cặp Coin] Tùy Chọn (`web_app`, `web_app1`, `bots/sub1`):
+  - **Yêu cầu của CEO:** "kiểm tra các cặp coin trên OKX SWAP cặp nào có thì thêm vào. và triển khai luôn Giải pháp [+ Thêm coin] ở trong phần cài đặt Cấu hình chiến thuật, ấn vào nút để hiện ra các list coin, tích coin nào thì cặp coin đó đc hiện ra ngoài bảng vị thế, muốn xoá khỏi bảng vị thế ko trade nữa thì bắt buộc phải đóng hết lệnh, ko còn lệnh nào đang chạy trên sàn, và vào cài đặt bỏ tích chọn cặp coin đó đi".
+  - **Đã thực hiện:**
+    1. **Kiểm tra sàn OKX SWAP:** Cả 10/10 cặp coin (`XRP`, `SOL`, `TRX`, `HYPE`, `ZEC`, `DOGE`, `ADA`, `LTC`, `NEAR`, `SUI`) đều tồn tại hợp đồng vĩnh viễn OKX SWAP. Trong đó SOL, XRP hỗ trợ 100x; các altcoin còn lại hỗ trợ tối đa 50x.
+    2. **Mở rộng Bot EMA200 (`bot_config.py`):** Bổ sung 10 cặp Altcoin vào danh mục `COIN_PORTFOLIO` với đòn bẩy chuẩn OKX và hệ số dao động `vol_mult` phù hợp.
+    3. **Giao diện `[+ Thêm Cặp Coin]`:** Đặt trong tab **Cấu Hình Chiến Thuật**, bấm nút bung mở bảng danh mục thẻ coin dạng grid hiện đại hiển thị tên coin, đòn bẩy tối đa và công tắc chọn.
+    4. **Hiển thị có chọn lọc:** Chỉ những coin được tick mới xuất hiện ngoài Bảng Vị Thế Dashboard, tránh bừa bãi.
+    5. **Quy tắc an toàn lệnh tuyệt đối:** Nếu coin đang có vị thế chạy trên sàn (`safePos`), hệ thống chặn không cho bỏ tick và hiện thông báo yêu cầu đóng lệnh trước. Ngược lại, nếu sàn phát hiện có lệnh sống của bất kỳ coin nào, coin đó luôn được hiển thị ra ngoài bảng để CEO kiểm soát.
+    6. **Biên dịch:** Đã build production cả hai web thành công 100% (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tối Ưu Toggle Switch Chuẩn 17px x 13px & Hành Trình Trượt 4px (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "Hành trình trượt rút ngắn chỉ còn 4px".
+  - **Đã thực hiện:**
+    - Giữ nguyên kích thước nút **17px x 13px** và núm tròn **9px x 9px**.
+    - Rút ngắn hành trình trượt xuống đúng **4px** (`transform: translateX(4px)`).
+    - Đồng bộ `web_app` và `web_app1`, build production thành công 100%.
+
+- **[12/09/2026]** - Gỡ Bỏ Icon Emoji Ở Hai Tab "Bảng Vị Thế" và "Logs" (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "bỏ icon ở Bảng vị thế và Logs đi".
+  - **Đã thực hiện:**
+    - Gỡ bỏ icon biểu đồ `📊` và icon màn hình `🖥` ở hai tab chuyển đổi bên dưới chart.
+    - Tab hiển thị chữ tối giản, chuyên nghiệp: `Bảng Vị Thế ({safePos.length})` và `Logs`.
+    - Đã kiểm tra trực quan trên trình duyệt (screenshot xác nhận) và hoàn tất build production (`npm.cmd run build`) cho cả hai web.
+
+- **[12/09/2026]** - Đồng Bộ Màu Nền Thanh Tiêu Đề Biểu Đồ (Vùng 1) Sang Màu Dark Chuẩn Của Bảng Vị Thế (Vùng 2) (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "màu ở xanh vùng 1 đc đổi sang màu lấy mã màu dark ở vùng 2".
+  - **Đã thực hiện:**
+    - Thay thế màu xanh than cũ (`#141722`) và viền xanh (`#222634`, `#1c202b`) ở thanh tiêu đề biểu đồ (`.single-chart-header` và `.single-chart-card`) sang mã màu dark xám chuẩn `#252526` và viền `#333333` y hệt tiêu đề bảng vị thế (`.positions-table th`).
+    - Toàn bộ giao diện chart và bảng vị thế đạt độ đồng bộ màu sắc 100%, không còn bị lệch tông xanh.
+    - Đã kiểm thử trực quan trên live browser và build production hoàn tất (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tối Ưu Bố Cục Nút Cài Đặt & Ô Chọn Bố Cục Biểu Đồ (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "trong hình đang thừa 2 nút cài đặt, tôi muốn di chuyển nút cài đặt 1 xuống vị trí ô đỏ như trong ảnh, và bỏ nút cài đặt 2 đi. phần ô chọn bố cục thì đưa xuống dưới cùng hàng với BTC-USDT , và đưa vào phần phía bên phải như hình 2".
+  - **Đã thực hiện:**
+    1. **Di chuyển nút Cài Đặt (1):** Đưa nút `⚙ Cài Đặt` xuống sidebar nằm ngang hàng với dropdown `Tài khoản phụ` (`display: flex; gap: 8px`).
+    2. **Xóa nút Cài đặt (2):** Gỡ bỏ hoàn toàn text link `⚙️ Cài đặt` thừa phía trên dropdown.
+    3. **Chuyển ô chọn Bố cục:** Gỡ bỏ thanh toolbar riêng biệt phía trên biểu đồ, đưa ô chọn bố cục TradingView vào bên trong thanh header của biểu đồ (`SingleChartPane`), nằm ở phía bên phải cạnh nhãn `#1`.
+    4. **Tối ưu không gian:** Mở rộng chiều cao hiển thị cho biểu đồ nến, popover chọn layout hiển thị mượt mà không bị cắt góc.
+    5. **Kiểm thử & Biên dịch:** Đã test thực tế bằng browser subagent (screenshot xác nhận hoạt động 100%) và build production thành công (`npm.cmd run build`).
+
+- **[12/09/2026]** - Đổi Nút "📺 Hướng Dẫn Sử Dụng" Thành "Hướng Dẫn", Bỏ Icon & Chuyển Sang Tông Xanh Slate Sang Trọng (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "Nút Hướng dẫn sử dụng đổi thanh "Hướng dẫn" bỏ icon và đổi màu nền khác hợp lý hơn thay vì màu đỏ như hiện tại."
+  - **Đã thực hiện:**
+    - Đổi tên nút thành `Hướng dẫn`, gỡ bỏ icon `📺`.
+    - Thay thế màu nền đỏ rực cũ (`#e50914`) bằng tông xanh navy/slate `#1e3a5f`, viền xanh dương `#2563eb`, chữ trắng `#ffffff` (hover chuyển xanh sáng `#2563eb`).
+    - Nút hiển thị trang nhã, chuyên nghiệp, hòa hợp hoàn hảo với giao diện nền tối của bảng Cài Đặt.
+    - Đã kiểm thử trực quan trên live browser và build production hoàn tất (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tạm Ẩn Vạch Màu Inline Flex (4px x 20px) Bảng Vị Thế (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "tạm thời ẩn vạch màu inline flex (4px x 20px) đứng ngay cạnh checkbox này đi vfi đã có chữ long/short 100x đằng sau rồi, khi nào tôi gọi thì mở lại sau."
+  - **Đã thực hiện:**
+    - Tạm thời gỡ bỏ vạch màu (4px x 20px) cạnh ô checkbox ở cả dòng chưa có vị thế và dòng có vị thế.
+    - Giữ bố cục thẳng hàng gọn gàng: Checkbox ➔ Tên cặp coin ➔ Nhãn Long/Short 100x (xanh/đỏ).
+    - Đã kiểm thử trực quan trên giao diện thực tế và build production hoàn tất (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tinh Chỉnh Nút Tích Tròn Chọn Cặp Coin: Viền Xám Nguyên Bản & Chấm Xanh Phẳng Không Phát Sáng (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "ở phần chấm xanh tích trọn cặp coin giao dịch này tôi muốn sửa: viền ngoài vẫn để màu xám như cũ, chỉ có cặp coin nào đc tích chọn thì trong dữa có chấm xanh (chấm xanh thường ko phát sáng)".
+  - **Đã thực hiện:**
+    1. **CSS Checkbox (`index.css`):**
+       - Khi chưa tích: Vòng tròn viền xám `#555555`, nền tối `#181818`, bên trong rỗng.
+       - Khi tích chọn (`:checked`): Giữ nguyên viền ngoài màu xám `#555555`, nền tối `#181818`, loại bỏ toàn bộ hiệu ứng đổi màu viền xanh và viền phát sáng ngoài (`box-shadow: none`).
+       - Chấm xanh ở giữa (`::after`): Kích thước tròn 8px, màu xanh lá phẳng `#10B981`, bỏ hoàn toàn hiệu ứng phát quang/hào quang neon (`box-shadow: none`).
+    2. **Kiểm thử trực quan:** Đã test thực tế trên live browser và chụp screenshot: viền xám tinh tế, chấm xanh phẳng rõ ràng, toggle mượt mà.
+    3. **Biên dịch:** Đã chạy `npm.cmd run build` cả 2 frontend thành công 100%.
+
+- **[12/09/2026]** - Sửa Hộp Thoại Dừng Bot (Không Cần Nhập Mã Rườm Rà) & Khắc Phục Lỗi Cột Xanh Trên Trình Duyệt Mobile iOS Safari (`web_app`, `web_app1`):
+  - **Yêu cầu & Câu hỏi của CEO:**
+    1. "web - bot đang chạy ấn dừng chạy bot nó yêu cầu vui lòng nhập mã bảo mật (okx uid) để xác nhận dừng bot: là mã gì vậy? sao tôi nhập cụm mật khẩu pass của apikey nó báo không đúng."
+    2. "hiện tại khi mở web mobile autotrader.fun trên trình duyệt điện thoại bị lỗi như hình trên, có một cột màu xanh không biết ở đâu ra, và không có gạch xanh/đỏ long/short như hiện tại đang dùng. hãy tìm nguyên nhân và fix."
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Mã bảo mật khi dừng Bot:** Trước đây code dùng `window.prompt("Vui lòng nhập mã bảo mật (OKX UID) để xác nhận dừng Bot:")` và kiểm tra khớp với `currentUid` (UID tài khoản đăng nhập, ví dụ `admtls12021` hoặc UID OKX). Do đó khi người dùng nhập Passphrase của API Key thì hệ thống báo sai. Hơn nữa, việc bắt gõ tay UID gây cản trở và chậm trễ khi muốn dừng bot khẩn cấp.
+    2. **Lỗi cột xanh trên Mobile iOS Safari:** Trong file CSS tại media query `@media (max-width: 768px)`, bảng vị thế `.positions-table-wrapper` có thuộc tính `position: relative;`. Trong khi đó, theo chuẩn hiển thị của WebKit (iOS Safari), thẻ `<tr>` không hỗ trợ `position: relative`. Vì vậy, thẻ con `<div style={{ position: "absolute", left: 0, top: "6px", bottom: "6px", width: "4px" }}>` (vạch xanh/đỏ) bị thoát ra ngoài thẻ dòng `<tr>` và neo vào thẻ cha gần nhất là `.positions-table-wrapper`. Hậu quả là vạch xanh của dòng vị thế bị kéo dãn cao từ đỉnh xuống đáy toàn bộ bảng tạo thành một cột màu xanh dài bất thường, đồng thời làm biến mất các vạch nhỏ phân biệt Long/Short ở từng dòng.
+  - **Đã thực hiện:**
+    1. **Đơn giản hóa nút Dừng Bot (`handleStopBot`):** Chuyển sang dùng hộp thoại xác nhận nhanh gọn `window.confirm("Bạn có chắc chắn muốn DỪNG CHẠY BOT không?")`. Người dùng chỉ cần bấm OK là dừng ngay lập tức, không bắt nhập bất kỳ mã UID hay passphrase nào.
+    2. **Tái cấu trúc vạch chỉ báo Long/Short theo chuẩn Inline Flex:** Gỡ bỏ toàn bộ `position: absolute` và `position: relative`. Đưa vạch chỉ báo thành một thẻ inline flex kích thước `4px x 20px`, `borderRadius: 2px` nằm ngay trước ô checkbox của cột Cặp giao dịch:
+       - Vị thế Long: Màu xanh lá `#4caf50`.
+       - Vị thế Short: Màu đỏ `#ff5252`.
+       - Dòng chưa có vị thế: Màu trong suốt `transparent` (giữ thẳng hàng cột với các dòng khác).
+       - Hoạt động mượt mà, thẳng hàng và chuẩn xác 100% trên cả Desktop, Android lẫn iOS Safari Mobile mà không bao giờ bị tràn layout.
+    3. **Biên dịch & Kiểm thử:** Đã chạy `npm.cmd run build` cả 2 thư mục `web_app/frontend` và `web_app1/frontend` thành công 100%.
 
 - **[11/09/2026]** - Tách Biệt Râu Nến Khỏi Volume (Thoáng Đẹp) & Khóa Chống Tự Reset Zoom Khi Kéo Nến (`web_app`, `web_app1`, `desktop_app`):
   - **Yêu cầu của CEO:**

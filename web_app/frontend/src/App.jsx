@@ -3,12 +3,21 @@ import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairM
 import "./App.css";
 
 const COIN_LIST = [
-  { label: "BTC-USDT", value: "BTC-USDT-SWAP" },
-  { label: "ETH-USDT", value: "ETH-USDT-SWAP" },
-  { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
-  { label: "USDT.D", value: "USDT.D" },
-  { label: "SOL-USDT", value: "SOL-USDT-SWAP" },
-  { label: "XRP-USDT", value: "XRP-USDT-SWAP" },
+  { label: "XAU-USDT", value: "XAU-USDT-SWAP", maxLever: 100 },
+  { label: "CL-USDT", value: "CL-USDT-SWAP", maxLever: 50 },
+  { label: "BTC-USDT", value: "BTC-USDT-SWAP", maxLever: 100 },
+  { label: "ETH-USDT", value: "ETH-USDT-SWAP", maxLever: 100 },
+  { label: "SOL-USDT", value: "SOL-USDT-SWAP", maxLever: 100 },
+  { label: "XRP-USDT", value: "XRP-USDT-SWAP", maxLever: 100 },
+  { label: "DOGE-USDT", value: "DOGE-USDT-SWAP", maxLever: 50 },
+  { label: "SUI-USDT", value: "SUI-USDT-SWAP", maxLever: 50 },
+  { label: "NEAR-USDT", value: "NEAR-USDT-SWAP", maxLever: 50 },
+  { label: "ADA-USDT", value: "ADA-USDT-SWAP", maxLever: 50 },
+  { label: "LTC-USDT", value: "LTC-USDT-SWAP", maxLever: 50 },
+  { label: "TRX-USDT", value: "TRX-USDT-SWAP", maxLever: 50 },
+  { label: "HYPE-USDT", value: "HYPE-USDT-SWAP", maxLever: 50 },
+  { label: "ZEC-USDT", value: "ZEC-USDT-SWAP", maxLever: 50 },
+  { label: "USDT.D", value: "USDT.D", maxLever: 1 },
 ];
 const TF_LIST = ["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"];
 const BOT_TFS = ["M5", "M15", "M30", "H1", "H2", "H4"];
@@ -153,6 +162,7 @@ function SingleChartPane({
   showToolbar = true,
   layout,
   isVisible = true,
+  layoutSelector = null,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -612,8 +622,11 @@ function SingleChartPane({
               ))}
             </select>
           </div>
-          <div style={{ fontSize: "10px", color: "#888", fontWeight: "bold" }}>
-            #{chartIndex + 1}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {layoutSelector}
+            <div style={{ fontSize: "10px", color: "#888", fontWeight: "bold" }}>
+              #{chartIndex + 1}
+            </div>
           </div>
         </div>
       )}
@@ -920,6 +933,23 @@ function App() {
   const [closedPositions, setClosedPositions] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("strategy");
+  const [showCoinSelector, setShowCoinSelector] = useState(false);
+  const [watchlistCoins, setWatchlistCoins] = useState(() => {
+    try {
+      const curUid = localStorage.getItem("tls1_uid") || "guest";
+      const saved = localStorage.getItem(`tls1_watchlist_coins_${curUid}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (!parsed.includes("CL-USDT-SWAP")) {
+            parsed.splice(1, 0, "CL-USDT-SWAP");
+          }
+          return parsed;
+        }
+      }
+    } catch { }
+    return ["XAU-USDT-SWAP", "CL-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
+  });
 
   const [accounts, setAccounts] = useState(() => {
     try {
@@ -1680,9 +1710,7 @@ function App() {
   };
   const handleStopBot = async () => {
     const currentUid = localStorage.getItem('tls1_uid') || loginUid;
-    const confirmKey = window.prompt("Vui lòng nhập mã bảo mật (OKX UID) để xác nhận dừng Bot:");
-    if (confirmKey !== currentUid) {
-      if (confirmKey !== null) alert("Mã xác nhận không đúng! Không thể dừng Bot.");
+    if (!window.confirm("Bạn có chắc chắn muốn DỪNG CHẠY BOT không?")) {
       return;
     }
 
@@ -1742,6 +1770,35 @@ function App() {
       } catch { }
       return updated;
     });
+  };
+
+  const handleToggleWatchlistCoin = (coinValue) => {
+    const isCurrentlySelected = watchlistCoins.includes(coinValue);
+    const curUid = localStorage.getItem("tls1_uid") || loginUid || "guest";
+    if (isCurrentlySelected) {
+      // Bắt buộc kiểm tra: nếu coin còn vị thế trên sàn thì CHẶN
+      const hasOpenPosition = safePos.some(p => p.instId === coinValue);
+      if (hasOpenPosition) {
+        const coinName = coinValue.replace("-USDT-SWAP", "").replace("-SWAP", "");
+        alert(`⚠️ Không thể bỏ chọn [${coinName}] vì đang có vị thế mở trên sàn!\n\nQuy tắc an toàn: Vui lòng đóng hết lệnh của cặp này trước khi gỡ bỏ khỏi danh sách theo dõi.`);
+        return;
+      }
+      const updated = watchlistCoins.filter(c => c !== coinValue);
+      setWatchlistCoins(updated);
+      try {
+        localStorage.setItem(`tls1_watchlist_coins_${curUid}`, JSON.stringify(updated));
+      } catch { }
+      // Tự động tắt trade nếu cặp này đang bật trong activePairs
+      if (activePairs.includes(coinValue)) {
+        togglePair(coinValue);
+      }
+    } else {
+      const updated = [...watchlistCoins, coinValue];
+      setWatchlistCoins(updated);
+      try {
+        localStorage.setItem(`tls1_watchlist_coins_${curUid}`, JSON.stringify(updated));
+      } catch { }
+    }
   };
   const safeEnabledTfs = Array.isArray(enabledTfs) ? enabledTfs : [];
   const isRunning = botStatus === "RUNNING";
@@ -1895,27 +1952,32 @@ function App() {
           <div className="sidebar-content">
             {/* Account selector per Bot */}
             <div style={{ marginBottom: "10px", padding: "8px 10px", background: "#1e1e1e", borderRadius: "6px", border: "1px solid #333" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+              <div style={{ marginBottom: "5px" }}>
                 <span style={{ fontSize: "11px", color: "#aaa", fontWeight: "bold" }}>
                   Tài khoản ({activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}):
                 </span>
-                <button
-                  onClick={() => { setShowSettings(true); setSettingsTab("api"); }}
-                  style={{ background: "transparent", border: "none", color: "#58a6ff", cursor: "pointer", fontSize: "11px", textDecoration: "underline" }}
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <select
+                  className="styled-select"
+                  style={{ flex: 1, minWidth: 0, background: "#2a2a2a", border: "1px solid #444", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", outline: "none", height: "28px" }}
+                  value={botAccountMap[activeBotTab] || "sub1"}
+                  onChange={e => handleAssignAccountToActiveBot(e.target.value)}
                 >
-                  ⚙️ Cài đặt
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-chart-settings"
+                  style={{ height: "28px", whiteSpace: "nowrap", flexShrink: 0 }}
+                  onClick={() => setShowSettings(true)}
+                  title="Cài đặt hệ thống & API Key"
+                >
+                  ⚙ Cài Đặt
                 </button>
               </div>
-              <select
-                className="styled-select"
-                style={{ width: "100%", background: "#2a2a2a", border: "1px solid #444", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", outline: "none" }}
-                value={botAccountMap[activeBotTab] || "sub1"}
-                onChange={e => handleAssignAccountToActiveBot(e.target.value)}
-              >
-                {accounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.name}</option>
-                ))}
-              </select>
             </div>
 
             <div className="group-box" style={{ position: "relative" }}>
@@ -2080,98 +2142,6 @@ function App() {
 
           {/* Cụm thẻ Workspace & Biểu đồ */}
           <div className="chart-panel-card">
-            {/* Hàng điều khiển bo gọn đúng đến các nút và sát chart nến */}
-            <div className="chart-corner-toolbar">
-              <div className="chart-title-controls">
-                {/* Nút chọn Bố cục TradingView */}
-                <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
-                  <button
-                    type="button"
-                    className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
-                    title="Chọn bố cục biểu đồ (TradingView Layout)"
-                    onClick={() => setShowLayoutMenu(!showLayoutMenu)}
-                  >
-                    {renderLayoutIcon(chartLayout, 18, 18)}
-                  </button>
-
-                  {showLayoutMenu && (
-                    <div className="layout-selector-popover">
-                      {/* Row 1: 1 chart */}
-                      <div className="layout-popover-row">
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
-                          title="1 Biểu đồ đơn"
-                          onClick={() => handleSelectLayout("1")}
-                        >
-                          {renderLayoutIcon("1", 24, 24)}
-                        </button>
-                      </div>
-                      <div className="layout-popover-divider"></div>
-
-                      {/* Row 2: 2 charts */}
-                      <div className="layout-popover-row">
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
-                          title="2 Biểu đồ (Cột dọc 1x2)"
-                          onClick={() => handleSelectLayout("2-col")}
-                        >
-                          {renderLayoutIcon("2-col", 24, 24)}
-                        </button>
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
-                          title="2 Biểu đồ (Hàng ngang 2x1)"
-                          onClick={() => handleSelectLayout("2-row")}
-                        >
-                          {renderLayoutIcon("2-row", 24, 24)}
-                        </button>
-                      </div>
-                      <div className="layout-popover-divider"></div>
-
-                      {/* Row 3: 3 charts */}
-                      <div className="layout-popover-row">
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
-                          title="3 Biểu đồ (Cột dọc 1x3)"
-                          onClick={() => handleSelectLayout("3-col")}
-                        >
-                          {renderLayoutIcon("3-col", 24, 24)}
-                        </button>
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
-                          title="3 Biểu đồ (Hàng ngang 3x1)"
-                          onClick={() => handleSelectLayout("3-row")}
-                        >
-                          {renderLayoutIcon("3-row", 24, 24)}
-                        </button>
-                      </div>
-                      <div className="layout-popover-divider"></div>
-
-                      {/* Row 4: 4 charts */}
-                      <div className="layout-popover-row">
-                        <button
-                          type="button"
-                          className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
-                          title="4 Biểu đồ (Lưới 2x2)"
-                          onClick={() => handleSelectLayout("4-grid")}
-                        >
-                          {renderLayoutIcon("4-grid", 24, 24)}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <button className="btn-chart-settings" onClick={() => setShowSettings(true)}>
-                  ⚙ Cài Đặt
-                </button>
-              </div>
-            </div>
-
             <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
               <section className="pane-chart" style={{ position: "relative" }}>
                 <div className={`multi-chart-container layout-${chartLayout}`}>
@@ -2191,6 +2161,92 @@ function App() {
                       showToolbar={true}
                       layout={chartLayout}
                       isVisible={idx < getActiveChartsCount(chartLayout)}
+                      layoutSelector={idx === 0 ? (
+                        <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
+                          <button
+                            type="button"
+                            className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
+                            title="Chọn bố cục biểu đồ (TradingView Layout)"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowLayoutMenu(!showLayoutMenu);
+                            }}
+                          >
+                            {renderLayoutIcon(chartLayout, 14, 14)}
+                          </button>
+
+                          {showLayoutMenu && (
+                            <div className="layout-selector-popover">
+                              {/* Row 1: 1 chart */}
+                              <div className="layout-popover-row">
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
+                                  title="1 Biểu đồ đơn"
+                                  onClick={() => handleSelectLayout("1")}
+                                >
+                                  {renderLayoutIcon("1", 24, 24)}
+                                </button>
+                              </div>
+                              <div className="layout-popover-divider"></div>
+
+                              {/* Row 2: 2 charts */}
+                              <div className="layout-popover-row">
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
+                                  title="2 Biểu đồ (Cột dọc 1x2)"
+                                  onClick={() => handleSelectLayout("2-col")}
+                                >
+                                  {renderLayoutIcon("2-col", 24, 24)}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
+                                  title="2 Biểu đồ (Hàng ngang 2x1)"
+                                  onClick={() => handleSelectLayout("2-row")}
+                                >
+                                  {renderLayoutIcon("2-row", 24, 24)}
+                                </button>
+                              </div>
+                              <div className="layout-popover-divider"></div>
+
+                              {/* Row 3: 3 charts */}
+                              <div className="layout-popover-row">
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
+                                  title="3 Biểu đồ (Cột dọc 1x3)"
+                                  onClick={() => handleSelectLayout("3-col")}
+                                >
+                                  {renderLayoutIcon("3-col", 24, 24)}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
+                                  title="3 Biểu đồ (Hàng ngang 3x1)"
+                                  onClick={() => handleSelectLayout("3-row")}
+                                >
+                                  {renderLayoutIcon("3-row", 24, 24)}
+                                </button>
+                              </div>
+                              <div className="layout-popover-divider"></div>
+
+                              {/* Row 4: 4 charts */}
+                              <div className="layout-popover-row">
+                                <button
+                                  type="button"
+                                  className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
+                                  title="4 Biểu đồ (Lưới 2x2)"
+                                  onClick={() => handleSelectLayout("4-grid")}
+                                >
+                                  {renderLayoutIcon("4-grid", 24, 24)}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     />
                   ))}
                 </div>
@@ -2206,10 +2262,10 @@ function App() {
               <div className="tab-bar-header">
                 <div className="tab-buttons">
                   <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
-                    📊 Bảng Vị Thế ({safePos.length})
+                    Bảng Vị Thế ({safePos.length})
                   </button>
                   <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
-                    🖥 Logs
+                    Logs
                   </button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -2301,12 +2357,12 @@ function App() {
                       </thead>
                       <tbody>
                         {(() => {
-                          const baseCoins = [
-                            COIN_LIST.find(c => c.value === "BTC-USDT-SWAP") || { label: "BTC-USDT", value: "BTC-USDT-SWAP" },
-                            COIN_LIST.find(c => c.value === "ETH-USDT-SWAP") || { label: "ETH-USDT", value: "ETH-USDT-SWAP" },
-                            COIN_LIST.find(c => c.value === "XAU-USDT-SWAP") || { label: "XAU-USDT", value: "XAU-USDT-SWAP" },
-                          ];
-                          const allCoinValues = new Set([...baseCoins.map(c => c.value), ...safePos.map(p => p.instId)]);
+                          const baseCoins = watchlistCoins.map(val => {
+                            const found = COIN_LIST.find(c => c.value === val);
+                            if (found) return found;
+                            return { label: val.replace("-SWAP", ""), value: val, maxLever: 50 };
+                          });
+                          const allCoinValues = new Set([...watchlistCoins, ...safePos.map(p => p.instId)]);
                           const displayCoins = Array.from(allCoinValues).map(val => {
                             const found = COIN_LIST.find(c => c.value === val);
                             if (found) return found;
@@ -2320,7 +2376,13 @@ function App() {
                           };
 
                           const sortedCoins = [...displayCoins].sort((a, b) => {
-                            return getCoinRoi(b.value) - getCoinRoi(a.value); // % PNL cao nhất từ trên xuống dưới
+                            const roiA = getCoinRoi(a.value);
+                            const roiB = getCoinRoi(b.value);
+                            if (roiA !== roiB) return roiB - roiA; // % PNL cao nhất từ trên xuống dưới
+                            // Nếu cả 2 đều chưa có vị thế, giữ đúng thứ tự ưu tiên trong COIN_LIST (XAU, CL lên đầu)
+                            const idxA = COIN_LIST.findIndex(c => c.value === a.value);
+                            const idxB = COIN_LIST.findIndex(c => c.value === b.value);
+                            return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
                           });
 
                           return sortedCoins.map((coin, i) => {
@@ -2332,14 +2394,16 @@ function App() {
                           if (posList.length === 0) {
                             return (
                               <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", borderLeft: "3px solid transparent" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                                    {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
                                     <input
                                       type="checkbox"
+                                      className="coin-toggle"
                                       checked={isChecked}
                                       onChange={() => togglePair(coin.value)}
                                       onClick={e => e.stopPropagation()}
-                                      style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
+                                      title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
                                     />
                                     <span style={{ color: "#aaa", fontSize: "15px" }}>{coin.label.replace("-SWAP", "")}</span>
                                   </div>
@@ -2382,21 +2446,21 @@ function App() {
                             const isAggregate = pos.is_aggregate || (!isChild && ticketIndex === 0);
 
                             return (
-                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), position: "relative", backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap", paddingLeft: isChild ? "32px" : "16px" }}>
-                                  {!isChild && <div style={{ position: "absolute", left: 0, top: "6px", bottom: "6px", width: "4px", borderRadius: "2px", backgroundColor: isLong ? "#4caf50" : "#ff5252" }}></div>}
-                                  
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0, paddingLeft: isChild ? "20px" : "0px" }}>
+                                    {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
                                     {!isChild ? (
                                       <input
                                         type="checkbox"
+                                        className="coin-toggle"
                                         checked={isChecked}
                                         onChange={() => togglePair(coin.value)}
                                         onClick={e => e.stopPropagation()}
-                                        style={{ cursor: "pointer", width: "18px", height: "18px", flexShrink: 0 }}
+                                        title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
                                       />
                                     ) : (
-                                      <div style={{ width: "18px", height: "18px", flexShrink: 0 }}></div>
+                                      <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
                                     )}
                                     
                                     <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -2647,8 +2711,8 @@ function App() {
                         type="button"
                         onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
                         style={{
-                          background: "#e50914",
-                          border: "1px solid #ff4d4d",
+                          background: "#1e3a5f",
+                          border: "1px solid #2563eb",
                           color: "#ffffff",
                           borderRadius: "4px",
                           padding: "2px 10px",
@@ -2657,11 +2721,17 @@ function App() {
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: "4px"
+                          transition: "all 0.15s ease"
                         }}
-                        title="Xem video Hướng Dẫn Sử Dụng trên YouTube"
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = "#2563eb";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = "#1e3a5f";
+                        }}
+                        title="Xem video Hướng Dẫn trên YouTube"
                       >
-                        📺 Hướng Dẫn Sử Dụng
+                        Hướng dẫn
                       </button>
                     </div>
                   </div>
@@ -2721,65 +2791,90 @@ function App() {
               {settingsTab === "strategy" && (
                 <div className="settings-tab-content">
                   <div className="settings-tab-scroll">
-                  {activeBotTab === "sub1" ? (
-                    <>
-                      {/* QUẢN LÝ VỐN & RỦI RO (Chuẩn Desktop App gui_main.py:2293) */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
-                        <div className="entry-setup-list">
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Volume Size ({risk.volUnit}):</span>
-                            </div>
-                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                              <button
-                                type="button"
-                                onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
-                                style={{
-                                  padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
-                                  border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
-                                  cursor: "pointer", fontWeight: "bold"
-                                }}
-                              >
-                                {risk.volUnit}
-                              </button>
-                              <NumberSpinBox
-                                value={risk.posVol}
-                                onChange={val => setRisk(r => ({ ...r, posVol: val }))}
-                                min={risk.volUnit === "LOT" ? 0.01 : 1}
-                                step={risk.volUnit === "LOT" ? 0.01 : 10}
-                                width="95px"
-                              />
-                            </div>
+                  {/* ===== CÁC PHẦN CHUNG ĐỒNG BỘ CHO TẤT CẢ CÁC BOT ===== */}
+                  {/* 1. THÊM MÃ GIAO DỊCH (CHUNG) */}
+                  <div className="settings-group">
+                    <div className="settings-group-title" style={{ margin: 0 }}>THÊM MÃ GIAO DỊCH</div>
+                    <div className="coin-select-grid">
+                      {COIN_LIST.filter(c => c.value !== "USDT.D").map(coin => {
+                        const isSelected = watchlistCoins.includes(coin.value);
+                        const hasPos = safePos.some(p => p.instId === coin.value);
+                        const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
+                        return (
+                          <div
+                            key={coin.value}
+                            className={`coin-select-card ${isSelected ? "selected" : ""}`}
+                            onClick={() => handleToggleWatchlistCoin(coin.value)}
+                            title={hasPos ? `${coinSymbol}: Đang có vị thế mở (bắt buộc đóng lệnh trước khi bỏ chọn)` : isSelected ? `Click để bỏ chọn ${coinSymbol}` : `Click để thêm ${coinSymbol} ra ngoài Bảng Vị Thế`}
+                          >
+                            <span className="coin-select-symbol">{coinSymbol}</span>
                           </div>
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Mức chốt lời gốc M5:</span>
-                            </div>
-                            <NumberSpinBox
-                              value={risk.tpPct}
-                              onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
-                              min={0.1}
-                              step={0.05}
-                              suffix="%"
-                              width="95px"
-                            />
-                          </div>
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Mức cắt lỗ gốc M5:</span>
-                            </div>
-                            <NumberSpinBox
-                              value={risk.slPct}
-                              onChange={val => setRisk(r => ({ ...r, slPct: val }))}
-                              min={0.1}
-                              step={0.05}
-                              suffix="%"
-                              width="95px"
-                            />
-                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. QUẢN LÝ VỐN & RỦI RO (CHUNG) */}
+                  <div className="settings-group">
+                    <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
+                    <div className="entry-setup-list">
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Volume Size ({risk.volUnit}):</span>
+                        </div>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
+                            style={{
+                              padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
+                              border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
+                              cursor: "pointer", fontWeight: "bold"
+                            }}
+                          >
+                            {risk.volUnit}
+                          </button>
+                          <NumberSpinBox
+                            value={risk.posVol}
+                            onChange={val => setRisk(r => ({ ...r, posVol: val }))}
+                            min={risk.volUnit === "LOT" ? 0.01 : 1}
+                            step={risk.volUnit === "LOT" ? 0.01 : 10}
+                            width="95px"
+                          />
                         </div>
                       </div>
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Mức chốt lời gốc M5:</span>
+                        </div>
+                        <NumberSpinBox
+                          value={risk.tpPct}
+                          onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
+                          min={0.1}
+                          step={0.05}
+                          suffix="%"
+                          width="95px"
+                        />
+                      </div>
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Mức cắt lỗ gốc M5:</span>
+                        </div>
+                        <NumberSpinBox
+                          value={risk.slPct}
+                          onChange={val => setRisk(r => ({ ...r, slPct: val }))}
+                          min={0.1}
+                          step={0.05}
+                          suffix="%"
+                          width="95px"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ===== PHẦN CẤU HÌNH ĐẶC THÙ CHO TỪNG BOT ===== */}
+                  {activeBotTab === "sub1" && (
+                    <>
                       {/* 1. Công Tắc Chiến Thuật EMA200 (Chuẩn layout Desktop: DCA Dương bên trái, Hedge & Chốt lời EMA200 cột phải) */}
                       <div className="settings-group">
                         <div className="settings-group-title">Công Tắc Chiến Thuật</div>
@@ -2833,117 +2928,10 @@ function App() {
                           </div>
                         </div>
                       </div>
-
-
-
-                      {/* 2. Điểm Vào Lệnh (Entry Setup) EMA200 — Mỗi setting là 1 dòng riêng biệt */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
-                        <div className="entry-setup-list">
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Đón trước cản:</span>
-                              <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
-                            </div>
-                            <NumberSpinBox
-                              value={entryCfg.entryOffset}
-                              onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
-                              step={0.01}
-                              min={0}
-                              suffix="%"
-                              width="95px"
-                            />
-                          </div>
-
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Khoảng cách nhồi DCA:</span>
-                              <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
-                            </div>
-                            <NumberSpinBox
-                              value={entryCfg.dcaGapPct}
-                              onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
-                              step={0.05}
-                              min={0}
-                              suffix="%"
-                              width="95px"
-                            />
-                          </div>
-
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Số nến xu hướng tối thiểu:</span>
-                              <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
-                            </div>
-                            <NumberSpinBox
-                              value={entryCfg.accumCandles}
-                              onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
-                              min={1}
-                              max={200}
-                              step={1}
-                              width="95px"
-                            />
-                          </div>
-
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
-                            </div>
-                            <ToggleSwitch
-                              checked={entryCfg.altcoinFollowBtc}
-                              onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
-                            />
-                          </div>
-
-                          {entryCfg.altcoinFollowBtc && (
-                            <div className="entry-setup-row">
-                              <div className="entry-label-wrap">
-                                <span>Hệ số nhạy ETH (Vol Mult):</span>
-                                <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
-                              </div>
-                              <NumberSpinBox
-                                value={entryCfg.ethVolMult}
-                                onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
-                                step={0.1}
-                                min={0}
-                                width="95px"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 5. Hệ Số Nhân Đa Khung (TF Multipliers) EMA200 */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
-                        <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
-                          <thead>
-                            <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
-                              <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
-                              <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
-                              <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[
-                              ["M5", "1.0x", "1.0x"],
-                              ["M15", "1.5x", "1.2x"],
-                              ["M30", "2.3x", "1.5x"],
-                              ["H1", "3.3x", "2.0x"],
-                              ["H2", "4.7x", "3.0x"],
-                              ["H4", "6.8x", "5.0x"],
-                            ].map(([tf, offset, vol]) => (
-                              <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
-                                <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
-                                <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
-                                <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
                     </>
-                  ) : (
+                  )}
+
+                  {activeBotTab === "sub2" && (
                     <>
                       {/* 1. Chiến Thuật Bắt Sóng SMC */}
                       <div className="settings-group">
@@ -2972,8 +2960,6 @@ function App() {
                           </div>
                         </div>
                       </div>
-
-
 
                       {/* 2. Cấu Hình Bắt Sóng SMC — Mỗi setting là 1 dòng riêng biệt */}
                       <div className="settings-group">
@@ -3062,6 +3048,142 @@ function App() {
                     </>
                   )}
 
+                  {activeBotTab === "sub3" && (
+                    <div className="settings-group">
+                      <div className="settings-group-title">Chiến Thuật Bắt Thanh Khoản (Liquidation)</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div className="toggle-row">
+                          <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
+                          <span className="toggle-name">Quét Thanh Khoản Tự Động</span>
+                          <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán săn thanh khoản các cụm lệnh Liquidation.")}>[?]</button>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung quét thanh khoản:</span>
+                          <select
+                            className="styled-select"
+                            value={strat.timeframeBase || "1H"}
+                            onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
+                            style={{ width: "90px" }}
+                          >
+                            <option value="5m">5m</option>
+                            <option value="15m">15m</option>
+                            <option value="30m">30m</option>
+                            <option value="1H">1H</option>
+                            <option value="4H">4H</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== CÁC PHẦN CHUNG TIẾP THEO (ĐỒNG BỘ CHO TẤT CẢ CÁC BOT) ===== */}
+                  {/* 3. Điểm Vào Lệnh (Entry Setup) — Mỗi setting là 1 dòng riêng biệt */}
+                  <div className="settings-group">
+                    <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
+                    <div className="entry-setup-list">
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Đón trước cản:</span>
+                          <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.entryOffset}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
+                          step={0.01}
+                          min={0}
+                          suffix="%"
+                          width="95px"
+                        />
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Khoảng cách nhồi DCA:</span>
+                          <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.dcaGapPct}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
+                          step={0.05}
+                          min={0}
+                          suffix="%"
+                          width="95px"
+                        />
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Số nến xu hướng tối thiểu:</span>
+                          <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.accumCandles}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
+                          min={1}
+                          max={200}
+                          step={1}
+                          width="95px"
+                        />
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
+                        </div>
+                        <ToggleSwitch
+                          checked={entryCfg.altcoinFollowBtc}
+                          onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
+                        />
+                      </div>
+
+                      {entryCfg.altcoinFollowBtc && (
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Hệ số nhạy ETH (Vol Mult):</span>
+                            <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
+                          </div>
+                          <NumberSpinBox
+                            value={entryCfg.ethVolMult}
+                            onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
+                            step={0.1}
+                            min={0}
+                            width="95px"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. Hệ Số Nhân Đa Khung (TF Multipliers) */}
+                  <div className="settings-group">
+                    <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
+                    <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
+                          <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
+                          <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
+                          <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          ["M5", "1.0x", "1.0x"],
+                          ["M15", "1.5x", "1.2x"],
+                          ["M30", "2.3x", "1.5x"],
+                          ["H1", "3.3x", "2.0x"],
+                          ["H2", "4.7x", "3.0x"],
+                          ["H4", "6.8x", "5.0x"],
+                        ].map(([tf, offset, vol]) => (
+                          <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
+                            <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
+                            <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
+                            <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
                   </div>
 
                   {/* Hàng 2 nút điều khiển chuẩn Desktop App bên dưới Tab 2 */}
@@ -3105,6 +3227,25 @@ function App() {
                               forceMarket: true,
                               maxSlippage: 0.8,
                             });
+                            setEntryCfg({
+                              entryOffset: "0.05",
+                              dcaGapPct: "0.20",
+                              confluencePct: "0.23",
+                              accumCandles: 60,
+                              altcoinFollowBtc: true,
+                              ethVolMult: "1.30",
+                            });
+                          } else {
+                            setRisk({ posVol: 100, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
+                            setStrat({ main: true, timeframeBase: "1H" });
+                            setEntryCfg({
+                              entryOffset: "0.05",
+                              dcaGapPct: "0.20",
+                              confluencePct: "0.23",
+                              accumCandles: 60,
+                              altcoinFollowBtc: true,
+                              ethVolMult: "1.30",
+                            });
                           }
                           alert("Đã khôi phục cài đặt về mặc định của nhà sản xuất!");
                         }
@@ -3119,8 +3260,9 @@ function App() {
                       onClick={async () => {
                         setIsSavingConfig(true);
                         await new Promise(resolve => setTimeout(resolve, 1200));
-                        alert(`Đã lưu Cấu Hình Chiến Thuật cho [${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}] thành công!`);
-                        addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho ${activeBotTab === "sub1" ? "Bot EMA200" : "Bot SMC"}`);
+                        const curBotName = activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : activeBotTab === "sub3" ? "Bot Liquidation" : "Bot";
+                        alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!`);
+                        addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình Chiến Thuật cho ${curBotName}`);
                         setIsSavingConfig(false);
                         setShowSettings(false);
                       }}

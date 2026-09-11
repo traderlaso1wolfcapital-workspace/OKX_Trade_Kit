@@ -1,9 +1,9 @@
 {
-    "version": "1.0.369",
+    "version": "1.0.370",
     "update_url": "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest",
     "update_url_win": "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest",
     "update_url_mac": "https://github.com/traderlaso1wolfcapital-creator/OKX_Trade_Kit/releases/latest",
-    "changelog": "Tách biệt râu nến và volume thoáng đãng, chống auto reset zoom khi kéo nến biểu đồ.",
+    "changelog": "T\u00e1ch bi\u1ec7t r\u00e2u n\u1ebfn v\u00e0 volume tho\u00e1ng \u0111\u00e3ng, ch\u1ed1ng auto reset zoom khi k\u00e9o n\u1ebfn bi\u1ec3u \u0111\u1ed3.",
     "COMMUNITY_CHAT_URL": "<widgetbot server=\"1377607263732367472\" channel=\"1424073008217067695\" width=\"100%\" height=\"100%\"></widgetbot><script src=\"https://cdn.jsdelivr.net/npm/@widgetbot/html-embed\"></script>",
     "FIREBASE_CHAT_URL": "https://botvip-e5772-default-rtdb.asia-southeast1.firebasedatabase.app"
 }
