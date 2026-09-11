@@ -764,17 +764,44 @@ async def stop_bot(uid: str, strategy: str = "sub1"):
 @app.get("/api/bot/config")
 def get_bot_config(uid: str, strategy: str = "sub1"):
     # Đọc cấu hình JSON
-    config_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}_global_config.json")
+    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
+    os.makedirs(config_dir, exist_ok=True)
+    config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
         # Mặc định cấu hình nếu chưa tồn tại
-        return {
+        default_cfg = {
             "ENABLED_TFS": ["M5", "M15", "M30", "H1", "H2", "H4"],
-            "ENABLED_COINS": ["BTC", "ETH", "XAU"]
+            "ENABLED_COINS": ["BTC", "ETH", "XAU"],
+            "POSITION_VOLUME_HIGH_CONFIDENCE": 40.0,
+            "SCALPING_TP_PCT": 0.008,
+            "SCALPING_SL_PCT": 0.008
         }
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(default_cfg, f, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
+        return default_cfg
         
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+        dirty = False
+        if "POSITION_VOLUME_HIGH_CONFIDENCE" not in cfg:
+            cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 40.0
+            dirty = True
+        if "SCALPING_TP_PCT" not in cfg:
+            cfg["SCALPING_TP_PCT"] = 0.008
+            dirty = True
+        if "SCALPING_SL_PCT" not in cfg:
+            cfg["SCALPING_SL_PCT"] = 0.008
+            dirty = True
+        if dirty:
+            try:
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, indent=4, ensure_ascii=False)
+            except Exception:
+                pass
         return cfg
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read config: {e}")

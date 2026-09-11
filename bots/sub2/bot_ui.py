@@ -183,8 +183,11 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict, system_c
     
     for symbol, tracker in sorted_trackers.items():
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
-        price = f"{float(tracker.live_price):.2f}"
         is_coin_enabled = (coin in enabled_coins)
+        has_pos = (tracker.has_long or tracker.has_short)
+        if not is_coin_enabled and not has_pos:
+            continue
+        price = f"{float(tracker.live_price):.2f}"
         
         if tracker.swing_trend == 1: trend_str = "BULL ▲"
         elif tracker.swing_trend == -1: trend_str = "BEAR ▼"
@@ -230,6 +233,9 @@ def print_dashboard(trackers: Dict[str, AssetTracker], env_paths: dict, system_c
         coin = tracker.coin_name if tracker.coin_name else symbol.split('-')[0]
         lines_desc = []
         is_coin_enabled = (coin in enabled_coins)
+        has_pos = (tracker.has_long or tracker.has_short)
+        if not is_coin_enabled and not has_pos:
+            continue
         
         # --- A. Lệnh ĐÃ KHỚP (Triggered Setups) ĐƯA LÊN ĐẦU TIÊN ---
         triggered = [s for s in tracker.trade_setups if s.triggered]

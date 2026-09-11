@@ -1637,6 +1637,14 @@ function App() {
           const d = await r.json();
           if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
           if (d.ENABLED_COINS) setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
+          if (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) {
+            setRisk(r => ({
+              ...r,
+              posVol: Number(d.POSITION_VOLUME_HIGH_CONFIDENCE),
+              tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
+              slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct
+            }));
+          }
         }
       } catch { }
     };

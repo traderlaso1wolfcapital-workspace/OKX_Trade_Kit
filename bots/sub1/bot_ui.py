@@ -100,13 +100,18 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             print(line)
 
     target_vol = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+    enabled_coins = getattr(globals_ref, "ENABLED_COINS", ["XAU", "CL", "BTC", "ETH"])
     try:
-        if os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
-            with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as _f:
+        cfg_file = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
+        if cfg_file and os.path.exists(cfg_file):
+            with open(cfg_file, "r", encoding="utf-8") as _f:
                 _cfg = json.load(_f)
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
                     target_vol = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                if "ENABLED_COINS" in _cfg:
+                    enabled_coins = _cfg["ENABLED_COINS"]
     except: pass
+    enabled_set = {str(c).split("-")[0].upper() for c in enabled_coins}
     if getattr(globals_ref, "USE_DYNAMIC_RISK", False):
         try:
             sl_pct = globals_ref.SCALPING_SL_PCT
@@ -224,8 +229,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
 
     active_limit_tfs = set()
     for cfg in COIN_PORTFOLIO:
+        c_upper = cfg["coin"].upper()
         if cfg["swap"] in state_matrix:
             tk = state_matrix[cfg["swap"]]
+            has_pos = (tk.has_long or tk.has_short)
+            if (c_upper not in enabled_set) and not has_pos:
+                continue
             # Đang có vị thế → đóng khung TF đã khớp
             if tk.has_long or tk.has_short:
                 pos_tf = getattr(tk, "active_pos_tf", None)
@@ -295,12 +304,19 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         return f"(VOL: {vol_val:.1f} U)"
     
     for cfg_idx, cfg in enumerate(COIN_PORTFOLIO):
+        c_upper = cfg["coin"].upper()
         sid = cfg["swap"]
-        if sid not in state_matrix: 
+        tk = state_matrix.get(sid)
+        has_pos = (tk.has_long or tk.has_short) if tk else False
+        is_coin_enabled = (c_upper in enabled_set)
+        
+        # ⚡ Chỉ hiển thị coin được tích trade hoặc đang có vị thế mở
+        if not is_coin_enabled and not has_pos:
+            continue
+
+        if not tk: 
             table_lines.append(f" {cfg['coin']:^4} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^7} | {'---':^18} ")
             continue
-            
-        tk = state_matrix[sid]
         
         # CÁCH EMA: luôn hiển thị khoảng cách tới EMA200-H4
         btc_tk = state_matrix.get("BTC-USDT-SWAP")
@@ -481,6 +497,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         coin_name = cfg["coin"]
         if sid not in state_matrix: continue
         tk = state_matrix[sid]
+        
+        # ⚡ LỌC BỎ CÁC COIN CHƯA TÍCH TRADE VÀ KHÔNG CÓ VỊ THẾ MỞ
+        is_coin_enabled = (coin_name.upper() in enabled_set)
+        if not is_coin_enabled and not tk.has_long and not tk.has_short:
+            continue
+
         leverage = cfg.get("leverage", 100)
         has_any = False
         # ╰─ luôn thẳng hàng dọc với ╭─ bằng cách tính indent từ chính dòng ╭─
@@ -626,8 +648,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                         lines.append(f"{indent_branch}{prefix}  Đang limit: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
                     pos_lines.append((0, coin_name, lines))
 
-    # ⚡ Sắp xếp: XAU ưu tiên 0, BTC ưu tiên 1, ETH ưu tiên 2, sau đó đến mode priority (❶=1, ❷=2, ❸=3), pending=0 xếp cuối
-    def _coin_order(c_name): return {"XAU": 0, "BTC": 1, "ETH": 2}.get(c_name, 99)
+    # ⚡ Sắp xếp theo thứ tự danh mục COIN_PORTFOLIO, sau đó đến mode priority (❶=1, ❷=2, ❸=3), pending=0 xếp cuối
+    portfolio_order = {item["coin"]: idx for idx, item in enumerate(COIN_PORTFOLIO)}
+    def _coin_order(c_name): return portfolio_order.get(c_name, 99)
     pos_lines.sort(key=lambda x: (_coin_order(x[1]), x[0] if x[0] > 0 else 99))
 
     is_first = True
