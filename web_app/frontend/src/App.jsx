@@ -230,8 +230,10 @@ function SingleChartPane({
   const getIndicatorTitle = (id) => {
     const titles = {
       liquid_v5: "TLS1 - Charts Liquid v5",
+      smc_ob: "SMC Order Block (Bot Live)",
       ema200: "EMA 200",
       ema_ribbon: "EMA Ribbon (20, 50, 200)",
+      bollinger_bands: "Bollinger Bands (20, 2)",
       bb: "Bollinger Bands (20, 2)",
       supertrend: "SuperTrend (10, 3)",
       rsi: "RSI (14)",
@@ -291,7 +293,7 @@ function SingleChartPane({
     const o = overlayRef.current;
     if (!o) return;
     const currentActive = activeIndicatorsRef.current || [];
-    if (!currentActive.includes("smc_ob")) {
+    if (!currentActive.includes("smc_ob") || hiddenIndicatorsRef.current?.has("smc_ob")) {
       o.innerHTML = "";
       return;
     }

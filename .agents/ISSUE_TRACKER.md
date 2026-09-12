@@ -17,6 +17,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/09/2026]** - Khắc Phục Hiển Thị & Đồng Bộ Chỉ Báo `SMC Order Block (Live từ Bot OKX)`:
+  - **Vấn đề:** Biểu đồ hiển thị mã `smc_ob` trong Indicator Legend nhưng bên trong Modal Indicators không thấy để bật/tắt.
+  - **Nguyên nhân:** `smc_ob` là tính năng vẽ khối Order Block trực tiếp từ Bot OKX (`rd.ob_boxes`), trước đây được lưu trong localStorage nhưng chưa được khai báo vào danh mục `BUILTIN_INDICATORS` của modal và thiếu map nhãn thân thiện.
+  - **Giải pháp:**
+    1. Đưa `SMC Order Block (Live từ Bot OKX)` (`id: "smc_ob"`) vào danh mục `System` của [IndicatorsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/IndicatorsModal.jsx).
+    2. Cập nhật `getIndicatorTitle` để hiển thị nhãn đẹp `SMC Order Block (Bot Live)` trên Indicator Legend chart.
+    3. Hỗ trợ ẩn/hiện tạm thời bằng icon con mắt thông qua `hiddenIndicators` trong hàm `drawObs()`.
+
 - **[12/09/2026]** - Hoàn Thiện Chuẩn Hoá Indicators Chuẩn Thế Giới, Dọn Dẹp Scripts Trắng & Tích Hợp Indicator Legend:
   - **Yêu cầu của CEO:**
     1. Mục `System`: Chỉ hiển thị các chỉ báo hệ thống phổ biến trên thế giới (Liquid v5, RSI, MACD, Volume 20, BB, EMA Ribbon, SuperTrend, EMA 200), vẽ chuẩn xác như TradingView.

@@ -14,6 +14,16 @@ export const BUILTIN_INDICATORS = [
     description: "Hệ thống phát hiện dòng tiền thông minh SMC: Quét khoảng trống giá (Fair Value Gaps) và Khối lệnh tổ chức (Order Blocks) chuẩn TLS1.",
   },
   {
+    id: "smc_ob",
+    name: "SMC Order Block (Live từ Bot OKX)",
+    category: "system",
+    type: "strategy",
+    author: "TLS1 Bot Engine",
+    boosts: "250 K",
+    isEditorPick: true,
+    description: "Các khối Order Block (vùng cung cầu tổ chức) do Bot OKX nhận diện tự động và cập nhật trực tiếp theo thời gian thực.",
+  },
+  {
     id: "rsi",
     name: "Relative Strength Index (RSI 14)",
     category: "system",
