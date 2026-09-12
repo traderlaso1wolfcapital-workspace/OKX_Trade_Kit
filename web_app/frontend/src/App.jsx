@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode } from "lightweight-charts";
+import DrawingToolbar, { DRAWING_TOOLS } from "./components/DrawingToolbar";
+import DrawingCanvasOverlay from "./components/DrawingCanvasOverlay";
+import IndicatorsModal from "./components/IndicatorsModal";
+import TradingViewEmbedChart from "./components/TradingViewEmbedChart";
+import {
+  calculateSMA,
+  calculateEMA,
+  calculateRSI,
+  calculateBollingerBands,
+  calculateMACD,
+  calculateSuperTrend,
+  runCoderCustomScript,
+} from "./utils/indicatorEngine";
 import "./App.css";
 
 const COIN_LIST = [
@@ -22,21 +35,7 @@ const COIN_LIST = [
 const TF_LIST = ["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"];
 const BOT_TFS = ["M5", "M15", "M30", "H1", "H2", "H4"];
 
-const calculateEMA = (data, period) => {
-  if (data.length < period) return [];
-  const k = 2 / (period + 1);
-  let emaData = [];
-  let sum = 0;
-  for (let i = 0; i < period; i++) sum += data[i].close;
-  let prevEma = sum / period;
-  emaData.push({ time: data[period - 1].time, value: prevEma });
-  for (let i = period; i < data.length; i++) {
-    const cur = (data[i].close - prevEma) * k + prevEma;
-    emaData.push({ time: data[i].time, value: cur });
-    prevEma = cur;
-  }
-  return emaData;
-};
+// calculateEMA, calculateSMA, calculateRSI... được import trực tiếp từ utils/indicatorEngine.js
 
 // ToggleSwitch component giống Desktop App
 function ToggleSwitch({ checked, onChange, labelOn = "ON", labelOff = "OFF" }) {
@@ -91,56 +90,56 @@ function NumberSpinBox({ value, onChange, min = 0, max, step = 1, suffix = "", w
   );
 }
 
-// TradingView Layout Icons
+// TradingView Layout Icons (Nét mảnh, tinh tế)
 const renderLayoutIcon = (type, w = 24, h = 24) => {
   if (type === "1") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="3" width="22" height="22" rx="3" stroke="currentColor" strokeWidth="2" />
+        <rect x="3" y="3" width="22" height="22" rx="2.5" stroke="currentColor" strokeWidth="1.2" />
       </svg>
     );
   }
   if (type === "2-col") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="3" width="10" height="22" rx="2" stroke="currentColor" strokeWidth="2" />
-        <rect x="15" y="3" width="10" height="22" rx="2" stroke="currentColor" strokeWidth="2" />
+        <rect x="3" y="3" width="10" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="15" y="3" width="10" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
       </svg>
     );
   }
   if (type === "2-row") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="3" width="22" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
-        <rect x="3" y="15" width="22" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
+        <rect x="3" y="3" width="22" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="3" y="15" width="22" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
       </svg>
     );
   }
   if (type === "3-col") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="2.5" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="10.75" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="19" y="3" width="6.5" height="22" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="2.5" y="3" width="6.5" height="22" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
+        <rect x="10.75" y="3" width="6.5" height="22" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
+        <rect x="19" y="3" width="6.5" height="22" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
       </svg>
     );
   }
   if (type === "3-row") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="2.5" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="3" y="10.75" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="3" y="19" width="22" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3" y="2.5" width="22" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
+        <rect x="3" y="10.75" width="22" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
+        <rect x="3" y="19" width="22" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.1" />
       </svg>
     );
   }
   if (type === "4-grid") {
     return (
       <svg width={w} height={h} viewBox="0 0 28 28" fill="none">
-        <rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="15" y="3" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="3" y="15" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="15" y="15" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="3" y="3" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="15" y="3" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="3" y="15" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="15" y="15" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
       </svg>
     );
   }
@@ -176,6 +175,52 @@ function SingleChartPane({
   const [isLogScale, setIsLogScale] = useState(false);
   const userInteractedRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const [activeDrawingTool, setActiveDrawingTool] = useState(DRAWING_TOOLS.CURSOR);
+  const [drawingsCount, setDrawingsCount] = useState(0);
+  const [clearDrawingsTrigger, setClearDrawingsTrigger] = useState(0);
+  const [chartInstance, setChartInstance] = useState(null);
+  const [seriesInstance, setSeriesInstance] = useState(null);
+
+  // Chế độ biểu đồ Hybrid: 'standard' (Biểu đồ Tiêu Chuẩn nội bộ) hoặc 'tv' (Biểu đồ TradingView Gốc)
+  const [chartMode, setChartMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`tls1_chart_mode_${chartIndex}`);
+      if (saved === "smc") return "standard";
+      return saved || "standard";
+    } catch {
+      return "standard";
+    }
+  });
+
+  const handleToggleChartMode = (mode) => {
+    setChartMode(mode);
+    try {
+      localStorage.setItem(`tls1_chart_mode_${chartIndex}`, mode);
+    } catch {}
+  };
+
+  // Trạng thái Indicators & Coder Custom Scripts
+  const [showIndicatorsModal, setShowIndicatorsModal] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tls1_active_indicators");
+      return saved ? JSON.parse(saved) : ["ema200", "smc_ob"];
+    } catch {
+      return ["ema200", "smc_ob"];
+    }
+  });
+  const [coderScripts, setCoderScripts] = useState([]);
+  const dynamicSeriesRef = useRef(new Map());
+
+  const toggleIndicator = (id) => {
+    setActiveIndicators((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      try {
+        localStorage.setItem("tls1_active_indicators", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Mặc định zoom nến to (khoảng 30-80 cây nến, cách viền phải 5-10 cây nến)
   const applyDefaultZoom = () => {
@@ -197,10 +242,14 @@ function SingleChartPane({
   };
 
   const drawObs = () => {
+    const o = overlayRef.current;
+    if (!activeIndicators.includes("smc_ob")) {
+      if (o) o.innerHTML = "";
+      return;
+    }
     const obs = activeObsRef.current;
     const c = chartRef.current;
     const s = candleSeriesRef.current;
-    const o = overlayRef.current;
     const cont = containerRef.current;
     if (!obs || !c || !s || !o || !cont || obs.length === 0) {
       if (o) o.innerHTML = "";
@@ -248,6 +297,219 @@ function SingleChartPane({
       box.style.pointerEvents = 'none';
       o.appendChild(box);
     });
+  };
+
+  // Quản lý và render toàn bộ các chỉ báo động (Built-in + Custom Scripts của Coder)
+  const updateIndicators = () => {
+    const chart = chartRef.current;
+    const candles = candlesRef.current;
+    if (!chart || !candles || candles.length === 0) return;
+
+    const seriesMap = dynamicSeriesRef.current;
+
+    const getOrCreateLineSeries = (key, options) => {
+      if (seriesMap.has(key)) {
+        return seriesMap.get(key);
+      }
+      const s = chart.addSeries(LineSeries, options);
+      seriesMap.set(key, s);
+      return s;
+    };
+
+    const getOrCreateHistogramSeries = (key, options) => {
+      if (seriesMap.has(key)) {
+        return seriesMap.get(key);
+      }
+      const s = chart.addSeries(HistogramSeries, options);
+      seriesMap.set(key, s);
+      return s;
+    };
+
+    const removeSeriesByKey = (key) => {
+      if (seriesMap.has(key)) {
+        try {
+          chart.removeSeries(seriesMap.get(key));
+        } catch (e) {}
+        seriesMap.delete(key);
+      }
+    };
+
+    // 1. EMA 200 Trendline
+    if (emaSeriesRef.current) {
+      if (activeIndicators.includes("ema200")) {
+        const emaData = calculateEMA(candles, 200);
+        try { emaSeriesRef.current.setData(emaData); } catch (e) {}
+      } else {
+        try { emaSeriesRef.current.setData([]); } catch (e) {}
+      }
+    }
+
+    // 2. Multiple EMA Ribbon (20, 50, 200)
+    if (activeIndicators.includes("ema_ribbon")) {
+      const s20 = getOrCreateLineSeries("ind_ribbon_20", {
+        color: "#2962ff", lineWidth: 1.5,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      const s50 = getOrCreateLineSeries("ind_ribbon_50", {
+        color: "#ff9800", lineWidth: 1.5,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      const s200 = getOrCreateLineSeries("ind_ribbon_200", {
+        color: "#e91e63", lineWidth: 2,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      try {
+        s20.setData(calculateEMA(candles, 20));
+        s50.setData(calculateEMA(candles, 50));
+        s200.setData(calculateEMA(candles, 200));
+      } catch (e) {}
+    } else {
+      removeSeriesByKey("ind_ribbon_20");
+      removeSeriesByKey("ind_ribbon_50");
+      removeSeriesByKey("ind_ribbon_200");
+    }
+
+    // 3. Bollinger Bands (20, 2)
+    if (activeIndicators.includes("bollinger_bands")) {
+      const bb = calculateBollingerBands(candles, 20, 2);
+      const sUpper = getOrCreateLineSeries("ind_bb_upper", {
+        color: "#2196f3", lineWidth: 1,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      const sBasis = getOrCreateLineSeries("ind_bb_basis", {
+        color: "#ffeb3b", lineWidth: 1, lineStyle: 2,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      const sLower = getOrCreateLineSeries("ind_bb_lower", {
+        color: "#2196f3", lineWidth: 1,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      try {
+        sUpper.setData(bb.upper);
+        sBasis.setData(bb.basis);
+        sLower.setData(bb.lower);
+      } catch (e) {}
+    } else {
+      removeSeriesByKey("ind_bb_upper");
+      removeSeriesByKey("ind_bb_basis");
+      removeSeriesByKey("ind_bb_lower");
+    }
+
+    // 4. SuperTrend (10, 3)
+    if (activeIndicators.includes("supertrend")) {
+      const st = calculateSuperTrend(candles, 10, 3);
+      const sSt = getOrCreateLineSeries("ind_supertrend", {
+        color: "#26a69a", lineWidth: 2,
+        priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      });
+      try {
+        sSt.setData(st.map(item => ({ time: item.time, value: item.value })));
+      } catch (e) {}
+    } else {
+      removeSeriesByKey("ind_supertrend");
+    }
+
+    // 5. RSI (14)
+    if (activeIndicators.includes("rsi")) {
+      try {
+        chart.priceScale("rsi").applyOptions({
+          scaleMargins: { top: 0.76, bottom: 0.04 },
+        });
+      } catch (e) {}
+      const sRsi = getOrCreateLineSeries("ind_rsi", {
+        color: "#9c27b0", lineWidth: 1.5,
+        priceScaleId: "rsi",
+        priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
+      });
+      try {
+        sRsi.setData(calculateRSI(candles, 14));
+      } catch (e) {}
+    } else {
+      removeSeriesByKey("ind_rsi");
+    }
+
+    // 6. MACD (12, 26, 9)
+    if (activeIndicators.includes("macd")) {
+      const macdRes = calculateMACD(candles, 12, 26, 9);
+      try {
+        chart.priceScale("macd").applyOptions({
+          scaleMargins: { top: 0.78, bottom: 0.02 },
+        });
+      } catch (e) {}
+      const sHist = getOrCreateHistogramSeries("ind_macd_hist", {
+        priceScaleId: "macd",
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      const sMacd = getOrCreateLineSeries("ind_macd_line", {
+        color: "#2962ff", lineWidth: 1.5,
+        priceScaleId: "macd",
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      const sSig = getOrCreateLineSeries("ind_macd_sig", {
+        color: "#ff6d00", lineWidth: 1.5,
+        priceScaleId: "macd",
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      try {
+        sHist.setData(macdRes.histogram);
+        sMacd.setData(macdRes.macd);
+        sSig.setData(macdRes.signal);
+      } catch (e) {}
+    } else {
+      removeSeriesByKey("ind_macd_hist");
+      removeSeriesByKey("ind_macd_line");
+      removeSeriesByKey("ind_macd_sig");
+    }
+
+    // 7. Coder Custom Scripts
+    const activeCustomScriptIds = activeIndicators.filter(id => id.startsWith("custom_"));
+    for (const [key] of seriesMap.entries()) {
+      if (key.startsWith("coder_script_")) {
+        const scriptId = key.replace("coder_script_", "").split("_plot_")[0];
+        if (!activeCustomScriptIds.includes(scriptId)) {
+          removeSeriesByKey(key);
+        }
+      }
+    }
+
+    for (const sId of activeCustomScriptIds) {
+      let script = coderScripts.find(s => s.id === sId);
+      if (!script) {
+        try {
+          const saved = JSON.parse(localStorage.getItem("tls1_coder_scripts") || "[]");
+          script = saved.find(s => s.id === sId);
+        } catch (e) {}
+      }
+      if (script && script.code) {
+        const res = runCoderCustomScript(script.code, candles);
+        if (res.success && res.plots) {
+          res.plots.forEach((plotItem, idx) => {
+            const plotKey = `coder_script_${sId}_plot_${idx}`;
+            const pSeries = getOrCreateLineSeries(plotKey, {
+              color: plotItem.color || "#00e676",
+              lineWidth: plotItem.lineWidth || 2,
+              priceLineVisible: false,
+              lastValueVisible: true,
+              crosshairMarkerVisible: false,
+              autoscaleInfoProvider: () => null,
+            });
+            try {
+              pSeries.setData(plotItem.data);
+            } catch (e) {}
+          });
+        }
+      }
+    }
+
+    // SMC Order Blocks
+    drawObs();
   };
 
   // Khởi tạo Chart
@@ -369,6 +631,8 @@ function SingleChartPane({
     candleSeriesRef.current = cs;
     volumeSeriesRef.current = vs;
     emaSeriesRef.current = es;
+    setChartInstance(chart);
+    setSeriesInstance(cs);
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawObs());
 
@@ -404,9 +668,20 @@ function SingleChartPane({
       containerEl.removeEventListener('pointerdown', handleUserInteraction);
       containerEl.removeEventListener('touchstart', handleUserInteraction);
       resizeObserver.disconnect();
+      dynamicSeriesRef.current.clear();
       chart.remove();
+      chartRef.current = null;
+      candleSeriesRef.current = null;
+      setChartInstance(null);
+      setSeriesInstance(null);
     };
   }, []);
+
+  // Tự động cập nhật các Indicators động khi activeIndicators hoặc coderScripts thay đổi
+  useEffect(() => {
+    if (!isVisible || !chartRef.current) return;
+    updateIndicators();
+  }, [activeIndicators, coderScripts, isVisible]);
 
   // Tự động căn chỉnh lại kích thước và zoom khi bố cục hoặc trạng thái hiển thị thay đổi
   useEffect(() => {
@@ -461,9 +736,12 @@ function SingleChartPane({
         setTimeout(() => {
           if (isMounted) {
             applyDefaultZoom();
+            updateIndicators();
             drawObs();
           }
         }, 15);
+      } else {
+        updateIndicators();
       }
     } else {
       // Chỉ xoá trắng khi chưa từng có dữ liệu cho coin/tf này
@@ -541,12 +819,14 @@ function SingleChartPane({
         if (rd.ob_boxes) {
           activeObsRef.current = rd.ob_boxes;
         }
+        updateIndicators();
 
         if (!hasInitializedRef.current) {
           hasInitializedRef.current = true;
           setTimeout(() => {
             if (!isMounted) return;
             applyDefaultZoom();
+            updateIndicators();
             drawObs();
           }, 30);
         } else {
@@ -595,6 +875,7 @@ function SingleChartPane({
       {showToolbar && (
         <div className="single-chart-header">
           <div className="single-chart-header-left">
+            {layoutSelector}
             <select
               className="styled-select"
               style={{ width: "105px", fontSize: "11px", padding: "1px 4px", height: "22px", border: "1px solid #333", borderRadius: "3px" }}
@@ -621,9 +902,49 @@ function SingleChartPane({
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            <button
+              className={`chart-indicators-btn ${activeIndicators.length > 0 ? "active" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowIndicatorsModal(true);
+              }}
+              title="Indicators, metrics & strategies"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M3 3v18h18" />
+                <path d="M7 16l4-6 4 3 6-8" />
+              </svg>
+              <span>Indicators</span>
+              {activeIndicators.length > 0 && (
+                <span className="indicator-badge">{activeIndicators.length}</span>
+              )}
+            </button>
+
+            {/* Chế độ Hybrid: Chuyển đổi giữa Standard và TV Pro - Hoàn toàn không có icon */}
+            <div className="chart-mode-pill-group">
+              <button
+                className={`chart-mode-pill ${chartMode === "standard" ? "active" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleChartMode("standard");
+                }}
+                title="Biểu đồ Tiêu Chuẩn (Khối Order Block live từ Bot)"
+              >
+                Standard
+              </button>
+              <button
+                className={`chart-mode-pill tv ${chartMode === "tv" ? "active" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleChartMode("tv");
+                }}
+                title="Biểu đồ TradingView Gốc (Full công cụ vẽ & indicator chính hãng)"
+              >
+                TV Pro
+              </button>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {layoutSelector}
             <div style={{ fontSize: "10px", color: "#888", fontWeight: "bold" }}>
               #{chartIndex + 1}
             </div>
@@ -631,64 +952,98 @@ function SingleChartPane({
         </div>
       )}
 
-      <div className="single-chart-body">
-        <div
-          className="single-chart-canvas"
-          ref={containerRef}
-          onWheel={() => setIsAutoFit(false)}
-          onTouchStart={() => setIsAutoFit(false)}
-          onMouseDown={() => setIsAutoFit(false)}
-        />
-        <div
-          ref={overlayRef}
-          style={{
-            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-            pointerEvents: 'none', zIndex: 4, overflow: 'hidden'
-          }}
-        />
-        <div style={{
-          position: "absolute", bottom: "6px", right: "52px",
-          display: "flex", gap: "4px", zIndex: 10
-        }}>
-          <button
-            title="Auto (Mặc định zoom 30-80 nến)"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = !isAutoFit;
-              setIsAutoFit(next);
-              if (next) {
-                userInteractedRef.current = false;
-                applyDefaultZoom();
-              }
-            }}
+      <div className="single-chart-body" style={{ display: chartMode === "tv" ? "none" : "flex" }}>
+        <div className="chart-stage-wrapper">
+          <div
+            className="single-chart-canvas"
+            ref={containerRef}
+            onWheel={() => setIsAutoFit(false)}
+            onTouchStart={() => setIsAutoFit(false)}
+            onMouseDown={() => setIsAutoFit(false)}
+          />
+          <DrawingCanvasOverlay
+            chart={chartInstance}
+            series={seriesInstance}
+            coin={coin}
+            activeTool={activeDrawingTool}
+            setActiveTool={setActiveDrawingTool}
+            onDrawingsCountChange={setDrawingsCount}
+            clearTrigger={clearDrawingsTrigger}
+          />
+          <div
+            ref={overlayRef}
             style={{
-              width: "20px", height: "20px",
-              background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-              color: isAutoFit ? "#fff" : "#d1d4dc",
-              border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
-              borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              pointerEvents: 'none', zIndex: 4, overflow: 'hidden'
             }}
-          >A</button>
-          <button
-            title="Log scale"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = !isLogScale;
-              setIsLogScale(next);
-              chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
-            }}
-            style={{
-              width: "20px", height: "20px",
-              background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
-              color: isLogScale ? "#fff" : "#d1d4dc",
-              border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
-              borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
-            }}
-          >L</button>
+          />
+          <div style={{
+            position: "absolute", bottom: "6px", right: "52px",
+            display: "flex", gap: "4px", zIndex: 10
+          }}>
+            <button
+              title="Auto (Mặc định zoom 30-80 nến)"
+              onClick={(e) => {
+                e.stopPropagation();
+                const next = !isAutoFit;
+                setIsAutoFit(next);
+                if (next) {
+                  userInteractedRef.current = false;
+                  applyDefaultZoom();
+                }
+              }}
+              style={{
+                width: "20px", height: "20px",
+                background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                color: isAutoFit ? "#fff" : "#d1d4dc",
+                border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
+                borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
+              }}
+            >A</button>
+            <button
+              title="Log scale"
+              onClick={(e) => {
+                e.stopPropagation();
+                const next = !isLogScale;
+                setIsLogScale(next);
+                chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+              }}
+              style={{
+                width: "20px", height: "20px",
+                background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
+                color: isLogScale ? "#fff" : "#d1d4dc",
+                border: isLogScale ? "1px solid #2962ff" : "1px solid #444",
+                borderRadius: "3px", fontSize: "10px", fontWeight: "bold", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1
+              }}
+            >L</button>
+          </div>
         </div>
       </div>
+
+      {/* Widget TradingView Chính Hãng khi ở chế độ TV Pro */}
+      {chartMode === "tv" && (
+        <div className="single-chart-body tv-body" style={{ flex: 1, height: "100%", width: "100%", position: "relative" }}>
+          <TradingViewEmbedChart
+            coin={coin}
+            tf={tf}
+            chartIndex={chartIndex}
+            isVisible={isVisible && chartMode === "tv"}
+          />
+        </div>
+      )}
+
+      {/* TradingView Indicators & Coder Scripts Modal */}
+      <IndicatorsModal
+        isOpen={showIndicatorsModal}
+        onClose={() => setShowIndicatorsModal(false)}
+        activeIndicators={activeIndicators}
+        onToggleIndicator={toggleIndicator}
+        customScripts={coderScripts}
+        onUpdateCustomScripts={setCoderScripts}
+        candles={candlesRef.current}
+      />
     </div>
   );
 }

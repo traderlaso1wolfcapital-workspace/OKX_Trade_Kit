@@ -73,7 +73,7 @@ if res.returncode == 0 and res_tag.returncode == 0:
     if ENABLE_BUILD_EXE_ACTION:
         print("🚀 HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ACTION ĐANG CHẠY TRÊN SERVER).")
     else:
-        print("🚀 HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ĐÃ KHÓA BUILD ACTION .EXE).")
+        print("✅ HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ĐÃ KHÓA BUILD ACTION .EXE).")
     print(f"Phiên bản: v{new_v}")
 else:
     print("❌ THẤT BẠI: Quá trình đẩy code lên GitHub gặp lỗi (Exit code != 0).")

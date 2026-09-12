@@ -17,6 +17,78 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/09/2026]** - Tinh Chỉnh Bố Cục Biểu Đồ: Nét Mảnh Tinh Tế & Chỉ Tô Viền Xanh Khi Chọn (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "các phần bố cục này cho nét mảnh hơn, và chỉ cần tô viền xanh khi chọn vào thôi ko cần bôi xanh cả" (kèm ảnh chụp popover bố cục với nút chọn bị bôi xanh toàn bộ).
+  - **Đã thực hiện:**
+    1. **Nét mảnh tinh tế (`renderLayoutIcon`):** Giảm độ dày nét vẽ (`strokeWidth`) của toàn bộ các icon bố cục từ 2.0px / 1.8px xuống 1.2px / 1.1px. Các ô chữ nhật thanh mảnh, sắc nét, chuẩn giao diện TradingView hiện đại.
+    2. **Chỉ viền xanh (`.layout-option-btn.selected`):** Bỏ hoàn toàn lớp nền màu xanh (`background: rgba(41,98,255,0.2)`), giữ nền tối tự nhiên (`#181b24`). Chỉ hiển thị viền xanh dương mảnh `1.5px solid #2962ff` quanh ô đang chọn, icon bên trong giữ màu trắng sáng tinh tế, không bị nhuộm xanh toàn bộ.
+    3. **Đồng bộ & Biên dịch:** Đồng bộ 100% sang `web_app1/frontend` và build production cả 2 dự án thành công 100% (`npm.cmd run build`).
+
+- **[12/09/2026]** - Tinh Gọn Giao Diện: Đổi Tên Thành "Standard", Xóa Hết Icon, Dọn Dẹp Tool Vẽ & Đưa Nút Bố Cục Về Góc Trên Bên Trái (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "vậy chế độ SMC đổi tên khác cho hợp lý và chung chung và clean các tool đi vì bên TV Pro có đủ công cụ rồi. xoá hết icon trước các tên SMC TV PRO đi, tôi ko thích thêm icon vào. chọn bố cục biểu đồ thì luôn đưa về góc trên bên trái biểu đồ".
+  - **Đã thực hiện:**
+    1. **Đổi tên & Bỏ toàn bộ Icon:** Đổi `⚡ SMC` thành `Standard` (chung chung, chuẩn kỹ thuật) và `📈 TV Pro` thành `TV Pro`. Xóa sạch mọi icon trang trí trước tên.
+    2. **Dọn dẹp công cụ (Clean Toolbar):** Gỡ bỏ thanh công cụ vẽ (`DrawingToolbar`) khỏi biểu đồ nội bộ (`Standard`) để trả lại 100% không gian nến thoáng đãng, tối ưu hiệu năng vì bên chế độ `TV Pro` đã có đầy đủ 100% công cụ vẽ chính hãng.
+    3. **Chuyển nút chọn bố cục về góc trên bên trái:** Đưa nút chọn bố cục (`layoutSelector`) ra vị trí đầu tiên của thanh Header bên trái (ngay trước bộ chọn coin & TF), đồng thời chỉnh menu popup thả xuống mở từ bên trái (`left: 0`) cực kỳ trực quan và tiện dụng.
+    4. **Đồng bộ & Biên dịch:** Đồng bộ 100% sang `web_app1/frontend` và build production cả 2 dự án thành công 100% (`npm.cmd run build`).
+
+
+- **[12/09/2026]** - Tích Hợp Chế Độ Hybrid Chart: Chuyển Đổi 1-Click Giữa TradingView Gốc & Bot SMC (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "hãy cố gắng lấy tool trực tiếp từ tradingview".
+  - **Đã thực hiện:**
+    1. **Component TradingView Chính Hãng (`TradingViewEmbedChart.jsx`):**
+       - Nhúng widget `TradingView Advanced Real-Time Chart` (`tv.js`) trực tiếp từ máy chủ TradingView.
+       - Tích hợp 100% công cụ kẻ vẽ gốc (Fibo, Gann, Brush, Long/Short Position, Thước đo, Text, Mũi tên, v.v.) và kho chỉ báo đồ sộ của TradingView.
+       - Bảng ánh xạ tự động mã coin OKX swap (`OKX:BTCUSDT.P`, `OKX:ETHUSDT.P`, `OKX:XAUUSDT.P`, `NYMEX:CL1!`, `CRYPTOCAP:USDT.D`...) và khung thời gian (`1`, `5`, `15`, `30`, `60`, `120`, `240`, `D`).
+    2. **Bộ Chuyển Đổi Chế Độ Hybrid (`App.jsx`):**
+       - Thêm nút công tắc `[⚡ SMC]` <---> `[📈 TV Pro]` ngay trên Header biểu đồ của từng ô nến.
+       - Chuyển đổi trạng thái 0ms, lưu nhớ lựa chọn vào `localStorage`.
+       - Ở chế độ `[⚡ SMC]`: Biểu đồ nội bộ siêu tốc kèm các khối Order Block SMC của Bot Python.
+       - Ở chế độ `[📈 TV Pro]`: Biểu đồ TradingView chính hãng với đầy đủ 100% công cụ vẽ và indicator gốc.
+    3. **Đồng bộ & Biên dịch:**
+       - Nạp sẵn `tv.js` trong `index.html` của cả 2 web app.
+       - Đồng bộ 100% sang `web_app1/frontend`.
+       - Biên dịch production cả 2 dự án (`npm.cmd run build`) thành công 100% (0 lỗi).
+
+
+- **[12/09/2026]** - Tích Hợp Bảng Chọn Chỉ Báo TradingView & Môi Trường Viết Script Cho Coder (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "ok triển khai cho tôi, và tôi cũng muốn phát triển để các coder có thể viết indicator chỉ báo như tradingview đang làm".
+  - **Đã thực hiện:**
+    1. **Môi trường tính toán chỉ báo & Script Engine (`indicatorEngine.js`):**
+       - Built-in Math: `calculateEMA`, `calculateSMA`, `calculateRSI`, `calculateBollingerBands`, `calculateMACD`, `calculateSuperTrend`.
+       - Sandbox Script Execution `runCoderCustomScript(scriptCode, candles)`: Cung cấp API tương tự Pine Script gồm `candles, close, open, high, low, volume, time, sma, ema, highest, lowest, plot(name, data, options)`.
+    2. **Component Modal TradingView Style (`IndicatorsModal.jsx`):**
+       - Modal Dark Mode chuẩn TradingView, thanh tìm kiếm Search tức thì.
+       - Tabs điều hướng: `Favorites`, `My scripts (Coder)`, `Technicals`, `SMC & Price Action`, `Community Scripts`.
+       - Bộ lọc Type: `All / Indicators / Strategies`.
+       - Tab `My scripts`: Code editor chuyên biệt cho coder lập trình trực tiếp, tạo mới, lưu, xóa và nút `▶ Apply to Chart` / `✓ Active on Chart` kèm thông báo lỗi biên dịch/runtime chi tiết.
+    3. **Tích hợp Header & Quản lý Series Động trên Chart (`App.jsx`):**
+       - Nút `Indicators` nằm trên Header `SingleChartPane` ngay cạnh chọn khung thời gian (TF) với badge hiển thị số lượng chỉ báo đang kích hoạt.
+       - Quản lý vòng đời series qua `dynamicSeriesRef (Map)`, vẽ trực tiếp lên chart và tự động cập nhật khi có nến mới hoặc đổi coin/TF.
+       - Cho phép bật/tắt độc lập các khối Order Block SMC và EMA 200.
+    4. **Đồng bộ & Kiểm thử:**
+       - Đồng bộ toàn bộ sang `web_app1/frontend`.
+       - Biên dịch production cả 2 dự án (`web_app`, `web_app1`) thành công 100% với `npm.cmd run build` (0 lỗi).
+
+  - **Yêu cầu của CEO:** "chỉ cần viền xanh xung quanh cái được chọn thôi ko đc bôi đen toàn bộ như này, tôi chỉ cần 10 tool cơ bản như trên thôi" (kèm ảnh nút chọn bị khối xanh đậm che phủ).
+  - **Đã thực hiện:**
+    1. **Sửa trạng thái Active (`.drawing-tool-btn.active`):** Bỏ hoàn toàn khối nền xanh đặc (`background: #2962ff`), đổi sang `border: 1.5px solid #2962ff`, nền giữ tối (`background: rgba(41, 98, 255, 0.08)`), icon bên trong hiển thị sáng rõ không bị che phủ.
+    2. **Tinh gọn còn đúng 10 công cụ cơ bản:**
+       - 1. `Cross` (Con trỏ)
+       - 2. `Brush` (Bút vẽ)
+       - 3. `Fib retracement` (Fib thoái lui)
+       - 4. `Trend-based fib extension` (Fib mở rộng)
+       - 5. `Long position` (Vị thế Long)
+       - 6. `Short position` (Vị thế Short)
+       - 7. `Rectangle` (Hộp cản OB)
+       - 8. `Path` (Đường gấp khúc)
+       - 9. `Trend line` (Đường xu hướng)
+       - 10. `Price range` (Thước đo biên độ giá)
+       - `Delete all drawings` (Thùng rác xóa toàn bộ)
+    3. **Biên dịch:** Đã build production cả 2 dự án (`web_app`, `web_app1`) thành công 100%.
+
+
+
 - **[12/09/2026]** - Tinh Chỉnh Công Tắc Gạt Mini: Chỉ Chấm Tròn Chuyển Màu Xanh Nến `#26a69a`, Nền Giữ Tối (`web_app`, `web_app1`):
   - **Yêu cầu của CEO:** "hiện tại khi chưa gạt thì như ảnh, khi gạt thì chỉ chấm xám ở giữa chuyển màu xanh xanh thôi, màu xanh nhu màu nến ảnh 2".
   - **Đã thực hiện:**
