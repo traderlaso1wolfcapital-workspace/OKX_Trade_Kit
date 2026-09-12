@@ -17,6 +17,72 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/09/2026]** - Hoàn Thiện Chuẩn Hoá Indicators Chuẩn Thế Giới, Dọn Dẹp Scripts Trắng & Tích Hợp Indicator Legend:
+  - **Yêu cầu của CEO:**
+    1. Mục `System`: Chỉ hiển thị các chỉ báo hệ thống phổ biến trên thế giới (Liquid v5, RSI, MACD, Volume 20, BB, EMA Ribbon, SuperTrend, EMA 200), vẽ chuẩn xác như TradingView.
+    2. Mục `Community` & `My Scripts`: Xóa sạch toàn bộ chỉ báo mẫu/ảo, để giao diện trống sạch đẹp vì chưa có ai đóng góp.
+    3. Giải đáp về `//@version=5` Pine Script của TradingView.
+    4. Góc trên biểu đồ có nút Chevron `^`/`v` kèm tooltip `Hide indicator legend` / `Show indicator legend`, hiển thị các chỉ báo đang bật kèm icon con mắt (ẩn/hiện) và nút `✕` (gỡ bỏ).
+    5. Nút `"Đang kích hoạt: X chỉ báo trên biểu đồ"` ở footer modal hoặc số badge trên chart khi bấm vào sẽ mở trực tiếp tab `Đang bật (Active)` để tắt nhanh chỉ báo.
+  - **Đã thực hiện:**
+    1. Đã tinh giản mục `System` còn đúng 8 chỉ báo tinh hoa chuẩn TradingView.
+    2. Đã dọn sạch các script mẫu ảo ở `Community` và `My Scripts` thành mảng rỗng `[]` kèm empty state thân thiện.
+    3. Tích hợp Indicator Legend góc trên trái chart: có nút `^` thu/phóng danh sách, icon con mắt ẩn/hiện, nút `✕` xóa.
+    4. Thêm tab `Đang bật (Active)` trong modal. Bấm vào badge số trên chart hoặc footer "Đang kích hoạt: X chỉ báo" sẽ tự động chuyển thẳng vào tab này.
+    5. Đã build production `npm.cmd run build` thành công và verify 100% bằng browser subagent.
+
+- **[12/09/2026]** - Tái Cấu Trúc Modal Indicators Thành 5 Danh Mục Chuẩn & Tối Giản:
+  - **Yêu cầu của CEO:** Thiết kế lại modal Indicators gồm 5 mục:
+    1. `Favorites` (Yêu thích)
+    2. `System` (Chỉ báo hệ thống mặc định của giới trading: Liquid v5, RSI, MACD, Volume, Bollinger Bands, EMA Ribbon, SuperTrend...)
+    3. `Community` (Chỉ báo cộng đồng có tag tác giả, boosts)
+    4. `My Scripts` (Chỉ báo tài khoản cá nhân, có nút bật/tắt Chia sẻ ra cộng đồng hoặc đặt Riêng tư)
+    5. `Source Code` (Bộ soạn thảo hỗ trợ viết code, tạo/lưu/xóa và apply to chart)
+  - **Đã thực hiện:**
+    1. Cập nhật `IndicatorsModal.jsx` với đúng 5 tab sidebar: `Favorites`, `System`, `Community`, `My Scripts`, `Source Code`.
+    2. Thêm thanh công cụ và badge toggle `[🌐 Đã chia sẻ]` / `[🔒 Riêng tư]` trong tab `My Scripts`. Khi bật chia sẻ, chỉ báo sẽ tự động xuất hiện trên tab `Community` kèm tên tác giả.
+    3. Đưa kịch bản cưng `TLS1 Charts_Liquid v5 (Order Blocks & FVG)` lên đầu danh mục `System`.
+    4. Biên dịch production `npm.cmd run build` thành công 100%.
+
+
+- **[12/09/2026]** - Chỉnh Nút "Indicators" Về Nền Dark Chữ Trắng Chuẩn:
+  - **Yêu cầu của CEO:** "indicator để nền dark chữ trắng như bình thường" (kèm ảnh chụp nút Indicators bị viền xanh chữ xanh).
+  - **Đã thực hiện:** Chỉnh nút `Indicators` (`.chart-indicators-btn`) luôn giữ màu nền dark `#171b26`, viền `#333333`, chữ màu trắng `#ffffff`, icon trắng tinh tế đồng bộ hoàn toàn với các dropdown bên cạnh trên cả 2 web app.
+
+
+- **[12/09/2026]** - Đồng Bộ Màu Sắc Nút Chế Độ Biểu Đồ (Nền Xanh Chữ Trắng Chuẩn):
+  - **Yêu cầu của CEO:** "chọn standard hay tradinview thì cũng chỉ cần nền xanh chữ trắng như hiện tại".
+  - **Đã thực hiện:** Đồng bộ style khi active của cả `Standard` và `TradingView` dùng chung màu nền xanh dương `#2962ff`, chữ màu trắng đậm `#ffffff` trên cả 2 web app.
+
+
+- **[12/09/2026]** - Tích Hợp Kho Kịch Bản Cộng Đồng (Community Scripts) Chuẩn 1:1 Theo TradingView (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "trong mục indicators của tradingview có các indicator của người dùng tải lên như trong hình, tôi cũng muốn có chúng trong mục indicators của web bạn hãy tích hợp giống tradingview giúp tôi" (kèm ảnh chụp modal Indicators có danh sách tác giả HPotter, LuxAlgo, Zeiierman, fluxchart, EmreKb...).
+  - **Đã thực hiện:**
+    1. **Tích hợp kho Community Scripts chuẩn 1:1:**
+       - Tích hợp đầy đủ các kịch bản nổi tiếng: `Bullish Engulfing automatic finding script (HPotter)`, `Candle Range Theory (fluxchart)`, `Dynamic Swing Anchored VWAP (Zeiierman) [EP]`, `Fair Value Gap [LuxAlgo]`, `FVG (Nephew_Sam_)`, `ICT Turtle Soup (fluxchart)`, `Linear Regression Candles (ugurvu)`, `Liquidity Swings [LuxAlgo]`, `M2 Global Liquidity Index (TibixAi)`, `Market Structure Break & Order Block (EmreKb) [EP]`, `Multiple EMA 8/34/89 (MrEricHoang)`.
+       - Hiển thị đầy đủ cột: ⭐ Star, Tên chỉ báo + Badge `EP` (Editor's Pick), Tên tác giả (Author link xanh dương), Lượt thích/Boosts (`25.2 K`, `61.1 K`...).
+    2. **Cấu trúc Sidebar Danh mục chuẩn TradingView:**
+       - `PERSONAL`: `Favorites`, `My scripts`, `Purchased`.
+       - `BUILT-IN`: `Technicals`, `Fundamentals`.
+       - `COMMUNITY`: `Editors' picks`, `Top`, `Trending`.
+       - Bộ lọc trên đỉnh: `All`, `Indicators`, `Strategies`.
+    3. **Tính năng dành cho Coder & Người dùng:**
+       - Bấm vào nút `{"{}"}`: Tự động mở và nạp mã nguồn thuật toán vào bộ soạn thảo `My scripts` để Coder tự do nghiên cứu, chỉnh sửa code và test run.
+       - Bấm vào icon 📄: Mở popover xem mô tả chi tiết thuật toán của tác giả.
+       - Bấm chọn chỉ báo: Lập tức kích hoạt và vẽ các đường / tín hiệu tương ứng lên biểu đồ (`App.jsx`).
+    4. **Đồng bộ & Biên dịch:** Đồng bộ 100% sang `web_app1/frontend` và build production cả 2 dự án thành công 100% (`npm.cmd run build`).
+
+
+- **[12/09/2026]** - Đổi Tên Nút Thành "TradingView" & Ẩn Triệt Để Logo TradingView Ở Góc Dưới (`web_app`, `web_app1`):
+  - **Yêu cầu của CEO:** "TV PRO nên đổi tên thành Tradingview luôn, nếu xoá đc logo tradingview bên góc dưới thì xoá giúp tôi luôn" (kèm ảnh chụp logo tròn TradingView).
+  - **Đã thực hiện:**
+    1. **Đổi tên nút:** Cập nhật nhãn nút từ `TV Pro` thành `TradingView` chuẩn xác trên thanh Header của toàn bộ các ô biểu đồ.
+    2. **Ẩn triệt để Logo / Copyright TradingView:**
+       - Thiết lập `disabled_features: ["link_to_tradingview", "header_widget_dom_node", "logo", "branding"]` trong cấu hình `TradingView.widget`.
+       - Thêm quy tắc CSS chuyên biệt ẩn toàn bộ các phần tử logo, link bản quyền, attribution watermark (`a[href*="tradingview.com"]`, `.tradingview-widget-copyright`, `#tv-attr-logo`, `.tv-attribution-logo`).
+    3. **Đồng bộ & Biên dịch:** Đồng bộ 100% sang `web_app1/frontend` và build production cả 2 dự án thành công 100% (`npm.cmd run build`).
+
+
 - **[12/09/2026]** - Tinh Chỉnh Bố Cục Biểu Đồ: Nét Mảnh Tinh Tế & Chỉ Tô Viền Xanh Khi Chọn (`web_app`, `web_app1`):
   - **Yêu cầu của CEO:** "các phần bố cục này cho nét mảnh hơn, và chỉ cần tô viền xanh khi chọn vào thôi ko cần bôi xanh cả" (kèm ảnh chụp popover bố cục với nút chọn bị bôi xanh toàn bộ).
   - **Đã thực hiện:**

@@ -98,6 +98,12 @@ export default function TradingViewEmbedChart({
         save_image: true,
         container_id: containerId,
         studies: [], // Để người dùng tự do thêm indicator từ kho TradingView
+        disabled_features: [
+          "link_to_tradingview",
+          "header_widget_dom_node",
+          "logo",
+          "branding"
+        ],
         overrides: {
           "paneProperties.background": "#0c0c0c",
           "paneProperties.vertGridProperties.color": "rgba(42, 46, 57, 0.35)",

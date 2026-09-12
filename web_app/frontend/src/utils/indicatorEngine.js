@@ -323,3 +323,145 @@ export function runCoderCustomScript(scriptCode, candles) {
     return { success: false, plots: [], error: err.message };
   }
 }
+
+/**
+ * Tính toán TLS1 Charts_Liquid v5 (Ported - Core Logic)
+ * Trả về danh sách Fair Value Gaps (FVG) và Order Blocks (OB)
+ */
+export function calculateLiquidV5(candles) {
+  if (!candles || candles.length < 5) return { fvg_boxes: [], ob_boxes: [] };
+  
+  const fvg_boxes = [];
+  const ob_boxes = [];
+  
+  // 1. Tính toán FVG (Fair Value Gaps)
+  for (let i = 2; i < candles.length; i++) {
+    const c0 = candles[i-2];
+    const c1 = candles[i-1];
+    const c2 = candles[i];
+    
+    // Bullish FVG (c2 low > c0 high)
+    if (c2.low > c0.high && c1.close > c0.high) {
+      const gap = c2.low - c0.high;
+      if (gap > (c0.high - c0.low) * 0.1) { // Lọc gap quá nhỏ
+        fvg_boxes.push({
+          type: 'bull',
+          top: c2.low,
+          bottom: c0.high,
+          time: c1.time, // Bắt đầu từ cây nến tạo gap (c1)
+          end_time: null,
+          is_fvg: true,
+        });
+      }
+    }
+    
+    // Bearish FVG (c2 high < c0 low)
+    if (c2.high < c0.low && c1.close < c0.low) {
+      const gap = c0.low - c2.high;
+      if (gap > (c0.high - c0.low) * 0.1) {
+        fvg_boxes.push({
+          type: 'bear',
+          top: c0.low,
+          bottom: c2.high,
+          time: c1.time,
+          end_time: null,
+          is_fvg: true,
+        });
+      }
+    }
+  }
+
+  // Cập nhật trạng thái FVG bị lấp đầy (Mitigated)
+  for (let f of fvg_boxes) {
+    const startIndex = candles.findIndex(c => c.time === f.time);
+    if (startIndex > -1) {
+      for (let i = startIndex + 1; i < candles.length; i++) {
+        const c = candles[i];
+        if (f.type === 'bull' && c.low <= f.bottom) {
+          f.end_time = c.time;
+          break;
+        }
+        if (f.type === 'bear' && c.high >= f.top) {
+          f.end_time = c.time;
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Tính toán Order Blocks (Dựa trên Swing High/Low cơ bản)
+  const pivotLen = 5;
+  for (let i = pivotLen; i < candles.length - pivotLen; i++) {
+    let isSwingHigh = true;
+    let isSwingLow = true;
+    for (let j = 1; j <= pivotLen; j++) {
+      if (candles[i-j].high >= candles[i].high || candles[i+j].high >= candles[i].high) isSwingHigh = false;
+      if (candles[i-j].low <= candles[i].low || candles[i+j].low <= candles[i].low) isSwingLow = false;
+    }
+    
+    if (isSwingHigh) {
+      // Bearish OB (Nến xanh cuối cùng trước đợt giảm)
+      for (let k = i; k >= Math.max(0, i-5); k--) {
+        if (candles[k].close > candles[k].open) {
+          ob_boxes.push({
+            type: 'bear',
+            top: candles[k].high,
+            bottom: candles[k].low,
+            time: candles[k].time,
+            end_time: null,
+            is_ob: true,
+          });
+          break;
+        }
+      }
+    }
+    if (isSwingLow) {
+      // Bullish OB (Nến đỏ cuối cùng trước đợt tăng)
+      for (let k = i; k >= Math.max(0, i-5); k--) {
+        if (candles[k].close < candles[k].open) {
+          ob_boxes.push({
+            type: 'bull',
+            top: candles[k].high,
+            bottom: candles[k].low,
+            time: candles[k].time,
+            end_time: null,
+            is_ob: true,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // Cập nhật trạng thái OB bị phá vỡ hoàn toàn
+  for (let ob of ob_boxes) {
+    const startIndex = candles.findIndex(c => c.time === ob.time);
+    if (startIndex > -1) {
+      for (let i = startIndex + 1; i < candles.length; i++) {
+        const c = candles[i];
+        if (ob.type === 'bull' && c.close < ob.bottom) { // Bị phá xuống
+          ob.end_time = c.time;
+          break;
+        }
+        if (ob.type === 'bear' && c.close > ob.top) { // Bị phá lên
+          ob.end_time = c.time;
+          break;
+        }
+      }
+    }
+  }
+  // 3. Lọc theo chuẩn TLS1 Charts_Liquid v5:
+  // - Chỉ giữ các khối ĐANG CÒN HIỆU LỰC (unmitigated, end_time == null)
+  // - showLastXFVGs = 2 (tối đa 2 Bull FVG & 2 Bear FVG mới nhất)
+  // - maxOrderBlocks = 5 (tối đa 3 Bull OB & 3 Bear OB mới nhất)
+  const activeBullFVG = fvg_boxes.filter(f => f.type === 'bull' && !f.end_time).slice(-2);
+  const activeBearFVG = fvg_boxes.filter(f => f.type === 'bear' && !f.end_time).slice(-2);
+  const activeBullOB = ob_boxes.filter(o => o.type === 'bull' && !o.end_time).slice(-3);
+  const activeBearOB = ob_boxes.filter(o => o.type === 'bear' && !o.end_time).slice(-3);
+
+  return {
+    fvg_boxes: [...activeBullFVG, ...activeBearFVG],
+    ob_boxes: [...activeBullOB, ...activeBearOB]
+  };
+}
+

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode } from "lightweight-charts";
 import DrawingToolbar, { DRAWING_TOOLS } from "./components/DrawingToolbar";
 import DrawingCanvasOverlay from "./components/DrawingCanvasOverlay";
-import IndicatorsModal from "./components/IndicatorsModal";
+import IndicatorsModal, { COMMUNITY_SCRIPTS } from "./components/IndicatorsModal";
 import TradingViewEmbedChart from "./components/TradingViewEmbedChart";
 import {
   calculateSMA,
@@ -12,6 +12,7 @@ import {
   calculateMACD,
   calculateSuperTrend,
   runCoderCustomScript,
+  calculateLiquidV5,
 } from "./utils/indicatorEngine";
 import "./App.css";
 
@@ -169,7 +170,9 @@ function SingleChartPane({
   const volumeSeriesRef = useRef(null);
   const emaSeriesRef = useRef(null);
   const overlayRef = useRef(null);
+  const liquidV5OverlayRef = useRef(null);
   const activeObsRef = useRef([]);
+  const liquidV5BoxesRef = useRef({ fvg_boxes: [], ob_boxes: [] });
   const candlesRef = useRef([]);
   const [isAutoFit, setIsAutoFit] = useState(true);
   const [isLogScale, setIsLogScale] = useState(false);
@@ -204,17 +207,60 @@ function SingleChartPane({
   const [activeIndicators, setActiveIndicators] = useState(() => {
     try {
       const saved = localStorage.getItem("tls1_active_indicators");
-      return saved ? JSON.parse(saved) : ["ema200", "smc_ob"];
+      return saved ? JSON.parse(saved) : ["ema200", "liquid_v5"];
     } catch {
-      return ["ema200", "smc_ob"];
+      return ["ema200", "liquid_v5"];
     }
   });
+  // Ref luôn giữ state mới nhất để các hàm bất đồng bộ/setInterval không bị Stale Closure
+  const activeIndicatorsRef = useRef(activeIndicators);
+  activeIndicatorsRef.current = activeIndicators;
+
   const [coderScripts, setCoderScripts] = useState([]);
+  const coderScriptsRef = useRef(coderScripts);
+  coderScriptsRef.current = coderScripts;
+
+  // Quản lý ẩn/hiện tạm thời trên biểu đồ (Hide indicator legend / eye icon)
+  const [hiddenIndicators, setHiddenIndicators] = useState(new Set());
+  const hiddenIndicatorsRef = useRef(hiddenIndicators);
+  hiddenIndicatorsRef.current = hiddenIndicators;
+  const [isLegendVisible, setIsLegendVisible] = useState(true);
+  const [indicatorsModalTab, setIndicatorsModalTab] = useState("system");
+
+  const getIndicatorTitle = (id) => {
+    const titles = {
+      liquid_v5: "TLS1 - Charts Liquid v5",
+      ema200: "EMA 200",
+      ema_ribbon: "EMA Ribbon (20, 50, 200)",
+      bb: "Bollinger Bands (20, 2)",
+      supertrend: "SuperTrend (10, 3)",
+      rsi: "RSI (14)",
+      macd: "MACD (12, 26, 9)",
+      volume: "Volume 20",
+    };
+    if (titles[id]) return titles[id];
+    const script = coderScripts.find((s) => s.id === id);
+    return script ? (script.name || script.title || id) : id;
+  };
+
+  const toggleHideIndicator = (id) => {
+    setHiddenIndicators((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      hiddenIndicatorsRef.current = next;
+      return next;
+    });
+  };
+
   const dynamicSeriesRef = useRef(new Map());
+  const updateIndicatorsRef = useRef(null);
+
 
   const toggleIndicator = (id) => {
     setActiveIndicators((prev) => {
       const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      activeIndicatorsRef.current = next;
       try {
         localStorage.setItem("tls1_active_indicators", JSON.stringify(next));
       } catch {}
@@ -243,16 +289,18 @@ function SingleChartPane({
 
   const drawObs = () => {
     const o = overlayRef.current;
-    if (!activeIndicators.includes("smc_ob")) {
-      if (o) o.innerHTML = "";
+    if (!o) return;
+    const currentActive = activeIndicatorsRef.current || [];
+    if (!currentActive.includes("smc_ob")) {
+      o.innerHTML = "";
       return;
     }
     const obs = activeObsRef.current;
     const c = chartRef.current;
     const s = candleSeriesRef.current;
     const cont = containerRef.current;
-    if (!obs || !c || !s || !o || !cont || obs.length === 0) {
-      if (o) o.innerHTML = "";
+    if (!obs || !c || !s || !cont || obs.length === 0) {
+      o.innerHTML = "";
       return;
     }
     o.innerHTML = "";
@@ -299,12 +347,102 @@ function SingleChartPane({
     });
   };
 
+  const drawLiquidV5Boxes = () => {
+    const o = liquidV5OverlayRef.current;
+    if (!o) return;
+    const currentActive = activeIndicatorsRef.current || [];
+    if (!currentActive.includes("liquid_v5")) {
+      o.innerHTML = "";
+      return;
+    }
+    const { fvg_boxes, ob_boxes } = liquidV5BoxesRef.current || {};
+    const c = chartRef.current;
+    const s = candleSeriesRef.current;
+    const cont = containerRef.current;
+    if (!c || !s || !cont || (!fvg_boxes?.length && !ob_boxes?.length)) {
+      o.innerHTML = "";
+      return;
+    }
+    o.innerHTML = "";
+    const w = o.clientWidth || cont.clientWidth;
+    if (w <= 0) return;
+    const maxRightX = w - 65; // Chừa lề trục giá phải
+
+    const drawBox = (item) => {
+      const y1 = s.priceToCoordinate(item.top);
+      const y2 = s.priceToCoordinate(item.bottom);
+      if (y1 === null && y2 === null) return;
+      const topY = y1 !== null ? y1 : 0;
+      const botY = y2 !== null ? y2 : o.clientHeight;
+      const minY = Math.min(topY, botY);
+      const maxY = Math.max(topY, botY);
+      const h = Math.max(maxY - minY, 2);
+
+      let startX = null;
+      if (item.time) {
+        try {
+          const xCoord = c.timeScale().timeToCoordinate(item.time);
+          if (xCoord !== null) startX = Math.floor(xCoord);
+        } catch (e) {}
+      }
+      if (startX === null) startX = -2000;
+
+      let endX = maxRightX;
+      if (item.end_time) {
+        try {
+          const xEndCoord = c.timeScale().timeToCoordinate(item.end_time);
+          if (xEndCoord !== null) endX = Math.floor(xEndCoord);
+        } catch (e) {}
+      }
+      if (startX >= maxRightX) return;
+      if (endX > maxRightX) endX = maxRightX;
+      if (endX < 0) return; // Nằm hoàn toàn bên trái màn hình
+      const boxWidth = endX - startX;
+      if (boxWidth <= 0) return;
+
+      const isBull = item.type === 'bull';
+      const bg = isBull
+        ? (item.is_fvg ? 'rgba(8, 153, 129, 0.22)' : 'rgba(21, 101, 192, 0.22)')
+        : (item.is_fvg ? 'rgba(242, 54, 70, 0.22)' : 'rgba(198, 40, 40, 0.22)');
+      const borderColor = isBull ? 'rgba(8, 153, 129, 0.85)' : 'rgba(242, 54, 70, 0.85)';
+
+      const box = document.createElement('div');
+      box.style.position = 'absolute';
+      box.style.top = minY + 'px';
+      box.style.left = startX + 'px';
+      box.style.width = boxWidth + 'px';
+      box.style.height = h + 'px';
+      box.style.backgroundColor = bg;
+      box.style.border = `1px solid ${borderColor}`;
+      box.style.borderRadius = '2px';
+      box.style.pointerEvents = 'none';
+
+      const tag = document.createElement('span');
+      tag.style.position = 'absolute';
+      tag.style.top = '1px';
+      tag.style.left = '4px';
+      tag.style.fontSize = '9px';
+      tag.style.fontWeight = '700';
+      tag.style.color = borderColor;
+      tag.innerText = item.is_fvg ? (isBull ? '+FVG' : '-FVG') : (isBull ? '+OB' : '-OB');
+      box.appendChild(tag);
+
+      o.appendChild(box);
+    };
+
+    if (fvg_boxes) fvg_boxes.forEach(f => drawBox(f));
+    if (ob_boxes) ob_boxes.forEach(ob => drawBox(ob));
+  };
+
   // Quản lý và render toàn bộ các chỉ báo động (Built-in + Custom Scripts của Coder)
   const updateIndicators = () => {
     const chart = chartRef.current;
     const candles = candlesRef.current;
     if (!chart || !candles || candles.length === 0) return;
 
+    // Luôn lấy danh sách active mới nhất từ Ref để chống Stale Closure
+    const currentActive = activeIndicatorsRef.current || [];
+    const currentScripts = coderScriptsRef.current || [];
     const seriesMap = dynamicSeriesRef.current;
 
     const getOrCreateLineSeries = (key, options) => {
@@ -334,9 +472,11 @@ function SingleChartPane({
       }
     };
 
+    const isIndHidden = (id) => hiddenIndicatorsRef.current?.has(id);
+
     // 1. EMA 200 Trendline
     if (emaSeriesRef.current) {
-      if (activeIndicators.includes("ema200")) {
+      if (currentActive.includes("ema200") && !isIndHidden("ema200")) {
         const emaData = calculateEMA(candles, 200);
         try { emaSeriesRef.current.setData(emaData); } catch (e) {}
       } else {
@@ -345,21 +485,18 @@ function SingleChartPane({
     }
 
     // 2. Multiple EMA Ribbon (20, 50, 200)
-    if (activeIndicators.includes("ema_ribbon")) {
+    if (currentActive.includes("ema_ribbon") && !isIndHidden("ema_ribbon")) {
       const s20 = getOrCreateLineSeries("ind_ribbon_20", {
-        color: "#2962ff", lineWidth: 1.5,
+        color: "#00e5ff", lineWidth: 1.5,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       const s50 = getOrCreateLineSeries("ind_ribbon_50", {
-        color: "#ff9800", lineWidth: 1.5,
+        color: "#ffeb3b", lineWidth: 1.5,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       const s200 = getOrCreateLineSeries("ind_ribbon_200", {
-        color: "#e91e63", lineWidth: 2,
+        color: "#e040fb", lineWidth: 2,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       try {
         s20.setData(calculateEMA(candles, 20));
@@ -373,22 +510,19 @@ function SingleChartPane({
     }
 
     // 3. Bollinger Bands (20, 2)
-    if (activeIndicators.includes("bollinger_bands")) {
+    if (currentActive.includes("bollinger_bands") && !isIndHidden("bollinger_bands")) {
       const bb = calculateBollingerBands(candles, 20, 2);
       const sUpper = getOrCreateLineSeries("ind_bb_upper", {
-        color: "#2196f3", lineWidth: 1,
+        color: "#2196f3", lineWidth: 1.5,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       const sBasis = getOrCreateLineSeries("ind_bb_basis", {
-        color: "#ffeb3b", lineWidth: 1, lineStyle: 2,
+        color: "#ff9800", lineWidth: 1.5, lineStyle: 2,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       const sLower = getOrCreateLineSeries("ind_bb_lower", {
-        color: "#2196f3", lineWidth: 1,
+        color: "#2196f3", lineWidth: 1.5,
         priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       try {
         sUpper.setData(bb.upper);
@@ -402,12 +536,11 @@ function SingleChartPane({
     }
 
     // 4. SuperTrend (10, 3)
-    if (activeIndicators.includes("supertrend")) {
+    if (currentActive.includes("supertrend") && !isIndHidden("supertrend")) {
       const st = calculateSuperTrend(candles, 10, 3);
       const sSt = getOrCreateLineSeries("ind_supertrend", {
         color: "#26a69a", lineWidth: 2,
         priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       });
       try {
         sSt.setData(st.map(item => ({ time: item.time, value: item.value })));
@@ -416,15 +549,31 @@ function SingleChartPane({
       removeSeriesByKey("ind_supertrend");
     }
 
-    // 5. RSI (14)
-    if (activeIndicators.includes("rsi")) {
-      try {
-        chart.priceScale("rsi").applyOptions({
-          scaleMargins: { top: 0.76, bottom: 0.04 },
-        });
-      } catch (e) {}
+    // 5. RSI (14) & 6. MACD (12, 26, 9)
+    const hasRsi = currentActive.includes("rsi") && !isIndHidden("rsi");
+    const hasMacd = currentActive.includes("macd") && !isIndHidden("macd");
+
+    // Khi bật RSI hoặc MACD, tách biệt trục giá nến và các sub-pane
+    try {
+      if (hasRsi && hasMacd) {
+        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.05, bottom: 0.38 } });
+        chart.priceScale("rsi").applyOptions({ scaleMargins: { top: 0.65, bottom: 0.18 }, visible: true });
+        chart.priceScale("macd").applyOptions({ scaleMargins: { top: 0.83, bottom: 0.02 }, visible: true });
+      } else if (hasRsi) {
+        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.25 } });
+        chart.priceScale("rsi").applyOptions({ scaleMargins: { top: 0.77, bottom: 0.02 }, visible: true });
+      } else if (hasMacd) {
+        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.25 } });
+        chart.priceScale("macd").applyOptions({ scaleMargins: { top: 0.77, bottom: 0.02 }, visible: true });
+      } else {
+        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.12 } });
+      }
+    } catch (e) {}
+
+    // RSI (14)
+    if (hasRsi) {
       const sRsi = getOrCreateLineSeries("ind_rsi", {
-        color: "#9c27b0", lineWidth: 1.5,
+        color: "#b388ff", lineWidth: 1.5,
         priceScaleId: "rsi",
         priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false,
       });
@@ -435,14 +584,9 @@ function SingleChartPane({
       removeSeriesByKey("ind_rsi");
     }
 
-    // 6. MACD (12, 26, 9)
-    if (activeIndicators.includes("macd")) {
+    // MACD (12, 26, 9)
+    if (hasMacd) {
       const macdRes = calculateMACD(candles, 12, 26, 9);
-      try {
-        chart.priceScale("macd").applyOptions({
-          scaleMargins: { top: 0.78, bottom: 0.02 },
-        });
-      } catch (e) {}
       const sHist = getOrCreateHistogramSeries("ind_macd_hist", {
         priceScaleId: "macd",
         priceLineVisible: false, lastValueVisible: false,
@@ -468,19 +612,31 @@ function SingleChartPane({
       removeSeriesByKey("ind_macd_sig");
     }
 
-    // 7. Coder Custom Scripts
-    const activeCustomScriptIds = activeIndicators.filter(id => id.startsWith("custom_"));
+    // 7. Volume 20 Chu Kỳ
+    const hasVol = currentActive.includes("volume") && !isIndHidden("volume");
+    if (volumeSeriesRef.current) {
+      try {
+        volumeSeriesRef.current.applyOptions({ visible: hasVol });
+      } catch (e) {}
+    }
+
+    // 8. Coder Custom Scripts
+    const activeCustomScriptIds = currentActive.filter(id => id.startsWith("custom_") || id.startsWith("comm_"));
     for (const [key] of seriesMap.entries()) {
       if (key.startsWith("coder_script_")) {
         const scriptId = key.replace("coder_script_", "").split("_plot_")[0];
-        if (!activeCustomScriptIds.includes(scriptId)) {
+        if (!activeCustomScriptIds.includes(scriptId) || isIndHidden(scriptId)) {
           removeSeriesByKey(key);
         }
       }
     }
 
     for (const sId of activeCustomScriptIds) {
-      let script = coderScripts.find(s => s.id === sId);
+      if (isIndHidden(sId)) continue;
+      let script = currentScripts.find(s => s.id === sId);
+      if (!script && typeof COMMUNITY_SCRIPTS !== "undefined") {
+        script = COMMUNITY_SCRIPTS.find(s => s.id === sId);
+      }
       if (!script) {
         try {
           const saved = JSON.parse(localStorage.getItem("tls1_coder_scripts") || "[]");
@@ -498,7 +654,6 @@ function SingleChartPane({
               priceLineVisible: false,
               lastValueVisible: true,
               crosshairMarkerVisible: false,
-              autoscaleInfoProvider: () => null,
             });
             try {
               pSeries.setData(plotItem.data);
@@ -510,7 +665,19 @@ function SingleChartPane({
 
     // SMC Order Blocks
     drawObs();
+
+    // TLS1 Charts Liquid v5
+    if (currentActive.includes("liquid_v5") && !isIndHidden("liquid_v5")) {
+      liquidV5BoxesRef.current = calculateLiquidV5(candles);
+    } else {
+      liquidV5BoxesRef.current = { fvg_boxes: [], ob_boxes: [] };
+    }
+    drawLiquidV5Boxes();
   };
+
+
+  // Cập nhật ref cho hàm updateIndicators
+  updateIndicatorsRef.current = updateIndicators;
 
   // Khởi tạo Chart
   useEffect(() => {
@@ -634,7 +801,10 @@ function SingleChartPane({
     setChartInstance(chart);
     setSeriesInstance(cs);
 
-    chart.timeScale().subscribeVisibleLogicalRangeChange(() => drawObs());
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      drawObs();
+      drawLiquidV5Boxes();
+    });
 
     // Bắt tương tác chuột/touch của người dùng để khóa zoom, không tự ý reset
     const handleUserInteraction = () => {
@@ -655,6 +825,7 @@ function SingleChartPane({
         if (width > 0 && height > 0) {
           chartRef.current.applyOptions({ width, height });
           drawObs();
+          drawLiquidV5Boxes();
           if (isAutoFit && !userInteractedRef.current) {
             applyDefaultZoom();
           }
@@ -677,11 +848,14 @@ function SingleChartPane({
     };
   }, []);
 
-  // Tự động cập nhật các Indicators động khi activeIndicators hoặc coderScripts thay đổi
+  // Tự động cập nhật các Indicators động khi activeIndicators, coderScripts hoặc hiddenIndicators thay đổi
   useEffect(() => {
+    activeIndicatorsRef.current = activeIndicators;
+    coderScriptsRef.current = coderScripts;
+    hiddenIndicatorsRef.current = hiddenIndicators;
     if (!isVisible || !chartRef.current) return;
-    updateIndicators();
-  }, [activeIndicators, coderScripts, isVisible]);
+    (updateIndicatorsRef.current || updateIndicators)();
+  }, [activeIndicators, coderScripts, isVisible, hiddenIndicators]);
 
   // Tự động căn chỉnh lại kích thước và zoom khi bố cục hoặc trạng thái hiển thị thay đổi
   useEffect(() => {
@@ -697,6 +871,7 @@ function SingleChartPane({
           applyDefaultZoom();
         }
         drawObs();
+        drawLiquidV5Boxes();
       }
     }, 40);
     return () => clearTimeout(timer);
@@ -736,12 +911,13 @@ function SingleChartPane({
         setTimeout(() => {
           if (isMounted) {
             applyDefaultZoom();
-            updateIndicators();
+            (updateIndicatorsRef.current || updateIndicators)();
             drawObs();
+            drawLiquidV5Boxes();
           }
         }, 15);
       } else {
-        updateIndicators();
+        (updateIndicatorsRef.current || updateIndicators)();
       }
     } else {
       // Chỉ xoá trắng khi chưa từng có dữ liệu cho coin/tf này
@@ -756,6 +932,9 @@ function SingleChartPane({
       }
       if (overlayRef.current) {
         overlayRef.current.innerHTML = "";
+      }
+      if (liquidV5OverlayRef.current) {
+        liquidV5OverlayRef.current.innerHTML = "";
       }
       candlesRef.current = [];
       activeObsRef.current = [];
@@ -819,15 +998,16 @@ function SingleChartPane({
         if (rd.ob_boxes) {
           activeObsRef.current = rd.ob_boxes;
         }
-        updateIndicators();
+        (updateIndicatorsRef.current || updateIndicators)();
 
         if (!hasInitializedRef.current) {
           hasInitializedRef.current = true;
           setTimeout(() => {
             if (!isMounted) return;
             applyDefaultZoom();
-            updateIndicators();
+            (updateIndicatorsRef.current || updateIndicators)();
             drawObs();
+            drawLiquidV5Boxes();
           }, 30);
         } else {
           // Khi cập nhật nến định kỳ:
@@ -850,6 +1030,7 @@ function SingleChartPane({
           setTimeout(() => {
             if (!isMounted) return;
             drawObs();
+            drawLiquidV5Boxes();
           }, 30);
         }
       } catch (e) {
@@ -906,6 +1087,7 @@ function SingleChartPane({
               className={`chart-indicators-btn ${activeIndicators.length > 0 ? "active" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
+                setIndicatorsModalTab("system");
                 setShowIndicatorsModal(true);
               }}
               title="Indicators, metrics & strategies"
@@ -916,7 +1098,17 @@ function SingleChartPane({
               </svg>
               <span>Indicators</span>
               {activeIndicators.length > 0 && (
-                <span className="indicator-badge">{activeIndicators.length}</span>
+                <span
+                  className="indicator-badge"
+                  title="Đang kích hoạt: Bấm để quản lý bật/tắt"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIndicatorsModalTab("active");
+                    setShowIndicatorsModal(true);
+                  }}
+                >
+                  {activeIndicators.length}
+                </span>
               )}
             </button>
 
@@ -940,7 +1132,7 @@ function SingleChartPane({
                 }}
                 title="Biểu đồ TradingView Gốc (Full công cụ vẽ & indicator chính hãng)"
               >
-                TV Pro
+                TradingView
               </button>
             </div>
           </div>
@@ -977,6 +1169,109 @@ function SingleChartPane({
               pointerEvents: 'none', zIndex: 4, overflow: 'hidden'
             }}
           />
+          <div
+            ref={liquidV5OverlayRef}
+            style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              pointerEvents: 'none', zIndex: 5, overflow: 'hidden'
+            }}
+          />
+
+          {/* TradingView-Style Indicator Legend Overlay */}
+          <div className="chart-legend-overlay">
+            <div className="chart-legend-header">
+              <button
+                className="chart-legend-toggle-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLegendVisible(prev => !prev);
+                }}
+                title={isLegendVisible ? "Hide indicator legend" : "Show indicator legend"}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  style={{
+                    transform: isLegendVisible ? "rotate(0deg)" : "rotate(180deg)",
+                    transition: "transform 0.15s ease",
+                  }}
+                >
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+              {!isLegendVisible && activeIndicators.length > 0 && (
+                <span
+                  className="chart-legend-collapsed-hint"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLegendVisible(true);
+                  }}
+                  title="Show indicator legend"
+                >
+                  {activeIndicators.length} ind
+                </span>
+              )}
+            </div>
+
+            {isLegendVisible && activeIndicators.length > 0 && (
+              <div className="chart-legend-list">
+                {activeIndicators.map((id) => {
+                  const isHidden = hiddenIndicators.has(id);
+                  const title = getIndicatorTitle(id);
+                  return (
+                    <div key={id} className={`chart-legend-item ${isHidden ? "legend-item-hidden" : ""}`}>
+                      <span
+                        className="chart-legend-item-title"
+                        title={title}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleHideIndicator(id);
+                        }}
+                      >
+                        {title}
+                      </span>
+                      <div className="chart-legend-actions">
+                        <button
+                          className="chart-legend-action-btn"
+                          title={isHidden ? "Show indicator" : "Hide indicator"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleHideIndicator(id);
+                          }}
+                        >
+                          {isHidden ? (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          className="chart-legend-action-btn remove-btn"
+                          title="Remove indicator"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleIndicator(id);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div style={{
             position: "absolute", bottom: "6px", right: "52px",
             display: "flex", gap: "4px", zIndex: 10
@@ -1043,6 +1338,7 @@ function SingleChartPane({
         customScripts={coderScripts}
         onUpdateCustomScripts={setCoderScripts}
         candles={candlesRef.current}
+        initialCategory={indicatorsModalTab}
       />
     </div>
   );
