@@ -78,7 +78,11 @@ def fetch_candles_paginated(client, inst_id: str, bar: str, limit: int) -> list[
 # ==============================================================================
 # 🛡️ KIỂM TOÁN LỆNH CƠ SỞ OKX
 # ==============================================================================
-def clean_limit_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None):
+def clean_limit_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None, dry_run: bool = False):
+    # 🔒 DRY-RUN: Không hủy lệnh thật khi đang chạy ngầm
+    if dry_run:
+        print(f"🌑 [DRY-RUN] clean_limit_orders: Bỏ qua hủy Limit cũ cho {inst_id} (shadow mode)")
+        return
     try:
         pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id})["data"]
         # Quét sạch cả hai tiền tố lệnh cũ (scv25) và mới (scvlmt) để tránh sót lệnh trên sàn
@@ -175,7 +179,11 @@ def check_partial_lock_sl(client, inst_id: str, side: str, avg_px: Decimal,
 
     return False
 
-def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None):
+def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None, dry_run: bool = False):
+    # 🔒 DRY-RUN: Không hủy TP/SL thật khi đang chạy ngầm
+    if dry_run:
+        print(f"🌑 [DRY-RUN] clean_algo_orders: Bỏ qua hủy Algo TP/SL cho {inst_id} (shadow mode)")
+        return
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
         # Quét sạch cả hai tiền tố lệnh cũ (scv25) và mới (scvlmt) để tránh sót lệnh trên sàn
@@ -190,7 +198,11 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
     except Exception as e:
         hft_logger.error(f"Lỗi clean_algo_orders: {e}", exc_info=True)
 
-def close_position_market(client, inst_id: str, pos_side: str, size: str, log_reason: str, td_mode: str = "cross"):
+def close_position_market(client, inst_id: str, pos_side: str, size: str, log_reason: str, td_mode: str = "cross", dry_run: bool = False):
+    # 🔒 DRY-RUN: Không đóng vị thế thật khi đang chạy ngầm
+    if dry_run:
+        print(f"🌑 [DRY-RUN] close_position_market: Sẽ đóng {inst_id} {pos_side.upper()} Market — {log_reason} (shadow mode, bỏ qua)")
+        return
     size_dec = Decimal(size)
     norm_side = "long" if pos_side == "long" or (pos_side == "net" and size_dec > 0) else "short"
     side = "sell" if norm_side == "long" else "buy"
@@ -214,11 +226,15 @@ def close_position_market(client, inst_id: str, pos_side: str, size: str, log_re
                 pass
         hft_logger.error(f"Lỗi close_position_market: {e}", exc_info=True)
 
-def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
+def cleanup_all_orders_on_startup(client, portfolio: list[dict], dry_run: bool = False):
     """
     Dọn dẹp toàn bộ lệnh Limit rác cũ khi khởi động.
     BẢO LƯU nguyên vẹn toàn bộ lệnh TP/SL của vị thế để đảm bảo an toàn tuyệt đối.
     """
+    # 🔒 DRY-RUN: Không hủy lệnh khi đang chạy ngầm
+    if dry_run:
+        print("🌑 [DRY-RUN] cleanup_all_orders_on_startup: Bỏ qua dọn dẹp Startup (shadow mode)")
+        return
     try:
         import time
         print("🧹 [STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh Limit rác trên OKX (Bảo lưu TP/SL)...")
@@ -239,7 +255,11 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     except Exception as e:
         hft_logger.error(f"Lỗi cleanup_all_orders_on_startup: {e}", exc_info=True)
 
-def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross"):
+def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
+    # 🔒 DRY-RUN
+    if dry_run:
+        print(f"🌑 [DRY-RUN] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={size} (shadow mode, bỏ qua)")
+        return None
     try:
         resp = client.request("POST", "/api/v5/trade/order", body={
             "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": size
@@ -264,7 +284,11 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
         hft_logger.error(f"Lỗi place_market_entry: {err_str}", exc_info=True)
         print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
-def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross"):
+def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
+    # 🔒 DRY-RUN: Ghi log ảo thay vì đặt lệnh thật lên OKX
+    if dry_run:
+        print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{price} sz={size} (shadow mode, bỏ qua)")
+        return None
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     try:
         resp = client.request("POST", "/api/v5/trade/order", body=body)
@@ -302,7 +326,12 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
             print("   Bạn vui lòng chuyển sang Chế độ phòng ngừa rủi ro (Hedge Mode), thay vì Chế độ một chiều (One-way Mode) như hiện tại.")
         raise
 
-def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross"):
+def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
+    # 🔒 DRY-RUN: Ghi log ảo thay vì đặt TP/SL thật
+    if dry_run:
+        tp_or_sl = "TP" if is_tp else "SL"
+        print(f"🌑 [DRY-RUN] place_algo_tpsl: Sẽ đặt {tp_or_sl} {inst_id} {pos_side.upper()} @{trigger_px} sz={size} (shadow mode, bỏ qua)")
+        return
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "conditional", "sz": size, "clOrdId": cl_id}
     tp_or_sl = "TP" if is_tp else "SL"
     if is_tp: body["tpTriggerPx"], body["tpOrdPx"] = trigger_px, "-1"

@@ -585,23 +585,11 @@ export function calculateLiquidV5(candles, options = {}) {
             lastCRT.tpTarget = lastCRT.entryPrice - (Math.abs(lastCRT.entryPrice - lastCRT.slTarget) * dynamicRR);
           }
         }
-        lastCRT.entry2Price = lastCRT.entryPrice + (lastCRT.slTarget - lastCRT.entryPrice) * (2 / 3);
         
-        alerts.push({ event: 'ENTRY', side: lastCRT.entryType.toUpperCase(), entry1: lastCRT.entryPrice, entry2: lastCRT.entry2Price, sl: lastCRT.slTarget, tp: lastCRT.tpTarget, time: c.time });
+        alerts.push({ event: 'ENTRY', side: lastCRT.entryType.toUpperCase(), entry: lastCRT.entryPrice, sl: lastCRT.slTarget, tp: lastCRT.tpTarget, time: c.time });
       }
 
       if (lastCRT.state === 'Entry Taken' && c.time > lastCRT.entryTime) {
-        if (!lastCRT.entry2Hit) {
-          if (lastCRT.entryType === 'Long' && c.low <= lastCRT.entry2Price) {
-            lastCRT.entry2Hit = true;
-            alerts.push({ event: 'ENTRY2_HIT', side: 'LONG', time: c.time });
-          }
-          if (lastCRT.entryType === 'Short' && c.high >= lastCRT.entry2Price) {
-            lastCRT.entry2Hit = true;
-            alerts.push({ event: 'ENTRY2_HIT', side: 'SHORT', time: c.time });
-          }
-        }
-
         if (lastCRT.entryType === 'Long') {
           if (c.high >= lastCRT.tpTarget) {
             lastCRT.exitPrice = lastCRT.tpTarget;
@@ -693,28 +681,27 @@ export function calculateLiquidV5(candles, options = {}) {
     totalProfit: (totalProfit * 100).toFixed(2)
   };
 
-  const limitCRT = crtList.slice(0, 20);
-  for (let crt of limitCRT) {
-    if (crt.entryTime && crt.tpTarget && crt.slTarget) {
-      const eTime = crt.exitTime || candles[candles.length - 1].time;
-      
-      crt_lines.push({ start_time: crt.entryTime, end_time: eTime, price: crt.entryPrice, color: '#ff9800', type: 'solid', tag: 'Entry 1%' });
-      crt_lines.push({ start_time: crt.entryTime, end_time: eTime, price: crt.entry2Price, color: '#ff9800', type: 'dashed', tag: 'Entry 2%' });
-      
-      const highColor = '#089981';
-      const lowColor = '#f23646';
-      
-      crt_lines.push({ start_time: crt.entryTime, end_time: eTime, price: crt.tpTarget, color: highColor, type: 'dashed', tag: 'TP' });
-      crt_lines.push({ start_time: crt.entryTime, end_time: eTime, price: crt.slTarget, color: lowColor, type: 'dashed', tag: 'SL' });
-      
-      crt_labels.push({ time: eTime, price: crt.tpTarget, text: 'TP', color: highColor, bg: 'rgba(8,153,129,0.5)' });
-      crt_labels.push({ time: eTime, price: crt.slTarget, text: 'SL', color: lowColor, bg: 'rgba(242,54,70,0.5)' });
-      
-      let entryY = crt.entryType === 'Long' ? Math.min(crt.entryPrice, Math.min(crt.slTarget, crt.tpTarget)) : Math.max(crt.entryPrice, Math.max(crt.slTarget, crt.tpTarget));
-      crt_labels.push({ time: crt.entryTime, price: entryY, text: crt.entryType.toUpperCase(), color: crt.entryType === 'Long' ? highColor : lowColor, bg: 'rgba(30,34,45,0.8)' });
-    }
+  // Tạo danh sách position_boxes từ các tín hiệu logic thật (CRT)
+  const position_boxes = [];
+  const validCRTs = crtList.filter(c => c.entryTime && c.entryPrice && c.tpTarget && c.slTarget);
+
+  // Hiển thị tối đa 3-5 vị thế gần nhất từ thuật toán
+  const recentCRTs = validCRTs.slice(-5);
+  for (let crt of recentCRTs) {
+    const entry2Price = crt.entry2Price || (crt.entryPrice + (crt.slTarget - crt.entryPrice) * (2 / 3));
+    position_boxes.push({
+      entryTime: crt.entryTime,
+      entryPrice: crt.entryPrice,
+      entry2Price: entry2Price,
+      tpTarget: crt.tpTarget,
+      slTarget: crt.slTarget,
+      entryType: crt.entryType,
+      state: crt.state,
+      exitTime: crt.exitTime,
+      exitPrice: crt.exitPrice
+    });
   }
 
-  return { fvg_boxes, ob_boxes, crt_lines, crt_labels, alerts, stats };
+  return { fvg_boxes, ob_boxes, crt_lines: [], crt_labels: [], position_boxes, alerts, stats };
 }
 

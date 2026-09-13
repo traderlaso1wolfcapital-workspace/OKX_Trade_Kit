@@ -378,8 +378,8 @@ def compute_ob_boxes(all_candles):
     return ob_boxes
 
 @app.get("/api/market/candles")
-def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 1500):
-    """Proxy OKX candle API với cơ chế Sliding Window Pool 1500 nến & Cache siêu tốc."""
+def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
+    """Proxy OKX candle API với cơ chế Sliding Window Pool 2500 nến & Cache siêu tốc."""
     try:
         limit = int(limit)
         now = time.time()
@@ -459,7 +459,7 @@ def _warmup_backend_candles():
     time.sleep(1.5)
     for p, b in [("BTC-USDT-SWAP", "1H"), ("ETH-USDT-SWAP", "1H"), ("XAU-USDT-SWAP", "1H"), ("CRYPTOCAP:USDT.D", "1H")]:
         try:
-            proxy_market_candles(instId=p, bar=b, limit=1500)
+            proxy_market_candles(instId=p, bar=b, limit=2500)
         except Exception:
             pass
 
@@ -603,6 +603,20 @@ def get_running_pid(uid: str, strategy: str) -> int:
             pass
     return 0
 
+def _get_flag_dir(uid: str, strategy: str) -> str:
+    return os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
+
+def _is_shadow_mode(uid: str, strategy: str) -> bool:
+    """Trả về True nếu bot đang chạy ngầm (dry_run=True)"""
+    acc_name = strategy
+    flag = os.path.join(_get_flag_dir(uid, strategy), f"dry_run_{acc_name}.flag")
+    if os.path.exists(flag):
+        try:
+            return open(flag).read().strip() == "1"
+        except:
+            pass
+    return True  # mặc định nếu chưa có file — coi như shadow
+
 @app.get("/api/bot/status")
 def get_bot_status(uid: str, strategy: str = "sub1"):
     proc = get_nested(bot_processes, uid, strategy)
@@ -618,29 +632,28 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
         uptime = int(time.time() - get_nested(bot_start_times, uid, strategy, time.time()))
     else:
         del_nested(bot_processes, uid, strategy)
-            
-    return {
-        "status": "RUNNING" if is_running else "STOPPED",
-        "uptime": uptime,
-        "strategy": strategy
-    }
+
+    if is_running:
+        # Phân biệt RUNNING (live) vs SHADOW (dry-run)
+        shadow = _is_shadow_mode(uid, strategy)
+        return {
+            "status": "SHADOW" if shadow else "RUNNING",
+            "uptime": uptime,
+            "strategy": strategy,
+            "dry_run": shadow
+        }
+    return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True}
 
 @app.post("/api/bot/start")
 async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, account_id: str = None):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
-    if get_running_pid(uid, strategy) > 0:
-        raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running in background.")
 
-    proc = get_nested(bot_processes, uid, strategy)
-    if proc and proc.poll() is None:
-        raise HTTPException(status_code=400, detail=f"Bot {strategy} is already running.")
-        
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not (api_key and secret_key and passphrase):
         raise HTTPException(status_code=400, detail=f"Cần cấu hình API Key cho tài khoản '{target_acc}' trước khi khởi động Bot {strategy}!")
-        
-    # Đồng bộ API key đã chọn vào các file env của bot để sys_bot_{strategy}.py đọc được ngay
+
+    # Đồng bộ API key đã chọn vào các file env của bot
     data_dir = get_user_data_dir(uid)
     strat_env_file = f".api_{strategy}"
     strat_env_path = os.path.join(data_dir, f"bots/{strategy}", strat_env_file)
@@ -648,21 +661,45 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     _save_env_file(os.path.join(data_dir, strat_env_file), api_key, secret_key, passphrase, is_demo)
     _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo)
 
+    flag_dir = _get_flag_dir(uid, strategy)
+    os.makedirs(flag_dir, exist_ok=True)
+    acc_name = strategy
+
+    proc = get_nested(bot_processes, uid, strategy)
+    pid = get_running_pid(uid, strategy)
+    process_alive = (pid > 0) or (proc and proc.poll() is None)
+
+    if process_alive:
+        # Process đang chạy (shadow mode) → chỉ cần kích hoạt bằng flag
+        # Xóa stop flag cũ nếu có
+        stop_flag = os.path.join(flag_dir, f"stop_{acc_name}.flag")
+        if os.path.exists(stop_flag):
+            try: os.remove(stop_flag)
+            except: pass
+        # Ghi activate flag
+        try:
+            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
+                f.write("1")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lỗi ghi activate flag: {e}")
+        return {"status": "success", "message": "⚡ Bot đã được KÍCH HOẠT! Lệnh thật sẽ được đặt lên OKX."}
+
+    # Process chưa chạy — spawn mới (bắt đầu ở DRY_RUN, ngay sau đó activate)
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
-    
     try:
-        flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
-        os.makedirs(flag_dir, exist_ok=True)
-        flag_path = os.path.join(flag_dir, f"stop_{strategy}.flag")
-        if os.path.exists(flag_path):
-            os.remove(flag_path)
-            
+        # Xoá stop/kill flag cũ
+        for fname in [f"stop_{acc_name}.flag", f"kill_{acc_name}.flag"]:
+            fp = os.path.join(flag_dir, fname)
+            if os.path.exists(fp):
+                try: os.remove(fp)
+                except: pass
+
         custom_env = os.environ.copy()
         custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
         custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
         custom_env["PYTHONUNBUFFERED"] = "1"
         custom_env["PYTHONIOENCODING"] = "utf-8"
-            
+
         new_proc = subprocess.Popen(
             cmd,
             cwd=OKX_TRADE_KIT_DIR,
@@ -671,17 +708,21 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
             env=custom_env,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         )
-        
         set_nested(bot_processes, uid, strategy, new_proc)
         set_nested(bot_start_times, uid, strategy, time.time())
-        
         if uid not in bot_log_queues: bot_log_queues[uid] = {}
         bot_log_queues[uid][strategy] = asyncio.Queue()
-        
         loop = asyncio.get_event_loop()
         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
-        
-        return {"status": "success", "message": "Đã khởi động Bot thành công!"}
+
+        # Chờ 2 giây cho bot khởi động rồi gửi activate ngay
+        await asyncio.sleep(2.0)
+        try:
+            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
+                f.write("1")
+        except: pass
+
+        return {"status": "success", "message": "Đã khởi động và kích hoạt Bot thành công!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -721,45 +762,82 @@ def reset_nen(uid: str, strategy: str = "sub1"):
 
 @app.post("/api/bot/stop")
 async def stop_bot(uid: str, strategy: str = "sub1"):
-    proc = get_nested(bot_processes, uid, strategy)
-    
-    flag_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"stop_{strategy}.flag")
+    """Dừng bot (chuyển về Shadow mode). Process tiếp tục chạy ngầm, chỉ đặt lệnh ảo."""
+    acc_name = strategy
+    flag_dir = _get_flag_dir(uid, strategy)
+    os.makedirs(flag_dir, exist_ok=True)
+
+    # Ghi stop flag → bot sẽ chuyển về DRY_RUN (không kill process)
     try:
-        os.makedirs(os.path.dirname(flag_path), exist_ok=True)
-        with open(flag_path, "w") as f:
+        with open(os.path.join(flag_dir, f"stop_{acc_name}.flag"), "w") as f:
             f.write("stop")
     except Exception:
         pass
-        
+
+    # Xóa activate flag nếu có (tránh race condition)
+    activate_flag = os.path.join(flag_dir, f"activate_{acc_name}.flag")
+    if os.path.exists(activate_flag):
+        try: os.remove(activate_flag)
+        except: pass
+
+    return {"message": f"Bot {strategy} đã chuyển về Shadow Mode (chạy ngầm).", "status": "SHADOW"}
+
+@app.post("/api/bot/shadow/start")
+async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = None):
+    """
+    Khởi động Shadow Bot nếu chưa chạy. Gọi khi app load để warm-up EMA/nến ngầm.
+    Nếu process đã alive — không làm gì.
+    """
+    if not uid: raise HTTPException(status_code=400, detail="uid is required")
+
     pid = get_running_pid(uid, strategy)
-    if pid > 0 and not proc:
-        try:
-            p = psutil.Process(pid)
-            p.terminate()
-            p.wait(timeout=2.0)
-        except psutil.TimeoutExpired:
-            p.kill()
-        except Exception:
-            pass
-            
-    if proc and proc.poll() is None:
-        try:
-            for _ in range(15):
-                if proc.poll() is not None:
-                    break
-                await asyncio.sleep(0.2)
-                
-            if proc.poll() is None:
-                proc.terminate()
-                await asyncio.sleep(1.0)
-                if proc.poll() is None:
-                    proc.kill()
-        except Exception:
-            pass
-            
-    if strategy in bot_processes:
-        del_nested(bot_processes, uid, strategy)
-    return {"message": f"Bot {strategy} stopped successfully.", "status": "STOPPED"}
+    proc = get_nested(bot_processes, uid, strategy)
+    if pid > 0 or (proc and proc.poll() is None):
+        return {"status": "already_running", "message": "Shadow bot đang chạy rồi."}
+
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
+    if not (api_key and secret_key and passphrase):
+        return {"status": "no_credentials", "message": "Chưa có API Key — bỏ qua khởi động Shadow Bot."}
+
+    data_dir = get_user_data_dir(uid)
+    strat_env_file = f".api_{strategy}"
+    strat_env_path = os.path.join(data_dir, f"bots/{strategy}", strat_env_file)
+    _save_env_file(strat_env_path, api_key, secret_key, passphrase, is_demo)
+    _save_env_file(os.path.join(data_dir, strat_env_file), api_key, secret_key, passphrase, is_demo)
+    _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo)
+
+    flag_dir = _get_flag_dir(uid, strategy)
+    os.makedirs(flag_dir, exist_ok=True)
+    # Xóa kill flag cũ
+    kill_flag = os.path.join(flag_dir, f"kill_{strategy}.flag")
+    if os.path.exists(kill_flag):
+        try: os.remove(kill_flag)
+        except: pass
+
+    cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
+    try:
+        custom_env = os.environ.copy()
+        custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
+        custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+        custom_env["PYTHONUNBUFFERED"] = "1"
+        custom_env["PYTHONIOENCODING"] = "utf-8"
+
+        new_proc = subprocess.Popen(
+            cmd, cwd=OKX_TRADE_KIT_DIR,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            env=custom_env,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        )
+        set_nested(bot_processes, uid, strategy, new_proc)
+        set_nested(bot_start_times, uid, strategy, time.time())
+        if uid not in bot_log_queues: bot_log_queues[uid] = {}
+        bot_log_queues[uid][strategy] = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
+        return {"status": "success", "message": "Shadow Bot đã được khởi động (chạy ngầm)."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/bot/config")
 def get_bot_config(uid: str, strategy: str = "sub1"):
@@ -1166,11 +1244,78 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                             "children_count": len(items_okx) if len(items_okx) > 1 else 0
                         })
                         
-                        # Tạm thời ẩn các dòng lệnh tách theo yêu cầu CEO, chỉ để dòng lệnh gộp
-                        # if len(items_okx) == 1 and len(active_items) > 1:
-                        #     ...
-                        # if len(items_okx) > 1:
-                        #     ...
+                        # Add Child Rows (Synthesize from bot's trade_markers.json if OKX returns aggregated)
+                        if len(items_okx) == 1 and len(active_items) > 1:
+                            # Update parent children count
+                            formatted_positions[-1]["children_count"] = len(active_items)
+                            
+                            for idx, item in enumerate(active_items):
+                                c_pos = abs(float(item.get("sz", 0)))
+                                c_avg_px = float(item.get("px", 0))
+                                # Estimate margin based on proportion of total_pos
+                                c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
+                                
+                                if c_avg_px > 0:
+                                    if pos_side == "long":
+                                        c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                                    else:
+                                        c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
+                                    c_upl = c_margin * (c_roi / 100)
+                                else:
+                                    c_roi = 0
+                                    c_upl = 0
+                                
+                                formatted_positions.append({
+                                    "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
+                                    "is_child": True,
+                                    "parent_id": parent_id,
+                                    "instId": inst_id,
+                                    "posSide": pos_side,
+                                    "pos": str(c_pos),
+                                    "margin": f"{c_margin:.2f}",
+                                    "avgPx": str(c_avg_px),
+                                    "lastPx": str(last_px),
+                                    "roi": f"{c_roi:.2f}",
+                                    "upl": f"{c_upl:.4f}",
+                                    "tp": tp_px,
+                                    "sl": sl_px,
+                                    "lever": str(int(leverage)),
+                                    "tf": item.get("tf", "").upper()
+                                })
+
+                        # Add Child Rows (Native Split Positions)
+                        if len(items_okx) > 1:
+                            for idx, i_okx in enumerate(items_okx):
+                                c_pos = abs(float(i_okx.get("pos", 0)))
+                                c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
+                                c_avg_px = float(i_okx.get("avgPx", 0))
+                                
+                                # Use OKX native values directly
+                                c_upl = float(i_okx.get("upl", 0))
+                                c_roi = float(i_okx.get("uplRatio", 0)) * 100
+                                
+                                # Tìm TF tương ứng từ active_items nếu có
+                                c_tf = ""
+                                if idx < len(active_items):
+                                    c_tf = active_items[idx].get("tf", "").upper()
+                                    
+                                formatted_positions.append({
+                                    "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
+                                    "is_child": True,
+                                    "parent_id": parent_id,
+                                    "instId": inst_id,
+                                    "posSide": pos_side,
+                                    "pos": str(c_pos),
+                                    "margin": f"{c_margin:.2f}",
+                                    "avgPx": str(c_avg_px),
+                                    "lastPx": str(last_px),
+                                    "roi": f"{c_roi:.2f}",
+                                    "upl": f"{c_upl:.4f}",
+                                    "tp": tp_px,
+                                    "sl": sl_px,
+                                    "lever": str(int(leverage)),
+                                    "tf": c_tf
+                                })
 
                     return formatted_positions
                 else:
@@ -1224,10 +1369,25 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                     "children_count": len(active_items) if len(active_items) > 1 else 0
                 })
                 
-                # Tạm thời ẩn các dòng lệnh tách theo yêu cầu CEO, chỉ để dòng lệnh gộp
-                # if len(active_items) > 1:
-                #     for idx, item in enumerate(active_items):
-                #         ...
+                if len(active_items) > 1:
+                    for idx, item in enumerate(active_items):
+                        mock_positions.append({
+                            "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
+                            "is_child": True,
+                            "parent_id": parent_id,
+                            "instId": inst_id,
+                            "posSide": side,
+                            "pos": str(item.get("volume", "1.0")),
+                            "margin": "0.00",
+                            "avgPx": str(item.get("price")),
+                            "lastPx": str(item.get("price")),
+                            "roi": "0.00",
+                            "upl": "0.00",
+                            "tp": "---",
+                            "sl": "---",
+                            "lever": "100",
+                            "tf": item.get("tf", "").upper()
+                        })
         return mock_positions
     except Exception:
         return []

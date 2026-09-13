@@ -35,6 +35,7 @@ const COIN_LIST = [
 ];
 const TF_LIST = ["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"];
 const BOT_TFS = ["M5", "M15", "M30", "H1", "H2", "H4"];
+export const ADMIN_UID = "admin";
 
 // calculateEMA, calculateSMA, calculateRSI... được import trực tiếp từ utils/indicatorEngine.js
 
@@ -164,6 +165,7 @@ function SingleChartPane({
   isVisible = true,
   layoutSelector = null,
   activeBotTab,
+  adminClosedPositions = [],
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -172,9 +174,20 @@ function SingleChartPane({
   const emaSeriesRef = useRef(null);
   const overlayRef = useRef(null);
   const liquidV5OverlayRef = useRef(null);
+  const liquidV5BoxesOverlayRef = useRef(null);
   const activeObsRef = useRef([]);
   const liquidV5BoxesRef = useRef({ fvg_boxes: [], ob_boxes: [] });
   const candlesRef = useRef([]);
+  const activeBotTabRef = useRef(activeBotTab);
+  const tfRef = useRef(tf);
+
+  useEffect(() => {
+    activeBotTabRef.current = activeBotTab;
+    tfRef.current = tf;
+    drawLiquidV5Boxes();
+    drawObs();
+  }, [activeBotTab, tf]);
+
   const [isAutoFit, setIsAutoFit] = useState(true);
   const [isLogScale, setIsLogScale] = useState(false);
   const userInteractedRef = useRef(false);
@@ -209,30 +222,101 @@ function SingleChartPane({
     try {
       const key = activeBotTab ? `tls1_active_indicators_${activeBotTab}` : "tls1_active_indicators";
       const saved = localStorage.getItem(key);
-      if (saved) return JSON.parse(saved);
-      if (activeBotTab === "sub1") return ["ema200"];
-      if (activeBotTab === "sub2") return ["ema200", "smc_ob"];
-      if (activeBotTab === "sub3") return ["ema200", "liquid_v5"];
-      return ["ema200", "liquid_v5"];
+      let list = saved ? JSON.parse(saved) : null;
+      if (!Array.isArray(list)) list = null;
+      if (!list) {
+        if (activeBotTab === "sub1") list = ["ema200", "volume"];
+        else if (activeBotTab === "sub2") list = ["ema200", "volume", "smc_ob"];
+        else if (activeBotTab === "sub3") list = ["ema200", "volume", "liquid_v5"];
+        else list = ["ema200", "volume", "liquid_v5"];
+      }
+      // Toàn bộ các chart luôn mặc định phải có chỉ báo ema200 và volume
+      if (!list.includes("ema200")) list.unshift("ema200");
+      if (!list.includes("volume")) {
+        const emaIdx = list.indexOf("ema200");
+        list.splice(emaIdx + 1, 0, "volume");
+      }
+      return list;
     } catch {
-      return ["ema200", "liquid_v5"];
+      return ["ema200", "volume", "liquid_v5"];
     }
   });
+
+  const [liveStats, setLiveStats] = useState(null);
+
+  const adminStats = React.useMemo(() => {
+    // Lọc theo coin và tf hiện tại
+    const filtered = adminClosedPositions.filter(p => {
+      // Coin thường dạng "BTC-USDT" và tf dạng "M5" (Bot TFs)
+      const isCoinMatch = p.instId === coin;
+      const isTfMatch = p.tf && (p.tf.toUpperCase() === tf.toUpperCase() || p.tf.toUpperCase() === tf.replace('m', 'M').replace('h', 'H'));
+      return isCoinMatch && isTfMatch;
+    });
+
+    if (filtered.length === 0) {
+      return { totalEntries: 0, wins: 0, losses: 0, winrate: "—", avgProfit: "—", totalProfit: "—" };
+    }
+
+    const totalEntries = filtered.length;
+    let wins = 0, losses = 0, totalPnl = 0;
+    for (const pos of filtered) {
+      const pnl = parseFloat(pos.pnl || "0");
+      totalPnl += pnl;
+      if (pnl > 0) wins++;
+      else losses++;
+    }
+    const winrate = Math.round((wins / totalEntries) * 100);
+    return {
+      totalEntries,
+      wins,
+      losses,
+      winrate: `${winrate}%`,
+      avgProfit: `${(totalPnl / totalEntries).toFixed(2)} USDT`,
+      totalProfit: `${totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)} USDT`
+    };
+  }, [adminClosedPositions, coin, tf]);
+
+  const backtestStats = React.useMemo(() => {
+    if (liveStats && liveStats.totalEntries > adminStats.totalEntries) {
+      return {
+        totalEntries: liveStats.totalEntries,
+        wins: liveStats.wins,
+        losses: liveStats.losses,
+        winrate: `${liveStats.winrate}%`,
+        avgProfit: `${liveStats.avgProfit}%`,
+        totalProfit: `${liveStats.totalProfit}%`
+      };
+    }
+    return adminStats;
+  }, [adminStats, liveStats]);
 
   useEffect(() => {
     if (!activeBotTab) return;
     try {
       const key = `tls1_active_indicators_${activeBotTab}`;
       const saved = localStorage.getItem(key);
-      if (saved) {
-        setActiveIndicators(JSON.parse(saved));
-      } else {
-        if (activeBotTab === "sub1") setActiveIndicators(["ema200"]);
-        else if (activeBotTab === "sub2") setActiveIndicators(["ema200", "smc_ob"]);
-        else if (activeBotTab === "sub3") setActiveIndicators(["ema200", "liquid_v5"]);
-        else setActiveIndicators(["ema200", "liquid_v5"]);
+      let list = saved ? JSON.parse(saved) : null;
+      if (!Array.isArray(list)) list = null;
+      if (!list) {
+        if (activeBotTab === "sub1") list = ["ema200", "volume"];
+        else if (activeBotTab === "sub2") list = ["ema200", "volume", "smc_ob"];
+        else if (activeBotTab === "sub3") list = ["ema200", "volume", "liquid_v5"];
+        else list = ["ema200", "volume", "liquid_v5"];
       }
+      // Toàn bộ các chart luôn mặc định phải có chỉ báo ema200 và volume
+      if (!list.includes("ema200")) list.unshift("ema200");
+      if (!list.includes("volume")) {
+        const emaIdx = list.indexOf("ema200");
+        list.splice(emaIdx + 1, 0, "volume");
+      }
+      setActiveIndicators(list);
     } catch (e) { }
+
+    setTimeout(() => {
+      applyDefaultZoom();
+      drawObs();
+      drawLiquidV5Boxes();
+    }, 50);
   }, [activeBotTab]);
 
   // Ref luôn giữ state mới nhất để các hàm bất đồng bộ/setInterval không bị Stale Closure
@@ -267,6 +351,7 @@ function SingleChartPane({
   const hiddenIndicatorsRef = useRef(hiddenIndicators);
   hiddenIndicatorsRef.current = hiddenIndicators;
   const [isLegendVisible, setIsLegendVisible] = useState(true);
+  const [isBacktestCollapsed, setIsBacktestCollapsed] = useState(false);
   const [indicatorsModalTab, setIndicatorsModalTab] = useState("system");
 
   const getIndicatorTitle = (id) => {
@@ -332,6 +417,147 @@ function SingleChartPane({
     } catch (e) { }
   };
 
+  // Quét toàn bộ lịch sử nến và tạo danh sách lệnh đã đóng (TP/SL) + lệnh đang mở hiện tại
+  // Mỗi lệnh: chờ giá chạm entryPrice → mở → chờ TP hoặc SL → đóng băng
+  const calculateEMA200Positions = (candles, currentTf) => {
+    if (!candles || candles.length < 205) return [];
+    const emaData = calculateEMA(candles, 200);
+    if (!emaData || emaData.length === 0) return [];
+
+    const emaMap = new Map();
+    emaData.forEach(item => emaMap.set(item.time, item.value));
+
+    const normTf = (currentTf || "4H").toUpperCase();
+    let offsetMult = 6.772;
+    if (normTf.includes("5M")) offsetMult = 1.0;
+    else if (normTf.includes("15M")) offsetMult = 1.5333;
+    else if (normTf.includes("30M")) offsetMult = 2.3333;
+    else if (normTf.includes("1H") || normTf.includes("60M")) offsetMult = 3.333;
+    else if (normTf.includes("2H") || normTf.includes("120M")) offsetMult = 4.667;
+    else if (normTf.includes("4H") || normTf.includes("240M")) offsetMult = 6.772;
+    else if (normTf.includes("1D") || normTf.includes("D")) offsetMult = 10.0;
+
+    const entryOffsetPct = 0.0005 * offsetMult;
+    const rawTpPct = 0.0120 * offsetMult;
+    const tpPct = rawTpPct > 0.05 ? 0.05 : rawTpPct;
+    const slPct = tpPct;
+
+    const results = [];
+    let activeTrade = null; // lệnh đang chờ entry
+    let consecutiveAbove = 0;
+    let consecutiveBelow = 0;
+
+    for (let i = 200; i < candles.length; i++) {
+      const candle = candles[i];
+      const ema = emaMap.get(candle.time);
+      if (!ema) continue;
+
+      if (candle.close >= ema) {
+        consecutiveAbove++;
+        consecutiveBelow = 0;
+      } else {
+        consecutiveBelow++;
+        consecutiveAbove = 0;
+      }
+
+      // Nếu đang có lệnh chờ entry (Limit order waiting)
+      if (activeTrade && activeTrade.state === 'waiting') {
+        const isLong = activeTrade.entryType === 'Long';
+        const entryHit = isLong
+          ? candle.low <= activeTrade.entryPrice
+          : candle.high >= activeTrade.entryPrice;
+
+        if (entryHit) {
+          activeTrade.state = 'open';
+          activeTrade.entryCandle = i;
+          activeTrade.entryTime = candle.time; // Khoá chặt vị trí hộp công cụ tại nến khớp lệnh
+        } else {
+          // Nếu EMA đã dịch chuyển > 0.3% so với lúc đặt lệnh → huỷ lệnh cũ, tạo lại
+          const emaDrift = Math.abs(ema - activeTrade.entryEma) / activeTrade.entryEma;
+          if (emaDrift > 0.003) {
+            activeTrade = null;
+          }
+          // Nếu đảo chiều hoàn toàn (trend changed) -> huỷ lệnh chờ
+          if (isLong && consecutiveBelow > 0) activeTrade = null;
+          if (!isLong && consecutiveAbove > 0) activeTrade = null;
+        }
+      }
+
+      // Nếu lệnh đang mở → kiểm tra TP/SL
+      if (activeTrade && activeTrade.state === 'open') {
+        const isLong = activeTrade.entryType === 'Long';
+        const tpHit = isLong
+          ? candle.high >= activeTrade.tpTarget
+          : candle.low <= activeTrade.tpTarget;
+        const slHit = isLong
+          ? candle.low <= activeTrade.slTarget
+          : candle.high >= activeTrade.slTarget;
+
+        if (tpHit || slHit) {
+          activeTrade.exitTime = candle.time;
+          activeTrade.exitResult = tpHit ? 'TP' : 'SL';
+          activeTrade.state = 'closed';
+          results.push({ ...activeTrade });
+          activeTrade = null;
+        }
+      }
+
+      // Nếu không có lệnh nào đang chạy → tạo lệnh mới từ EMA hiện tại (Chỉ khi tích luỹ >= 60 nến)
+      if (!activeTrade && (consecutiveAbove >= 60 || consecutiveBelow >= 60)) {
+        const isBull = consecutiveAbove >= 60;
+        const ep = isBull ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
+        const tp = isBull ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
+        const sl = isBull ? (ep * (1 - slPct)) : (ep * (1 + slPct));
+
+        activeTrade = {
+          entryTime: candle.time, // Bắt đầu tịnh tiến theo thời gian
+          entryEma: ema,
+          entryPrice: ep,
+          tpTarget: tp,
+          slTarget: sl,
+          entryType: isBull ? 'Long' : 'Short',
+          state: 'waiting',
+          isEmaBot: true,
+        };
+      }
+    }
+
+    // Thêm lệnh đang mở hiện tại (live) vào cuối danh sách
+    if (activeTrade && (activeTrade.state === 'open' || activeTrade.state === 'waiting')) {
+      results.push({ ...activeTrade, state: 'Active Position' });
+    }
+
+    return results;
+  };
+
+  // Helper tính toán tín hiệu Long/Short cho Bot SMC khi khớp Entry theo Order Block
+  // Chỉ hiển thị duy nhất 1 tool trên Order Block gần nhất của khung thời gian hiện tại
+  const calculateSMCPositions = (candles, obs) => {
+    if (!candles || candles.length < 25) return [];
+    const validObs = (obs || []).filter(ob => ob.high && ob.low);
+    if (validObs.length === 0) return [];
+
+    const latestOb = validObs[validObs.length - 1];
+    const isBull = latestOb.bias === 1;
+    const entryPrice = isBull ? latestOb.high : latestOb.low;
+    const obHeight = Math.abs(latestOb.high - latestOb.low);
+    const slDist = Math.max(obHeight, entryPrice * 0.008);
+    const tpDist = slDist * 1.5;
+    const slTarget = isBull ? latestOb.low - obHeight * 0.15 : latestOb.high + obHeight * 0.15;
+    const tpTarget = isBull ? entryPrice + tpDist : entryPrice - tpDist;
+
+    const entryCandle = candles[Math.max(0, candles.length - 20)];
+    return [{
+      entryTime: latestOb.time || entryCandle.time,
+      entryPrice: entryPrice,
+      tpTarget: tpTarget,
+      slTarget: slTarget,
+      entryType: isBull ? 'Long' : 'Short',
+      state: 'Active Position',
+      isSmcBot: true
+    }];
+  };
+
   const drawObs = () => {
     const o = overlayRef.current;
     if (!o) return;
@@ -351,7 +577,10 @@ function SingleChartPane({
     o.innerHTML = "";
     const w = o.clientWidth || cont.clientWidth;
     if (w <= 0) return;
-    const maxRightX = w - 65;
+    const plotW = (c.timeScale && typeof c.timeScale().width === 'function') ? c.timeScale().width() : 0;
+    const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - 70);
+    o.style.width = maxRightX + 'px';
+    o.style.overflow = 'hidden';
 
     obs.forEach(ob => {
       const y1 = s.priceToCoordinate(ob.high);
@@ -376,7 +605,7 @@ function SingleChartPane({
       if (startX < -2000) startX = -2000;
       if (startX >= maxRightX) return;
 
-      const boxWidth = maxRightX - startX;
+      const boxWidth = Math.max(0, maxRightX - startX);
       if (boxWidth <= 0) return;
 
       const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
@@ -393,216 +622,426 @@ function SingleChartPane({
   };
 
   const drawLiquidV5Boxes = () => {
-    const o = liquidV5OverlayRef.current;
-    if (!o) return;
+    const oBoxes = liquidV5BoxesOverlayRef.current;
+    const oTop = liquidV5OverlayRef.current;
+    if (oBoxes) oBoxes.innerHTML = "";
+    if (oTop) oTop.innerHTML = "";
+    if (!oBoxes && !oTop) return;
+
     const currentActive = activeIndicatorsRef.current || [];
-    if (!currentActive.includes("liquid_v5")) {
-      o.innerHTML = "";
+    const currentTab = activeBotTabRef.current;
+    const isEmaBot = currentTab === "sub1";
+    const isSmcBot = currentTab === "sub2";
+    const isLiquidActive = currentActive.includes("liquid_v5") && !hiddenIndicatorsRef.current?.has("liquid_v5");
+    const isLiquidBot = currentTab === "sub3" || isLiquidActive;
+
+    if (!isEmaBot && !isSmcBot && !isLiquidBot) {
       return;
     }
-    const { fvg_boxes, ob_boxes, crt_lines, crt_labels, alerts, stats } = liquidV5BoxesRef.current || {};
+
+    const { fvg_boxes, ob_boxes, crt_lines, crt_labels, alerts, stats, position_boxes } = liquidV5BoxesRef.current || {};
     const c = chartRef.current;
     const s = candleSeriesRef.current;
     const cont = containerRef.current;
     if (!c || !s || !cont) {
-      o.innerHTML = "";
       return;
     }
-    o.innerHTML = "";
-    const w = o.clientWidth || cont.clientWidth;
+    const w = (oBoxes && oBoxes.clientWidth) || (oTop && oTop.clientWidth) || cont.clientWidth;
     if (w <= 0) return;
-    const maxRightX = w - 65; // Chừa lề trục giá phải
+    const plotW = (c.timeScale && typeof c.timeScale().width === 'function') ? c.timeScale().width() : 0;
+    const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - 70); // Chuẩn xác tới mép trục giá phải
+
+    if (oBoxes) {
+      oBoxes.style.width = maxRightX + 'px';
+      oBoxes.style.overflow = 'hidden';
+    }
+    if (oTop) {
+      oTop.style.width = maxRightX + 'px';
+      oTop.style.overflow = 'hidden';
+    }
 
     // Function to calculate x coordinate
     const getXCoord = (timeVal) => {
       let x = null;
       if (timeVal) {
         try {
-          const xCoord = c.timeScale().timeToCoordinate(timeVal);
+          const secTime = timeVal > 100000000000 ? Math.floor(timeVal / 1000) : timeVal;
+          const xCoord = c.timeScale().timeToCoordinate(secTime);
           if (xCoord !== null) x = Math.floor(xCoord);
         } catch (e) { }
       }
       return x;
     };
 
-    // Draw Boxes
-    const drawBox = (item) => {
-      const y1 = s.priceToCoordinate(item.top);
-      const y2 = s.priceToCoordinate(item.bottom);
-      if (y1 === null && y2 === null) return;
-      const topY = y1 !== null ? y1 : 0;
-      const botY = y2 !== null ? y2 : o.clientHeight;
-      const minY = Math.min(topY, botY);
-      const maxY = Math.max(topY, botY);
-      const h = Math.max(maxY - minY, 2);
+    // 1. Box SMC & FVG ở bot Liqui: Chỉ vẽ khi có chỉ báo liquid_v5
+    if (oBoxes && isLiquidActive) {
+      const obs = activeObsRef.current || [];
+      obs.forEach(ob => {
+        const y1 = s.priceToCoordinate(ob.high);
+        const y2 = s.priceToCoordinate(ob.low);
+        if (y1 === null || y2 === null) return;
 
-      let startX = getXCoord(item.time) ?? -2000;
-      let endX = getXCoord(item.end_time) ?? maxRightX;
+        const topY = Math.min(y1, y2);
+        const botY = Math.max(y1, y2);
+        const h = Math.max(botY - topY, 4);
+        const isBull = ob.bias === 1;
 
-      if (startX >= maxRightX) return;
-      if (endX > maxRightX) endX = maxRightX;
-      if (endX < 0) return;
-      const boxWidth = endX - startX;
-      if (boxWidth <= 0) return;
+        let startX = null;
+        if (ob.time && ob.time > 0) {
+          try {
+            const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
+            const xCoord = c.timeScale().timeToCoordinate(secTime);
+            if (xCoord !== null) startX = Math.floor(xCoord);
+          } catch (e) { }
+        }
 
-      const isBull = item.type === 'bull';
-      const bg = isBull
-        ? (item.is_fvg ? 'rgba(8, 153, 129, 0.22)' : 'rgba(21, 101, 192, 0.22)')
-        : (item.is_fvg ? 'rgba(242, 54, 70, 0.22)' : 'rgba(198, 40, 40, 0.22)');
-      const borderColor = isBull ? 'rgba(8, 153, 129, 0.85)' : 'rgba(242, 54, 70, 0.85)';
+        if (startX === null) startX = 0;
+        if (startX < -2000) startX = -2000;
+        if (startX >= maxRightX) return;
 
-      const box = document.createElement('div');
-      box.style.position = 'absolute';
-      box.style.top = minY + 'px';
-      box.style.left = startX + 'px';
-      box.style.width = boxWidth + 'px';
-      box.style.height = h + 'px';
-      box.style.backgroundColor = bg;
-      box.style.border = `1px solid ${borderColor}`;
-      box.style.borderRadius = '2px';
-      box.style.pointerEvents = 'none';
+        const boxWidth = Math.max(0, maxRightX - startX);
+        if (boxWidth <= 0) return;
 
-      const tag = document.createElement('span');
-      tag.style.position = 'absolute';
-      tag.style.top = '1px';
-      tag.style.left = '4px';
-      tag.style.fontSize = '9px';
-      tag.style.fontWeight = '700';
-      tag.style.color = borderColor;
-      tag.innerText = item.is_fvg ? (isBull ? '+FVG' : '-FVG') : (isBull ? '+OB' : '-OB');
-      box.appendChild(tag);
-      o.appendChild(box);
+        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+        const box = document.createElement('div');
+        box.style.position = 'absolute';
+        box.style.top = topY + 'px';
+        box.style.left = startX + 'px';
+        box.style.width = boxWidth + 'px';
+        box.style.height = h + 'px';
+        box.style.backgroundColor = bg;
+        box.style.border = 'none';
+        box.style.pointerEvents = 'none';
+
+        oBoxes.appendChild(box);
+      });
+    }
+
+    // 2. Toàn bộ tín hiệu Long Short thiết kế lại chuẩn TradingView Position Box,
+    // Áp dụng đồng bộ cho TOÀN BỘ CÁC BOT: Bot EMA200 (sub1), Bot SMC (sub2), Bot Liquid V5 (sub3)
+    const candles = candlesRef.current || [];
+    let posList = [];
+    if (isEmaBot) {
+      posList = calculateEMA200Positions(candles, tfRef.current);
+    } else if (isSmcBot) {
+      posList = calculateSMCPositions(candles, activeObsRef.current);
+    } else {
+      posList = position_boxes || [];
+    }
+
+    // Compute universal live stats from posList for ALL bots
+    let cWins = 0, cLosses = 0, cProfit = 0, cEntries = 0;
+    posList.forEach(p => {
+      const isLiquidDone = p.state === 'Take Profit' || p.state === 'Stop Loss';
+      const isEmaDone = p.state === 'closed';
+      
+      if (isLiquidDone || isEmaDone) {
+        cEntries++;
+        let isWin = false;
+        if (p.state === 'Take Profit' || p.exitResult === 'TP') isWin = true;
+        
+        let profitPct = 0;
+        if (isWin) {
+          profitPct = Math.abs(p.tpTarget - p.entryPrice) / p.entryPrice;
+        } else {
+          profitPct = -Math.abs(p.entryPrice - p.slTarget) / p.entryPrice;
+        }
+        
+        if (isWin) cWins++;
+        else cLosses++;
+        
+        cProfit += profitPct;
+      }
+    });
+
+    const liveStatsObj = {
+      totalEntries: cEntries,
+      wins: cWins,
+      losses: cLosses,
+      winrate: cEntries > 0 ? ((cWins / cEntries) * 100).toFixed(2) : 0,
+      avgProfit: cEntries > 0 ? ((cProfit / cEntries) * 100).toFixed(2) : 0,
+      totalProfit: (cProfit * 100).toFixed(2)
     };
 
-    if (fvg_boxes && liquidV5Settings.showFVGs) fvg_boxes.forEach(f => drawBox(f));
-    if (ob_boxes && liquidV5Settings.showOrderBlocks) ob_boxes.forEach(ob => drawBox(ob));
+    if (oTop) {
+      posList.forEach(pos => {
+        if (!pos.entryTime || !pos.entryPrice || !pos.tpTarget || !pos.slTarget) return;
 
-    // Draw CRT Lines
-    if (crt_lines && liquidV5Settings.showHTFCandleLines) {
-      crt_lines.forEach(line => {
-        const y = s.priceToCoordinate(line.price);
-        if (y === null) return;
-        let startX = getXCoord(line.start_time) ?? -2000;
-        let endX = getXCoord(line.end_time) ?? maxRightX;
+        const entryTimeSec = pos.entryTime > 100000000000 ? Math.floor(pos.entryTime / 1000) : pos.entryTime;
+        const entryIdx = candles.findIndex(item => item.time >= entryTimeSec);
+        if (entryIdx < 0) return;
 
-        if (startX >= maxRightX) return;
-        if (endX > maxRightX) endX = maxRightX;
-        if (endX < 0) return;
+        const logicalRange = c.timeScale().getVisibleLogicalRange();
+        // Use cached positions if already frozen
+        let startX = pos._fixedStartX ?? null;
+        let endX = pos._fixedEndX ?? null;
 
-        const divLine = document.createElement('div');
-        divLine.style.position = 'absolute';
-        divLine.style.top = y + 'px';
-        divLine.style.left = startX + 'px';
-        divLine.style.width = (endX - startX) + 'px';
-        divLine.style.height = '1px';
-        divLine.style.borderTop = `2px ${line.type === 'dashed' ? 'dashed' : 'solid'} ${line.color}`;
-        divLine.style.pointerEvents = 'none';
-        o.appendChild(divLine);
+        if (logicalRange && logicalRange.to > logicalRange.from) {
+          const barWidth = maxRightX / (logicalRange.to - logicalRange.from);
+          // Compute positions only if not already cached
+          if (startX === null) {
+            startX = Math.floor((entryIdx - logicalRange.from) * barWidth);
+          }
+          if (endX === null) {
+            endX = Math.floor((entryIdx + 25 - logicalRange.from) * barWidth);
+          }
+
+          // Adjust endX for exit (TP/SL) if applicable
+          if (pos.exitTime) {
+            const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
+            const exitIdx = candles.findIndex(item => item.time >= exitTimeSec);
+            if (exitIdx > entryIdx) {
+              endX = Math.floor((exitIdx - logicalRange.from) * barWidth);
+            }
+          }
+          // Cache positions after first calculation
+          if (pos._fixedStartX === undefined) {
+            pos._fixedStartX = startX;
+            pos._fixedEndX = endX;
+          }
+        } else {
+          let sc = null;
+          try {
+            sc = c.timeScale().timeToCoordinate(candles[entryIdx].time);
+          } catch (e) { }
+          if (sc !== null) {
+            if (startX === null) {
+              startX = Math.floor(sc);
+            }
+            let barSpacing = 14;
+            if (candles.length >= 2) {
+              try {
+                const c1 = c.timeScale().timeToCoordinate(candles[candles.length - 1].time);
+                const c2 = c.timeScale().timeToCoordinate(candles[candles.length - 2].time);
+                if (c1 !== null && c2 !== null && c1 > c2) barSpacing = c1 - c2;
+              } catch (e) { }
+            }
+            if (endX === null) {
+              endX = Math.floor(startX + 25 * barSpacing);
+            }
+
+            if (pos.exitTime) {
+              try {
+                const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
+                const scExit = c.timeScale().timeToCoordinate(exitTimeSec);
+                if (scExit !== null && scExit > startX) {
+                  endX = Math.floor(scExit);
+                }
+              } catch (e) { }
+            }
+            // Cache after calculation if not cached yet
+            if (pos._fixedStartX === undefined) {
+              pos._fixedStartX = startX;
+              pos._fixedEndX = endX;
+            }
+          }
+        }
+
+        if (startX === null || endX === null) return;
+        if (endX < 0 || startX >= maxRightX) return;
+
+        // Giới hạn tuyệt đối mép phải không tràn qua trục giá
+        const clampedEndX = Math.min(endX, maxRightX);
+        const boxWidth = clampedEndX - startX;
+        if (boxWidth <= 4) return;
+
+        const yEntry1 = s.priceToCoordinate(pos.entryPrice);
+        const yTP = s.priceToCoordinate(pos.tpTarget);
+        const ySL = s.priceToCoordinate(pos.slTarget);
+        if (yEntry1 === null) return;
+
+        const clientH = oTop.clientHeight || 400;
+        const isLong = pos.entryType === 'Long';
+        const clampedYTP = yTP !== null ? yTP : (isLong ? 0 : clientH);
+        const clampedYSL = ySL !== null ? ySL : (isLong ? clientH : 0);
+
+        // Entry 2 (DCA ở 2/3 khoảng cách Stop Loss từ Entry 1)
+        const isStandardBot = pos.isEmaBot || pos.isSmcBot;
+        
+        let effectiveYEntry2;
+        if (isStandardBot) {
+          effectiveYEntry2 = yEntry1; // Bot chuẩn chỉ có 1 entry, đường chia cắt xanh/đỏ chính là Entry 1
+        } else {
+          const entry2Price = pos.entry2Price || (pos.entryPrice + (pos.slTarget - pos.entryPrice) * (2 / 3));
+          const yEntry2 = s.priceToCoordinate(entry2Price);
+          effectiveYEntry2 = yEntry2 !== null ? yEntry2 : (yEntry1 + (clampedYSL - yEntry1) * (2 / 3));
+        }
+
+        const posContainer = document.createElement('div');
+        posContainer.style.position = 'absolute';
+        posContainer.style.top = '0px';
+        posContainer.style.left = startX + 'px';
+        posContainer.style.width = boxWidth + 'px';
+        posContainer.style.height = '100%';
+        posContainer.style.pointerEvents = 'none';
+        posContainer.style.zIndex = '1';
+
+        // Màu sắc chuẩn TradingView Long/Short Position Box: phẳng mờ, border: none
+        const greenBg = 'rgba(20, 58, 54, 0.75)';
+        const redBg = 'rgba(68, 24, 33, 0.75)';
+
+        // Tông màu trắng mờ nhạt, tinh tế cho vạch chỉ và chữ E1/E2
+        const lineStrokeColor = 'rgba(235, 240, 250, 0.45)';
+        const labelTextColor = 'rgba(235, 240, 250, 0.5)';
+
+        // Vạch trắng Entry chính (luôn hiển thị cho mọi Bot theo yêu cầu CEO)
+        const e1Line = document.createElement('div');
+        e1Line.style.position = 'absolute';
+        e1Line.style.top = yEntry1 + 'px';
+        e1Line.style.left = '0px';
+        e1Line.style.width = '100%';
+        e1Line.style.height = '1px';
+        e1Line.style.backgroundColor = lineStrokeColor;
+        e1Line.style.zIndex = '1';
+        posContainer.appendChild(e1Line);
+
+        if (isLong) {
+          // LONG:
+          // Vùng XANH bao trọn từ TP xuống tận Entry 2 (khoảng giữa E1 - E2 được tô XANH)
+          const greenTop = Math.min(clampedYTP, effectiveYEntry2);
+          const greenH = Math.max(Math.abs(effectiveYEntry2 - clampedYTP), 2);
+
+          // Vùng ĐỎ (SL ngắn) từ Entry 2 xuống đến SL
+          const redTop = Math.min(effectiveYEntry2, clampedYSL);
+          const redH = Math.max(Math.abs(clampedYSL - effectiveYEntry2), 2);
+
+          const tpBox = document.createElement('div');
+          tpBox.style.position = 'absolute';
+          tpBox.style.top = greenTop + 'px';
+          tpBox.style.left = '0px';
+          tpBox.style.width = '100%';
+          tpBox.style.height = greenH + 'px';
+          tpBox.style.backgroundColor = greenBg;
+          tpBox.style.border = 'none';
+          tpBox.style.boxSizing = 'border-box';
+          posContainer.appendChild(tpBox);
+
+          const slBox = document.createElement('div');
+          slBox.style.position = 'absolute';
+          slBox.style.top = redTop + 'px';
+          slBox.style.left = '0px';
+          slBox.style.width = '100%';
+          slBox.style.height = redH + 'px';
+          slBox.style.backgroundColor = redBg;
+          slBox.style.border = 'none';
+          slBox.style.boxSizing = 'border-box';
+          posContainer.appendChild(slBox);
+
+          if (!isStandardBot) {
+            const e1Label = document.createElement('span');
+            e1Label.textContent = 'E1';
+            e1Label.style.position = 'absolute';
+            e1Label.style.top = (yEntry1 - 15) + 'px';
+            e1Label.style.left = '5px';
+            e1Label.style.color = labelTextColor;
+            e1Label.style.fontSize = '11px';
+            e1Label.style.fontWeight = 'bold';
+            e1Label.style.fontFamily = 'monospace';
+            e1Label.style.zIndex = '1';
+            posContainer.appendChild(e1Label);
+
+            // Vạch trắng Entry 2 (E2) - nhạt, nằm dưới lớp nến
+            const e2Line = document.createElement('div');
+            e2Line.style.position = 'absolute';
+            e2Line.style.top = effectiveYEntry2 + 'px';
+            e2Line.style.left = '0px';
+            e2Line.style.width = '100%';
+            e2Line.style.height = '1px';
+            e2Line.style.backgroundColor = lineStrokeColor;
+            e2Line.style.zIndex = '1';
+            posContainer.appendChild(e2Line);
+
+            const e2Label = document.createElement('span');
+            e2Label.textContent = 'E2';
+            e2Label.style.position = 'absolute';
+            e2Label.style.top = (effectiveYEntry2 - 15) + 'px';
+            e2Label.style.left = '5px';
+            e2Label.style.color = labelTextColor;
+            e2Label.style.fontSize = '11px';
+            e2Label.style.fontWeight = 'bold';
+            e2Label.style.fontFamily = 'monospace';
+            e2Label.style.zIndex = '1';
+            posContainer.appendChild(e2Label);
+          }
+        } else {
+          // SHORT:
+          // Vùng ĐỎ (SL ngắn) từ SL xuống đến Entry 2
+          const redTop = Math.min(clampedYSL, effectiveYEntry2);
+          const redH = Math.max(Math.abs(effectiveYEntry2 - clampedYSL), 2);
+
+          // Vùng XANH bao trọn từ Entry 2 xuống tận TP Target (khoảng giữa E2 - E1 được tô XANH)
+          const greenTop = Math.min(effectiveYEntry2, clampedYTP);
+          const greenH = Math.max(Math.abs(clampedYTP - effectiveYEntry2), 2);
+
+          const slBox = document.createElement('div');
+          slBox.style.position = 'absolute';
+          slBox.style.top = redTop + 'px';
+          slBox.style.left = '0px';
+          slBox.style.width = '100%';
+          slBox.style.height = redH + 'px';
+          slBox.style.backgroundColor = redBg;
+          slBox.style.border = 'none';
+          slBox.style.boxSizing = 'border-box';
+          posContainer.appendChild(slBox);
+
+          const tpBox = document.createElement('div');
+          tpBox.style.position = 'absolute';
+          tpBox.style.top = greenTop + 'px';
+          tpBox.style.left = '0px';
+          tpBox.style.width = '100%';
+          tpBox.style.height = greenH + 'px';
+          tpBox.style.backgroundColor = greenBg;
+          tpBox.style.border = 'none';
+          tpBox.style.boxSizing = 'border-box';
+          posContainer.appendChild(tpBox);
+
+          if (!isStandardBot) {
+            // Vạch trắng Entry 2 (E2) - nhạt, nằm dưới lớp nến
+            const e2Line = document.createElement('div');
+            e2Line.style.position = 'absolute';
+            e2Line.style.top = effectiveYEntry2 + 'px';
+            e2Line.style.left = '0px';
+            e2Line.style.width = '100%';
+            e2Line.style.height = '1px';
+            e2Line.style.backgroundColor = lineStrokeColor;
+            e2Line.style.zIndex = '1';
+            posContainer.appendChild(e2Line);
+
+            const e2Label = document.createElement('span');
+            e2Label.textContent = 'E2';
+            e2Label.style.position = 'absolute';
+            e2Label.style.top = (effectiveYEntry2 - 15) + 'px';
+            e2Label.style.left = '5px';
+            e2Label.style.color = labelTextColor;
+            e2Label.style.fontSize = '11px';
+            e2Label.style.fontWeight = 'bold';
+            e2Label.style.fontFamily = 'monospace';
+            e2Label.style.zIndex = '1';
+            posContainer.appendChild(e2Label);
+
+            const e1Label = document.createElement('span');
+            e1Label.textContent = 'E1';
+            e1Label.style.position = 'absolute';
+            e1Label.style.top = (yEntry1 - 15) + 'px';
+            e1Label.style.left = '5px';
+            e1Label.style.color = labelTextColor;
+            e1Label.style.fontSize = '11px';
+            e1Label.style.fontWeight = 'bold';
+            e1Label.style.fontFamily = 'monospace';
+            e1Label.style.zIndex = '1';
+            posContainer.appendChild(e1Label);
+          }
+        }
+
+        oTop.appendChild(posContainer);
       });
     }
 
-    // Draw CRT Labels
-    if (crt_labels) {
-      crt_labels.forEach(lbl => {
-        const y = s.priceToCoordinate(lbl.price);
-        if (y === null) return;
-        let x = getXCoord(lbl.time) ?? maxRightX;
-        if (x < 0 || x > maxRightX) return;
-
-        const labelDiv = document.createElement('div');
-        labelDiv.style.position = 'absolute';
-        labelDiv.style.top = (y - 9) + 'px';
-        labelDiv.style.left = x + 'px';
-        labelDiv.style.padding = '3px 8px';
-        labelDiv.style.borderRadius = '3px';
-        labelDiv.style.borderTopLeftRadius = '0';
-        labelDiv.style.borderBottomLeftRadius = '0';
-        labelDiv.style.fontSize = '11px';
-        labelDiv.style.fontWeight = '500';
-        labelDiv.style.color = '#fff';
-        labelDiv.style.backgroundColor = lbl.color;
-        labelDiv.style.border = 'none';
-        labelDiv.style.pointerEvents = 'none';
-        labelDiv.style.boxShadow = 'none';
-        labelDiv.style.display = 'flex';
-        labelDiv.style.alignItems = 'center';
-        labelDiv.style.justifyContent = 'center';
-        labelDiv.innerText = lbl.text;
-
-        // arrow pointer using border trick
-        const arrow = document.createElement('div');
-        arrow.style.position = 'absolute';
-        arrow.style.left = '-6px';
-        arrow.style.top = '50%';
-        arrow.style.transform = 'translateY(-50%)';
-        arrow.style.width = '0';
-        arrow.style.height = '0';
-        arrow.style.borderTop = '9px solid transparent';
-        arrow.style.borderBottom = '9px solid transparent';
-        arrow.style.borderRight = `6px solid ${lbl.color}`;
-        labelDiv.appendChild(arrow);
-
-        o.appendChild(labelDiv);
-      });
-    }
-
-    // Draw Stats Table
-    if (stats) {
-      const statsDiv = document.createElement('div');
-      statsDiv.style.position = 'absolute';
-      statsDiv.style.top = '10px';
-      statsDiv.style.right = '70px';
-      statsDiv.style.backgroundColor = 'rgba(19, 23, 34, 0.85)';
-      statsDiv.style.border = '1px solid rgba(255,255,255,0.1)';
-      statsDiv.style.borderRadius = '4px';
-      statsDiv.style.padding = '8px';
-      statsDiv.style.color = '#d1d4dc';
-      statsDiv.style.fontSize = '11px';
-      statsDiv.style.pointerEvents = 'none';
-      statsDiv.style.zIndex = '100';
-      statsDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
-      statsDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif';
-
-      const header = document.createElement('div');
-      header.style.textAlign = 'center';
-      header.style.fontWeight = 'bold';
-      header.style.marginBottom = '6px';
-      header.style.color = '#fff';
-      header.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
-      header.style.paddingBottom = '4px';
-      header.innerText = 'TLS1 Backtesting';
-      statsDiv.appendChild(header);
-
-      const rows = [
-        ['Total Entries', stats.totalEntries],
-        ['Wins', stats.wins],
-        ['Losses', stats.losses],
-        ['Winrate', `${stats.winrate}%`],
-        ['Average Profit', `${stats.avgProfit}%`],
-        ['Total Profit', `${stats.totalProfit}%`]
-      ];
-
-      rows.forEach(r => {
-        const rowDiv = document.createElement('div');
-        rowDiv.style.display = 'flex';
-        rowDiv.style.justifyContent = 'space-between';
-        rowDiv.style.marginBottom = '4px';
-        rowDiv.style.width = '140px';
-
-        const label = document.createElement('span');
-        label.innerText = r[0];
-        const val = document.createElement('span');
-        val.style.fontWeight = 'bold';
-        val.style.color = r[0] === 'Winrate' ? (parseFloat(stats.winrate) > 50 ? '#089981' : '#f23646') :
-          (r[0].includes('Profit') ? (parseFloat(r[1]) > 0 ? '#089981' : '#f23646') : '#fff');
-        val.innerText = r[1];
-
-        rowDiv.appendChild(label);
-        rowDiv.appendChild(val);
-        statsDiv.appendChild(rowDiv);
-      });
-
-      o.appendChild(statsDiv);
+    // Cập nhật Backtest Stats state cho bảng thống kê (nếu tính toán live có nhiều lệnh hơn)
+    if (liveStatsObj.totalEntries > 0) {
+      setLiveStats(liveStatsObj);
+    } else if (stats && stats.totalEntries > 0) {
+      setLiveStats(stats);
     }
 
     // Process Alerts (only show if not processed yet)
@@ -798,12 +1237,29 @@ function SingleChartPane({
       removeSeriesByKey("ind_macd_sig");
     }
 
-    // 7. Volume 20 Chu Kỳ
+    // 7. Volume 20 Chu Kỳ (Histogram + MA 20 Line)
     const hasVol = currentActive.includes("volume") && !isIndHidden("volume");
     if (volumeSeriesRef.current) {
       try {
         volumeSeriesRef.current.applyOptions({ visible: hasVol });
       } catch (e) { }
+    }
+    if (hasVol && candles && candles.length > 20) {
+      const volData = candles.map(c => ({ time: c.time, value: c.volume || 0 }));
+      const volMa = calculateSMA(volData, 20);
+      const sVolMa = getOrCreateLineSeries("ind_vol_ma", {
+        color: "rgba(33, 150, 243, 0.8)",
+        lineWidth: 1.5,
+        priceScaleId: "",
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      try {
+        sVolMa.setData(volMa);
+      } catch (e) { }
+    } else {
+      removeSeriesByKey("ind_vol_ma");
     }
 
     // 8. Coder Custom Scripts
@@ -884,7 +1340,7 @@ function SingleChartPane({
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth || 300,
       height: containerRef.current.clientHeight || 200,
-      layout: { background: { type: 'solid', color: '#0c0c0c' }, textColor: '#787b86', attributionLogo: false },
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', attributionLogo: false },
       grid: {
         vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
         horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
@@ -1052,6 +1508,8 @@ function SingleChartPane({
     hiddenIndicatorsRef.current = hiddenIndicators;
     if (!isVisible || !chartRef.current) return;
     (updateIndicatorsRef.current || updateIndicators)();
+    drawObs();
+    drawLiquidV5Boxes();
   }, [activeIndicators, coderScripts, isVisible, hiddenIndicators]);
 
   // Tự động căn chỉnh lại kích thước và zoom khi bố cục hoặc trạng thái hiển thị thay đổi
@@ -1140,7 +1598,7 @@ function SingleChartPane({
     const fetchCandles = async () => {
       if (!candleSeriesRef.current) return;
       try {
-        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=1500`);
+        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=2500`);
         if (!res.ok) return;
         const rd = await res.json();
         if (!isMounted || targetCoin !== coin || targetTf !== tf || rd.code !== "0" || !rd.data || rd.data.length === 0) return;
@@ -1342,10 +1800,35 @@ function SingleChartPane({
       )}
 
       <div className="single-chart-body" style={{ display: chartMode === "tv" ? "none" : "flex" }}>
-        <div className="chart-stage-wrapper">
+        <div className="chart-stage-wrapper" style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#0c0c0c', overflow: 'hidden' }}>
+          {/* TOÀN BỘ CÁC TOOL VÀ BOX (SMC OB, Liquid OB/FVG, Long/Short Position Box) NẰM BÊN DƯỚI NẾN */}
+          <div
+            ref={overlayRef}
+            style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
+            }}
+          />
+          <div
+            ref={liquidV5BoxesOverlayRef}
+            style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
+            }}
+          />
+          <div
+            ref={liquidV5OverlayRef}
+            style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
+            }}
+          />
+
+          {/* Canvas Biểu Đồ Nến NẰM ĐÈ LÊN TRÊN ĐẦU TIÊN BẤT CHẤP MỌI THỨ */}
           <div
             className="single-chart-canvas"
             ref={containerRef}
+            style={{ position: 'relative', width: '100%', height: '100%', zIndex: 10 }}
             onWheel={() => setIsAutoFit(false)}
             onTouchStart={() => setIsAutoFit(false)}
             onMouseDown={() => setIsAutoFit(false)}
@@ -1359,61 +1842,11 @@ function SingleChartPane({
             onDrawingsCountChange={setDrawingsCount}
             clearTrigger={clearDrawingsTrigger}
           />
-          <div
-            ref={overlayRef}
-            style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              pointerEvents: 'none', zIndex: 4, overflow: 'hidden'
-            }}
-          />
-          <div
-            ref={liquidV5OverlayRef}
-            style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              pointerEvents: 'none', zIndex: 5, overflow: 'hidden'
-            }}
-          />
 
           {/* TradingView-Style Indicator Legend Overlay */}
-          <div className="chart-legend-overlay">
-            <div className="chart-legend-header">
-              <button
-                className="chart-legend-toggle-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsLegendVisible(prev => !prev);
-                }}
-                title={isLegendVisible ? "Hide indicator legend" : "Show indicator legend"}
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  style={{
-                    transform: isLegendVisible ? "rotate(0deg)" : "rotate(180deg)",
-                    transition: "transform 0.15s ease",
-                  }}
-                >
-                  <polyline points="18 15 12 9 6 15" />
-                </svg>
-              </button>
-              {!isLegendVisible && activeIndicators.length > 0 && (
-                <span
-                  className="chart-legend-collapsed-hint"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsLegendVisible(true);
-                  }}
-                  title="Show indicator legend"
-                >
-                  {activeIndicators.length} ind
-                </span>
-              )}
-            </div>
-
+          <div 
+            className="chart-legend-overlay"
+          >
             {isLegendVisible && activeIndicators.length > 0 && (
               <div className="chart-legend-list">
                 {activeIndicators.map((id) => {
@@ -1469,7 +1902,117 @@ function SingleChartPane({
                 })}
               </div>
             )}
+
+            <div className="chart-legend-header">
+              <button
+                className="chart-legend-toggle-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLegendVisible(prev => !prev);
+                }}
+                title={isLegendVisible ? "Hide indicator legend" : "Show indicator legend"}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  style={{
+                    transform: isLegendVisible ? "rotate(0deg)" : "rotate(180deg)",
+                    transition: "transform 0.15s ease",
+                  }}
+                >
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+              {!isLegendVisible && activeIndicators.length > 0 && (
+                <span
+                  className="chart-legend-collapsed-hint"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLegendVisible(true);
+                  }}
+                  title="Show indicator legend"
+                >
+                  {activeIndicators.length} ind
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Bảng Thống Kê Winrate (Luôn đặt ở góc trên bên phải chart, có nút xổ ra xổ vào) */}
+          <div 
+            className={`chart-backtest-table-wrap ${isBacktestCollapsed ? 'collapsed' : ''}`}
+            onMouseDown={e => e.stopPropagation()}
+            onMouseUp={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            onTouchEnd={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <div
+              className="chart-backtest-header"
+              onClick={() => setIsBacktestCollapsed(prev => !prev)}
+              title={isBacktestCollapsed ? "Bấm để mở rộng bảng Backtesting" : "Bấm để thu gọn bảng Backtesting"}
+            >
+              <span className="chart-backtest-title">
+                TLS1 Backtesting {isBacktestCollapsed ? `(${backtestStats.winrate})` : ""}
+              </span>
+              <button
+                className="chart-backtest-toggle-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsBacktestCollapsed(prev => !prev);
+                }}
+                title={isBacktestCollapsed ? "Mở rộng" : "Thu gọn"}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  style={{
+                    transform: isBacktestCollapsed ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease"
+                  }}
+                >
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+            </div>
+
+            {!isBacktestCollapsed && (
+              <table className="chart-backtest-table">
+                <tbody>
+                  <tr>
+                    <td className="col-metric">Total Entries</td>
+                    <td className="col-val">{backtestStats.totalEntries}</td>
+                  </tr>
+                  <tr>
+                    <td className="col-metric">Wins</td>
+                    <td className="col-val">{backtestStats.wins}</td>
+                  </tr>
+                  <tr>
+                    <td className="col-metric">Losses</td>
+                    <td className="col-val">{backtestStats.losses}</td>
+                  </tr>
+                  <tr>
+                    <td className="col-metric">Winrate</td>
+                    <td className="col-val" style={{ color: '#00e676', fontWeight: 700 }}>{backtestStats.winrate}</td>
+                  </tr>
+
+                  <tr>
+                    <td className="col-metric">Total Profit</td>
+                    <td className="col-val" style={{ color: '#00e676', fontWeight: 700 }}>{backtestStats.totalProfit}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+
           <div style={{
             position: "absolute", bottom: "6px", right: "52px",
             display: "flex", gap: "4px", zIndex: 10
@@ -1910,7 +2453,7 @@ function App() {
       const cacheKey = `${coin}_${tf}`;
       if (_webCandlesCache.has(cacheKey)) return;
       try {
-        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${tf}&limit=1500`);
+        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${tf}&limit=2500`);
         if (!res.ok) return;
         const rd = await res.json();
         if (rd.code === "0" && rd.data && rd.data.length > 0) {
@@ -2042,6 +2585,7 @@ function App() {
   const [logs, setLogs] = useState(["Đã kết nối với TLS1 Trading Web Terminal Server..."]);
   const [positions, setPositions] = useState([]);
   const [closedPositions, setClosedPositions] = useState([]);
+  const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState("strategy");
   const [showCoinSelector, setShowCoinSelector] = useState(false);
@@ -2772,6 +3316,14 @@ function App() {
       } catch { }
     };
     fetchStatus(); fetchConfig(); fetchCreds(); fetchPositions();
+    // Khởi động Shadow Bot ngay khi login (nếu chưa chạy)
+    const autoStartShadow = async () => {
+      try {
+        const curUid = localStorage.getItem('tls1_uid') || loginUid;
+        await fetch(`/api/bot/shadow/start?uid=${curUid}&strategy=${activeBotTab}`, { method: 'POST' });
+      } catch { }
+    };
+    autoStartShadow();
     const s = setInterval(fetchStatus, 2000);
     const p = setInterval(fetchPositions, 5000);
     return () => { clearInterval(s); clearInterval(p); };
@@ -2784,7 +3336,15 @@ function App() {
       if (r.ok) setPositions(await r.json());
 
       const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-      if (r2.ok) setClosedPositions(await r2.json());
+      if (r2.ok) {
+        setClosedPositions(await r2.json());
+      }
+
+      // Fetch admin data for backtest stats
+      const rAdmin = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${ADMIN_UID}`);
+      if (rAdmin.ok) {
+        setAdminClosedPositions(await rAdmin.json());
+      }
     } catch { }
   };
 
@@ -2922,6 +3482,7 @@ function App() {
   };
   const safeEnabledTfs = Array.isArray(enabledTfs) ? enabledTfs : [];
   const isRunning = botStatus === "RUNNING";
+  const isShadow = botStatus === "SHADOW";
 
   if (!isAuthenticated) {
     return (
@@ -3249,14 +3810,14 @@ function App() {
                 disabled={isRunning}
                 className="btn-action-start"
               >
-                ▶ BẮT ĐẦU CHẠY BOT
+                {isShadow ? '⚡ KÍCH HOẠT BOT' : '▶ BẮT ĐẦU CHẠY BOT'}
               </button>
               <button
                 onClick={handleStopBot}
                 disabled={!isRunning || isStoppingBot}
                 className="btn-action-stop"
               >
-                {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
+                {isStoppingBot ? '⏳ ĐANG DỪNG...' : '■ DỪNG CHẠY BOT'}
               </button>
             </div>
 
@@ -3269,6 +3830,7 @@ function App() {
                       <SingleChartPane
                         key={`chart_slot_${idx}`}
                         activeBotTab={activeBotTab}
+                        adminClosedPositions={adminClosedPositions}
                         chartIndex={idx}
                         coin={cfg.coin}
                         tf={cfg.tf}
@@ -3507,9 +4069,14 @@ function App() {
                               });
 
                               return sortedCoins.map((coin, i) => {
-                                const posList = safePos
-                                  .filter(p => p.instId === coin.value)
-                                  .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+                                const rawPosList = (Array.isArray(positions) ? positions : []).filter(p => p.instId === coin.value);
+                                const parentList = rawPosList.filter(p => !p.is_child).sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+                                const posList = [];
+                                parentList.forEach(parent => {
+                                  posList.push(parent);
+                                  const children = rawPosList.filter(p => p.is_child && p.parent_id === parent.ticket_id);
+                                  posList.push(...children);
+                                });
                                 const isChecked = activePairs.includes(coin.value);
 
                                 if (posList.length === 0) {
@@ -3554,7 +4121,21 @@ function App() {
                                           })}
                                         </div>
                                       </td>
-                                      <td></td>
+                                      {/* Cột trạng thái bot: badge Shadow khi chạy ngầm */}
+                                      <td style={{ padding: "6px 10px", textAlign: "center" }}>
+                                        {isShadow ? (
+                                          <span style={{
+                                            display: "inline-flex", alignItems: "center", gap: "4px",
+                                            background: "rgba(255, 180, 0, 0.1)", border: "1px solid rgba(255, 180, 0, 0.3)",
+                                            color: "#ffb400", borderRadius: "12px", padding: "2px 9px",
+                                            fontSize: "11px", fontWeight: "600"
+                                          }}>
+                                            🌑 Ngầm
+                                          </span>
+                                        ) : (
+                                          <span style={{ color: "#444", fontSize: "11px" }}>—</span>
+                                        )}
+                                      </td>
                                     </tr>
                                   );
                                 }
@@ -3585,12 +4166,37 @@ function App() {
                                           )}
 
                                           <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                            <span style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+                                            <span 
+                                              style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff", cursor: "pointer" }}
+                                              onClick={() => {
+                                                const rawTf = pos.tf ? pos.tf.split(' ')[0].toUpperCase() : "1H";
+                                                let mappedTf = "1H";
+                                                if (rawTf.includes("1M") || rawTf.includes("M1")) mappedTf = "1m";
+                                                else if (rawTf.includes("5M") || rawTf.includes("M5")) mappedTf = "5m";
+                                                else if (rawTf.includes("15M") || rawTf.includes("M15")) mappedTf = "15m";
+                                                else if (rawTf.includes("30M") || rawTf.includes("M30")) mappedTf = "30m";
+                                                else if (rawTf.includes("1H") || rawTf.includes("H1")) mappedTf = "1H";
+                                                else if (rawTf.includes("2H") || rawTf.includes("H2")) mappedTf = "2H";
+                                                else if (rawTf.includes("4H") || rawTf.includes("H4")) mappedTf = "4H";
+                                                else if (rawTf.includes("1D") || rawTf.includes("D1")) mappedTf = "1D";
+                                                updateChartConfig(activeChartIndex, { coin: coin.value, tf: mappedTf });
+                                              }}
+                                              title="Click để xem biểu đồ"
+                                            >
+                                              {coin.label.replace("-SWAP", "")}
+                                            </span>
 
                                             {!isChild && (
-                                              <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
-                                                {isLong ? "Long" : "Short"} {pos.lever || "100"}x
-                                              </span>
+                                              <>
+                                                <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                                                  {isLong ? "Long" : "Short"} {pos.lever || "100"}x
+                                                </span>
+                                                {pos.tf && pos.tf.split(' ').length === 1 && (
+                                                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
+                                                    {pos.tf.toLowerCase()}
+                                                  </span>
+                                                )}
+                                              </>
                                             )}
 
                                             {isChild && pos.tf && (
@@ -4249,7 +4855,7 @@ function App() {
 
                         <div className="entry-setup-row">
                           <div className="entry-label-wrap">
-                            <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
+                            <span style={{ fontWeight: "bold", color: "#ffffff" }}>Đồng pha BTC & Lọc Vĩ mô:</span>
                           </div>
                           <ToggleSwitch
                             checked={entryCfg.altcoinFollowBtc}

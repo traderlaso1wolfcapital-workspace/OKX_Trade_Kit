@@ -3259,7 +3259,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
         add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
         # add_checkbox(l_toggles, 2, 0, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
-        # add_checkbox(l_toggles, 3, 0, "Altcoin đánh theo BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC | TẮT: Altcoin dùng EMA200 của chính nó", colspan=2)
+        # add_checkbox(l_toggles, 3, 0, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4 | TẮT: Từng TF hoạt động hoàn toàn độc lập", colspan=2)
         layout.addWidget(grp_toggles)
 
         # 2. BẢO VỆ & CẮT LỆNH TỰ ĐỘNG

@@ -421,6 +421,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     coin_name = cfg["coin"]
     if swap_id not in state_matrix: return
     tracker = state_matrix[swap_id]
+    # 🔒 DRY-RUN MODE: Đọc từ system_config — khi True thì toàn bộ lệnh POST lên OKX bị bỏ qua
+    dry_run: bool = bool(system_config.get("DRY_RUN", False))
     
     # Phân nhóm tài sản: crypto (neo BTC nếu ON) | forex (kim loại, cổ phiếu, cặp tiền - giao dịch độc lập)
     _asset_class = cfg.get("asset_class", "crypto")
@@ -1202,10 +1204,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ⚡ Force re-apply TP/SL ngay sau khi sync TF thay đổi
     if btc_sync_tf_changed:
         if tracker.has_long and active_long_pos:
-            clean_algo_orders(client, swap_id, "cross", "long")
+            clean_algo_orders(client, swap_id, "cross", "long", dry_run=dry_run)
             apply_emergency_tpsl(client, swap_id, active_long_pos[0], state_matrix, globals_ref)
         if tracker.has_short and active_short_pos:
-            clean_algo_orders(client, swap_id, "cross", "short")
+            clean_algo_orders(client, swap_id, "cross", "short", dry_run=dry_run)
             apply_emergency_tpsl(client, swap_id, active_short_pos[0], state_matrix, globals_ref)
 
     if tracker.has_long and tracker.has_short: tracker.last_pos_state = "had_both"
@@ -1236,8 +1238,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.mae_history_disp_long = f"{tracker.mae_max_pct_long:.1f}%"
 
         if globals_ref.ENABLE_SIDEWAY_SAFE_EXIT and is_sideway_strict and current_roi_pct >= Decimal("20.0"):
-            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Sideway Protection LONG: ROI {current_roi_pct:.1f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Sideway Protection LONG: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_long = "Sideway_Safe_Exit"
             tracker.record_exit("LONG", current_roi_pct, "Sideway_Safe_Exit", "Chốt lời chủ động do Sideway (Vi phạm ĐK)")
             return
@@ -1252,8 +1254,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 tracker.squeeze_defense_active_long = True
             
             if getattr(tracker, "squeeze_defense_active_long", False) and tracker.live_price <= defense_sl_px:
-                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Squeeze Defense LONG: ROI {current_roi_pct:.1f}%", "cross")
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Squeeze Defense LONG: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                 tracker.closure_reason_long = "Squeeze_Defense_Exit"
                 tracker.record_exit("LONG", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
                 tracker.squeeze_defense_active_long = False
@@ -1264,8 +1266,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if is_in_profit:
                 target_ema200 = getattr(tracker, f"{pos_tf.lower()}_ema200", tracker.ema200 if pos_tf == "M5" else Decimal("0"))
                 if target_ema200 > 0 and tracker.live_price >= target_ema200:
-                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Ping-Pong TP LONG: ROI {current_roi_pct:.1f}%", "cross")
+                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Ping-Pong TP LONG: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                     tracker.closure_reason_long = "PingPong_TP_Exit"
                     tracker.record_exit("LONG", current_roi_pct, "PingPong_TP_Exit", f"Chốt lời non (Ping-Pong) tại {pos_tf} EMA200.")
                     return
@@ -1275,8 +1277,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             higher_tf_ema200 = get_nearest_opposite_ema200(tracker, "LONG", pos_tf)
             if higher_tf_ema200 > 0 and is_in_profit:
                 if tracker.live_price >= higher_tf_ema200:
-                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Dynamic EMA200 TP LONG: ROI {current_roi_pct:.1f}%", "cross")
+                    clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+                    close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Dynamic EMA200 TP LONG: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                     tracker.closure_reason_long = "Dynamic_EMA200_TP_Exit"
                     tracker.record_exit("LONG", current_roi_pct, "Dynamic_EMA200_TP_Exit", f"Chốt lời động chạm cản EMA200 TF lớn hơn.")
                     return
@@ -1284,8 +1286,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         # 1.5. Safeguard Entry Recover Close (Âm >70% SL, hồi về Entry thoát hòa)
         sl_pct_cap = coin_sl_pct * Decimal("100")
         if globals_ref.ENABLE_SAFEGUARD_ENTRY_EXIT and tracker.mae_max_pct_long >= (sl_pct_cap * Decimal("0.70")) and tracker.live_price >= avg_px_l:
-            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Safeguard Entry Close LONG: MAE reached {tracker.mae_max_pct_long:.2f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Safeguard Entry Close LONG: MAE reached {tracker.mae_max_pct_long:.2f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_long = "Safeguard_Entry_Exit"
             tracker.record_exit("LONG", current_roi_pct, "Safeguard_Entry_Exit", f"Lỗ sâu ({tracker.mae_max_pct_long:.2f}%) hồi về Entry thoát hòa.")
             return
@@ -1346,8 +1348,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 tracker.active_sl_px_long = round_to_tick(avg_px_l * (Decimal("1") - active_coin_sl_pct), tick_sz)
 
             if tracker.live_price <= tracker.active_sl_px_long:
-                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Trailing SL Hit LONG", "cross")
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Trailing SL Hit LONG", "cross", dry_run=dry_run)
                 tracker.closure_reason_long = "Dynamic_Floor_Safe_Close_Long"
                 tracker.record_exit("LONG", current_roi_pct, "Dynamic_Floor_Safe_Close_Long", "Chạm Trailing SL bảo vệ")
                 return
@@ -1364,16 +1366,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
         if globals_ref.ENABLE_MAX_ROI_EXIT and is_in_profit:
             if current_roi_pct >= Decimal("120.0"):
-                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Max ROI Hit LONG", "cross")
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+                close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Max ROI Hit LONG", "cross", dry_run=dry_run)
                 tracker.closure_reason_long = "Divergence_Exit_Long"
                 tracker.record_exit("LONG", current_roi_pct, "Divergence_Exit_Long", "Cắn mốc Lợi nhuận Vàng tối đa")
                 return
 
         pos_tf = getattr(tracker, "active_pos_tf", "M5")
         if globals_ref.ENABLE_SIDEWAY_VAP_EXIT and tracker.mtf_states.get(pos_tf, tracker.mtf_states["M5"])["fail"] >= 2 and current_roi_pct >= Decimal("0.0"):
-            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
-            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Sideway Vap Exit LONG: ROI {current_roi_pct:.1f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"], f"Sideway Vap Exit LONG: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_long = "Sideway_Vap_Exit"
             tracker.record_exit("LONG", current_roi_pct, "Sideway_Vap_Exit", f"Cắt hòa/dương khi Vấp 2/2 trong khung {pos_tf}")
             return
@@ -1450,8 +1452,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         tracker.mae_history_disp_short = f"{tracker.mae_max_pct_short:.1f}%"
 
         if globals_ref.ENABLE_SIDEWAY_SAFE_EXIT and is_sideway_strict and current_roi_pct >= Decimal("20.0"):
-            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Sideway Protection SHORT: ROI {current_roi_pct:.1f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Sideway Protection SHORT: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_short = "Sideway_Safe_Exit"
             tracker.record_exit("SHORT", current_roi_pct, "Sideway_Safe_Exit", "Chốt lời chủ động do Sideway (Vi phạm ĐK)")
             return
@@ -1464,8 +1466,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # Dời SL về dương nhẹ (trả phí giao dịch ~ 0.1% ROE / đòn bẩy)
                 defense_sl_px = round_to_tick(avg_px_s * (Decimal("1") - (Decimal("0.001") / Decimal(str(cfg["leverage"])))), tick_sz)
                 if tracker.live_price >= defense_sl_px:
-                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Squeeze Defense SHORT: ROI {current_roi_pct:.1f}%", "cross")
+                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Squeeze Defense SHORT: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                     tracker.closure_reason_short = "Squeeze_Defense_Exit"
                     tracker.record_exit("SHORT", current_roi_pct, "Squeeze_Defense_Exit", f"Phòng thủ Nén tam giác tại {pos_tf} (SL Dương).")
                     return
@@ -1475,8 +1477,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if is_in_profit:
                 target_ema200 = getattr(tracker, f"{pos_tf.lower()}_ema200", tracker.ema200 if pos_tf == "M5" else Decimal("0"))
                 if target_ema200 > 0 and tracker.live_price <= target_ema200:
-                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Ping-Pong TP SHORT: ROI {current_roi_pct:.1f}%", "cross")
+                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Ping-Pong TP SHORT: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                     tracker.closure_reason_short = "PingPong_TP_Exit"
                     tracker.record_exit("SHORT", current_roi_pct, "PingPong_TP_Exit", f"Chốt lời non (Ping-Pong) tại {pos_tf} EMA200.")
                     return
@@ -1486,8 +1488,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             higher_tf_ema200 = get_nearest_opposite_ema200(tracker, "SHORT", pos_tf)
             if higher_tf_ema200 > 0 and is_in_profit:
                 if tracker.live_price <= higher_tf_ema200:
-                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Dynamic EMA200 TP SHORT: ROI {current_roi_pct:.1f}%", "cross")
+                    clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+                    close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Dynamic EMA200 TP SHORT: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
                     tracker.closure_reason_short = "Dynamic_EMA200_TP_Exit"
                     tracker.record_exit("SHORT", current_roi_pct, "Dynamic_EMA200_TP_Exit", f"Chốt lời động chạm cản EMA200 TF lớn hơn.")
                     return
@@ -1495,8 +1497,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         # 1.5. Safeguard Entry Recover Close (Âm >70% SL, hồi về Entry thoát hòa)
         sl_pct_cap = coin_sl_pct * Decimal("100")
         if globals_ref.ENABLE_SAFEGUARD_ENTRY_EXIT and tracker.mae_max_pct_short >= (sl_pct_cap * Decimal("0.70")) and tracker.live_price <= avg_px_s:
-            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Safeguard Entry Close SHORT: MAE reached {tracker.mae_max_pct_short:.2f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Safeguard Entry Close SHORT: MAE reached {tracker.mae_max_pct_short:.2f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_short = "Safeguard_Entry_Exit"
             tracker.record_exit("SHORT", current_roi_pct, "Safeguard_Entry_Exit", f"Lỗ sâu ({tracker.mae_max_pct_short:.2f}%) hồi về Entry thoát hòa.")
             return
@@ -1558,8 +1560,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 tracker.active_sl_px_short = round_to_tick(avg_px_s * (Decimal("1") + active_coin_sl_pct), tick_sz)
 
             if tracker.live_price >= tracker.active_sl_px_short:
-                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Trailing SL Hit SHORT", "cross")
+                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+                close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Trailing SL Hit SHORT", "cross", dry_run=dry_run)
                 tracker.closure_reason_short = "Dynamic_Floor_Safe_Close_Short"
                 tracker.record_exit("SHORT", current_roi_pct, "Dynamic_Floor_Safe_Close_Short", "Chạm Trailing SL bảo vệ")
                 return
@@ -1576,16 +1578,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
         if globals_ref.ENABLE_MAX_ROI_EXIT and is_in_profit:
             if current_roi_pct >= Decimal("120.0"):
-                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-                close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Max ROI Hit SHORT", "cross")
+                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+                close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Max ROI Hit SHORT", "cross", dry_run=dry_run)
                 tracker.closure_reason_short = "Divergence_Exit_Short"
                 tracker.record_exit("SHORT", current_roi_pct, "Divergence_Exit_Short", "Cắn mốc Lợi nhuận Vàng tối đa")
                 return
 
         pos_tf = getattr(tracker, "active_pos_tf", "M5")
         if globals_ref.ENABLE_SIDEWAY_VAP_EXIT and tracker.mtf_states.get(pos_tf, tracker.mtf_states["M5"])["fail"] >= 2 and current_roi_pct >= Decimal("0.0"):
-            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
-            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Sideway Vap Exit SHORT: ROI {current_roi_pct:.1f}%", "cross")
+            clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
+            close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"], f"Sideway Vap Exit SHORT: ROI {current_roi_pct:.1f}%", "cross", dry_run=dry_run)
             tracker.closure_reason_short = "Sideway_Vap_Exit"
             tracker.record_exit("SHORT", current_roi_pct, "Sideway_Vap_Exit", f"Cắt hòa/dương khi Vấp 2/2 trong khung {pos_tf}")
             return
@@ -2111,9 +2113,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 pos_s = active_short_pos[0]
                 avg_px_s = tracker.active_avg_px_short
                 roi_s = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
-                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"])
+                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"], dry_run=dry_run)
                 close_position_market(client, swap_id, pos_s["posSide"], pos_s["pos"],
-                    f"H4 Flip under→above ({h4_st['accum']}n)", "cross")
+                    f"H4 Flip under→above ({h4_st['accum']}n)", "cross", dry_run=dry_run)
                 tracker.closure_reason_short = "H4_Flip_Close"
                 tracker.record_exit("SHORT", roi_s, "H4_Flip_Close",
                     f"H4 đảo chiều Tăng sau {h4_st['accum']} nến — đóng toàn bộ SHORT")
@@ -2122,9 +2124,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 pos_l = active_long_pos[0]
                 avg_px_l = tracker.active_avg_px_long
                 roi_l = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
-                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"])
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"], dry_run=dry_run)
                 close_position_market(client, swap_id, pos_l["posSide"], pos_l["pos"],
-                    f"H4 Flip above→under ({h4_st['accum']}n)", "cross")
+                    f"H4 Flip above→under ({h4_st['accum']}n)", "cross", dry_run=dry_run)
                 tracker.closure_reason_long = "H4_Flip_Close"
                 tracker.record_exit("LONG", roi_l, "H4_Flip_Close",
                     f"H4 đảo chiều Giảm sau {h4_st['accum']} nến — đóng toàn bộ LONG")
@@ -2154,7 +2156,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
     if not is_macro_approved and not xl_found:
         if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
-            clean_limit_orders(client, swap_id, "cross")
+            clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
             tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
 
     # ==============================
@@ -2167,7 +2169,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         # 1. Chặn lưới Limit mới (tạm ngưng giao dịch chờ xu hướng rõ)
         is_limit_setup_cycle = False
         if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
-            clean_limit_orders(client, swap_id, "cross")
+            clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
             tracker.placed_entry_px_long_by_tf = {}
             tracker.placed_entry_px_short_by_tf = {}
             tracker.placed_entry_px_long = "---"
@@ -2178,16 +2180,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             avg_px_l = tracker.active_avg_px_long
             current_roi_long = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_long >= Decimal("0.1"):
-                clean_algo_orders(client, swap_id, "cross", "long")
-                close_position_market(client, swap_id, "long", str(cross_long_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross")
+                clean_algo_orders(client, swap_id, "cross", "long", dry_run=dry_run)
+                close_position_market(client, swap_id, "long", str(cross_long_amt, dry_run=dry_run), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross")
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
                 
         if tracker.has_short and cross_short_amt > 0:
             avg_px_s = tracker.active_avg_px_short
             current_roi_short = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_short >= Decimal("0.1"):
-                clean_algo_orders(client, swap_id, "cross", "short")
-                close_position_market(client, swap_id, "short", str(cross_short_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross")
+                clean_algo_orders(client, swap_id, "cross", "short", dry_run=dry_run)
+                close_position_market(client, swap_id, "short", str(cross_short_amt, dry_run=dry_run), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross")
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
 
 
@@ -2196,7 +2198,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # 🛑 CẦU DAO AN TOÀN: VOLUME SPIKE KHÔNG GÀI LIMIT
             if is_vol_spike:
                 if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
-                    clean_limit_orders(client, swap_id, "cross")
+                    clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
                     tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
                     send_telegram_notification(f"🛑 [CẦU DAO] {cfg['coin']}: Bão Volume Spike! Đã hủy lưới Limit để né bắt dao rơi.")
                 return 
@@ -2249,7 +2251,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if not is_enabled:
                 # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
                 # Kệ xác lệnh Market và lệnh TP/SL đã đặt trên sàn -> Bot ngưng phân tích (Return)
-                clean_limit_orders(client, swap_id, "cross")
+                clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
                       
                 tracker.placed_entry_px_long_by_tf = {}
                 tracker.placed_entry_px_short_by_tf = {}
@@ -2357,33 +2359,43 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             allowed_long = False
             allowed_short = False
 
-            if tracker.has_long:
+            _is_sync = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
+            if not _is_sync:
+                # ⚡ Độc lập TF (Đồng pha OFF): Không bị khóa bởi lệnh ngược chiều, M5 có thể Long & M15 Short (Hedge)
                 allowed_long = True
-            if tracker.has_short:
                 allowed_short = True
-            
-            if not tracker.has_long and not tracker.has_short:
-                # Reset filled_tfs khi không còn vị thế nào (chu kỳ mới)
-                tracker.pos_cycle_filled_tfs = []
-                tracker.pos_cycle_closed_tfs = []
-                # Nếu chưa có vị thế, hướng đi được quyết định bởi BTC (nếu là Altcoin sync) hoặc tín hiệu của bản thân (BTC, forex như XAU)
-                h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
-                if coin_name == "BTC" or not _is_alt_synced:
-                    allowed_long = (tracker.trend in ("UPTREND", "HEDGE")) and h4_side != "under"
-                    allowed_short = (tracker.trend in ("DOWNTREND", "HEDGE")) and h4_side != "above"
-                else:
-                    btc_tk = state_matrix.get("BTC-USDT-SWAP")
-                    if btc_tk:
-                        btc_dir = "SIDEWAY"
-                        if btc_tk.has_long:
-                            btc_dir = "UPTREND"
-                        elif btc_tk.has_short:
-                            btc_dir = "DOWNTREND"
-                        else:
-                            btc_dir = btc_tk.trend
-                        btc_h4_side = btc_tk.mtf_states.get("H4", {}).get("side", "none")
-                        allowed_long = (btc_dir in ("UPTREND", "HEDGE")) and btc_h4_side != "under"
-                        allowed_short = (btc_dir in ("DOWNTREND", "HEDGE")) and btc_h4_side != "above"
+                if not tracker.has_long and not tracker.has_short:
+                    tracker.pos_cycle_filled_tfs = []
+                    tracker.pos_cycle_closed_tfs = []
+            else:
+                if tracker.has_long:
+                    allowed_long = True
+                if tracker.has_short:
+                    allowed_short = True
+                
+                if not tracker.has_long and not tracker.has_short:
+                    # Reset filled_tfs khi không còn vị thế nào (chu kỳ mới)
+                    tracker.pos_cycle_filled_tfs = []
+                    tracker.pos_cycle_closed_tfs = []
+                    
+                    # Hướng đi được quyết định bởi BTC (nếu là Altcoin sync) hoặc tín hiệu của bản thân
+                    h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
+                    if coin_name == "BTC" or not _is_alt_synced:
+                        allowed_long = (tracker.trend in ("UPTREND", "HEDGE")) and h4_side != "under"
+                        allowed_short = (tracker.trend in ("DOWNTREND", "HEDGE")) and h4_side != "above"
+                    else:
+                        btc_tk = state_matrix.get("BTC-USDT-SWAP")
+                        if btc_tk:
+                            btc_dir = "SIDEWAY"
+                            if btc_tk.has_long:
+                                btc_dir = "UPTREND"
+                            elif btc_tk.has_short:
+                                btc_dir = "DOWNTREND"
+                            else:
+                                btc_dir = btc_tk.trend
+                            btc_h4_side = btc_tk.mtf_states.get("H4", {}).get("side", "none")
+                            allowed_long = (btc_dir in ("UPTREND", "HEDGE")) and btc_h4_side != "under"
+                            allowed_short = (btc_dir in ("DOWNTREND", "HEDGE")) and btc_h4_side != "above"
 
             # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Chỉ khi thực sự là vị thế HEDGE hoặc đang rình HEDGE)
             is_hd_active = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)) or (not tracker.has_long and not tracker.has_short and xl_found)
@@ -2404,29 +2416,33 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # ⚡ CẦU DAO CHỐNG RƯỚN VĨ MÔ (Macro Extension Breaker)
             # Khi ALTCOIN_FOLLOW_BTC_EMA = ON, dùng trạng thái của BTC làm chuẩn
             # Tránh Altcoin bị kẹt khóa vĩnh viễn do lệch pha H2/H4 EMA200 với BTC
-            _alt_follow_btc_macro = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
-            if _is_alt_synced and _alt_follow_btc_macro:
-                _btc_tk_macro = state_matrix.get("BTC-USDT-SWAP")
-                if _btc_tk_macro:
-                    tracker.is_macro_overextended = getattr(_btc_tk_macro, "is_macro_overextended", False)
+            # Khi Đồng pha = OFF, tắt luôn cầu dao vĩ mô
+            _is_sync = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
+            if not _is_sync:
+                tracker.is_macro_overextended = False
             else:
-                _h4_ema200 = get_ema200_for_tf("H4")
-                _h2_ema200 = get_ema200_for_tf("H2")
-                if _h4_ema200 > 0 and _h2_ema200 > 0:
-                    _macro_dist_pct = abs(tracker.live_price - _h4_ema200) / _h4_ema200
-                    _limit_pct = getattr(globals_ref, "MACRO_EXTENSION_LIMIT_PCT", Decimal("0.08")) * getattr(tracker, "vol_mult", Decimal("1.0"))
-                    _is_overextended = getattr(tracker, "is_macro_overextended", False)
-                    
-                    if _macro_dist_pct > _limit_pct:
-                        if not _is_overextended:
-                            tracker.is_macro_overextended = True
-                            print(f"\n🚨 [CẦU DAO VĨ MÔ] {coin_name} vượt ngưỡng rướn {_limit_pct*100:.1f}% (Cách H4 {_macro_dist_pct*100:.1f}%). Khóa rải lưới M5, M15, M30!")
-                    elif _is_overextended:
-                        # Mở khóa ở mốc 2%
-                        _unlock_limit = Decimal("0.02")
-                        if _macro_dist_pct <= _unlock_limit:
-                            tracker.is_macro_overextended = False
-                            print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã điều chỉnh về gần H4 (Cách {_macro_dist_pct*100:.1f}% <= 2%). Mở lại lưới thuận xu hướng!")
+                if _is_alt_synced:
+                    _btc_tk_macro = state_matrix.get("BTC-USDT-SWAP")
+                    if _btc_tk_macro:
+                        tracker.is_macro_overextended = getattr(_btc_tk_macro, "is_macro_overextended", False)
+                else:
+                    _h4_ema200 = get_ema200_for_tf("H4")
+                    _h2_ema200 = get_ema200_for_tf("H2")
+                    if _h4_ema200 > 0 and _h2_ema200 > 0:
+                        _macro_dist_pct = abs(tracker.live_price - _h4_ema200) / _h4_ema200
+                        _limit_pct = getattr(globals_ref, "MACRO_EXTENSION_LIMIT_PCT", Decimal("0.08")) * getattr(tracker, "vol_mult", Decimal("1.0"))
+                        _is_overextended = getattr(tracker, "is_macro_overextended", False)
+                        
+                        if _macro_dist_pct > _limit_pct:
+                            if not _is_overextended:
+                                tracker.is_macro_overextended = True
+                                print(f"\n🚨 [CẦU DAO VĨ MÔ] {coin_name} vượt ngưỡng rướn {_limit_pct*100:.1f}% (Cách H4 {_macro_dist_pct*100:.1f}%). Khóa rải lưới M5, M15, M30!")
+                        elif _is_overextended:
+                            # Mở khóa ở mốc 2%
+                            _unlock_limit = Decimal("0.02")
+                            if _macro_dist_pct <= _unlock_limit:
+                                tracker.is_macro_overextended = False
+                                print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã điều chỉnh về gần H4 (Cách {_macro_dist_pct*100:.1f}% <= 2%). Mở lại lưới thuận xu hướng!")
 
             _is_overextended = getattr(tracker, "is_macro_overextended", False)
             _blocked_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])] if _is_overextended else []
@@ -2776,7 +2792,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.missing_count_long[tf] = 0
                             
 
-                        place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
+                        place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf, dry_run=dry_run), px_str,
                                          f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
@@ -2956,7 +2972,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         else:
                             tracker.missing_count_short[tf] = 0
                             
-                        place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
+                        place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf, dry_run=dry_run), px_str,
                                          f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s

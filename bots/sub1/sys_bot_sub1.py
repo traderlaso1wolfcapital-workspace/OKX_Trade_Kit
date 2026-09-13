@@ -55,7 +55,9 @@ system_config = {
     "SHOULD_RESET_NEN": False,
     "LAST_EVOLUTION_TIMESTAMP": 0.0,
     "SHOULD_STOP": False,
-    "STARTUP_CLEANUP_DONE": False
+    "STARTUP_CLEANUP_DONE": False,
+    "DRY_RUN": True,       # 🔒 Mặc định: chạy ngầm, không đặt lệnh OKX cho đến khi được kích hoạt
+    "KILL_PROCESS": False, # 🛑 Thoát hoàn toàn process khi app tắt
 }
 
 def main():
@@ -88,6 +90,8 @@ def main():
     system_config["LAST_EVOLUTION_TIMESTAMP"] = 0.0
     system_config["STARTUP_CLEANUP_DONE"] = False
     system_config["BOT_START_TIME"] = time.time()
+    system_config["DRY_RUN"] = True       # Bắt đầu ở chế độ ngầm cho đến khi nhận lệnh activate
+    system_config["KILL_PROCESS"] = False
     
     if getattr(sys, 'frozen', False):
         base_dir = os.path.dirname(sys.executable)
@@ -370,16 +374,16 @@ def main():
         last_config_mtime = os.path.getmtime(config_path)
 
     while True:
-        # Hỗ trợ dừng bot từ GUI
-        if system_config.get("SHOULD_STOP", False):
-            print("\n🛑 [HỆ THỐNG DỪNG]: Đã nhận tín hiệu tắt bot từ GUI.")
+        # 🛑 Thoát hoàn toàn (chỉ khi app tắt, không phải khi Stop bình thường)
+        if system_config.get("KILL_PROCESS", False):
+            print("\n🛑 [HỆ THỐNG TẪT]: Đã nhận tín hiệu tắt toàn bộ process.")
             break
 
         try:
             current_now = time.time()
             
-            # --- STARTUP CLEANUP ---
-            if not system_config.get("STARTUP_CLEANUP_DONE", False):
+            # --- STARTUP CLEANUP --- (Chỉ chạy khi được kích hoạt lần đầu, bỏ qua ở DRY-RUN)
+            if not system_config.get("STARTUP_CLEANUP_DONE", False) and not system_config.get("DRY_RUN", True):
                 bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO)
                 system_config["STARTUP_CLEANUP_DONE"] = True
                 time.sleep(2)
@@ -388,9 +392,36 @@ def main():
             try:
                 stop_flag_path = os.path.join(JSON_DATA_DIR, f"stop_{acc_name}.flag")
                 if os.path.exists(stop_flag_path):
-                    system_config["SHOULD_STOP"] = True
+                    # Đây giờ chỉ đưa về DRY_RUN (chạy ngầm), không thoát process
+                    system_config["DRY_RUN"] = True
+                    print(f"\n🌑 [SHADOW MODE]: Bot {acc_name} đã chuyển về chế độ ngầm (DRY-RUN). Tiếp tục đếm nến, không đặt lệnh.")
                     try: os.remove(stop_flag_path)
                     except: pass
+
+                # Kích hoạt bot thật (chuyển từ shadow → live)
+                activate_flag_path = os.path.join(JSON_DATA_DIR, f"activate_{acc_name}.flag")
+                if os.path.exists(activate_flag_path):
+                    if not system_config["STARTUP_CLEANUP_DONE"]:
+                        bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
+                        system_config["STARTUP_CLEANUP_DONE"] = True
+                    system_config["DRY_RUN"] = False
+                    print(f"\n⚡ [ACTIVATED]: Bot {acc_name} đã được KÍCH HOẠT! Bắt đầu đặt lệnh thật lên OKX.")
+                    try: os.remove(activate_flag_path)
+                    except: pass
+
+                # Tắt toàn bộ process (chuyển từ shadow → exit)
+                kill_flag_path = os.path.join(JSON_DATA_DIR, f"kill_{acc_name}.flag")
+                if os.path.exists(kill_flag_path):
+                    system_config["KILL_PROCESS"] = True
+                    try: os.remove(kill_flag_path)
+                    except: pass
+
+                # Ghi trạng thái DRY_RUN ra file để backend Web đọc
+                status_file = os.path.join(JSON_DATA_DIR, f"dry_run_{acc_name}.flag")
+                try:
+                    with open(status_file, "w") as _sf:
+                        _sf.write("1" if system_config.get("DRY_RUN", True) else "0")
+                except: pass
 
                 reset_wallet_flag_path = os.path.join(JSON_DATA_DIR, f"reset_wallet_{acc_name}.flag")
                 if os.path.exists(reset_wallet_flag_path):

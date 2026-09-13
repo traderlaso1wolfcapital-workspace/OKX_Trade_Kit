@@ -17,6 +17,55 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[13/09/2026]** - Tái Cấu Trúc Tín Hiệu Long/Short Bot Liqui Chuẩn TradingView (Ảnh 1) & Đồng Bộ SMC OB:
+  - **Yêu cầu của CEO:** "toàn bộ tín hiệu long short hiện tại của bot liqui thiết kế lại giống như ảnh 1, ko nên dùng các kẻ nét đứt, và cho độ dài của chúng luôn dài ra bao chọn 25 cây nến. các box smc ở bot liqui chỉ cần thể hiện OB giống như thông số bên bot smc là đc".
+  - **Đã thực hiện:**
+    1. **Thiết kế khối vị thế Long/Short giống 100% Ảnh 1 (TradingView Long/Short Position Box):**
+       - Thay thế hoàn toàn các đường kẻ nét đứt và nhãn tag `SHORT`, `SL`, `TP` cũ.
+       - Tạo 2 khối hộp màu liên kết liền mạch: Vùng Xanh Teal Target (Take Profit) và Vùng Đỏ Burgundy Risk (Stop Loss), viền sắc nét, ngăn cách bởi đường Entry nét liền màu trắng mỏng.
+       - Chiều rộng của khối vị thế được tính toán chính xác kéo dài bao trọn đúng **25 cây nến** tính từ nến vào lệnh.
+    2. **Đồng bộ Order Blocks (SMC OB) giữa Bot Liquidation và Bot SMC:**
+       - Sử dụng trực tiếp `activeObsRef.current` (chuẩn thuật toán `compute_ob_boxes` backend) để hiển thị các khối OB với cùng thông số và style (dải mờ không viền nằm dưới nến) như bên Bot SMC.
+    3. **Tự động áp dụng Zoom chuẩn:** Tự động căn chỉnh nến phóng to rõ ràng khi chuyển tab, giúp nhìn thấy rõ nến và khối vị thế 25 cây nến.
+    4. Đã build production frontend và kiểm thử trực tiếp trên browser đối chứng hình ảnh đạt chuẩn 100%.
+
+- **[13/09/2026]** - Thiết Lập Mặc Định Luôn Bật EMA 200 Và Volume Trên Toàn Bộ Các Chart:
+  - **Yêu cầu của CEO:** "toàn bộ các chart luôn mặc định phải có chỉ báo ema200 và volume".
+  - **Đã thực hiện:**
+    1. Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), cấu hình `activeIndicators` mặc định luôn chèn `ema200` và `volume` ngay cả khi tải lại trang, đổi cặp coin, đổi khung thời gian hoặc chuyển đổi giữa các tab bot:
+       - **Bot EMA200 (`sub1`):** Mặc định `["ema200", "volume"]`.
+       - **Bot SMC (`sub2`):** Mặc định `["ema200", "volume", "smc_ob"]`.
+       - **Bot Liquidation (`sub3`):** Mặc định `["ema200", "volume", "liquid_v5"]`.
+    2. Vẽ đầy đủ cột khối lượng (Volume Histogram xanh/đỏ) kết hợp đường trung bình Volume MA 20 chu kỳ tại đáy biểu đồ.
+    3. Đã build production và kiểm thử tự động trên browser xác nhận cả 3 tab bot đều có sẵn `EMA 200` và `Volume 20`.
+
+- **[13/09/2026]** - Thiết Kế Bảng Thống Kê Winrate Chuẩn Trên Toàn Bộ Các Tab Bot:
+  - **Yêu cầu của CEO:** "toàn bộ các tab bot thiết kế lại giao diện bảng thống kê winrate đầy đủ như ảnh trên, luôn đặt ở góc trên bên phải chart" (kèm ảnh minh họa bảng TLS1 Backtesting).
+  - **Đã thực hiện:**
+    1. **Thiết kế chuẩn 100% ảnh mẫu:** Tạo bảng HTML table grid với viền mờ tinh tế phân cách từng ô (`border: 1px solid rgba(42, 53, 74, 0.7)`), background màu slate navy sang trọng (`rgba(14, 18, 28, 0.88)`), chữ căn giữa chuẩn chỉnh.
+    2. **Đầy đủ 6 chỉ số:** `Total Entries`, `Wins`, `Losses`, `Winrate`, `Average Profit`, `Total Profit`.
+    3. **Hiển thị trên toàn bộ các Tab Bot:** Tích hợp trực tiếp vào [SingleChartPane](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), tự động xuất hiện ở góc trên bên phải biểu đồ sát mép trục giá trên cả 3 bot: **Bot EMA200 (`sub1`)**, **Bot SMC (`sub2`)**, và **Bot Liquidation (`sub3`)**.
+    4. **Đồng bộ hóa dữ liệu thông minh:** Dữ liệu backtest được tính toán và đồng bộ động theo từng thuật toán bot và cập nhật tức thì khi nến/tín hiệu thay đổi.
+    5. Đã build production và kiểm thử thực tế trên browser đối chứng cả 3 tab bot xác nhận hoạt động hoàn hảo.
+
+- **[13/09/2026]** - Tái Cấu Trúc Khối Order Block Bên Bot Liquidation Giống 100% Bot SMC:
+  - **Yêu cầu của CEO:** "ở bên bot liqui các box ob thiết kế lại giao diện màu sắc và style giống 100% box ob bên bot smc, ko viền ngoài luôn nằm bên dưới chart" (kèm ảnh minh họa Bot SMC).
+  - **Đã thực hiện:**
+    1. **Màu sắc & Style chuẩn 100% Bot SMC:** Đổi sang dải màu phẳng trong suốt (`rgba(21, 101, 192, 0.2)` cho Bullish OB, `rgba(198, 40, 40, 0.2)` cho Bearish OB), tự động trải dài sang phải trục giá (`maxRightX - startX`).
+    2. **Không viền ngoài (`border: none`):** Bỏ toàn bộ đường viền 1px nét đậm màu xanh/đỏ và xóa bỏ các thẻ chữ `+OB` / `-OB` / `+FVG` gây rối mắt.
+    3. **Nằm bên dưới biểu đồ nến (Underlying Layer):**
+       - Khai báo thêm layer nền riêng `liquidV5BoxesOverlayRef` với `zIndex: 1`.
+       - Đổi chart layout background sang `transparent` và đưa `single-chart-canvas` lên `zIndex: 2`.
+       - Các cây nến, râu nến, đường EMA và giá live hiển thị đè lên trên các khối OB, các khối OB làm nền chìm hoàn toàn bên dưới nến như mong đợi.
+    4. Đã build production và kiểm thử đối chứng thực tế trên browser xác nhận chính xác.
+
+- **[13/09/2026]** - Đổi Vị Trí Nút Mũi Tên Xổ Ra/Xổ Vào (`^`/`v`) Nằm Bên Dưới Chỉ Báo:
+  - **Yêu cầu của CEO:** "luôn cho mũi tên xổ ra xổ vào indicator ở bên dưới chỉ báo" (kèm ảnh minh họa mũi tên đỏ trỏ từ trên xuống dưới chỉ báo).
+  - **Đã thực hiện:**
+    1. Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), đổi thứ tự render của `chart-legend-overlay`: Danh sách chỉ báo `chart-legend-list` hiển thị ở trên, và nút bấm Chevron `chart-legend-header` luôn nằm ngay **BÊN DƯỚI** các chỉ báo.
+    2. Cập nhật CSS trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css) để khoảng cách và căn lề thẩm mỹ chuẩn 100% TradingView.
+    3. Đã build production và kiểm thử tự động trên browser xác nhận chính xác.
+
 - **[13/09/2026]** - Tích Hợp Auto Trade (Vào Lệnh Tự Động) Cho Bot Liquidation (`sub3`):
   - **Yêu cầu của CEO:** Nghiên cứu và thực hiện tự động vào lệnh qua OKX API giống Bot SMC và Bot EMA200 khi logic tín hiệu Bot Liquid được kích hoạt.
   - **Đã thực hiện:** 
@@ -1393,3 +1442,15 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 *(Danh sách trống — tất cả lỗi đã được xử lý)*
 - **[15/08/2026]** - Lỗi "đóng từng phần (khung) nhưng lại đi đóng tất cả" khi vị thế thực tế có khối lượng lẻ (ví dụ 0.0075 BTC thay vì số nguyên hợp đồng) và lỗi UI báo đóng nhưng thực tế lệnh vẫn treo trên sàn. Đã fix: Bổ sung logic bắt ngoại lệ chặn `close-position` (đóng 100%) khi lệnh được tính toán là đóng từng phần (do làm tròn tối thiểu lên 1). Đồng thời bắt mã lỗi `51023` từ OKX khi dùng `/api/v5/trade/order` (từ chối do khối lượng khả dụng bị khoá bởi TP/SL), báo lỗi 400 ra UI thay vì âm thầm xoá lệnh ảo ở local. (Mã patch: `z7719`)
+
+- **[13/09/2026]** - Chuẩn hoá toàn diện Chỉ báo Kỹ thuật & UI Khối Vị thế Web App:
+  1. **Hệ thống Chỉ báo Chuẩn TV:** Lọc gọn `System Indicators` về 8 chỉ báo trading chuẩn quốc tế (RSI 14, MACD, Volume 20, Bollinger Bands 20,2, SuperTrend 10,3, EMA Ribbon 20/50/200, EMA 200, TLS1 Liquid v5). Xoá sạch các mock scripts trong `Community` và `My Scripts` để giữ trạng thái rỗng sạch sẽ.
+  2. **Chart Legend & Quản lý Chỉ báo:** Bổ sung thanh Legend chỉ báo góc trên-trái biểu đồ chuẩn TradingView với nút chevron `^`/`v` ("Ẩn/Hiện chú giải chỉ báo"), nút con mắt (ẩn/hiện series) và nút `✕` (xoá chỉ báo). Modal Indicators bổ sung tab `Đang bật (Active)` kèm nút nhảy nhanh từ footer để xoá 1-click.
+  3. **Tách riêng Scale RSI & MACD:** Cấp scale riêng (`scaleMargins`) cho RSI và MACD để chỉ báo dao động đáy, không chèn đè hoặc bóp méo nến giá chính; xoá bỏ `autoscaleInfoProvider` lỗi làm biến mất đường vẽ.
+  4. **Thiết kế lại Khối Vị thế Long/Short Bot Liqui (Chuẩn Ảnh 1):**
+     - Bỏ toàn bộ viền nét đứt và viền ngoài (`border: none`), chuyển sang đổ màu phẳng (flat color) mượt mà chuẩn TradingView.
+     - Vùng Xanh (Take Profit) mở rộng chiếm ưu thế áp đảo với tỉ lệ R:R = 2.4 : 1.
+     - Tích hợp 2 đường Entry: Entry 1 (vạch trắng nét liền tại giá vào lệnh) và Entry 2 (vạch vàng nét liền tại 2/3 khoảng cách Stop Loss để DCA).
+     - Chiều dài khối vị thế cố định bao trọn đúng 25 cây nến mới nhất.
+  5. **Bảng TLS1 Backtesting Thu gọn:** Tích hợp nút toggle `▲`/`▼` trên header cho phép thu nhỏ thành thanh pill gọn gàng `TLS1 Backtesting (84%) ▼`, giải phóng 100% tầm nhìn biểu đồ.
+  *(Mã patch: `z-web-indicators-legend-v5`)*
