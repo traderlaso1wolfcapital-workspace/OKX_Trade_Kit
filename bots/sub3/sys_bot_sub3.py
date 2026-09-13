@@ -30,8 +30,11 @@ except ModuleNotFoundError:
     HAS_PSUTIL = False
 
 from bots.sub1.bot_api import OKXRestCore
+from bots.sub1.bot_orders import place_market_entry, place_algo_tpsl, fetch_spec, clean_algo_orders
 from bots.sub3.sys_liquid_strategy import LiquidationStrategy
 from bots.sub3.bot_ui import print_dashboard, update_wallet_metrics
+import math
+import datetime
 
 # Đường dẫn dữ liệu User (Luôn dùng LOCALAPPDATA kể cả khi chạy dev)
 USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "TLS1_Trading")
@@ -57,6 +60,7 @@ def _build_env_paths(base_dir: str, env_file_name: str) -> dict:
         "JSON_DATA_DIR": json_data_dir,
         "JSON_EVOLUTION_DATA_FILE": os.path.join(json_data_dir, f"{acc_name}_evolution_data.json"),
         "FILE_GLOBAL_CONFIG": os.path.join(json_data_dir, f"{acc_name}_global_config.json"),
+        "FILE_TRADE_HISTORY": os.path.join(json_data_dir, f"{acc_name}_lich_su_tien_hoa_chi_tiet.json"),
     }
 
 def _load_strategy_config(env_paths: dict) -> dict:
@@ -311,8 +315,81 @@ def main():
                             if len(htf_klines) >= 50 and len(ltf_klines) > 0:
                                 signal = cs.get_signal(htf_klines, ltf_klines)
                                 if signal and "action" in signal:
-                                    print(f"\n🔥 [{coin}] TÍN HIỆU VÀO LỆNH: {signal}")
-                                    # TODO: Gắn API đặt lệnh thật ở đây
+                                    action = signal["action"]
+                                    # Chống trùng lệnh
+                                    if action == "LONG" and coin_states[coin]["has_long"]:
+                                        pass
+                                    elif action == "SHORT" and coin_states[coin]["has_short"]:
+                                        pass
+                                    else:
+                                        print(f"\n🔥 [{coin}] TÍN HIỆU VÀO LỆNH: {signal}")
+                                        try:
+                                            # Hủy các lệnh chờ cũ cùng chiều
+                                            pos_side = "long" if action == "LONG" else "short"
+                                            clean_algo_orders(okx_api, inst_id, pos_side=pos_side)
+                                            
+                                            spec = fetch_spec(okx_api, inst_id)
+                                            vol_usd = float(strategy_cfg.get("posVol", 20.0))
+                                            entry_px = float(signal["entry"])
+                                            
+                                            lot_sz = float(spec.get("lotSz", 0.001))
+                                            ct_val = float(spec.get("ctVal", 1.0))
+                                            min_sz = float(spec.get("minSz", lot_sz))
+                                            tick_sz = float(spec.get("tickSz", 0.1))
+                                            
+                                            if entry_px > 0 and ct_val > 0:
+                                                raw_size = vol_usd / (entry_px * ct_val)
+                                                order_size = max(min_sz, math.floor(raw_size / lot_sz) * lot_sz)
+                                                sz_str = f"{order_size:.8f}".rstrip("0").rstrip(".")
+                                                
+                                                side = "buy" if action == "LONG" else "sell"
+                                                print(f"🚀 [{coin}] Đặt lệnh {action} MARKET với {sz_str} lots.")
+                                                
+                                                # Vào lệnh Market
+                                                entry_resp = place_market_entry(okx_api, inst_id, side=side, pos_side=pos_side, size=sz_str)
+                                                if entry_resp:
+                                                    print(f"✅ [{coin}] Đã khớp lệnh {action}.")
+                                                    
+                                                    # Tính và đặt TPSL
+                                                    sl_rounded = math.floor(float(signal["sl"]) / tick_sz) * tick_sz
+                                                    tp_rounded = math.floor(float(signal["tp"]) / tick_sz) * tick_sz
+                                                    
+                                                    sl_str = f"{sl_rounded:.8f}".rstrip("0").rstrip(".")
+                                                    tp_str = f"{tp_rounded:.8f}".rstrip("0").rstrip(".")
+                                                    
+                                                    close_side = "sell" if action == "LONG" else "buy"
+                                                    
+                                                    print(f"🛡️ [{coin}] Đặt OCO: TP = {tp_str} | SL = {sl_str}")
+                                                    # Đặt SL
+                                                    place_algo_tpsl(okx_api, inst_id, close_side, pos_side, sz_str, sl_str, is_tp=False, cl_id="")
+                                                    # Đặt TP
+                                                    place_algo_tpsl(okx_api, inst_id, close_side, pos_side, sz_str, tp_str, is_tp=True, cl_id="")
+                                                    
+                                                    # Ghi lịch sử
+                                                    trade_rec = {
+                                                        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                                        "coin": coin,
+                                                        "type": "Market",
+                                                        "action": action,
+                                                        "sz": sz_str,
+                                                        "price": entry_px,
+                                                        "tp": tp_str,
+                                                        "sl": sl_str
+                                                    }
+                                                    history_path = env_paths.get("FILE_TRADE_HISTORY")
+                                                    if history_path:
+                                                        history_list = []
+                                                        if os.path.exists(history_path):
+                                                            try:
+                                                                with open(history_path, "r", encoding="utf-8") as f:
+                                                                    history_list = json.load(f)
+                                                            except: pass
+                                                        history_list.insert(0, trade_rec)
+                                                        history_list = history_list[:100] # Giữ 100 lệnh mới nhất
+                                                        with open(history_path, "w", encoding="utf-8") as f:
+                                                            json.dump(history_list, f, ensure_ascii=False, indent=4)
+                                        except Exception as ex:
+                                            print(f"❌ [{coin}] Lỗi đặt lệnh: {ex}")
                         
                     except Exception as e:
                         if iteration <= DATA_FETCH_INTERVAL:

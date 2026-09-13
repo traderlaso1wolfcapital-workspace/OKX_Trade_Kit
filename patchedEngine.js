@@ -342,8 +342,6 @@ export function calculateLiquidV5(candles, options = {}) {
     tpslMethod = 'Dynamic',
     tpPercent = 0.3,
     slPercent = 0.4,
-    maxFVGLength = 2,
-    higherTF = 'H4',
   } = options;
 
   const fvg_boxes = [];
@@ -355,16 +353,6 @@ export function calculateLiquidV5(candles, options = {}) {
   if (!candles || candles.length < Math.max(atrLen, swingLength, atrLenCRT) + 5) {
     return { fvg_boxes, ob_boxes, crt_lines, crt_labels, alerts };
   }
-
-  const getHighLow = (idx, lb) => {
-    let high = -Infinity;
-    let low = Infinity;
-    for (let j = Math.max(0, idx - lb + 1); j <= idx; j++) {
-      if (candles[j].high > high) high = candles[j].high;
-      if (candles[j].low < low) low = candles[j].low;
-    }
-    return { high, low };
-  };
 
   // 1. Calculate TR and ATR
   const tr = new Array(candles.length).fill(0);
@@ -400,23 +388,11 @@ export function calculateLiquidV5(candles, options = {}) {
     
     let newBulkyCandle = false;
     
-    // -- CRT Logic (H4 Simulation) --
-    let dt = candles.length > 1 ? candles[1].time - candles[0].time : 3600;
-    let htfSeconds = 4 * 3600; // H4
-    if (higherTF === 'D') htfSeconds = 24 * 3600;
-    if (higherTF === '1H') htfSeconds = 3600;
-    let lookback = Math.max(1, Math.floor(htfSeconds / dt));
-    
-    let hl = getHighLow(i, lookback);
-    let pseudoTR = hl.high - hl.low;
-    let htfATR = atrCRT[i] * Math.sqrt(lookback);
-    let isBulky = pseudoTR > htfATR * bulkyCandleATR;
-    lastHigh = hl.high;
-    lastLow = hl.low;
-    
-    // Simulate HTF bar close
-    if (i >= lookback && isBulky && (i % lookback === 0)) {
-       newBulkyCandle = true;
+    // Trigger bulky candle if the current candle itself is massive 
+    if (tr[i] > atr[i] * bulkyCandleATR * 2) {
+      newBulkyCandle = true;
+      lastHigh = c.high;
+      lastLow = c.low;
     }
 
     // -- FVG Detection --
@@ -505,10 +481,10 @@ export function calculateLiquidV5(candles, options = {}) {
       if (lastCRT.state === 'Waiting For Bulky Candle' && newBulkyCandle) {
         lastCRT.bulkyHigh = lastHigh;
         lastCRT.bulkyLow = lastLow;
-        lastCRT.state = 'Waiting For Side Retest';
+        lastCRT.state = 'Waiting For Side Retest'; global.logState('Waiting For Side Retest');
       } else if (lastCRT.state === 'Waiting For Side Retest') {
         if (c.close > lastCRT.bulkyHigh || c.close < lastCRT.bulkyLow) {
-          lastCRT.state = 'Aborted';
+          lastCRT.state = 'Aborted'; global.logState('Aborted');
         } else {
           let bearOverlap = c.high > lastCRT.bulkyHigh && c.close <= lastCRT.bulkyHigh;
           let bullOverlap = c.low < lastCRT.bulkyLow && c.close >= lastCRT.bulkyLow;
@@ -551,17 +527,17 @@ export function calculateLiquidV5(candles, options = {}) {
       }
       
       if (lastCRT.state === 'Waiting For FVG Retracement') {
-        if (lastCRT.fvg.type === 'bull' && c.low <= lastCRT.fvg.max) lastCRT.state = 'Enter Position';
-        if (lastCRT.fvg.type === 'bear' && c.high >= lastCRT.fvg.min) lastCRT.state = 'Enter Position';
+        if (lastCRT.fvg.type === 'bull' && c.low <= lastCRT.fvg.max) lastCRT.state = 'Enter Position'; global.logState('Enter Position');
+        if (lastCRT.fvg.type === 'bear' && c.high >= lastCRT.fvg.min) lastCRT.state = 'Enter Position'; global.logState('Enter Position');
       }
       
       if (lastCRT.state === 'Waiting For OB Retracement') {
-        if (lastCRT.ob.type === 'bull' && c.low <= lastCRT.ob.top) lastCRT.state = 'Enter Position';
-        if (lastCRT.ob.type === 'bear' && c.high >= lastCRT.ob.bottom) lastCRT.state = 'Enter Position';
+        if (lastCRT.ob.type === 'bull' && c.low <= lastCRT.ob.top) lastCRT.state = 'Enter Position'; global.logState('Enter Position');
+        if (lastCRT.ob.type === 'bear' && c.high >= lastCRT.ob.bottom) lastCRT.state = 'Enter Position'; global.logState('Enter Position');
       }
 
       if (lastCRT.state === 'Enter Position') {
-        lastCRT.state = 'Entry Taken';
+        lastCRT.state = 'Entry Taken'; global.logState('Entry Taken');
         lastCRT.entryTime = c.time;
         lastCRT.entryPrice = c.close;
         lastCRT.entry2Hit = false;
@@ -606,24 +582,24 @@ export function calculateLiquidV5(candles, options = {}) {
           if (c.high >= lastCRT.tpTarget) {
             lastCRT.exitPrice = lastCRT.tpTarget;
             lastCRT.exitTime = c.time;
-            lastCRT.state = 'Take Profit';
+            lastCRT.state = 'Take Profit'; global.logState('Take Profit');
             alerts.push({ event: 'TP_HIT', side: 'LONG', time: c.time });
           } else if (c.low <= lastCRT.slTarget) {
             lastCRT.exitPrice = lastCRT.slTarget;
             lastCRT.exitTime = c.time;
-            lastCRT.state = 'Stop Loss';
+            lastCRT.state = 'Stop Loss'; global.logState('Stop Loss');
             alerts.push({ event: 'SL_HIT', side: 'LONG', time: c.time });
           }
         } else {
           if (c.low <= lastCRT.tpTarget) {
             lastCRT.exitPrice = lastCRT.tpTarget;
             lastCRT.exitTime = c.time;
-            lastCRT.state = 'Take Profit';
+            lastCRT.state = 'Take Profit'; global.logState('Take Profit');
             alerts.push({ event: 'TP_HIT', side: 'SHORT', time: c.time });
           } else if (c.high >= lastCRT.slTarget) {
             lastCRT.exitPrice = lastCRT.slTarget;
             lastCRT.exitTime = c.time;
-            lastCRT.state = 'Stop Loss';
+            lastCRT.state = 'Stop Loss'; global.logState('Stop Loss');
             alerts.push({ event: 'SL_HIT', side: 'SHORT', time: c.time });
           }
         }

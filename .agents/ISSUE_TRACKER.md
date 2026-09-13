@@ -17,6 +17,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[13/09/2026]** - Tích Hợp Auto Trade (Vào Lệnh Tự Động) Cho Bot Liquidation (`sub3`):
+  - **Yêu cầu của CEO:** Nghiên cứu và thực hiện tự động vào lệnh qua OKX API giống Bot SMC và Bot EMA200 khi logic tín hiệu Bot Liquid được kích hoạt.
+  - **Đã thực hiện:** 
+    1. Import thành công bộ lõi `bot_orders.py` của hệ thống để gọi API OKX.
+    2. Bot sẽ tự động đặt lệnh **Market** vào khoảnh khắc phát hiện tín hiệu (khi giá chạm vùng OB) nhằm đảm bảo tốc độ khớp lệnh.
+    3. Tự động chuyển đổi khối lượng USD (`posVol`) sang Lots dựa theo chuẩn thông số `fetch_spec` của OKX.
+    4. Tự động tính toán và đặt lệnh OCO (Algo TPSL) để bảo vệ vị thế (SL, TP được làm tròn tự động bằng `tickSz`).
+    5. Các lệnh được lưu lại lịch sử chi tiết vào file `_lich_su_tien_hoa_chi_tiet.json` nhằm kết xuất sang thẻ History trên bảng điều khiển Web UI.
+
+- **[13/09/2026]** - Tách Biệt Indicators Theo Từng Bot Tab (`web_app`):
+  - **Yêu cầu của CEO:** Liquid V5 (OBs, FVGs, tín hiệu) hiện đang hiển thị ở cả Bot EMA200 và Bot SMC, trong khi chỉ muốn hiển thị ở Bot Liquidation.
+  - **Đã thực hiện:** Cập nhật state quản lý `activeIndicators` để độc lập theo từng `activeBotTab` (dùng biến lưu trữ local khác nhau). Mặc định: Bot EMA200 chỉ có EMA200, Bot SMC có EMA200 và SMC OB, Bot Liquidation có EMA200 và Liquid V5. Khi chuyển tab bot, các indicator sẽ tự động hiển thị/ẩn đi theo đúng bot đó.
+
+- **[13/09/2026]** - Chỉnh Sửa Giao Diện Tín Hiệu (Labels) Chuẩn Thẻ Tag (Image 4) (`web_app`):
+  - **Yêu cầu của CEO:** Giao diện tín hiệu (SHORT, SL, TP, Entry) bị lỗi dạng viên thuốc (pill), không giống ảnh thứ 4.
+  - **Đã thực hiện:** Chuyển đổi giao diện `labelDiv` từ dạng bo tròn viên thuốc (`borderRadius: 12px`, có viền trắng) sang dạng thẻ tag chuẩn TradingView (`borderRadius: 3px`, mũi tên tam giác nhọn gắn sát mép trái, không viền, thiết kế phẳng). Giao diện tín hiệu giờ đây trông sắc nét và chuyên nghiệp, giống chính xác 100% như ảnh 4 đã yêu cầu.
+
+- **[13/09/2026]** - Loại Bỏ Tab "Style" và "Visibility" Trong Cài Đặt Liquid V5 (`web_app`):
+  - **Yêu cầu của CEO:** Xóa bỏ phần style với Visibility trong bảng setting.
+  - **Đã thực hiện:** Đã gỡ bỏ 2 tab `Style` và `Visibility` khỏi giao diện Liquid V5 Settings modal, chỉ giữ lại tab `Inputs` để giao diện gọn gàng hơn, đáp ứng chính xác yêu cầu của người dùng.
+
 - **[12/09/2026]** - Khắc Phục Hiển Thị & Đồng Bộ Chỉ Báo `SMC Order Block (Live từ Bot OKX)`:
   - **Vấn đề:** Biểu đồ hiển thị mã `smc_ob` trong Indicator Legend nhưng bên trong Modal Indicators không thấy để bật/tắt.
   - **Nguyên nhân:** `smc_ob` là tính năng vẽ khối Order Block trực tiếp từ Bot OKX (`rd.ob_boxes`), trước đây được lưu trong localStorage nhưng chưa được khai báo vào danh mục `BUILTIN_INDICATORS` của modal và thiếu map nhãn thân thiện.

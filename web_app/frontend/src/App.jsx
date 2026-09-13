@@ -163,6 +163,7 @@ function SingleChartPane({
   layout,
   isVisible = true,
   layoutSelector = null,
+  activeBotTab,
 }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -199,19 +200,41 @@ function SingleChartPane({
     setChartMode(mode);
     try {
       localStorage.setItem(`tls1_chart_mode_${chartIndex}`, mode);
-    } catch {}
+    } catch { }
   };
 
   // Trạng thái Indicators & Coder Custom Scripts
   const [showIndicatorsModal, setShowIndicatorsModal] = useState(false);
   const [activeIndicators, setActiveIndicators] = useState(() => {
     try {
-      const saved = localStorage.getItem("tls1_active_indicators");
-      return saved ? JSON.parse(saved) : ["ema200", "liquid_v5"];
+      const key = activeBotTab ? `tls1_active_indicators_${activeBotTab}` : "tls1_active_indicators";
+      const saved = localStorage.getItem(key);
+      if (saved) return JSON.parse(saved);
+      if (activeBotTab === "sub1") return ["ema200"];
+      if (activeBotTab === "sub2") return ["ema200", "smc_ob"];
+      if (activeBotTab === "sub3") return ["ema200", "liquid_v5"];
+      return ["ema200", "liquid_v5"];
     } catch {
       return ["ema200", "liquid_v5"];
     }
   });
+
+  useEffect(() => {
+    if (!activeBotTab) return;
+    try {
+      const key = `tls1_active_indicators_${activeBotTab}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setActiveIndicators(JSON.parse(saved));
+      } else {
+        if (activeBotTab === "sub1") setActiveIndicators(["ema200"]);
+        else if (activeBotTab === "sub2") setActiveIndicators(["ema200", "smc_ob"]);
+        else if (activeBotTab === "sub3") setActiveIndicators(["ema200", "liquid_v5"]);
+        else setActiveIndicators(["ema200", "liquid_v5"]);
+      }
+    } catch (e) { }
+  }, [activeBotTab]);
+
   // Ref luôn giữ state mới nhất để các hàm bất đồng bộ/setInterval không bị Stale Closure
   const activeIndicatorsRef = useRef(activeIndicators);
   activeIndicatorsRef.current = activeIndicators;
@@ -219,6 +242,25 @@ function SingleChartPane({
   const [coderScripts, setCoderScripts] = useState([]);
   const coderScriptsRef = useRef(coderScripts);
   coderScriptsRef.current = coderScripts;
+
+  // Liquid V5 Settings
+  const [showLiquidV5Settings, setShowLiquidV5Settings] = useState(false);
+  const [liquidV5Settings, setLiquidV5Settings] = useState({
+    higherTF: 'H4',
+    htfCandleSize: 'Big',
+    entryMode: 'FVGs',
+    requireRetracement: false,
+    showHTFCandleLines: true,
+    fvgDetectionSensitivity: 'All',
+    showFVGs: true,
+    swingLength: 35,
+    showOrderBlocks: true,
+    tpslMethod: 'Dynamic',
+    tpPercent: 0.3,
+    slPercent: 0.4,
+    fillBackgrounds: true,
+    onlyWinrateEntry2: false
+  });
 
   // Quản lý ẩn/hiện tạm thời trên biểu đồ (Hide indicator legend / eye icon)
   const [hiddenIndicators, setHiddenIndicators] = useState(new Set());
@@ -264,8 +306,9 @@ function SingleChartPane({
       const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
       activeIndicatorsRef.current = next;
       try {
-        localStorage.setItem("tls1_active_indicators", JSON.stringify(next));
-      } catch {}
+        const key = activeBotTab ? `tls1_active_indicators_${activeBotTab}` : "tls1_active_indicators";
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch { }
       return next;
     });
   };
@@ -286,7 +329,7 @@ function SingleChartPane({
         from: Math.max(0, total - candleCount),
         to: total - 1 + rightOffset,
       });
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const drawObs = () => {
@@ -357,11 +400,11 @@ function SingleChartPane({
       o.innerHTML = "";
       return;
     }
-    const { fvg_boxes, ob_boxes } = liquidV5BoxesRef.current || {};
+    const { fvg_boxes, ob_boxes, crt_lines, crt_labels, alerts, stats } = liquidV5BoxesRef.current || {};
     const c = chartRef.current;
     const s = candleSeriesRef.current;
     const cont = containerRef.current;
-    if (!c || !s || !cont || (!fvg_boxes?.length && !ob_boxes?.length)) {
+    if (!c || !s || !cont) {
       o.innerHTML = "";
       return;
     }
@@ -370,6 +413,19 @@ function SingleChartPane({
     if (w <= 0) return;
     const maxRightX = w - 65; // Chừa lề trục giá phải
 
+    // Function to calculate x coordinate
+    const getXCoord = (timeVal) => {
+      let x = null;
+      if (timeVal) {
+        try {
+          const xCoord = c.timeScale().timeToCoordinate(timeVal);
+          if (xCoord !== null) x = Math.floor(xCoord);
+        } catch (e) { }
+      }
+      return x;
+    };
+
+    // Draw Boxes
     const drawBox = (item) => {
       const y1 = s.priceToCoordinate(item.top);
       const y2 = s.priceToCoordinate(item.bottom);
@@ -380,25 +436,12 @@ function SingleChartPane({
       const maxY = Math.max(topY, botY);
       const h = Math.max(maxY - minY, 2);
 
-      let startX = null;
-      if (item.time) {
-        try {
-          const xCoord = c.timeScale().timeToCoordinate(item.time);
-          if (xCoord !== null) startX = Math.floor(xCoord);
-        } catch (e) {}
-      }
-      if (startX === null) startX = -2000;
+      let startX = getXCoord(item.time) ?? -2000;
+      let endX = getXCoord(item.end_time) ?? maxRightX;
 
-      let endX = maxRightX;
-      if (item.end_time) {
-        try {
-          const xEndCoord = c.timeScale().timeToCoordinate(item.end_time);
-          if (xEndCoord !== null) endX = Math.floor(xEndCoord);
-        } catch (e) {}
-      }
       if (startX >= maxRightX) return;
       if (endX > maxRightX) endX = maxRightX;
-      if (endX < 0) return; // Nằm hoàn toàn bên trái màn hình
+      if (endX < 0) return;
       const boxWidth = endX - startX;
       if (boxWidth <= 0) return;
 
@@ -428,12 +471,153 @@ function SingleChartPane({
       tag.style.color = borderColor;
       tag.innerText = item.is_fvg ? (isBull ? '+FVG' : '-FVG') : (isBull ? '+OB' : '-OB');
       box.appendChild(tag);
-
       o.appendChild(box);
     };
 
-    if (fvg_boxes) fvg_boxes.forEach(f => drawBox(f));
-    if (ob_boxes) ob_boxes.forEach(ob => drawBox(ob));
+    if (fvg_boxes && liquidV5Settings.showFVGs) fvg_boxes.forEach(f => drawBox(f));
+    if (ob_boxes && liquidV5Settings.showOrderBlocks) ob_boxes.forEach(ob => drawBox(ob));
+
+    // Draw CRT Lines
+    if (crt_lines && liquidV5Settings.showHTFCandleLines) {
+      crt_lines.forEach(line => {
+        const y = s.priceToCoordinate(line.price);
+        if (y === null) return;
+        let startX = getXCoord(line.start_time) ?? -2000;
+        let endX = getXCoord(line.end_time) ?? maxRightX;
+
+        if (startX >= maxRightX) return;
+        if (endX > maxRightX) endX = maxRightX;
+        if (endX < 0) return;
+
+        const divLine = document.createElement('div');
+        divLine.style.position = 'absolute';
+        divLine.style.top = y + 'px';
+        divLine.style.left = startX + 'px';
+        divLine.style.width = (endX - startX) + 'px';
+        divLine.style.height = '1px';
+        divLine.style.borderTop = `2px ${line.type === 'dashed' ? 'dashed' : 'solid'} ${line.color}`;
+        divLine.style.pointerEvents = 'none';
+        o.appendChild(divLine);
+      });
+    }
+
+    // Draw CRT Labels
+    if (crt_labels) {
+      crt_labels.forEach(lbl => {
+        const y = s.priceToCoordinate(lbl.price);
+        if (y === null) return;
+        let x = getXCoord(lbl.time) ?? maxRightX;
+        if (x < 0 || x > maxRightX) return;
+
+        const labelDiv = document.createElement('div');
+        labelDiv.style.position = 'absolute';
+        labelDiv.style.top = (y - 9) + 'px';
+        labelDiv.style.left = x + 'px';
+        labelDiv.style.padding = '3px 8px';
+        labelDiv.style.borderRadius = '3px';
+        labelDiv.style.borderTopLeftRadius = '0';
+        labelDiv.style.borderBottomLeftRadius = '0';
+        labelDiv.style.fontSize = '11px';
+        labelDiv.style.fontWeight = '500';
+        labelDiv.style.color = '#fff';
+        labelDiv.style.backgroundColor = lbl.color;
+        labelDiv.style.border = 'none';
+        labelDiv.style.pointerEvents = 'none';
+        labelDiv.style.boxShadow = 'none';
+        labelDiv.style.display = 'flex';
+        labelDiv.style.alignItems = 'center';
+        labelDiv.style.justifyContent = 'center';
+        labelDiv.innerText = lbl.text;
+
+        // arrow pointer using border trick
+        const arrow = document.createElement('div');
+        arrow.style.position = 'absolute';
+        arrow.style.left = '-6px';
+        arrow.style.top = '50%';
+        arrow.style.transform = 'translateY(-50%)';
+        arrow.style.width = '0';
+        arrow.style.height = '0';
+        arrow.style.borderTop = '9px solid transparent';
+        arrow.style.borderBottom = '9px solid transparent';
+        arrow.style.borderRight = `6px solid ${lbl.color}`;
+        labelDiv.appendChild(arrow);
+
+        o.appendChild(labelDiv);
+      });
+    }
+
+    // Draw Stats Table
+    if (stats) {
+      const statsDiv = document.createElement('div');
+      statsDiv.style.position = 'absolute';
+      statsDiv.style.top = '10px';
+      statsDiv.style.right = '70px';
+      statsDiv.style.backgroundColor = 'rgba(19, 23, 34, 0.85)';
+      statsDiv.style.border = '1px solid rgba(255,255,255,0.1)';
+      statsDiv.style.borderRadius = '4px';
+      statsDiv.style.padding = '8px';
+      statsDiv.style.color = '#d1d4dc';
+      statsDiv.style.fontSize = '11px';
+      statsDiv.style.pointerEvents = 'none';
+      statsDiv.style.zIndex = '100';
+      statsDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
+      statsDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif';
+
+      const header = document.createElement('div');
+      header.style.textAlign = 'center';
+      header.style.fontWeight = 'bold';
+      header.style.marginBottom = '6px';
+      header.style.color = '#fff';
+      header.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+      header.style.paddingBottom = '4px';
+      header.innerText = 'TLS1 Backtesting';
+      statsDiv.appendChild(header);
+
+      const rows = [
+        ['Total Entries', stats.totalEntries],
+        ['Wins', stats.wins],
+        ['Losses', stats.losses],
+        ['Winrate', `${stats.winrate}%`],
+        ['Average Profit', `${stats.avgProfit}%`],
+        ['Total Profit', `${stats.totalProfit}%`]
+      ];
+
+      rows.forEach(r => {
+        const rowDiv = document.createElement('div');
+        rowDiv.style.display = 'flex';
+        rowDiv.style.justifyContent = 'space-between';
+        rowDiv.style.marginBottom = '4px';
+        rowDiv.style.width = '140px';
+
+        const label = document.createElement('span');
+        label.innerText = r[0];
+        const val = document.createElement('span');
+        val.style.fontWeight = 'bold';
+        val.style.color = r[0] === 'Winrate' ? (parseFloat(stats.winrate) > 50 ? '#089981' : '#f23646') :
+          (r[0].includes('Profit') ? (parseFloat(r[1]) > 0 ? '#089981' : '#f23646') : '#fff');
+        val.innerText = r[1];
+
+        rowDiv.appendChild(label);
+        rowDiv.appendChild(val);
+        statsDiv.appendChild(rowDiv);
+      });
+
+      o.appendChild(statsDiv);
+    }
+
+    // Process Alerts (only show if not processed yet)
+    if (alerts && alerts.length > 0) {
+      const lastAlert = alerts[alerts.length - 1];
+      const alertKey = `${lastAlert.time}-${lastAlert.event}-${lastAlert.side}`;
+      if (window._lastLiquidAlert !== alertKey) {
+        window._lastLiquidAlert = alertKey;
+        if (window.showToast) {
+          window.showToast(`[LIQUID V5] ${lastAlert.event} ${lastAlert.side}`, "info");
+        } else {
+          console.log(`[LIQUID V5 ALERT] ${lastAlert.event} ${lastAlert.side}`, lastAlert);
+        }
+      }
+    }
   };
 
   // Quản lý và render toàn bộ các chỉ báo động (Built-in + Custom Scripts của Coder)
@@ -469,7 +653,7 @@ function SingleChartPane({
       if (seriesMap.has(key)) {
         try {
           chart.removeSeries(seriesMap.get(key));
-        } catch (e) {}
+        } catch (e) { }
         seriesMap.delete(key);
       }
     };
@@ -480,9 +664,9 @@ function SingleChartPane({
     if (emaSeriesRef.current) {
       if (currentActive.includes("ema200") && !isIndHidden("ema200")) {
         const emaData = calculateEMA(candles, 200);
-        try { emaSeriesRef.current.setData(emaData); } catch (e) {}
+        try { emaSeriesRef.current.setData(emaData); } catch (e) { }
       } else {
-        try { emaSeriesRef.current.setData([]); } catch (e) {}
+        try { emaSeriesRef.current.setData([]); } catch (e) { }
       }
     }
 
@@ -504,7 +688,7 @@ function SingleChartPane({
         s20.setData(calculateEMA(candles, 20));
         s50.setData(calculateEMA(candles, 50));
         s200.setData(calculateEMA(candles, 200));
-      } catch (e) {}
+      } catch (e) { }
     } else {
       removeSeriesByKey("ind_ribbon_20");
       removeSeriesByKey("ind_ribbon_50");
@@ -530,7 +714,7 @@ function SingleChartPane({
         sUpper.setData(bb.upper);
         sBasis.setData(bb.basis);
         sLower.setData(bb.lower);
-      } catch (e) {}
+      } catch (e) { }
     } else {
       removeSeriesByKey("ind_bb_upper");
       removeSeriesByKey("ind_bb_basis");
@@ -546,7 +730,7 @@ function SingleChartPane({
       });
       try {
         sSt.setData(st.map(item => ({ time: item.time, value: item.value })));
-      } catch (e) {}
+      } catch (e) { }
     } else {
       removeSeriesByKey("ind_supertrend");
     }
@@ -570,7 +754,7 @@ function SingleChartPane({
       } else {
         chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.12 } });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // RSI (14)
     if (hasRsi) {
@@ -581,7 +765,7 @@ function SingleChartPane({
       });
       try {
         sRsi.setData(calculateRSI(candles, 14));
-      } catch (e) {}
+      } catch (e) { }
     } else {
       removeSeriesByKey("ind_rsi");
     }
@@ -607,7 +791,7 @@ function SingleChartPane({
         sHist.setData(macdRes.histogram);
         sMacd.setData(macdRes.macd);
         sSig.setData(macdRes.signal);
-      } catch (e) {}
+      } catch (e) { }
     } else {
       removeSeriesByKey("ind_macd_hist");
       removeSeriesByKey("ind_macd_line");
@@ -619,7 +803,7 @@ function SingleChartPane({
     if (volumeSeriesRef.current) {
       try {
         volumeSeriesRef.current.applyOptions({ visible: hasVol });
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 8. Coder Custom Scripts
@@ -643,7 +827,7 @@ function SingleChartPane({
         try {
           const saved = JSON.parse(localStorage.getItem("tls1_coder_scripts") || "[]");
           script = saved.find(s => s.id === sId);
-        } catch (e) {}
+        } catch (e) { }
       }
       if (script && script.code) {
         const res = runCoderCustomScript(script.code, candles);
@@ -659,7 +843,7 @@ function SingleChartPane({
             });
             try {
               pSeries.setData(plotItem.data);
-            } catch (e) {}
+            } catch (e) { }
           });
         }
       }
@@ -670,7 +854,18 @@ function SingleChartPane({
 
     // TLS1 Charts Liquid v5
     if (currentActive.includes("liquid_v5") && !isIndHidden("liquid_v5")) {
-      liquidV5BoxesRef.current = calculateLiquidV5(candles);
+      const bulkyATR = liquidV5Settings.htfCandleSize === 'Big' ? 2.1 : liquidV5Settings.htfCandleSize === 'Normal' ? 1.6 : 1.3;
+      liquidV5BoxesRef.current = calculateLiquidV5(candles, {
+        higherTF: liquidV5Settings.higherTF,
+        bulkyCandleATR: bulkyATR,
+        entryMode: liquidV5Settings.entryMode,
+        requireRetracement: liquidV5Settings.requireRetracement,
+        fvgSensitivity: liquidV5Settings.fvgDetectionSensitivity === 'All' ? 1.0 : 1.5,
+        swingLength: liquidV5Settings.swingLength,
+        tpslMethod: liquidV5Settings.tpslMethod,
+        tpPercent: liquidV5Settings.tpPercent,
+        slPercent: liquidV5Settings.slPercent
+      });
     } else {
       liquidV5BoxesRef.current = { fvg_boxes: [], ob_boxes: [] };
     }
@@ -762,7 +957,7 @@ function SingleChartPane({
           if (lr && lr.to < (candles.length - 15)) {
             return res; // Đang soi lịch sử nến xa thì hiển thị co giãn tự nhiên
           }
-        } catch (e) {}
+        } catch (e) { }
 
         const range = max - min;
         const pos = (currentPrice - min) / range; // 0.0 (đáy) -> 1.0 (đỉnh), 0.50 là tâm chính giữa
@@ -900,13 +1095,13 @@ function SingleChartPane({
       candlesRef.current = cached.candles;
       activeObsRef.current = cached.ob_boxes || [];
       if (candleSeriesRef.current) {
-        try { candleSeriesRef.current.setData(cached.candles); } catch {}
+        try { candleSeriesRef.current.setData(cached.candles); } catch { }
       }
       if (volumeSeriesRef.current && cached.volume) {
-        try { volumeSeriesRef.current.setData(cached.volume); } catch {}
+        try { volumeSeriesRef.current.setData(cached.volume); } catch { }
       }
       if (emaSeriesRef.current && cached.ema) {
-        try { emaSeriesRef.current.setData(cached.ema); } catch {}
+        try { emaSeriesRef.current.setData(cached.ema); } catch { }
       }
       if (!hasInitializedRef.current) {
         hasInitializedRef.current = true;
@@ -986,7 +1181,7 @@ function SingleChartPane({
         if (chartRef.current && hasInitializedRef.current) {
           try {
             prevRange = chartRef.current.timeScale().getVisibleLogicalRange();
-          } catch (e) {}
+          } catch (e) { }
         }
 
         candlesRef.current = unique;
@@ -1017,7 +1212,7 @@ function SingleChartPane({
             // User đã tự zoom/drag: TUYỆT ĐỐI GIỮ NGUYÊN tầm nhìn hiện tại, không reset!
             try {
               chartRef.current.timeScale().setVisibleLogicalRange(prevRange);
-            } catch (e) {}
+            } catch (e) { }
           } else if (!userInteractedRef.current) {
             // Chưa thao tác (chế độ Auto): bám theo nến mới nhất và luôn cách viền phải 8 nến
             try {
@@ -1027,7 +1222,7 @@ function SingleChartPane({
                 from: unique.length - 1 + 8 - span,
                 to: unique.length - 1 + 8,
               });
-            } catch (e) {}
+            } catch (e) { }
           }
           setTimeout(() => {
             if (!isMounted) return;
@@ -1257,6 +1452,7 @@ function SingleChartPane({
                             </svg>
                           )}
                         </button>
+
                         <button
                           className="chart-legend-action-btn remove-btn"
                           title="Remove indicator"
@@ -1342,6 +1538,268 @@ function SingleChartPane({
         candles={candlesRef.current}
         initialCategory={indicatorsModalTab}
       />
+
+      {/* LIQUID V5 SETTINGS MODAL */}
+      {showLiquidV5Settings && (
+        <div className="account-prompt-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 100000 }} onClick={e => e.target === e.currentTarget && setShowLiquidV5Settings(false)}>
+          <div className="tv-settings-modal" style={{
+            width: '420px',
+            background: '#1e222d',
+            border: '1px solid #434651',
+            borderRadius: '6px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            flexDirection: 'column',
+            color: '#d1d4dc',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px 0' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Tiodev_TLS1 Charts_Liquid</h3>
+              <button onClick={() => setShowLiquidV5Settings(false)} style={{ background: 'none', border: 'none', color: '#787b86', cursor: 'pointer', fontSize: '20px', padding: 0 }}>✕</button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '24px', padding: '16px 20px 0', borderBottom: '1px solid #434651', fontSize: '14px', fontWeight: 500 }}>
+              <div style={{ paddingBottom: '10px', color: '#d1d4dc', borderBottom: '2px solid #2962ff', cursor: 'pointer' }}>Inputs</div>
+            </div>
+
+            <div style={{ padding: '20px', maxHeight: '60vh', overflowY: 'auto' }}>
+
+              {/* General Configuration */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Higher Timeframe</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} value={liquidV5Settings.higherTF} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, higherTF: e.target.value })}>
+                  <option value="1H">1H</option>
+                  <option value="H4">4H</option>
+                  <option value="D">Daily</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>HTF Candle Size</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} value={liquidV5Settings.htfCandleSize} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, htfCandleSize: e.target.value })}>
+                  <option value="Big">Big</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Small">Small</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Entry Mode</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} value={liquidV5Settings.entryMode} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, entryMode: e.target.value })}>
+                  <option value="FVGs">FVGs (Auto)</option>
+                  <option value="Order Blocks">Order Blocks</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" id="requireRet" checked={liquidV5Settings.requireRetracement} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, requireRetracement: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="requireRet" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Require Retracement</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" id="showHtfLine" checked={liquidV5Settings.showHTFCandleLines} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, showHTFCandleLines: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="showHtfLine" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Show HTF Candle Lines</label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>FVG Detection Sensitivity</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} value={liquidV5Settings.fvgDetectionSensitivity} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, fvgDetectionSensitivity: e.target.value })}>
+                  <option value="All">All</option>
+                  <option value="Extreme">Extreme</option>
+                  <option value="High">High</option>
+                  <option value="Normal">Normal</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" id="showFVG" checked={liquidV5Settings.showFVGs} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, showFVGs: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="showFVG" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Show FVGs</label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Swing Length</span>
+                <input type="number" style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none', boxSizing: 'border-box' }} value={liquidV5Settings.swingLength} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, swingLength: parseInt(e.target.value) || 35 })} />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
+                <input type="checkbox" id="showOB" checked={liquidV5Settings.showOrderBlocks} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, showOrderBlocks: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="showOB" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Show Order Blocks</label>
+              </div>
+
+              {/* TP / SL */}
+              <div style={{ color: '#787b86', fontSize: '12px', textTransform: 'uppercase', marginBottom: '16px' }}>TP / SL</div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" defaultChecked style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Enabled</label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>TP / SL Method</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} value={liquidV5Settings.tpslMethod} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, tpslMethod: e.target.value })}>
+                  <option value="Dynamic">Dynamic</option>
+                  <option value="Fixed">Fixed</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Dynamic Risk</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} defaultValue="Highest">
+                  <option value="Highest">Highest</option>
+                  <option value="Normal">Normal</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Fixed Take Profit %</span>
+                <input type="number" step="0.1" style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none', boxSizing: 'border-box' }} value={liquidV5Settings.tpPercent} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, tpPercent: parseFloat(e.target.value) || 0.3 })} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Fixed Stop Loss %</span>
+                <input type="number" step="0.1" style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none', boxSizing: 'border-box' }} value={liquidV5Settings.slPercent} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, slPercent: parseFloat(e.target.value) || 0.4 })} />
+              </div>
+
+              {/* BACKTESTING DASHBOARD */}
+              <div style={{ color: '#787b86', fontSize: '12px', textTransform: 'uppercase', marginBottom: '16px' }}>BACKTESTING DASHBOARD</div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" id="onlyWinrateEntry2" checked={liquidV5Settings.onlyWinrateEntry2} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, onlyWinrateEntry2: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="onlyWinrateEntry2" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Only winrate Entry2</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" defaultChecked style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Enabled</label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Position</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} defaultValue="Top Right">
+                  <option value="Top Right">Top Right</option>
+                  <option value="Bottom Right">Bottom Right</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+                <input type="checkbox" id="fillBackgrounds" checked={liquidV5Settings.fillBackgrounds} onChange={(e) => setLiquidV5Settings({ ...liquidV5Settings, fillBackgrounds: e.target.checked })} style={{ marginRight: '12px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label htmlFor="fillBackgrounds" style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Fill Backgrounds</label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px', width: '120px' }}>Background</span>
+                <div style={{ width: '28px', height: '28px', backgroundColor: '#131722', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+              </div>
+
+              {/* ALERTS */}
+              <div style={{ color: '#787b86', fontSize: '12px', textTransform: 'uppercase', marginBottom: '16px' }}>ALERTS</div>
+
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Long Signal</label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Short Signal</label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Take-Profit Signal</label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>Stop-Loss Signal</label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>TP 2/3 Signal</label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" defaultChecked style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                  <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>SL 2/3 Signal</label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '32px' }}>
+                <input type="checkbox" style={{ marginRight: '8px', accentColor: '#2962ff', width: '16px', height: '16px', cursor: 'pointer' }} />
+                <label style={{ color: '#d1d4dc', fontSize: '14px', cursor: 'pointer' }}>[TEST] 1 alert</label>
+              </div>
+
+              {/* VISUALS */}
+              <div style={{ color: '#787b86', fontSize: '12px', textTransform: 'uppercase', marginBottom: '16px' }}>VISUALS</div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
+                <span style={{ color: '#d1d4dc', fontSize: '14px' }}>TP / SL Layout</span>
+                <select style={{ background: '#131722', color: '#d1d4dc', border: '1px solid #434651', borderRadius: '4px', padding: '6px 8px', fontSize: '14px', width: '130px', outline: 'none' }} defaultValue="Default">
+                  <option value="Default">Default</option>
+                  <option value="Compact">Compact</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Bullish FVG</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: 'rgba(0, 150, 136, 0.4)', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Bearish FVG</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: 'rgba(244, 67, 54, 0.4)', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Long</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: '#00bcd4', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Short</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: '#ff5252', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Text</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: '#ffffff', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#d1d4dc', fontSize: '14px' }}>Entry2</span>
+                  <div style={{ width: '28px', height: '28px', backgroundColor: '#ffb300', border: '1px solid #434651', borderRadius: '4px', cursor: 'pointer' }}></div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #434651', alignItems: 'center' }}>
+              <select style={{ background: 'transparent', border: 'none', color: '#d1d4dc', fontSize: '14px', outline: 'none', cursor: 'pointer' }}>
+                <option>Defaults</option>
+              </select>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  style={{ background: 'transparent', border: '1px solid #434651', color: '#d1d4dc', padding: '8px 20px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 500 }}
+                  onClick={() => setShowLiquidV5Settings(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={{ background: '#2962ff', border: 'none', color: '#fff', padding: '8px 20px', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 500 }}
+                  onClick={() => {
+                    setShowLiquidV5Settings(false);
+                    updateIndicatorsRef.current(); // Force re-render indicators
+                  }}
+                >
+                  Ok
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1412,7 +1870,7 @@ function App() {
           return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     const defaultCoins = getLayoutDefaults(layout);
     return [
       { id: 0, coin: defaultCoins[0] || "BTC-USDT-SWAP", tf: "1H" },
@@ -1485,7 +1943,7 @@ function App() {
             timestamp: Date.now()
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     });
   }, []);
 
@@ -1619,7 +2077,7 @@ function App() {
           return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [{ id: "sub1", name: "Tài khoản phụ" }];
   });
 
@@ -1632,7 +2090,7 @@ function App() {
   const [botAccountMap, setBotAccountMap] = useState(() => {
     const saved = localStorage.getItem("tls1_bot_accounts");
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try { return JSON.parse(saved); } catch { }
     }
     return { sub1: "sub1", sub2: "sub1", sub3: "sub1" };
   });
@@ -2359,9 +2817,9 @@ function App() {
 
     try {
       const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
-      if (r.ok) { 
-        const d = await r.json(); 
-        setBotStatus(d.status); 
+      if (r.ok) {
+        const d = await r.json();
+        setBotStatus(d.status);
         addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}`);
       } else {
         const err = await r.json();
@@ -2482,10 +2940,10 @@ function App() {
               {authStep === "uid"
                 ? "Nhập OKX UID của bạn:"
                 : authStep === "create_password"
-                ? `Thiết Lập Mật Khẩu (${loginUid}):`
-                : authStep === "require_password"
-                ? `Nhập Mật Khẩu (${loginUid}):`
-                : "Nhập Mật Khẩu Passphrase:"}
+                  ? `Thiết Lập Mật Khẩu (${loginUid}):`
+                  : authStep === "require_password"
+                    ? `Nhập Mật Khẩu (${loginUid}):`
+                    : "Nhập Mật Khẩu Passphrase:"}
             </h3>
             <form onSubmit={handleLogin}>
               {authStep === "uid" ? (
@@ -2731,208 +3189,209 @@ function App() {
         <div className="main-section">
           {/* 1. HEADER BAR: BOT TABS (1:1 DESKTOP APP) + JOIN CỘNG ĐỒNG + SLOT INDICATOR */}
           <header className="bot-tabs-bar">
-          <div className="bot-tabs-group">
-            {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"], ["sub3", "Bot Liquidation"]].map(([sub, label]) => (
-              <button
-                key={sub}
-                className={`bot-tab ${activeBotTab === sub ? "active" : ""}`}
-                onClick={() => setActiveBotTab(sub)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Slot indicator & Nút Join Cộng đồng */}
-          <div className="header-right-tools">
-            <a
-              href="https://discord.gg/8NXaSCvZ6u"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-join-community"
-              title="Tham gia cộng đồng Discord Trader TLS1"
-            >
-              💬 Join Cộng đồng
-            </a>
-            <div className="slot-indicator-wrap">
-              <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
-              <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
-                {slotCount}/{MAX_SLOTS}
-              </span>
-              <span style={{ display: "inline-flex", gap: "2px", alignItems: "center", marginLeft: "2px" }}>
-                {Array.from({ length: 5 }).map((_, i) => {
-                  const threshold = (i + 1) * 20;
-                  const active = slotCount >= threshold - 19;
-                  const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
-                  return (
-                    <span
-                      key={i}
-                      style={{
-                        display: "inline-block",
-                        width: "3px",
-                        height: "10px",
-                        backgroundColor: active ? barColor : "#3a3a3a",
-                        borderRadius: "1px"
-                      }}
-                    />
-                  );
-                })}
-              </span>
+            <div className="bot-tabs-group">
+              {[["sub1", "Bot EMA200"], ["sub2", "Bot SMC"], ["sub3", "Bot Liquidation"]].map(([sub, label]) => (
+                <button
+                  key={sub}
+                  className={`bot-tab ${activeBotTab === sub ? "active" : ""}`}
+                  onClick={() => setActiveBotTab(sub)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          </div>
-        </header>
 
-        {/* THẺ LIỀN KHỐI BAO TRÒN TOÀN BỘ MỌI THỨ BÊN TRONG CỤM BOT (1:1 ẢNH 2) */}
-        <div className="bot-panel-card">
-          {/* Hàng nút Hành động: Bắt đầu / Dừng bot */}
-          <div className="bot-action-bar">
-            <button
-              onClick={handleStartBot}
-              disabled={isRunning}
-              className="btn-action-start"
-            >
-              ▶ BẮT ĐẦU CHẠY BOT
-            </button>
-            <button
-              onClick={handleStopBot}
-              disabled={!isRunning || isStoppingBot}
-              className="btn-action-stop"
-            >
-              {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
-            </button>
-          </div>
+            {/* Slot indicator & Nút Join Cộng đồng */}
+            <div className="header-right-tools">
+              <a
+                href="https://discord.gg/8NXaSCvZ6u"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-join-community"
+                title="Tham gia cộng đồng Discord Trader TLS1"
+              >
+                💬 Join Cộng đồng
+              </a>
+              <div className="slot-indicator-wrap">
+                <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
+                <span style={{ color: slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50", fontSize: "11px", fontWeight: "bold" }}>
+                  {slotCount}/{MAX_SLOTS}
+                </span>
+                <span style={{ display: "inline-flex", gap: "2px", alignItems: "center", marginLeft: "2px" }}>
+                  {Array.from({ length: 5 }).map((_, i) => {
+                    const threshold = (i + 1) * 20;
+                    const active = slotCount >= threshold - 19;
+                    const barColor = slotCount >= 100 ? "#ff3333" : slotCount >= 80 ? "#ffaa00" : "#4caf50";
+                    return (
+                      <span
+                        key={i}
+                        style={{
+                          display: "inline-block",
+                          width: "3px",
+                          height: "10px",
+                          backgroundColor: active ? barColor : "#3a3a3a",
+                          borderRadius: "1px"
+                        }}
+                      />
+                    );
+                  })}
+                </span>
+              </div>
+            </div>
+          </header>
 
-          {/* Cụm thẻ Workspace & Biểu đồ */}
-          <div className="chart-panel-card">
-            <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
-              <section className="pane-chart" style={{ position: "relative" }}>
-                <div className={`multi-chart-container layout-${chartLayout}`}>
-                  {chartsConfig.slice(0, 4).map((cfg, idx) => (
-                    <SingleChartPane
-                      key={`chart_slot_${idx}`}
-                      chartIndex={idx}
-                      coin={cfg.coin}
-                      tf={cfg.tf}
-                      onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
-                      onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
-                      isActive={activeChartIndex === idx}
-                      onActivate={() => {
-                        setActiveChartIndex(idx);
-                        setSelectedCoin(cfg.coin);
-                      }}
-                      showToolbar={true}
-                      layout={chartLayout}
-                      isVisible={idx < getActiveChartsCount(chartLayout)}
-                      layoutSelector={idx === 0 ? (
-                        <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
-                          <button
-                            type="button"
-                            className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
-                            title="Chọn bố cục biểu đồ (TradingView Layout)"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowLayoutMenu(!showLayoutMenu);
-                            }}
-                          >
-                            {renderLayoutIcon(chartLayout, 14, 14)}
-                          </button>
+          {/* THẺ LIỀN KHỐI BAO TRÒN TOÀN BỘ MỌI THỨ BÊN TRONG CỤM BOT (1:1 ẢNH 2) */}
+          <div className="bot-panel-card">
+            {/* Hàng nút Hành động: Bắt đầu / Dừng bot */}
+            <div className="bot-action-bar">
+              <button
+                onClick={handleStartBot}
+                disabled={isRunning}
+                className="btn-action-start"
+              >
+                ▶ BẮT ĐẦU CHẠY BOT
+              </button>
+              <button
+                onClick={handleStopBot}
+                disabled={!isRunning || isStoppingBot}
+                className="btn-action-stop"
+              >
+                {isStoppingBot ? "⏳ ĐANG DỪNG..." : "■ DỪNG CHẠY BOT"}
+              </button>
+            </div>
 
-                          {showLayoutMenu && (
-                            <div className="layout-selector-popover">
-                              {/* Row 1: 1 chart */}
-                              <div className="layout-popover-row">
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
-                                  title="1 Biểu đồ đơn"
-                                  onClick={() => handleSelectLayout("1")}
-                                >
-                                  {renderLayoutIcon("1", 24, 24)}
-                                </button>
+            {/* Cụm thẻ Workspace & Biểu đồ */}
+            <div className="chart-panel-card">
+              <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
+                <section className="pane-chart" style={{ position: "relative" }}>
+                  <div className={`multi-chart-container layout-${chartLayout}`}>
+                    {chartsConfig.slice(0, 4).map((cfg, idx) => (
+                      <SingleChartPane
+                        key={`chart_slot_${idx}`}
+                        activeBotTab={activeBotTab}
+                        chartIndex={idx}
+                        coin={cfg.coin}
+                        tf={cfg.tf}
+                        onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
+                        onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
+                        isActive={activeChartIndex === idx}
+                        onActivate={() => {
+                          setActiveChartIndex(idx);
+                          setSelectedCoin(cfg.coin);
+                        }}
+                        showToolbar={true}
+                        layout={chartLayout}
+                        isVisible={idx < getActiveChartsCount(chartLayout)}
+                        layoutSelector={idx === 0 ? (
+                          <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
+                            <button
+                              type="button"
+                              className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
+                              title="Chọn bố cục biểu đồ (TradingView Layout)"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowLayoutMenu(!showLayoutMenu);
+                              }}
+                            >
+                              {renderLayoutIcon(chartLayout, 14, 14)}
+                            </button>
+
+                            {showLayoutMenu && (
+                              <div className="layout-selector-popover">
+                                {/* Row 1: 1 chart */}
+                                <div className="layout-popover-row">
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
+                                    title="1 Biểu đồ đơn"
+                                    onClick={() => handleSelectLayout("1")}
+                                  >
+                                    {renderLayoutIcon("1", 24, 24)}
+                                  </button>
+                                </div>
+                                <div className="layout-popover-divider"></div>
+
+                                {/* Row 2: 2 charts */}
+                                <div className="layout-popover-row">
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
+                                    title="2 Biểu đồ (Cột dọc 1x2)"
+                                    onClick={() => handleSelectLayout("2-col")}
+                                  >
+                                    {renderLayoutIcon("2-col", 24, 24)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
+                                    title="2 Biểu đồ (Hàng ngang 2x1)"
+                                    onClick={() => handleSelectLayout("2-row")}
+                                  >
+                                    {renderLayoutIcon("2-row", 24, 24)}
+                                  </button>
+                                </div>
+                                <div className="layout-popover-divider"></div>
+
+                                {/* Row 3: 3 charts */}
+                                <div className="layout-popover-row">
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
+                                    title="3 Biểu đồ (Cột dọc 1x3)"
+                                    onClick={() => handleSelectLayout("3-col")}
+                                  >
+                                    {renderLayoutIcon("3-col", 24, 24)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
+                                    title="3 Biểu đồ (Hàng ngang 3x1)"
+                                    onClick={() => handleSelectLayout("3-row")}
+                                  >
+                                    {renderLayoutIcon("3-row", 24, 24)}
+                                  </button>
+                                </div>
+                                <div className="layout-popover-divider"></div>
+
+                                {/* Row 4: 4 charts */}
+                                <div className="layout-popover-row">
+                                  <button
+                                    type="button"
+                                    className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
+                                    title="4 Biểu đồ (Lưới 2x2)"
+                                    onClick={() => handleSelectLayout("4-grid")}
+                                  >
+                                    {renderLayoutIcon("4-grid", 24, 24)}
+                                  </button>
+                                </div>
                               </div>
-                              <div className="layout-popover-divider"></div>
+                            )}
+                          </div>
+                        ) : null}
+                      />
+                    ))}
+                  </div>
+                </section>
 
-                              {/* Row 2: 2 charts */}
-                              <div className="layout-popover-row">
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
-                                  title="2 Biểu đồ (Cột dọc 1x2)"
-                                  onClick={() => handleSelectLayout("2-col")}
-                                >
-                                  {renderLayoutIcon("2-col", 24, 24)}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
-                                  title="2 Biểu đồ (Hàng ngang 2x1)"
-                                  onClick={() => handleSelectLayout("2-row")}
-                                >
-                                  {renderLayoutIcon("2-row", 24, 24)}
-                                </button>
-                              </div>
-                              <div className="layout-popover-divider"></div>
+                {/* Resizer */}
+                <div
+                  className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
+                  onMouseDown={startResizing}
+                />
 
-                              {/* Row 3: 3 charts */}
-                              <div className="layout-popover-row">
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
-                                  title="3 Biểu đồ (Cột dọc 1x3)"
-                                  onClick={() => handleSelectLayout("3-col")}
-                                >
-                                  {renderLayoutIcon("3-col", 24, 24)}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
-                                  title="3 Biểu đồ (Hàng ngang 3x1)"
-                                  onClick={() => handleSelectLayout("3-row")}
-                                >
-                                  {renderLayoutIcon("3-row", 24, 24)}
-                                </button>
-                              </div>
-                              <div className="layout-popover-divider"></div>
-
-                              {/* Row 4: 4 charts */}
-                              <div className="layout-popover-row">
-                                <button
-                                  type="button"
-                                  className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
-                                  title="4 Biểu đồ (Lưới 2x2)"
-                                  onClick={() => handleSelectLayout("4-grid")}
-                                >
-                                  {renderLayoutIcon("4-grid", 24, 24)}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                    />
-                  ))}
-                </div>
-              </section>
-
-            {/* Resizer */}
-            <div
-              className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
-              onMouseDown={startResizing}
-            />
-
-            <section className="pane-tabs">
-              <div className="tab-bar-header">
-                <div className="tab-buttons">
-                  <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
-                    Bảng Vị Thế ({safePos.length})
-                  </button>
-                  <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
-                    Logs
-                  </button>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {/* Tạm thời ẩn nút lịch sử lệnh theo yêu cầu CEO */}
-                  {/* <button
+                <section className="pane-tabs">
+                  <div className="tab-bar-header">
+                    <div className="tab-buttons">
+                      <button className={`tab-btn ${activeTab === "positions" ? "active" : ""}`} onClick={() => setActiveTab("positions")}>
+                        Bảng Vị Thế ({safePos.length})
+                      </button>
+                      <button className={`tab-btn ${activeTab === "logs" ? "active" : ""}`} onClick={() => setActiveTab("logs")}>
+                        Logs
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingRight: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {/* Tạm thời ẩn nút lịch sử lệnh theo yêu cầu CEO */}
+                      {/* <button
                     className={activeTab === "history" ? "active-icon-btn" : "icon-btn"}
                     onClick={() => setActiveTab("history")}
                     title={`Lịch Sử Lệnh (${closedPositions.length})`}
@@ -2950,294 +3409,294 @@ function App() {
                   >
                     📜
                   </button> */}
-                  {/* <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
+                      {/* <span className={`status-badge ${isRunning ? "running" : "stopped"}`}>
                     {isRunning ? `● ĐANG CHẠY | ${formatUptime(uptime)}` : "● ĐÃ DỪNG"}
                   </span> */}
-                </div>
-              </div>
-              <div className="tab-content">
-                {activeTab === "logs" ? (
-                  <div className="logs-terminal" ref={terminalRef}>
-                    {logs.map((block) => (
-                      <div key={block.id} className="log-block" style={{ marginBottom: "20px" }}>
-                        {block.lines.map((l, i) => <div key={i} className="log-line">{l}</div>)}
-                      </div>
-                    ))}
+                    </div>
                   </div>
-                ) : activeTab === "history" ? (
-                  <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-                    <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
-                      <thead>
-                        <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Thời gian đóng</th>
-                          <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Cặp giao dịch (TF)</th>
-                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá vào</th>
-                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá đóng</th>
-                          <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                          <th style={{ padding: "6px 15px", textAlign: "right", fontSize: "15px", whiteSpace: "nowrap", minWidth: "120px" }}>PNL (USDT)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {closedPositions.map((pos) => (
-                          <tr key={pos.ticket_id} style={{ borderBottom: "1px solid #333" }}>
-                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", color: "#aaa" }}>
-                              {new Date(pos.closeTime).toLocaleString('vi-VN')}
-                            </td>
-                            <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", fontWeight: "bold", color: pos.posSide === "long" ? "#4caf50" : "#ff5252" }}>
-                              {pos.instId.replace("-SWAP", "")} ({pos.tf})
-                            </td>
-                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.entryPx).toFixed(4)}</td>
-                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.exitPx).toFixed(4)}</td>
-                            <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.pos).toFixed(2)}</td>
-                            <td style={{ padding: "6px 15px", fontSize: "15px", fontWeight: "bold", color: parseFloat(pos.pnl) >= 0 ? "#4caf50" : "#ff5252" }}>
-                              {parseFloat(pos.pnl) >= 0 ? "+" : ""}{parseFloat(pos.pnl).toFixed(4)} $
-                            </td>
-                          </tr>
+                  <div className="tab-content">
+                    {activeTab === "logs" ? (
+                      <div className="logs-terminal" ref={terminalRef}>
+                        {logs.map((block) => (
+                          <div key={block.id} className="log-block" style={{ marginBottom: "20px" }}>
+                            {block.lines.map((l, i) => <div key={i} className="log-line">{l}</div>)}
+                          </div>
                         ))}
-                        {closedPositions.length === 0 && (
-                          <tr>
-                            <td colSpan="6" style={{ textAlign: "center", padding: "20px", color: "#888" }}>
-                              Chưa có dữ liệu lịch sử đóng lệnh.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-                    <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
-                      <thead>
-                        <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Điểm vào</th>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
-                          <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const baseCoins = watchlistCoins.map(val => {
-                            const found = COIN_LIST.find(c => c.value === val);
-                            if (found) return found;
-                            return { label: val.replace("-SWAP", ""), value: val, maxLever: 50 };
-                          });
-                          const allCoinValues = new Set([...watchlistCoins, ...safePos.map(p => p.instId)]);
-                          const displayCoins = Array.from(allCoinValues).map(val => {
-                            const found = COIN_LIST.find(c => c.value === val);
-                            if (found) return found;
-                            return { label: val.replace("-SWAP", ""), value: val };
-                          }).filter(c => c.value !== "USDT.D");
-
-                          const getCoinRoi = (coinValue) => {
-                            const list = safePos.filter(p => p.instId === coinValue);
-                            if (list.length === 0) return -999999999;
-                            return Math.max(...list.map(p => parseFloat(p.roi || 0)));
-                          };
-
-                          const sortedCoins = [...displayCoins].sort((a, b) => {
-                            const roiA = getCoinRoi(a.value);
-                            const roiB = getCoinRoi(b.value);
-                            if (roiA !== roiB) return roiB - roiA; // % PNL cao nhất từ trên xuống dưới
-                            // Nếu cả 2 đều chưa có vị thế, giữ đúng thứ tự ưu tiên trong COIN_LIST (XAU, CL lên đầu)
-                            const idxA = COIN_LIST.findIndex(c => c.value === a.value);
-                            const idxB = COIN_LIST.findIndex(c => c.value === b.value);
-                            return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
-                          });
-
-                          return sortedCoins.map((coin, i) => {
-                            const posList = safePos
-                              .filter(p => p.instId === coin.value)
-                              .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
-                            const isChecked = activePairs.includes(coin.value);
-
-                          if (posList.length === 0) {
-                            return (
-                              <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                                    {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
-                                    <input
-                                      type="checkbox"
-                                      className="coin-toggle"
-                                      checked={isChecked}
-                                      onChange={() => togglePair(coin.value)}
-                                      onClick={e => e.stopPropagation()}
-                                      title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
-                                    />
-                                    <span style={{ color: "#aaa", fontSize: "15px" }}>{coin.label.replace("-SWAP", "")}</span>
-                                  </div>
+                      </div>
+                    ) : activeTab === "history" ? (
+                      <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+                        <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
+                          <thead>
+                            <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
+                              <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Thời gian đóng</th>
+                              <th style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Cặp giao dịch (TF)</th>
+                              <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá vào</th>
+                              <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Giá đóng</th>
+                              <th style={{ padding: "6px 10px", fontSize: "15px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                              <th style={{ padding: "6px 15px", textAlign: "right", fontSize: "15px", whiteSpace: "nowrap", minWidth: "120px" }}>PNL (USDT)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {closedPositions.map((pos) => (
+                              <tr key={pos.ticket_id} style={{ borderBottom: "1px solid #333" }}>
+                                <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "14px", color: "#aaa" }}>
+                                  {new Date(pos.closeTime).toLocaleString('vi-VN')}
                                 </td>
-                                <td></td><td></td><td></td>
-                                <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                  <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-                                    {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
-                                      const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
-                                      const isOn = coinTfs.includes(tf);
-                                      const label = tf.replace("M", "");
-                                      return (
-                                        <span
-                                          key={tf}
-                                          onClick={() => handleTfToggle(coin.value, tf)}
-                                          style={{
-                                            cursor: "pointer", padding: "0px", borderRadius: "6px",
-                                            fontSize: "12px", fontWeight: "bold",
-                                            background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
-                                            border: isOn ? "1px solid #1d766b" : "1px solid #444444",
-                                            width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
-                                          }}
-                                        >
-                                          {label}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
+                                <td style={{ textAlign: "left", padding: "6px 10px", fontSize: "15px", fontWeight: "bold", color: pos.posSide === "long" ? "#4caf50" : "#ff5252" }}>
+                                  {pos.instId.replace("-SWAP", "")} ({pos.tf})
                                 </td>
-                                <td></td>
+                                <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.entryPx).toFixed(4)}</td>
+                                <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.exitPx).toFixed(4)}</td>
+                                <td style={{ padding: "6px 10px", fontSize: "15px" }}>{parseFloat(pos.pos).toFixed(2)}</td>
+                                <td style={{ padding: "6px 15px", fontSize: "15px", fontWeight: "bold", color: parseFloat(pos.pnl) >= 0 ? "#4caf50" : "#ff5252" }}>
+                                  {parseFloat(pos.pnl) >= 0 ? "+" : ""}{parseFloat(pos.pnl).toFixed(4)} $
+                                </td>
                               </tr>
-                            );
-                          }
-
-                          return posList.map((pos, ticketIndex) => {
-                            const isLong = pos.posSide === "long";
-                            const upl = parseFloat(pos.upl || "0");
-                            const margin = parseFloat(pos.margin || "0");
-                            const isChild = pos.is_child;
-                            const isAggregate = pos.is_aggregate || (!isChild && ticketIndex === 0);
-
-                            return (
-                              <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
-                                <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0, paddingLeft: isChild ? "20px" : "0px" }}>
-                                    {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
-                                    {!isChild ? (
-                                      <input
-                                        type="checkbox"
-                                        className="coin-toggle"
-                                        checked={isChecked}
-                                        onChange={() => togglePair(coin.value)}
-                                        onClick={e => e.stopPropagation()}
-                                        title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
-                                      />
-                                    ) : (
-                                      <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
-                                    )}
-                                    
-                                    <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                      <span style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
-                                      
-                                      {!isChild && (
-                                        <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
-                                          {isLong ? "Long" : "Short"} {pos.lever || "100"}x
-                                        </span>
-                                      )}
-                                      
-                                      {isChild && pos.tf && (
-                                        <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
-                                          {pos.tf.toLowerCase()}
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
+                            ))}
+                            {closedPositions.length === 0 && (
+                              <tr>
+                                <td colSpan="6" style={{ textAlign: "center", padding: "20px", color: "#888" }}>
+                                  Chưa có dữ liệu lịch sử đóng lệnh.
                                 </td>
-                                <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}</td>
-                                <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
-                                <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
-                                  {(() => {
-                                    const roi = parseFloat(pos.roi || 0);
-                                    const color = roi >= 0 ? "#26a69a" : "#ef5350";
-                                    return (
-                                      <span style={{ color }}>
-                                          <span style={{ fontSize: "17px" }}>{upl >= 0 ? "+" : ""}{upl.toFixed(2)}</span> USDT &nbsp;&nbsp; <span style={{ opacity: 0.97 }}>({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)</span>
-                                        </span>
-                                    );
-                                  })()}
-                                </td>
-                                <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                  {!isChild && ticketIndex === 0 && (
-                                    <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
-                                      {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
-                                        const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
-                                        const isOn = coinTfs.includes(tf);
-                                        const label = tf.replace("M", "");
-                                        return (
-                                          <span
-                                            key={tf}
-                                            onClick={() => handleTfToggle(coin.value, tf)}
-                                            style={{
-                                              cursor: "pointer", padding: "0px", borderRadius: "6px",
-                                              fontSize: "12px", fontWeight: "bold",
-                                              background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
-                                              border: isOn ? "1px solid #1d766b" : "1px solid #444444",
-                                              width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
-                                            }}
-                                          >
-                                            {label}
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="positions-table-wrapper" style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+                        <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
+                          <thead>
+                            <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Điểm vào</th>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
+                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              const baseCoins = watchlistCoins.map(val => {
+                                const found = COIN_LIST.find(c => c.value === val);
+                                if (found) return found;
+                                return { label: val.replace("-SWAP", ""), value: val, maxLever: 50 };
+                              });
+                              const allCoinValues = new Set([...watchlistCoins, ...safePos.map(p => p.instId)]);
+                              const displayCoins = Array.from(allCoinValues).map(val => {
+                                const found = COIN_LIST.find(c => c.value === val);
+                                if (found) return found;
+                                return { label: val.replace("-SWAP", ""), value: val };
+                              }).filter(c => c.value !== "USDT.D");
+
+                              const getCoinRoi = (coinValue) => {
+                                const list = safePos.filter(p => p.instId === coinValue);
+                                if (list.length === 0) return -999999999;
+                                return Math.max(...list.map(p => parseFloat(p.roi || 0)));
+                              };
+
+                              const sortedCoins = [...displayCoins].sort((a, b) => {
+                                const roiA = getCoinRoi(a.value);
+                                const roiB = getCoinRoi(b.value);
+                                if (roiA !== roiB) return roiB - roiA; // % PNL cao nhất từ trên xuống dưới
+                                // Nếu cả 2 đều chưa có vị thế, giữ đúng thứ tự ưu tiên trong COIN_LIST (XAU, CL lên đầu)
+                                const idxA = COIN_LIST.findIndex(c => c.value === a.value);
+                                const idxB = COIN_LIST.findIndex(c => c.value === b.value);
+                                return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
+                              });
+
+                              return sortedCoins.map((coin, i) => {
+                                const posList = safePos
+                                  .filter(p => p.instId === coin.value)
+                                  .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+                                const isChecked = activePairs.includes(coin.value);
+
+                                if (posList.length === 0) {
+                                  return (
+                                    <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
+                                      <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
+                                          {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
+                                          <input
+                                            type="checkbox"
+                                            className="coin-toggle"
+                                            checked={isChecked}
+                                            onChange={() => togglePair(coin.value)}
+                                            onClick={e => e.stopPropagation()}
+                                            title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                                          />
+                                          <span style={{ color: "#aaa", fontSize: "15px" }}>{coin.label.replace("-SWAP", "")}</span>
+                                        </div>
+                                      </td>
+                                      <td></td><td></td><td></td>
+                                      <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                        <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
+                                          {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
+                                            const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
+                                            const isOn = coinTfs.includes(tf);
+                                            const label = tf.replace("M", "");
+                                            return (
+                                              <span
+                                                key={tf}
+                                                onClick={() => handleTfToggle(coin.value, tf)}
+                                                style={{
+                                                  cursor: "pointer", padding: "0px", borderRadius: "6px",
+                                                  fontSize: "12px", fontWeight: "bold",
+                                                  background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
+                                                  border: isOn ? "1px solid #1d766b" : "1px solid #444444",
+                                                  width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
+                                                }}
+                                              >
+                                                {label}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      </td>
+                                      <td></td>
+                                    </tr>
+                                  );
+                                }
+
+                                return posList.map((pos, ticketIndex) => {
+                                  const isLong = pos.posSide === "long";
+                                  const upl = parseFloat(pos.upl || "0");
+                                  const margin = parseFloat(pos.margin || "0");
+                                  const isChild = pos.is_child;
+                                  const isAggregate = pos.is_aggregate || (!isChild && ticketIndex === 0);
+
+                                  return (
+                                    <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
+                                      <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0, paddingLeft: isChild ? "20px" : "0px" }}>
+                                          {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
+                                          {!isChild ? (
+                                            <input
+                                              type="checkbox"
+                                              className="coin-toggle"
+                                              checked={isChecked}
+                                              onChange={() => togglePair(coin.value)}
+                                              onClick={e => e.stopPropagation()}
+                                              title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                                            />
+                                          ) : (
+                                            <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
+                                          )}
+
+                                          <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <span style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff" }}>{coin.label.replace("-SWAP", "")}</span>
+
+                                            {!isChild && (
+                                              <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
+                                                {isLong ? "Long" : "Short"} {pos.lever || "100"}x
+                                              </span>
+                                            )}
+
+                                            {isChild && pos.tf && (
+                                              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
+                                                {pos.tf.toLowerCase()}
+                                              </span>
+                                            )}
                                           </span>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </td>
-                                <td style={{ textAlign: "center", padding: "6px 10px" }}>
-                                  <button
-                                    onClick={async () => {
-                                      const coinName = coin.label.replace("-SWAP", "");
-                                      if (!window.confirm(`Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`)) return;
-                                      try {
-                                        const u = localStorage.getItem('tls1_uid') || loginUid;
-                                        const strat = selectedAccount || "sub1";
-                                        const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}`, {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({
-                                            ticket_id: pos.ticket_id,
-                                            instId: pos.instId || `${coin.value}-SWAP`,
-                                            posSide: pos.posSide,
-                                            pos: pos.pos,
-                                            upl: pos.upl,
-                                            exitPx: pos.lastPx
-                                          })
-                                        });
-                                        const data = await res.json();
-                                        if (res.ok) {
-                                          alert(`✅ Đã đóng vị thế ${coinName} thành công!`);
-                                          fetchPositions();
-                                        } else {
-                                          alert(`❌ Lỗi khi đóng vị thế ${coinName}: ` + (data.detail || data.message || "Lỗi máy chủ"));
-                                        }
-                                      } catch (e) {
-                                        alert(`❌ Lỗi kết nối khi đóng vị thế ${coinName}: ` + e.message);
-                                      }
-                                    }}
-                                    style={{
-                                      background: "#c62828", color: "white", border: "none",
-                                      borderRadius: "6px", padding: "6px 16px", cursor: "pointer",
-                                      fontSize: "14px", fontWeight: "bold"
-                                    }}>
-                                    Đóng
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        });
-                      })()}
-                      </tbody>
-                    </table>
+                                        </div>
+                                      </td>
+                                      <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}</td>
+                                      <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
+                                      <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
+                                        {(() => {
+                                          const roi = parseFloat(pos.roi || 0);
+                                          const color = roi >= 0 ? "#26a69a" : "#ef5350";
+                                          return (
+                                            <span style={{ color }}>
+                                              <span style={{ fontSize: "17px" }}>{upl >= 0 ? "+" : ""}{upl.toFixed(2)}</span> USDT &nbsp;&nbsp; <span style={{ opacity: 0.97 }}>({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)</span>
+                                            </span>
+                                          );
+                                        })()}
+                                      </td>
+                                      <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                        {!isChild && ticketIndex === 0 && (
+                                          <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
+                                            {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
+                                              const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
+                                              const isOn = coinTfs.includes(tf);
+                                              const label = tf.replace("M", "");
+                                              return (
+                                                <span
+                                                  key={tf}
+                                                  onClick={() => handleTfToggle(coin.value, tf)}
+                                                  style={{
+                                                    cursor: "pointer", padding: "0px", borderRadius: "6px",
+                                                    fontSize: "12px", fontWeight: "bold",
+                                                    background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
+                                                    border: isOn ? "1px solid #1d766b" : "1px solid #444444",
+                                                    width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
+                                                  }}
+                                                >
+                                                  {label}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td style={{ textAlign: "center", padding: "6px 10px" }}>
+                                        <button
+                                          onClick={async () => {
+                                            const coinName = coin.label.replace("-SWAP", "");
+                                            if (!window.confirm(`Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`)) return;
+                                            try {
+                                              const u = localStorage.getItem('tls1_uid') || loginUid;
+                                              const strat = selectedAccount || "sub1";
+                                              const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}`, {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                  ticket_id: pos.ticket_id,
+                                                  instId: pos.instId || `${coin.value}-SWAP`,
+                                                  posSide: pos.posSide,
+                                                  pos: pos.pos,
+                                                  upl: pos.upl,
+                                                  exitPx: pos.lastPx
+                                                })
+                                              });
+                                              const data = await res.json();
+                                              if (res.ok) {
+                                                alert(`✅ Đã đóng vị thế ${coinName} thành công!`);
+                                                fetchPositions();
+                                              } else {
+                                                alert(`❌ Lỗi khi đóng vị thế ${coinName}: ` + (data.detail || data.message || "Lỗi máy chủ"));
+                                              }
+                                            } catch (e) {
+                                              alert(`❌ Lỗi kết nối khi đóng vị thế ${coinName}: ` + e.message);
+                                            }
+                                          }}
+                                          style={{
+                                            background: "#c62828", color: "white", border: "none",
+                                            borderRadius: "6px", padding: "6px 16px", cursor: "pointer",
+                                            fontSize: "14px", fontWeight: "bold"
+                                          }}>
+                                          Đóng
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+                              });
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </section>
-          </main>
+                </section>
+              </main>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-            {/* SETTINGS MODAL — 1:1 CLONE TỪ DESKTOP APP (PyQt6 QDialog) */}
+      {/* SETTINGS MODAL — 1:1 CLONE TỪ DESKTOP APP (PyQt6 QDialog) */}
       {showSettings && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowSettings(false)}>
           <div className="modal-content settings-modal">
@@ -3263,140 +3722,140 @@ function App() {
               {settingsTab === "api" && (
                 <div className="settings-tab-content">
                   <div className="settings-tab-scroll">
-                  {/* Chọn tài khoản */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", marginBottom: "14px" }}>
-                    <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
-                      Tài khoản gán cho [{activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"}]:
-                    </label>
-                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                      <select
-                        className="styled-select"
-                        style={{ minWidth: "200px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "5px 10px", borderRadius: "4px", fontSize: "12px" }}
-                        value={selectedAccount}
-                        onChange={e => handleAssignAccountToActiveBot(e.target.value)}
-                      >
-                        {accounts.map(acc => (
-                          <option key={acc.id} value={acc.id}>{acc.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                        title="Tạo Tài Khoản Mới"
-                        onClick={handleCreateAccount}
-                      >+</button>
-                      <button
-                        style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                        title="Xóa Tài Khoản"
-                        onClick={handleDeleteAccount}
-                      >−</button>
-                    </div>
-                  </div>
-
-                  {/* Thông Tin API OKX */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Thông Tin API OKX</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
-                      <div className="settings-form-row">
-                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Mã API (API Key):</label>
-                        <input
-                          type="text"
-                          className="styled-input"
-                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
-                          value={apiKey}
-                          onChange={e => setApiKey(e.target.value)}
-                          placeholder="Nhập API Key..."
-                        />
-                      </div>
-                      <div className="settings-form-row">
-                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Khóa Bí Mật (Secret):</label>
-                        <input
-                          type="password"
-                          className="styled-input"
-                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
-                          value={secretKey}
-                          onChange={e => setSecretKey(e.target.value)}
-                          placeholder="Nhập Secret Key..."
-                        />
-                      </div>
-                      <div className="settings-form-row">
-                        <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Cụm Mật Khẩu (Pass):</label>
-                        <input
-                          type="password"
-                          className="styled-input"
-                          style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
-                          value={passphrase}
-                          onChange={e => setPassphrase(e.target.value)}
-                          placeholder="Nhập Passphrase..."
-                        />
+                    {/* Chọn tài khoản */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", marginBottom: "14px" }}>
+                      <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                        Tài khoản gán cho [{activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"}]:
+                      </label>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <select
+                          className="styled-select"
+                          style={{ minWidth: "200px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "5px 10px", borderRadius: "4px", fontSize: "12px" }}
+                          value={selectedAccount}
+                          onChange={e => handleAssignAccountToActiveBot(e.target.value)}
+                        >
+                          {accounts.map(acc => (
+                            <option key={acc.id} value={acc.id}>{acc.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          title="Tạo Tài Khoản Mới"
+                          onClick={handleCreateAccount}
+                        >+</button>
+                        <button
+                          style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          title="Xóa Tài Khoản"
+                          onClick={handleDeleteAccount}
+                        >−</button>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Lệnh Can Thiệp Nhanh */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Lệnh Can Thiệp Nhanh (Audit Hệ Thống)</div>
-                    <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
-                      <button
-                        className="btn-audit"
-                        onClick={handleResetCapital}
-                      >
-                        ♻️ Reset Vốn Gốc (Audit)
-                      </button>
-                      {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                    {/* Thông Tin API OKX */}
+                    <div className="settings-group">
+                      <div className="settings-group-title">Thông Tin API OKX</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                        <div className="settings-form-row">
+                          <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Mã API (API Key):</label>
+                          <input
+                            type="text"
+                            className="styled-input"
+                            style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                            value={apiKey}
+                            onChange={e => setApiKey(e.target.value)}
+                            placeholder="Nhập API Key..."
+                          />
+                        </div>
+                        <div className="settings-form-row">
+                          <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Khóa Bí Mật (Secret):</label>
+                          <input
+                            type="password"
+                            className="styled-input"
+                            style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                            value={secretKey}
+                            onChange={e => setSecretKey(e.target.value)}
+                            placeholder="Nhập Secret Key..."
+                          />
+                        </div>
+                        <div className="settings-form-row">
+                          <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>Cụm Mật Khẩu (Pass):</label>
+                          <input
+                            type="password"
+                            className="styled-input"
+                            style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                            value={passphrase}
+                            onChange={e => setPassphrase(e.target.value)}
+                            placeholder="Nhập Passphrase..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lệnh Can Thiệp Nhanh */}
+                    <div className="settings-group">
+                      <div className="settings-group-title">Lệnh Can Thiệp Nhanh (Audit Hệ Thống)</div>
+                      <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
                         <button
                           className="btn-audit"
-                          onClick={handleResetNen}
+                          onClick={handleResetCapital}
                         >
-                          ♻️ Reset Đếm Nến
+                          ♻️ Reset Vốn Gốc (Audit)
                         </button>
-                      )}
+                        {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                          <button
+                            className="btn-audit"
+                            onClick={handleResetNen}
+                          >
+                            ♻️ Reset Đếm Nến
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Mã Máy HWID */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Mã Máy (HWID) Cá Nhân</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
-                      <span style={{ color: "#aaaaaa", fontSize: "12px" }}>Mã Máy của bạn:</span>
-                      <span
-                        className="hwid-value"
-                        style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
-                        title="Click để copy Mã Máy"
-                        onClick={() => {
-                          navigator.clipboard.writeText(hwid);
-                          alert("✅ Đã Copy Mã Máy: " + hwid);
-                        }}
-                      >
-                        {hwid}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
-                        style={{
-                          background: "#1e3a5f",
-                          border: "1px solid #2563eb",
-                          color: "#ffffff",
-                          borderRadius: "4px",
-                          padding: "2px 10px",
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          transition: "all 0.15s ease"
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = "#2563eb";
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = "#1e3a5f";
-                        }}
-                        title="Xem video Hướng Dẫn trên YouTube"
-                      >
-                        Hướng dẫn
-                      </button>
+                    {/* Mã Máy HWID */}
+                    <div className="settings-group">
+                      <div className="settings-group-title">Mã Máy (HWID) Cá Nhân</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
+                        <span style={{ color: "#aaaaaa", fontSize: "12px" }}>Mã Máy của bạn:</span>
+                        <span
+                          className="hwid-value"
+                          style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
+                          title="Click để copy Mã Máy"
+                          onClick={() => {
+                            navigator.clipboard.writeText(hwid);
+                            alert("✅ Đã Copy Mã Máy: " + hwid);
+                          }}
+                        >
+                          {hwid}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
+                          style={{
+                            background: "#1e3a5f",
+                            border: "1px solid #2563eb",
+                            color: "#ffffff",
+                            borderRadius: "4px",
+                            padding: "2px 10px",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            transition: "all 0.15s ease"
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = "#2563eb";
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = "#1e3a5f";
+                          }}
+                          title="Xem video Hướng Dẫn trên YouTube"
+                        >
+                          Hướng dẫn
+                        </button>
+                      </div>
                     </div>
-                  </div>
                   </div>
 
                   {/* Nút Lưu API Key chuẩn vị trí Tab 1 Desktop App */}
@@ -3453,159 +3912,274 @@ function App() {
               {settingsTab === "strategy" && (
                 <div className="settings-tab-content">
                   <div className="settings-tab-scroll">
-                  {/* ===== CÁC PHẦN CHUNG ĐỒNG BỘ CHO TẤT CẢ CÁC BOT ===== */}
-                  {/* 1. THÊM MÃ GIAO DỊCH (CHUNG) */}
-                  <div className="settings-group">
-                    <div className="settings-group-title" style={{ margin: 0 }}>THÊM MÃ GIAO DỊCH</div>
-                    <div className="coin-select-grid">
-                      {COIN_LIST.filter(c => c.value !== "USDT.D").map(coin => {
-                        const isSelected = watchlistCoins.includes(coin.value);
-                        const hasPos = safePos.some(p => p.instId === coin.value);
-                        const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
-                        return (
-                          <div
-                            key={coin.value}
-                            className={`coin-select-card ${isSelected ? "selected" : ""}`}
-                            onClick={() => handleToggleWatchlistCoin(coin.value)}
-                            title={hasPos ? `${coinSymbol}: Đang có vị thế mở (bắt buộc đóng lệnh trước khi bỏ chọn)` : isSelected ? `Click để bỏ chọn ${coinSymbol}` : `Click để thêm ${coinSymbol} ra ngoài Bảng Vị Thế`}
-                          >
-                            <span className="coin-select-symbol">{coinSymbol}</span>
-                          </div>
-                        );
-                      })}
+                    {/* ===== CÁC PHẦN CHUNG ĐỒNG BỘ CHO TẤT CẢ CÁC BOT ===== */}
+                    {/* 1. THÊM MÃ GIAO DỊCH (CHUNG) */}
+                    <div className="settings-group">
+                      <div className="settings-group-title" style={{ margin: 0 }}>THÊM MÃ GIAO DỊCH</div>
+                      <div className="coin-select-grid">
+                        {COIN_LIST.filter(c => c.value !== "USDT.D").map(coin => {
+                          const isSelected = watchlistCoins.includes(coin.value);
+                          const hasPos = safePos.some(p => p.instId === coin.value);
+                          const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
+                          return (
+                            <div
+                              key={coin.value}
+                              className={`coin-select-card ${isSelected ? "selected" : ""}`}
+                              onClick={() => handleToggleWatchlistCoin(coin.value)}
+                              title={hasPos ? `${coinSymbol}: Đang có vị thế mở (bắt buộc đóng lệnh trước khi bỏ chọn)` : isSelected ? `Click để bỏ chọn ${coinSymbol}` : `Click để thêm ${coinSymbol} ra ngoài Bảng Vị Thế`}
+                            >
+                              <span className="coin-select-symbol">{coinSymbol}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 2. QUẢN LÝ VỐN & RỦI RO (CHUNG) */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
-                    <div className="entry-setup-list">
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Volume Size ({risk.volUnit}):</span>
+                    {/* 2. QUẢN LÝ VỐN & RỦI RO (CHUNG) */}
+                    <div className="settings-group">
+                      <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
+                      <div className="entry-setup-list">
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Volume Size ({risk.volUnit}):</span>
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
+                              style={{
+                                padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
+                                border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
+                                cursor: "pointer", fontWeight: "bold"
+                              }}
+                            >
+                              {risk.volUnit}
+                            </button>
+                            <NumberSpinBox
+                              value={risk.posVol}
+                              onChange={val => setRisk(r => ({ ...r, posVol: val }))}
+                              min={risk.volUnit === "LOT" ? 0.01 : 1}
+                              step={risk.volUnit === "LOT" ? 0.01 : 10}
+                              width="95px"
+                            />
+                          </div>
                         </div>
-                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                          <button
-                            type="button"
-                            onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
-                            style={{
-                              padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
-                              border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
-                              cursor: "pointer", fontWeight: "bold"
-                            }}
-                          >
-                            {risk.volUnit}
-                          </button>
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Mức chốt lời gốc M5:</span>
+                          </div>
                           <NumberSpinBox
-                            value={risk.posVol}
-                            onChange={val => setRisk(r => ({ ...r, posVol: val }))}
-                            min={risk.volUnit === "LOT" ? 0.01 : 1}
-                            step={risk.volUnit === "LOT" ? 0.01 : 10}
+                            value={risk.tpPct}
+                            onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
+                            min={0.1}
+                            step={0.05}
+                            suffix="%"
+                            width="95px"
+                          />
+                        </div>
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Mức cắt lỗ gốc M5:</span>
+                          </div>
+                          <NumberSpinBox
+                            value={risk.slPct}
+                            onChange={val => setRisk(r => ({ ...r, slPct: val }))}
+                            min={0.1}
+                            step={0.05}
+                            suffix="%"
                             width="95px"
                           />
                         </div>
                       </div>
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Mức chốt lời gốc M5:</span>
-                        </div>
-                        <NumberSpinBox
-                          value={risk.tpPct}
-                          onChange={val => setRisk(r => ({ ...r, tpPct: val }))}
-                          min={0.1}
-                          step={0.05}
-                          suffix="%"
-                          width="95px"
-                        />
-                      </div>
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Mức cắt lỗ gốc M5:</span>
-                        </div>
-                        <NumberSpinBox
-                          value={risk.slPct}
-                          onChange={val => setRisk(r => ({ ...r, slPct: val }))}
-                          min={0.1}
-                          step={0.05}
-                          suffix="%"
-                          width="95px"
-                        />
-                      </div>
                     </div>
-                  </div>
 
-                  {/* ===== PHẦN CẤU HÌNH ĐẶC THÙ CHO TỪNG BOT ===== */}
-                  {activeBotTab === "sub1" && (
-                    <>
-                      {/* 1. Công Tắc Chiến Thuật EMA200 (Chuẩn layout Desktop: DCA Dương bên trái, Hedge & Chốt lời EMA200 cột phải) */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">Công Tắc Chiến Thuật</div>
-                        <div className="tactics-toggles-layout">
-                          {/* Cột trái: DCA Dương chiếm trọn chiều cao */}
-                          <div className="toggle-row tactics-left-col">
-                            <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
-                            <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
-                            <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
-                          </div>
-
-                          {/* Cột phải: Đánh Sóng Đảo Chiều ở trên, Chốt lời bám EMA200 ở dưới */}
-                          <div className="tactics-right-col">
-                            <div className="toggle-row">
-                              <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
-                              <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
-                              <button className="btn-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%">[?]</button>
+                    {/* ===== PHẦN CẤU HÌNH ĐẶC THÙ CHO TỪNG BOT ===== */}
+                    {activeBotTab === "sub1" && (
+                      <>
+                        {/* 1. Công Tắc Chiến Thuật EMA200 (Chuẩn layout Desktop: DCA Dương bên trái, Hedge & Chốt lời EMA200 cột phải) */}
+                        <div className="settings-group">
+                          <div className="settings-group-title">Công Tắc Chiến Thuật</div>
+                          <div className="tactics-toggles-layout">
+                            {/* Cột trái: DCA Dương chiếm trọn chiều cao */}
+                            <div className="toggle-row tactics-left-col">
+                              <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
+                              <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
+                              <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
                             </div>
-                            <div className="toggle-row">
-                              <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
-                              <span className="toggle-name">Chốt lời bám EMA200</span>
-                              <button className="btn-help" onClick={() => alert("Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")} title="Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.">[?]</button>
+
+                            {/* Cột phải: Đánh Sóng Đảo Chiều ở trên, Chốt lời bám EMA200 ở dưới */}
+                            <div className="tactics-right-col">
+                              <div className="toggle-row">
+                                <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
+                                <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
+                                <button className="btn-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%">[?]</button>
+                              </div>
+                              <div className="toggle-row">
+                                <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
+                                <span className="toggle-name">Chốt lời bám EMA200</span>
+                                <button className="btn-help" onClick={() => alert("Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")} title="Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.">[?]</button>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* 2. Lớp Bảo Vệ Cục Bộ EMA200 */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
-                        <div className="toggle-grid">
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.safeguardEntry} onChange={v => setStrat(s => ({ ...s, safeguardEntry: v }))} />
-                            <span className="toggle-name">Thoát hòa vốn khi giá hồi</span>
-                            <button className="btn-help" onClick={() => alert("Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")} title="Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.">[?]</button>
-                          </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.trailingSl} onChange={v => setStrat(s => ({ ...s, trailingSl: v }))} />
-                            <span className="toggle-name">Khóa lời động (Trailing SL)</span>
-                            <button className="btn-help" onClick={() => alert("Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")} title="Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.">[?]</button>
-                          </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.maxRoi} onChange={v => setStrat(s => ({ ...s, maxRoi: v }))} />
-                            <span className="toggle-name">Chốt lời lớn (ROI ≥ 120%)</span>
-                            <button className="btn-help" onClick={() => alert("Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")} title="Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).">[?]</button>
-                          </div>
-                          <div className="toggle-row">
-                            <ToggleSwitch checked={strat.h4Flip} onChange={v => setStrat(s => ({ ...s, h4Flip: v }))} />
-                            <span className="toggle-name">Cắt lệnh khi H4 đảo chiều</span>
-                            <button className="btn-help" onClick={() => alert("Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")} title="Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).">[?]</button>
+                        {/* 2. Lớp Bảo Vệ Cục Bộ EMA200 */}
+                        <div className="settings-group">
+                          <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
+                          <div className="toggle-grid">
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.safeguardEntry} onChange={v => setStrat(s => ({ ...s, safeguardEntry: v }))} />
+                              <span className="toggle-name">Thoát hòa vốn khi giá hồi</span>
+                              <button className="btn-help" onClick={() => alert("Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")} title="Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.">[?]</button>
+                            </div>
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.trailingSl} onChange={v => setStrat(s => ({ ...s, trailingSl: v }))} />
+                              <span className="toggle-name">Khóa lời động (Trailing SL)</span>
+                              <button className="btn-help" onClick={() => alert("Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")} title="Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.">[?]</button>
+                            </div>
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.maxRoi} onChange={v => setStrat(s => ({ ...s, maxRoi: v }))} />
+                              <span className="toggle-name">Chốt lời lớn (ROI ≥ 120%)</span>
+                              <button className="btn-help" onClick={() => alert("Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")} title="Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).">[?]</button>
+                            </div>
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.h4Flip} onChange={v => setStrat(s => ({ ...s, h4Flip: v }))} />
+                              <span className="toggle-name">Cắt lệnh khi H4 đảo chiều</span>
+                              <button className="btn-help" onClick={() => alert("Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")} title="Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).">[?]</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </>
-                  )}
+                      </>
+                    )}
 
-                  {activeBotTab === "sub2" && (
-                    <>
-                      {/* 1. Chiến Thuật Bắt Sóng SMC */}
+                    {activeBotTab === "sub2" && (
+                      <>
+                        {/* 1. Chiến Thuật Bắt Sóng SMC */}
+                        <div className="settings-group">
+                          <div className="settings-group-title">Chiến Thuật Bắt Sóng SMC</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                            <div className="toggle-row">
+                              <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
+                              <span className="toggle-name">Đánh SMC Order Block</span>
+                              <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")}>[?]</button>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc (Base TF):</span>
+                              <select
+                                className="styled-select"
+                                value={strat.timeframeBase || "1H"}
+                                onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
+                                style={{ width: "90px" }}
+                              >
+                                <option value="5m">5m</option>
+                                <option value="15m">15m</option>
+                                <option value="30m">30m</option>
+                                <option value="1H">1H</option>
+                                <option value="2H">2H</option>
+                                <option value="4H">4H</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Cấu Hình Bắt Sóng SMC — Mỗi setting là 1 dòng riêng biệt */}
+                        <div className="settings-group">
+                          <div className="settings-group-title">Cấu Hình Bắt Sóng SMC</div>
+                          <div className="entry-setup-list">
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Nguồn bắt cản (OB Source):</span>
+                              <select
+                                className="styled-select"
+                                style={{ width: "130px" }}
+                                value={smcEntryCfg.source}
+                                onChange={e => setSmcEntryCfg(s => ({ ...s, source: e.target.value }))}
+                              >
+                                <option value="ALL">Cả hai sóng</option>
+                                <option value="SWING">Chỉ sóng lớn</option>
+                                <option value="INTERNAL">Chỉ sóng nhỏ</option>
+                              </select>
+                            </div>
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Hướng vào lệnh:</span>
+                              <select
+                                className="styled-select"
+                                style={{ width: "130px" }}
+                                value={smcEntryCfg.dir}
+                                onChange={e => setSmcEntryCfg(s => ({ ...s, dir: e.target.value }))}
+                              >
+                                <option value="BOTH">Hai chiều</option>
+                                <option value="LONG_ONLY">Chỉ Long</option>
+                                <option value="SHORT_ONLY">Chỉ Short</option>
+                              </select>
+                            </div>
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Lọc lực nến cản (x ATR):</span>
+                              <NumberSpinBox
+                                value={smcEntryCfg.obVol}
+                                onChange={val => setSmcEntryCfg(s => ({ ...s, obVol: val }))}
+                                step={0.1}
+                                min={0}
+                                width="95px"
+                              />
+                            </div>
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng lớn (Swing nến):</span>
+                              <NumberSpinBox
+                                value={smcEntryCfg.swingLength}
+                                onChange={val => setSmcEntryCfg(s => ({ ...s, swingLength: val }))}
+                                min={10}
+                                max={200}
+                                step={1}
+                                width="95px"
+                              />
+                            </div>
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng nhỏ (Internal nến):</span>
+                              <NumberSpinBox
+                                value={smcEntryCfg.internalLength}
+                                onChange={val => setSmcEntryCfg(s => ({ ...s, internalLength: val }))}
+                                min={1}
+                                max={50}
+                                step={1}
+                                width="95px"
+                              />
+                            </div>
+                            <div className="entry-setup-row">
+                              <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", color: "#ffffff" }}>Ép khớp Market khi lọt cản:</span>
+                              <ToggleSwitch
+                                checked={smcEntryCfg.forceMarket}
+                                onChange={v => setSmcEntryCfg(s => ({ ...s, forceMarket: v }))}
+                              />
+                            </div>
+                            {smcEntryCfg.forceMarket && (
+                              <div className="entry-setup-row">
+                                <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Trượt giá Market tối đa:</span>
+                                <NumberSpinBox
+                                  value={smcEntryCfg.maxSlippage}
+                                  onChange={val => setSmcEntryCfg(s => ({ ...s, maxSlippage: val }))}
+                                  step={0.1}
+                                  min={0}
+                                  suffix="%"
+                                  width="95px"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {activeBotTab === "sub3" && (
                       <div className="settings-group">
-                        <div className="settings-group-title">Chiến Thuật Bắt Sóng SMC</div>
+                        <div className="settings-group-title">Chiến Thuật Bắt Thanh Khoản (Liquidation)</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
-                            <span className="toggle-name">Đánh SMC Order Block</span>
-                            <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")}>[?]</button>
+                            <span className="toggle-name">Quét Thanh Khoản Tự Động</span>
+                            <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán săn thanh khoản các cụm lệnh Liquidation.")}>[?]</button>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc (Base TF):</span>
+                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung quét thanh khoản:</span>
                             <select
                               className="styled-select"
                               value={strat.timeframeBase || "1H"}
@@ -3616,235 +4190,120 @@ function App() {
                               <option value="15m">15m</option>
                               <option value="30m">30m</option>
                               <option value="1H">1H</option>
-                              <option value="2H">2H</option>
                               <option value="4H">4H</option>
                             </select>
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* 2. Cấu Hình Bắt Sóng SMC — Mỗi setting là 1 dòng riêng biệt */}
-                      <div className="settings-group">
-                        <div className="settings-group-title">Cấu Hình Bắt Sóng SMC</div>
-                        <div className="entry-setup-list">
-                          <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Nguồn bắt cản (OB Source):</span>
-                            <select
-                              className="styled-select"
-                              style={{ width: "130px" }}
-                              value={smcEntryCfg.source}
-                              onChange={e => setSmcEntryCfg(s => ({ ...s, source: e.target.value }))}
-                            >
-                              <option value="ALL">Cả hai sóng</option>
-                              <option value="SWING">Chỉ sóng lớn</option>
-                              <option value="INTERNAL">Chỉ sóng nhỏ</option>
-                            </select>
+                    {/* ===== CÁC PHẦN CHUNG TIẾP THEO (ĐỒNG BỘ CHO TẤT CẢ CÁC BOT) ===== */}
+                    {/* 3. Điểm Vào Lệnh (Entry Setup) — Mỗi setting là 1 dòng riêng biệt */}
+                    <div className="settings-group">
+                      <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
+                      <div className="entry-setup-list">
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Đón trước cản:</span>
+                            <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
                           </div>
-                          <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Hướng vào lệnh:</span>
-                            <select
-                              className="styled-select"
-                              style={{ width: "130px" }}
-                              value={smcEntryCfg.dir}
-                              onChange={e => setSmcEntryCfg(s => ({ ...s, dir: e.target.value }))}
-                            >
-                              <option value="BOTH">Hai chiều</option>
-                              <option value="LONG_ONLY">Chỉ Long</option>
-                              <option value="SHORT_ONLY">Chỉ Short</option>
-                            </select>
+                          <NumberSpinBox
+                            value={entryCfg.entryOffset}
+                            onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
+                            step={0.01}
+                            min={0}
+                            suffix="%"
+                            width="95px"
+                          />
+                        </div>
+
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Khoảng cách nhồi DCA:</span>
+                            <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
                           </div>
+                          <NumberSpinBox
+                            value={entryCfg.dcaGapPct}
+                            onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
+                            step={0.05}
+                            min={0}
+                            suffix="%"
+                            width="95px"
+                          />
+                        </div>
+
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>Số nến xu hướng tối thiểu:</span>
+                            <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
+                          </div>
+                          <NumberSpinBox
+                            value={entryCfg.accumCandles}
+                            onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
+                            min={1}
+                            max={200}
+                            step={1}
+                            width="95px"
+                          />
+                        </div>
+
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
+                          </div>
+                          <ToggleSwitch
+                            checked={entryCfg.altcoinFollowBtc}
+                            onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
+                          />
+                        </div>
+
+                        {entryCfg.altcoinFollowBtc && (
                           <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Lọc lực nến cản (x ATR):</span>
+                            <div className="entry-label-wrap">
+                              <span>Hệ số nhạy ETH (Vol Mult):</span>
+                              <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
+                            </div>
                             <NumberSpinBox
-                              value={smcEntryCfg.obVol}
-                              onChange={val => setSmcEntryCfg(s => ({ ...s, obVol: val }))}
+                              value={entryCfg.ethVolMult}
+                              onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
                               step={0.1}
                               min={0}
                               width="95px"
                             />
                           </div>
-                          <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng lớn (Swing nến):</span>
-                            <NumberSpinBox
-                              value={smcEntryCfg.swingLength}
-                              onChange={val => setSmcEntryCfg(s => ({ ...s, swingLength: val }))}
-                              min={10}
-                              max={200}
-                              step={1}
-                              width="95px"
-                            />
-                          </div>
-                          <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Độ dài sóng nhỏ (Internal nến):</span>
-                            <NumberSpinBox
-                              value={smcEntryCfg.internalLength}
-                              onChange={val => setSmcEntryCfg(s => ({ ...s, internalLength: val }))}
-                              min={1}
-                              max={50}
-                              step={1}
-                              width="95px"
-                            />
-                          </div>
-                          <div className="entry-setup-row">
-                            <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", color: "#ffffff" }}>Ép khớp Market khi lọt cản:</span>
-                            <ToggleSwitch
-                              checked={smcEntryCfg.forceMarket}
-                              onChange={v => setSmcEntryCfg(s => ({ ...s, forceMarket: v }))}
-                            />
-                          </div>
-                          {smcEntryCfg.forceMarket && (
-                            <div className="entry-setup-row">
-                              <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Trượt giá Market tối đa:</span>
-                              <NumberSpinBox
-                                value={smcEntryCfg.maxSlippage}
-                                onChange={val => setSmcEntryCfg(s => ({ ...s, maxSlippage: val }))}
-                                step={0.1}
-                                min={0}
-                                suffix="%"
-                                width="95px"
-                              />
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
-                    </>
-                  )}
+                    </div>
 
-                  {activeBotTab === "sub3" && (
+                    {/* 4. Hệ Số Nhân Đa Khung (TF Multipliers) */}
                     <div className="settings-group">
-                      <div className="settings-group-title">Chiến Thuật Bắt Thanh Khoản (Liquidation)</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
-                          <span className="toggle-name">Quét Thanh Khoản Tự Động</span>
-                          <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán săn thanh khoản các cụm lệnh Liquidation.")}>[?]</button>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung quét thanh khoản:</span>
-                          <select
-                            className="styled-select"
-                            value={strat.timeframeBase || "1H"}
-                            onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
-                            style={{ width: "90px" }}
-                          >
-                            <option value="5m">5m</option>
-                            <option value="15m">15m</option>
-                            <option value="30m">30m</option>
-                            <option value="1H">1H</option>
-                            <option value="4H">4H</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ===== CÁC PHẦN CHUNG TIẾP THEO (ĐỒNG BỘ CHO TẤT CẢ CÁC BOT) ===== */}
-                  {/* 3. Điểm Vào Lệnh (Entry Setup) — Mỗi setting là 1 dòng riêng biệt */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Điểm Vào Lệnh (Entry Setup)</div>
-                    <div className="entry-setup-list">
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Đón trước cản:</span>
-                          <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
-                        </div>
-                        <NumberSpinBox
-                          value={entryCfg.entryOffset}
-                          onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
-                          step={0.01}
-                          min={0}
-                          suffix="%"
-                          width="95px"
-                        />
-                      </div>
-
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Khoảng cách nhồi DCA:</span>
-                          <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
-                        </div>
-                        <NumberSpinBox
-                          value={entryCfg.dcaGapPct}
-                          onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
-                          step={0.05}
-                          min={0}
-                          suffix="%"
-                          width="95px"
-                        />
-                      </div>
-
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Số nến xu hướng tối thiểu:</span>
-                          <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
-                        </div>
-                        <NumberSpinBox
-                          value={entryCfg.accumCandles}
-                          onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
-                          min={1}
-                          max={200}
-                          step={1}
-                          width="95px"
-                        />
-                      </div>
-
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span style={{ fontWeight: "bold", color: "#ffffff" }}>Altcoin neo theo BTC:</span>
-                        </div>
-                        <ToggleSwitch
-                          checked={entryCfg.altcoinFollowBtc}
-                          onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
-                        />
-                      </div>
-
-                      {entryCfg.altcoinFollowBtc && (
-                        <div className="entry-setup-row">
-                          <div className="entry-label-wrap">
-                            <span>Hệ số nhạy ETH (Vol Mult):</span>
-                            <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
-                          </div>
-                          <NumberSpinBox
-                            value={entryCfg.ethVolMult}
-                            onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
-                            step={0.1}
-                            min={0}
-                            width="95px"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 4. Hệ Số Nhân Đa Khung (TF Multipliers) */}
-                  <div className="settings-group">
-                    <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
-                    <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
-                          <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
-                          <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
-                          <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          ["M5", "1.0x", "1.0x"],
-                          ["M15", "1.5x", "1.2x"],
-                          ["M30", "2.3x", "1.5x"],
-                          ["H1", "3.3x", "2.0x"],
-                          ["H2", "4.7x", "3.0x"],
-                          ["H4", "6.8x", "5.0x"],
-                        ].map(([tf, offset, vol]) => (
-                          <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
-                            <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
-                            <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
-                            <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                      <div className="settings-group-title">Hệ Số Nhân Đa Khung (TF Multipliers)</div>
+                      <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
+                            <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
+                            <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
+                            <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {[
+                            ["M5", "1.0x", "1.0x"],
+                            ["M15", "1.5x", "1.2x"],
+                            ["M30", "2.3x", "1.5x"],
+                            ["H1", "3.3x", "2.0x"],
+                            ["H2", "4.7x", "3.0x"],
+                            ["H4", "6.8x", "5.0x"],
+                          ].map(([tf, offset, vol]) => (
+                            <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
+                              <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
+                              <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
+                              <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
                   </div>
 
