@@ -3666,7 +3666,7 @@ function App() {
             {/* Account selector per Bot */}
             {/* Gộp Account selector và QUẢN LÝ VỐN & RỦI RO thành 1 khối */}
             <div className="group-box" style={{ position: "relative", marginTop: "12px", paddingTop: "15px" }}>
-              <span className="group-box-title">
+              <span className="group-box-title" style={{ color: "#ffffff", fontSize: "13px", fontWeight: "bold" }}>
                 Tài khoản ({activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}):
               </span>
               
@@ -4582,27 +4582,28 @@ function App() {
                       <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
                       <div className="entry-setup-list">
                         <div className="entry-setup-row">
-                          <div className="entry-label-wrap">
-                            <span>Ký quỹ ({risk.volUnit}):</span>
+                          <div className="entry-label-wrap" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <span>Ký quỹ:</span>
+                            <div style={{ display: "flex", gap: "2px" }}>
+                              <button
+                                type="button"
+                                onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
+                                style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                              >USDT</button>
+                              <button
+                                type="button"
+                                onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
+                                style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                              >% VỐN</button>
+                            </div>
                           </div>
                           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            <button
-                              type="button"
-                              onClick={() => setRisk(r => ({ ...r, volUnit: r.volUnit === "USDT" ? "LOT" : "USDT" }))}
-                              style={{
-                                padding: "2px 8px", fontSize: "11px", borderRadius: "4px",
-                                border: "1px solid #555", background: "#2d2d2d", color: "#ff9900",
-                                cursor: "pointer", fontWeight: "bold"
-                              }}
-                            >
-                              {risk.volUnit}
-                            </button>
                             <NumberSpinBox
                               value={risk.posVol}
                               onChange={val => setRisk(r => ({ ...r, posVol: val }))}
                               min={risk.volUnit === "LOT" ? 0.01 : 1}
                               step={risk.volUnit === "LOT" ? 0.01 : 10}
-                              suffix={risk.volUnit === "USDT" ? "$" : ""}
+                              suffix={risk.volUnit === "USDT" ? "$" : "%"}
                               width="95px"
                             />
                           </div>
