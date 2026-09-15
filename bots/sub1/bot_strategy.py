@@ -2181,7 +2181,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             current_roi_long = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_long >= Decimal("0.1"):
                 clean_algo_orders(client, swap_id, "cross", "long", dry_run=dry_run)
-                close_position_market(client, swap_id, "long", str(cross_long_amt, dry_run=dry_run), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross")
+                close_position_market(client, swap_id, "long", str(cross_long_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross", dry_run=dry_run)
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
                 
         if tracker.has_short and cross_short_amt > 0:
@@ -2189,7 +2189,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             current_roi_short = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_short >= Decimal("0.1"):
                 clean_algo_orders(client, swap_id, "cross", "short", dry_run=dry_run)
-                close_position_market(client, swap_id, "short", str(cross_short_amt, dry_run=dry_run), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross")
+                close_position_market(client, swap_id, "short", str(cross_short_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross", dry_run=dry_run)
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
 
 
@@ -2660,7 +2660,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
-                tf_target_usdt = target_usdt * tf_vol_mult
+                tf_target_usdt = target_usdt * tf_vol_mult * Decimal(str(_get_leverage(tf)))
                 px_tf = calculate_entry_px(tf, "long")
                 if px_tf <= 0: continue
                 
@@ -2792,8 +2792,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.missing_count_long[tf] = 0
                             
 
-                        place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf, dry_run=dry_run), px_str,
-                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
+                        place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
+                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
                     except Exception as _e:
@@ -2844,7 +2844,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
                     tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
-                tf_target_usdt = target_usdt * tf_vol_mult
+                tf_target_usdt = target_usdt * tf_vol_mult * Decimal(str(_get_leverage(tf)))
                 px_tf = calculate_entry_px(tf, "short")
                 if px_tf <= 0: continue
 
@@ -2972,8 +2972,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         else:
                             tracker.missing_count_short[tf] = 0
                             
-                        place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf, dry_run=dry_run), px_str,
-                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode)
+                        place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
+                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
                     except Exception as _e:

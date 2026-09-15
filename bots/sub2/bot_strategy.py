@@ -776,9 +776,13 @@ def run_strategy_cycle(
                 setup.last_order_attempt = now_ts
                 # Chọn volume theo loại OB: Internal = 50 USDT, Swing = 100 USDT
                 if setup.ob_source == "INTERNAL":
-                    pos_usdt = INTERNAL_VOLUME_USDT
+                    _margin = getattr(bot_config, "INTERNAL_VOLUME_USDT", INTERNAL_VOLUME_USDT)
+                    _leverage = getattr(bot_config, "INTERNAL_LEVERAGE", INTERNAL_LEVERAGE)
+                    pos_usdt = _margin * Decimal(str(_leverage))
                 else:
-                    pos_usdt = SWING_VOLUME_USDT
+                    _margin = getattr(bot_config, "SWING_VOLUME_USDT", SWING_VOLUME_USDT)
+                    _leverage = getattr(bot_config, "LEVERAGE", LEVERAGE)
+                    pos_usdt = _margin * Decimal(str(_leverage))
                 
                 # ⚡ Kiểm tra giá lọt qua Entry để ép khớp Market (bắt Entry đẹp hơn)
                 lp = tracker.live_price

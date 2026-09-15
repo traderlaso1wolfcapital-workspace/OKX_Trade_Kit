@@ -329,7 +329,8 @@ def main():
                                             clean_algo_orders(okx_api, inst_id, pos_side=pos_side)
                                             
                                             spec = fetch_spec(okx_api, inst_id)
-                                            vol_usd = float(strategy_cfg.get("posVol", 20.0))
+                                            lever = int(strategy_cfg.get("LEVERAGES", {}).get(coin, 100))
+                                            vol_usd = float(strategy_cfg.get("posVol", 1.0)) * lever
                                             entry_px = float(signal["entry"])
                                             
                                             lot_sz = float(spec.get("lotSz", 0.001))

@@ -350,8 +350,8 @@ function SingleChartPane({
   const [hiddenIndicators, setHiddenIndicators] = useState(new Set());
   const hiddenIndicatorsRef = useRef(hiddenIndicators);
   hiddenIndicatorsRef.current = hiddenIndicators;
-  const [isLegendVisible, setIsLegendVisible] = useState(true);
-  const [isBacktestCollapsed, setIsBacktestCollapsed] = useState(false);
+  const [isLegendVisible, setIsLegendVisible] = useState(false);
+  const [isBacktestCollapsed, setIsBacktestCollapsed] = useState(true);
   const [indicatorsModalTab, setIndicatorsModalTab] = useState("system");
 
   const getIndicatorTitle = (id) => {
@@ -1341,6 +1341,9 @@ function SingleChartPane({
       width: containerRef.current.clientWidth || 300,
       height: containerRef.current.clientHeight || 200,
       layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', attributionLogo: false },
+      localization: {
+        priceFormatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
+      },
       grid: {
         vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
         horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
@@ -1957,7 +1960,7 @@ function SingleChartPane({
               title={isBacktestCollapsed ? "Bấm để mở rộng bảng Backtesting" : "Bấm để thu gọn bảng Backtesting"}
             >
               <span className="chart-backtest-title">
-                TLS1 Backtesting {isBacktestCollapsed ? `(${backtestStats.winrate})` : ""}
+                Backtesting
               </span>
               <button
                 className="chart-backtest-toggle-btn"
@@ -2877,7 +2880,7 @@ function App() {
     timeframeBase: "1H",
   });
   // Risk settings
-  const [risk, setRisk] = useState({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+  const [risk, setRisk] = useState({ posVol: 1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const isInitialRiskRender = useRef(true);
 
@@ -3090,7 +3093,7 @@ function App() {
 
     if (activeBotTab === "sub1") {
       // Defaults for Bot EMA200
-      setRisk({ posVol: 40, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+      setRisk({ posVol: 1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
         main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -3100,7 +3103,7 @@ function App() {
       setActiveCoinsCfg({ xau: true, btc: true, eth: true });
     } else if (activeBotTab === "sub2") {
       // Defaults for Bot SMC
-      setRisk({ posVol: 500, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
+      setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: false,
@@ -3685,7 +3688,7 @@ function App() {
               <div style={{ position: "absolute", top: "-10px", right: "8px", display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#252526", padding: "0 4px" }}>
                 <div style={{ display: "flex", gap: "2px" }}>
                   <button
-                    onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 40 : r.posVol }))}
+                    onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
                     style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                   >USDT</button>
                   <button
@@ -3704,12 +3707,13 @@ function App() {
               {!isRiskCollapsed && (
                 <div className="risk-grid">
                   <div className="risk-row">
-                    <label>{risk.volUnit === "USDT" ? "Volume Size (USDT):" : "Volume Size (Lot):"}</label>
+                    <label>{risk.volUnit === "USDT" ? "Ký quỹ (USDT):" : "Ký quỹ (Lot):"}</label>
                     <NumberSpinBox
                       value={risk.posVol}
                       onChange={val => setRisk(r => ({ ...r, posVol: val }))}
                       min={risk.volUnit === "LOT" ? 0.01 : 1}
                       step={risk.volUnit === "LOT" ? 0.01 : 10}
+                      suffix={risk.volUnit === "USDT" ? "$" : ""}
                     />
                   </div>
                   {activeBotTab === "sub1" ? (
@@ -3790,7 +3794,9 @@ function App() {
                 className="btn-join-community"
                 title="Tham gia cộng đồng Discord Trader TLS1"
               >
-                💬 Join Cộng đồng
+                <svg width="16" height="16" viewBox="0 0 127.14 96.36" fill="currentColor">
+                  <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83A97.68 97.68 0 0 0 49 6.83 72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.73 56.6 2.05 80A105.73 105.73 0 0 0 34.6 96.36a77.7 77.7 0 0 0 7-11.41 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 60.32 0c.87.66 1.75 1.34 2.66 2a68.42 68.42 0 0 1-10.87 5.19 77 77 0 0 0 7 11.41A105.49 105.49 0 0 0 125.09 80c4.15-26.15-.98-49.49-17.39-71.93ZM42.56 65.3c-5.36 0-9.82-4.9-9.82-10.88s4.36-10.88 9.82-10.88 9.9 4.9 9.82 10.88c0 6-4.46 10.88-9.82 10.88Zm41.92 0c-5.36 0-9.82-4.9-9.82-10.88s4.36-10.88 9.82-10.88 9.9 4.9 9.82 10.88c0 6-4.46 10.88-9.82 10.88Z" />
+                </svg>
               </a>
               <div className="slot-indicator-wrap">
                 <span style={{ color: "#ccc", fontSize: "11px", fontWeight: "bold" }}>Slot:</span>
@@ -3823,21 +3829,25 @@ function App() {
           {/* THẺ LIỀN KHỐI BAO TRÒN TOÀN BỘ MỌI THỨ BÊN TRONG CỤM BOT (1:1 ẢNH 2) */}
           <div className="bot-panel-card">
             {/* Hàng nút Hành động: Bắt đầu / Dừng bot */}
-            <div className="bot-action-bar">
-              <button
-                onClick={handleStartBot}
-                disabled={isRunning}
-                className="btn-action-start"
-              >
-                {isShadow ? '⚡ KÍCH HOẠT BOT' : '▶ BẮT ĐẦU CHẠY BOT'}
-              </button>
-              <button
-                onClick={handleStopBot}
-                disabled={!isRunning || isStoppingBot}
-                className="btn-action-stop"
-              >
-                {isStoppingBot ? '⏳ ĐANG DỪNG...' : '■ DỪNG CHẠY BOT'}
-              </button>
+            <div className="bot-action-bar" style={{ display: 'flex', justifyContent: 'center' }}>
+              {isRunning ? (
+                <button
+                  onClick={handleStopBot}
+                  disabled={isStoppingBot}
+                  className="btn-action-stop"
+                  style={{ width: "fit-content", alignSelf: "center" }}
+                >
+                  {isStoppingBot ? '⏳ ĐANG DỪNG...' : '■ DỪNG BOT'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartBot}
+                  className="btn-action-start"
+                  style={{ width: "fit-content", alignSelf: "center" }}
+                >
+                  ▶ CHẠY BOT
+                </button>
+              )}
             </div>
 
             {/* Cụm thẻ Workspace & Biểu đồ */}
@@ -4554,7 +4564,7 @@ function App() {
                       <div className="entry-setup-list">
                         <div className="entry-setup-row">
                           <div className="entry-label-wrap">
-                            <span>Volume Size ({risk.volUnit}):</span>
+                            <span>Ký quỹ ({risk.volUnit}):</span>
                           </div>
                           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                             <button
@@ -4573,6 +4583,7 @@ function App() {
                               onChange={val => setRisk(r => ({ ...r, posVol: val }))}
                               min={risk.volUnit === "LOT" ? 0.01 : 1}
                               step={risk.volUnit === "LOT" ? 0.01 : 10}
+                              suffix={risk.volUnit === "USDT" ? "$" : ""}
                               width="95px"
                             />
                           </div>
@@ -4928,7 +4939,7 @@ function App() {
                       onClick={() => {
                         if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH của app không?")) {
                           if (activeBotTab === "sub1") {
-                            setRisk({ posVol: 100, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+                            setRisk({ posVol: 1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
                             setStrat({
                               main: true, pyramidDca: true, hedge: true, xole: true, dynamicEma200Tp: false,
                               dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -4944,7 +4955,7 @@ function App() {
                               ethVolMult: "1.30",
                             });
                           } else if (activeBotTab === "sub2") {
-                            setRisk({ posVol: 100, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
+                            setRisk({ posVol: 1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
                             setStrat({
                               main: true, xole: false, dynamicEma200Tp: false,
                               dynamicPingpongTp: false, altcoinFollowBtc: false,
@@ -4970,7 +4981,7 @@ function App() {
                               ethVolMult: "1.30",
                             });
                           } else {
-                            setRisk({ posVol: 100, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
+                            setRisk({ posVol: 1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
                             setStrat({ main: true, timeframeBase: "1H" });
                             setEntryCfg({
                               entryOffset: "0.05",
