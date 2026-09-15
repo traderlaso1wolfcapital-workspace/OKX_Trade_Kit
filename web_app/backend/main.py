@@ -998,23 +998,15 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
 def get_bot_accounts(uid: str):
     data_dir = get_user_data_dir(uid)
     acc_file = os.path.join(data_dir, "accounts.json")
-    default_accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
     if os.path.exists(acc_file):
         try:
             with open(acc_file, "r", encoding="utf-8") as f:
                 accounts = json.load(f)
-                if isinstance(accounts, list) and len(accounts) > 0:
-                    cleaned = [
-                        {"id": "sub1", "name": "Tài khoản phụ"} if a.get("id") == "sub1" else a
-                        for a in accounts
-                        if not (a.get("id") == "sub2" and a.get("name") in ["Tài khoản phụ 2", "Tài khoản 2"])
-                    ]
-                    if not any(a.get("id") == "sub1" for a in cleaned):
-                        cleaned.insert(0, {"id": "sub1", "name": "Tài khoản phụ"})
-                    return cleaned
+                if isinstance(accounts, list):
+                    return accounts
         except Exception:
             pass
-    return default_accounts
+    return []
 
 @app.post("/api/bot/accounts")
 def create_bot_account(req: AccountCreate, uid: str):
@@ -1026,12 +1018,12 @@ def create_bot_account(req: AccountCreate, uid: str):
     os.makedirs(data_dir, exist_ok=True)
     acc_file = os.path.join(data_dir, "accounts.json")
     
-    accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    accounts = []
     if os.path.exists(acc_file):
         try:
             with open(acc_file, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
-                if isinstance(loaded, list) and len(loaded) > 0:
+                if isinstance(loaded, list):
                     accounts = loaded
         except Exception:
             pass
@@ -1056,12 +1048,12 @@ def delete_bot_account(account_id: str, uid: str):
     data_dir = get_user_data_dir(uid)
     acc_file = os.path.join(data_dir, "accounts.json")
     
-    accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
+    accounts = []
     if os.path.exists(acc_file):
         try:
             with open(acc_file, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
-                if isinstance(loaded, list) and len(loaded) > 0:
+                if isinstance(loaded, list):
                     accounts = loaded
         except Exception:
             pass
@@ -1073,11 +1065,7 @@ def delete_bot_account(account_id: str, uid: str):
         except Exception: pass
         
     # Lọc bỏ account
-    remaining = [a for a in accounts if a.get("id") != account_id]
-    if len(remaining) == 0:
-        accounts = [{"id": "sub1", "name": "Tài khoản phụ"}]
-    else:
-        accounts = remaining
+    accounts = [a for a in accounts if a.get("id") != account_id]
         
     with open(acc_file, "w", encoding="utf-8") as f:
         json.dump(accounts, f, indent=4, ensure_ascii=False)
