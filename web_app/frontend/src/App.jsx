@@ -2669,7 +2669,7 @@ function App() {
     return defaults;
   });
   const availableAccountsForTab = accounts.filter(acc => {
-    return !Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+    return !Object.entries(botAccountMap).some(([bot, accountId]) => {
       return bot !== activeBotTab && accountId === acc.id;
     });
   });
@@ -2697,13 +2697,13 @@ function App() {
   useEffect(() => {
     const activeBotAccount = botAccountMap[activeBotTab];
     if (activeBotAccount && accounts.length > 0) {
-      const isUsedByOther = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+      const isUsedByOther = Object.entries(botAccountMap).some(([bot, accountId]) => {
         return bot !== activeBotTab && accountId === activeBotAccount;
       });
       if (isUsedByOther) {
         // Tài khoản đã bị bot khác chiếm -> Fallback sang tài khoản trống đầu tiên
         const available = accounts.filter(acc => {
-          return !Object.entries(activeBotAccounts).some(([b, aId]) => b !== activeBotTab && aId === acc.id);
+          return !Object.entries(botAccountMap).some(([b, aId]) => b !== activeBotTab && aId === acc.id);
         });
         if (available.length > 0) {
           handleAssignAccountToActiveBot(available[0].id);
@@ -2712,7 +2712,7 @@ function App() {
         }
       }
     }
-  }, [activeBotAccounts, activeBotTab, accounts, botAccountMap]);
+  }, [botAccountMap, activeBotTab, accounts]);
 
   const handleAssignAccountToActiveBot = (accId) => {
     setSelectedAccount(accId);
@@ -3761,7 +3761,7 @@ function App() {
                 >
                   {accounts.length === 0 && <option value="">(Chưa có tài khoản)</option>}
                   {accounts.map(acc => {
-                    const isUsedByOtherBot = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+                    const isUsedByOtherBot = Object.entries(botAccountMap).some(([bot, accountId]) => {
                       return bot !== activeBotTab && accountId === acc.id;
                     });
                     return (
@@ -4451,7 +4451,7 @@ function App() {
                         >
                           {accounts.length === 0 && <option value="">(Bấm nút + để tạo tài khoản)</option>}
                           {accounts.map(acc => {
-                            const isUsedByOtherBot = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+                            const isUsedByOtherBot = Object.entries(botAccountMap).some(([bot, accountId]) => {
                               return bot !== activeBotTab && accountId === acc.id;
                             });
                             return (
