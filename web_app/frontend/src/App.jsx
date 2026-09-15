@@ -1857,6 +1857,44 @@ function SingleChartPane({
           <div 
             className="chart-legend-overlay"
           >
+            <div className="chart-legend-header">
+              <button
+                className="chart-legend-toggle-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLegendVisible(prev => !prev);
+                }}
+                title={isLegendVisible ? "Hide indicator legend" : "Show indicator legend"}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  style={{
+                    transform: isLegendVisible ? "rotate(0deg)" : "rotate(180deg)",
+                    transition: "transform 0.15s ease",
+                  }}
+                >
+                  <polyline points="18 15 12 9 6 15" />
+                </svg>
+              </button>
+              {!isLegendVisible && activeIndicators.length > 0 && (
+                <span
+                  className="chart-legend-collapsed-hint"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsLegendVisible(true);
+                  }}
+                  title="Show indicator legend"
+                >
+                  {activeIndicators.length} ind
+                </span>
+              )}
+            </div>
+
             {isLegendVisible && activeIndicators.length > 0 && (
               <div className="chart-legend-list">
                 {activeIndicators.map((id) => {
@@ -1912,44 +1950,6 @@ function SingleChartPane({
                 })}
               </div>
             )}
-
-            <div className="chart-legend-header">
-              <button
-                className="chart-legend-toggle-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsLegendVisible(prev => !prev);
-                }}
-                title={isLegendVisible ? "Hide indicator legend" : "Show indicator legend"}
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  style={{
-                    transform: isLegendVisible ? "rotate(0deg)" : "rotate(180deg)",
-                    transition: "transform 0.15s ease",
-                  }}
-                >
-                  <polyline points="18 15 12 9 6 15" />
-                </svg>
-              </button>
-              {!isLegendVisible && activeIndicators.length > 0 && (
-                <span
-                  className="chart-legend-collapsed-hint"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsLegendVisible(true);
-                  }}
-                  title="Show indicator legend"
-                >
-                  {activeIndicators.length} ind
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Bảng Thống Kê Winrate (Luôn đặt ở góc trên bên phải chart, có nút xổ ra xổ vào) */}
