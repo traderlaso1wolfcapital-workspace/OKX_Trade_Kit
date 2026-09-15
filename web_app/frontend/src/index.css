@@ -3160,7 +3160,7 @@ div[class*="tradingview-widget-copyright"],
 .chart-backtest-table-wrap {
   position: absolute;
   top: 0;
-  right: 65px; /* Giữ bảng bên trong chart, không đè lên thanh giá bên phải */
+  right: 85px; /* Giữ bảng bên trong chart, không đè lên thanh giá bên phải */
   z-index: 20;
   pointer-events: auto;
   user-select: none;
@@ -3257,6 +3257,6 @@ div[class*="tradingview-widget-copyright"],
 @media (max-width: 768px) {
   .chart-backtest-table-wrap {
     top: 0;
-    right: 55px;
+    right: 75px;
   }
 }

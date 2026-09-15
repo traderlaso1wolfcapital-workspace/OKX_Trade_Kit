@@ -2622,14 +2622,11 @@ function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          if (!parsed.includes("CL-USDT-SWAP")) {
-            parsed.splice(1, 0, "CL-USDT-SWAP");
-          }
           return parsed;
         }
       }
     } catch { }
-    return ["XAU-USDT-SWAP", "CL-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
+    return ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
   });
 
   const [accounts, setAccounts] = useState(() => {
