@@ -1341,9 +1341,6 @@ function SingleChartPane({
       width: containerRef.current.clientWidth || 300,
       height: containerRef.current.clientHeight || 200,
       layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', attributionLogo: false },
-      localization: {
-        priceFormatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
-      },
       grid: {
         vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
         horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
@@ -1390,11 +1387,19 @@ function SingleChartPane({
       color: "rgba(220,220,220,0.8)", lineWidth: 2,
       priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
       autoscaleInfoProvider: () => null,
+      priceFormat: {
+        type: 'custom',
+        formatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
+      },
     });
 
     const cs = chart.addSeries(CandlestickSeries, {
       upColor: "#26a69a", downColor: "#ef5350",
       borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+      priceFormat: {
+        type: 'custom',
+        formatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
+      },
       autoscaleInfoProvider: (original) => {
         const res = original();
         if (!res || !res.priceRange) return res;
@@ -1444,12 +1449,7 @@ function SingleChartPane({
     const vs = chart.addSeries(HistogramSeries, {
       color: '#26a69a',
       priceFormat: {
-        type: 'custom',
-        formatter: (price) => {
-          if (price >= 1000000) return (price / 1000000).toFixed(1) + 'M';
-          if (price >= 1000) return (price / 1000).toFixed(1) + 'K';
-          return price.toFixed(1);
-        },
+        type: 'volume',
       },
       priceScaleId: '',
     });
