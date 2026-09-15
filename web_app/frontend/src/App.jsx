@@ -3664,13 +3664,35 @@ function App() {
           {/* Sidebar content - QUẢN LÝ VỐN & RỦI RO */}
           <div className="sidebar-content">
             {/* Account selector per Bot */}
-            <div style={{ marginBottom: "10px", padding: "8px 10px", background: "#1e1e1e", borderRadius: "6px", border: "1px solid #333" }}>
-              <div style={{ marginBottom: "5px" }}>
-                <span style={{ fontSize: "11px", color: "#aaa", fontWeight: "bold" }}>
-                  Tài khoản ({activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}):
-                </span>
+            {/* Gộp Account selector và QUẢN LÝ VỐN & RỦI RO thành 1 khối */}
+            <div className="group-box" style={{ position: "relative", marginTop: "12px", paddingTop: "15px" }}>
+              <span className="group-box-title">
+                Tài khoản ({activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation"}):
+              </span>
+              
+              {/* Toggles and Collapse Button on the border */}
+              <div style={{ position: "absolute", top: "-10px", right: "8px", display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#252526", padding: "0 4px" }}>
+                <div style={{ display: "flex", gap: "2px" }}>
+                  <button
+                    onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
+                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >USDT</button>
+                  <button
+                    onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
+                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                  >% VỐN</button>
+                </div>
+                <button
+                  onClick={() => setIsRiskCollapsed(!isRiskCollapsed)}
+                  style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "10px", padding: "0 2px" }}
+                  title={isRiskCollapsed ? "Mở rộng cấu hình vốn" : "Thu gọn cấu hình vốn"}
+                >
+                  {isRiskCollapsed ? "▼" : "▲"}
+                </button>
               </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+
+              {/* Account Selector */}
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
                 <select
                   className="styled-select"
                   style={{ flex: 1, minWidth: 0, background: "#2a2a2a", border: "1px solid #444", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", outline: "none", height: "28px" }}
@@ -3692,39 +3714,18 @@ function App() {
                   ⚙ Cài Đặt
                 </button>
               </div>
-            </div>
 
-            <div className="group-box" style={{ position: "relative" }}>
-              <span className="group-box-title">QUẢN LÝ VỐN & RỦI RO</span>
-              <div style={{ position: "absolute", top: "-10px", right: "8px", display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#252526", padding: "0 4px" }}>
-                <div style={{ display: "flex", gap: "2px" }}>
-                  <button
-                    onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
-                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
-                  >USDT</button>
-                  <button
-                    onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
-                    style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
-                  >LOT</button>
-                </div>
-                <button
-                  onClick={() => setIsRiskCollapsed(!isRiskCollapsed)}
-                  style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "10px", padding: "0 2px" }}
-                  title={isRiskCollapsed ? "Mở rộng" : "Thu gọn"}
-                >
-                  {isRiskCollapsed ? "▼" : "▲"}
-                </button>
-              </div>
+              {/* Risk Management Grid (Collapsible) */}
               {!isRiskCollapsed && (
                 <div className="risk-grid">
                   <div className="risk-row">
-                    <label>{risk.volUnit === "USDT" ? "Ký quỹ (USDT):" : "Ký quỹ (Lot):"}</label>
+                    <label>Ký quỹ (USDT/% VỐN):</label>
                     <NumberSpinBox
                       value={risk.posVol}
                       onChange={val => setRisk(r => ({ ...r, posVol: val }))}
                       min={risk.volUnit === "LOT" ? 0.01 : 1}
                       step={risk.volUnit === "LOT" ? 0.01 : 10}
-                      suffix={risk.volUnit === "USDT" ? "$" : ""}
+                      suffix={risk.volUnit === "USDT" ? "$" : "%"}
                     />
                   </div>
                   {activeBotTab === "sub1" ? (
