@@ -633,6 +633,22 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
     else:
         del_nested(bot_processes, uid, strategy)
 
+    # Calculate active_accounts
+    data_dir = get_user_data_dir(uid)
+    active_accounts = {}
+    for strat in ["sub1", "sub2", "sub3"]:
+        s_proc = get_nested(bot_processes, uid, strat)
+        s_pid = get_running_pid(uid, strat)
+        if s_pid > 0 or (s_proc and s_proc.poll() is None):
+            running_acc_file = os.path.join(data_dir, f"bots/{strat}", f".running_account_{strat}")
+            if os.path.exists(running_acc_file):
+                try:
+                    with open(running_acc_file, "r") as f:
+                        acc = f.read().strip()
+                        if acc:
+                            active_accounts[strat] = acc
+                except: pass
+
     if is_running:
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
         shadow = _is_shadow_mode(uid, strategy)
@@ -640,9 +656,10 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
             "status": "SHADOW" if shadow else "RUNNING",
             "uptime": uptime,
             "strategy": strategy,
-            "dry_run": shadow
+            "dry_run": shadow,
+            "active_accounts": active_accounts
         }
-    return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True}
+    return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True, "active_accounts": active_accounts}
 
 @app.on_event("startup")
 async def auto_resume_bots():
@@ -1077,6 +1094,28 @@ def get_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
     return {"api_key": api_key, "secret_key": secret_key, "passphrase": passphrase}
+
+@app.delete("/api/bot/credentials")
+def delete_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None):
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    data_dir = get_user_data_dir(uid)
+    
+    paths_to_remove = [
+        os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"),
+        os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"),
+        os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
+        os.path.join(data_dir, f".api_{target_acc}")
+    ]
+    
+    deleted_any = False
+    for p in paths_to_remove:
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+                deleted_any = True
+            except: pass
+            
+    return {"status": "ok", "deleted": deleted_any}
 
 @app.post("/api/bot/credentials")
 def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "sub1", account_id: str = None):

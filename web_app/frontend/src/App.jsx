@@ -2371,6 +2371,7 @@ function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [lockMessage, setLockMessage] = useState("");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isStartingBot, setIsStartingBot] = useState(false);
   const [isStoppingBot, setIsStoppingBot] = useState(false);
   const [botPnl, setBotPnl] = useState("");
   const [botWinrate, setBotWinrate] = useState("");
@@ -2655,20 +2656,63 @@ function App() {
   const [botAccountMap, setBotAccountMap] = useState(() => {
     const saved = localStorage.getItem("tls1_bot_accounts");
     if (saved) {
-      try { return JSON.parse(saved); } catch { }
+      try { 
+        const parsed = JSON.parse(saved);
+        if (Object.keys(parsed).length > 0) return parsed;
+      } catch { }
     }
-    return {};
+    const defaults = {
+      sub1: "sub1_default",
+      sub2: "sub2_default"
+    };
+    localStorage.setItem("tls1_bot_accounts", JSON.stringify(defaults));
+    return defaults;
   });
+  const availableAccountsForTab = accounts.filter(acc => {
+    return !Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+      return bot !== activeBotTab && accountId === acc.id;
+    });
+  });
+  const getEffectiveAccount = () => {
+    if (botAccountMap[activeBotTab] && availableAccountsForTab.some(a => a.id === botAccountMap[activeBotTab])) {
+      return botAccountMap[activeBotTab];
+    }
+    return availableAccountsForTab.length > 0 ? availableAccountsForTab[0].id : "";
+  };
+  const effectiveAccId = getEffectiveAccount();
 
-  const currentAccount = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+
+  const currentAccount = effectiveAccId;
   const [selectedAccount, setSelectedAccount] = useState(currentAccount);
 
   // Khi chuyển bot tab hoặc cập nhật botAccountMap, đồng bộ selectedAccount
   useEffect(() => {
-    const acc = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+    const acc = effectiveAccId;
     setSelectedAccount(acc);
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
   }, [activeBotTab]);
+
+
+  // Tự động gán lại tài khoản hợp lệ nếu tài khoản hiện tại bị khoá
+  useEffect(() => {
+    const activeBotAccount = botAccountMap[activeBotTab];
+    if (activeBotAccount && accounts.length > 0) {
+      const isUsedByOther = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+        return bot !== activeBotTab && accountId === activeBotAccount;
+      });
+      if (isUsedByOther) {
+        // Tài khoản đã bị bot khác chiếm -> Fallback sang tài khoản trống đầu tiên
+        const available = accounts.filter(acc => {
+          return !Object.entries(activeBotAccounts).some(([b, aId]) => b !== activeBotTab && aId === acc.id);
+        });
+        if (available.length > 0) {
+          handleAssignAccountToActiveBot(available[0].id);
+        } else {
+          handleAssignAccountToActiveBot(""); // Không còn tài khoản trống
+        }
+      }
+    }
+  }, [activeBotAccounts, activeBotTab, accounts, botAccountMap]);
 
   const handleAssignAccountToActiveBot = (accId) => {
     setSelectedAccount(accId);
@@ -2773,7 +2817,7 @@ function App() {
     if (!isAuthenticated) return;
     const fetchBalance = async () => {
       try {
-        const acc = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+        const acc = effectiveAccId;
         if (!acc) return;
         const r = await fetch(`/api/account/balance?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${acc}`);
         if (r.ok) {
@@ -2848,7 +2892,7 @@ function App() {
         slTriggerPx: hasTPSL && tradeSL ? tradeSL.toString() : "",
         tpTriggerPx: hasTPSL && tradeTP ? tradeTP.toString() : ""
       };
-      const acc = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+      const acc = effectiveAccId;
       if (!acc) return;
       const r = await fetch(`/api/trade/order?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${acc}`, {
         method: "POST",
@@ -3006,10 +3050,32 @@ function App() {
     setShowDeleteAccountModal(true);
   };
 
+  const handleResetApiKey = async () => {
+    const targetAccountId = selectedAccount;
+    const currentAcc = accounts.find(a => a.id === targetAccountId);
+    const accName = currentAcc?.name || targetAccountId;
+    const uid = localStorage.getItem('tls1_uid') || loginUid;
+
+    if (!window.confirm(`Bạn có chắc muốn LÀM SẠCH (Reset) API Key của tài khoản [${accName}] không?`)) return;
+
+    setIsSavingConfig(true);
+    try {
+      await fetch(`/api/bot/credentials?uid=${uid}&strategy=${activeBotTab}&account_id=${targetAccountId}`, { method: "DELETE" });
+      setApiKey("");
+      setSecretKey("");
+      setPassphrase("");
+      addSystemLog(`🔄 [API KEY] Đã làm sạch API Key của tài khoản: "${accName}"`);
+      alert("Đã làm sạch cấu hình API Key thành công!");
+    } catch (e) {
+      console.error(e);
+      alert("Lỗi khi xoá API Key");
+    }
+    setIsSavingConfig(false);
+  };
+
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
 
-    // 1. Hiệu ứng loading 1.2s (theo yêu cầu CEO tầm 1-1.5s)
     setIsDeletingAccount(true);
     await new Promise(resolve => setTimeout(resolve, 1200));
 
@@ -3058,15 +3124,12 @@ function App() {
               localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
             }
           }
-        })
-        .catch(err => {
-          console.warn("Background delete account sync warning:", err);
-        });
+        }).catch(err => console.error(err));
     } catch (e) {
-      console.warn("Delete account error:", e);
-    } finally {
-      setIsDeletingAccount(false);
+      console.error(e);
     }
+
+    setIsDeletingAccount(false);
   };
 
   // Cấu hình Điểm vào lệnh (Entry Config - EMA200)
@@ -3308,7 +3371,12 @@ function App() {
     const fetchStatus = async () => {
       try {
         const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r.ok) { const d = await r.json(); setBotStatus(d.status); setUptime(d.uptime); }
+        if (r.ok) { 
+          const d = await r.json(); 
+          setBotStatus(d.status); 
+          setUptime(d.uptime);
+          if (d.active_accounts) setActiveBotAccounts(d.active_accounts);
+        }
       } catch { }
     };
     const fetchConfig = async () => {
@@ -3331,7 +3399,7 @@ function App() {
     };
     const fetchCreds = async () => {
       try {
-        const targetAcc = selectedAccount || botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+        const targetAcc = selectedAccount || effectiveAccId;
         if (!targetAcc) return;
         const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
@@ -3358,7 +3426,7 @@ function App() {
 
   const fetchPositions = async () => {
     try {
-      const acc = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+      const acc = effectiveAccId;
       if (!acc) return;
       const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
       if (r.ok) setPositions(await r.json());
@@ -3378,7 +3446,7 @@ function App() {
 
   // Chart rendering handled inside SingleChartPane component
   const handleStartBot = async () => {
-    const currentAcc = botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "");
+    const currentAcc = effectiveAccId;
     if (!currentAcc) {
       alert("⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi chạy bot!");
       return;
@@ -3408,6 +3476,7 @@ function App() {
     }
 
     try {
+      setIsStartingBot(true);
       const r = await fetch(`/api/bot/start?uid=${localStorage.getItem('tls1_uid') || loginUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
       if (r.ok) {
         const d = await r.json();
@@ -3418,6 +3487,7 @@ function App() {
         alert(`❌ Lỗi khởi động bot: ${err.detail || "Không rõ nguyên nhân"}`);
       }
     } catch { alert("Lỗi kết nối khi khởi động bot!"); }
+    finally { setIsStartingBot(false); }
   };
   const handleStopBot = async () => {
     const currentUid = localStorage.getItem('tls1_uid') || loginUid;
@@ -3686,13 +3756,20 @@ function App() {
                 <select
                   className="styled-select"
                   style={{ flex: 1, minWidth: 0, background: "#2a2a2a", border: "1px solid #444", color: "#fff", padding: "4px 8px", borderRadius: "4px", fontSize: "12px", outline: "none", height: "28px" }}
-                  value={botAccountMap[activeBotTab] || (accounts.length > 0 ? accounts[0].id : "")}
+                  value={effectiveAccId}
                   onChange={e => handleAssignAccountToActiveBot(e.target.value)}
                 >
                   {accounts.length === 0 && <option value="">(Chưa có tài khoản)</option>}
-                  {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>{acc.name}</option>
-                  ))}
+                  {accounts.map(acc => {
+                    const isUsedByOtherBot = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+                      return bot !== activeBotTab && accountId === acc.id;
+                    });
+                    return (
+                      <option key={acc.id} value={acc.id} disabled={isUsedByOtherBot}>
+                        {acc.name} {isUsedByOtherBot ? "(Đang chạy)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 <button
                   type="button"
@@ -3856,10 +3933,11 @@ function App() {
               ) : (
                 <button
                   onClick={handleStartBot}
+                  disabled={isStartingBot}
                   className="btn-action-start"
                   style={{ width: "fit-content", alignSelf: "center" }}
                 >
-                  ▶ CHẠY BOT
+                  {isStartingBot ? '⏳ ĐANG KHỞI ĐỘNG...' : '▶ CHẠY BOT'}
                 </button>
               )}
             </div>
@@ -4372,9 +4450,16 @@ function App() {
                           onChange={e => handleAssignAccountToActiveBot(e.target.value)}
                         >
                           {accounts.length === 0 && <option value="">(Bấm nút + để tạo tài khoản)</option>}
-                          {accounts.map(acc => (
-                            <option key={acc.id} value={acc.id}>{acc.name}</option>
-                          ))}
+                          {accounts.map(acc => {
+                            const isUsedByOtherBot = Object.entries(activeBotAccounts).some(([bot, accountId]) => {
+                              return bot !== activeBotTab && accountId === acc.id;
+                            });
+                            return (
+                              <option key={acc.id} value={acc.id} disabled={isUsedByOtherBot}>
+                                {acc.name} {isUsedByOtherBot ? "(Đang chạy)" : ""}
+                              </option>
+                            );
+                          })}
                         </select>
                         <button
                           style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
