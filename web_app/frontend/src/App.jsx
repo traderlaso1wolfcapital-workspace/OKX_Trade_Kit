@@ -1443,7 +1443,14 @@ function SingleChartPane({
 
     const vs = chart.addSeries(HistogramSeries, {
       color: '#26a69a',
-      priceFormat: { type: 'volume' },
+      priceFormat: {
+        type: 'custom',
+        formatter: (price) => {
+          if (price >= 1000000) return (price / 1000000).toFixed(1) + 'M';
+          if (price >= 1000) return (price / 1000).toFixed(1) + 'K';
+          return price.toFixed(1);
+        },
+      },
       priceScaleId: '',
     });
     chart.priceScale('').applyOptions({
