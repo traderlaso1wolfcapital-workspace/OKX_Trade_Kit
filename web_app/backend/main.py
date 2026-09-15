@@ -719,22 +719,50 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     pid = get_running_pid(uid, strategy)
     process_alive = (pid > 0) or (proc and proc.poll() is None)
 
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    current_running_acc = ""
+    if os.path.exists(running_acc_file):
+        with open(running_acc_file, "r") as f:
+            current_running_acc = f.read().strip()
+
     if process_alive:
-        # Process đang chạy (shadow mode) → chỉ cần kích hoạt bằng flag
-        # Xóa stop flag cũ nếu có
-        stop_flag = os.path.join(flag_dir, f"stop_{acc_name}.flag")
-        if os.path.exists(stop_flag):
-            try: os.remove(stop_flag)
-            except: pass
-        # Ghi activate flag
-        try:
-            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
-                f.write("1")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Lỗi ghi activate flag: {e}")
-        return {"status": "success", "message": "⚡ Bot đã được KÍCH HOẠT! Lệnh thật sẽ được đặt lên OKX."}
+        if current_running_acc != target_acc:
+            # Tài khoản thay đổi -> KILL process để khởi động lại với API key mới
+            if proc:
+                try:
+                    import psutil
+                    parent = psutil.Process(proc.pid)
+                    for child in parent.children(recursive=True): child.kill()
+                    parent.kill()
+                except: proc.kill()
+            elif pid > 0:
+                try:
+                    import psutil
+                    parent = psutil.Process(pid)
+                    for child in parent.children(recursive=True): child.kill()
+                    parent.kill()
+                except: pass
+            del_nested(bot_processes, uid, strategy)
+            process_alive = False
+        else:
+            # Process đang chạy và cùng tài khoản -> chỉ cần kích hoạt bằng flag
+            stop_flag = os.path.join(flag_dir, f"stop_{acc_name}.flag")
+            if os.path.exists(stop_flag):
+                try: os.remove(stop_flag)
+                except: pass
+            try:
+                with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
+                    f.write("1")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Lỗi ghi activate flag: {e}")
+            return {"status": "success", "message": "⚡ Bot đã được KÍCH HOẠT! Lệnh thật sẽ được đặt lên OKX."}
 
     # Process chưa chạy — spawn mới (bắt đầu ở DRY_RUN, ngay sau đó activate)
+    try:
+        with open(running_acc_file, "w") as f:
+            f.write(target_acc)
+    except: pass
+
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
     try:
         # Xoá stop/kill flag cũ
@@ -1134,6 +1162,31 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     if strategy:
         _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
         
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    if os.path.exists(running_acc_file):
+        with open(running_acc_file, "r") as f:
+            current_running = f.read().strip()
+        if current_running == target_acc:
+            # Người dùng đổi API key của chính tài khoản đang chạy -> KILL bot để nạp lại
+            proc = get_nested(bot_processes, uid, strategy)
+            pid = get_running_pid(uid, strategy)
+            if proc or pid > 0:
+                if proc:
+                    try:
+                        import psutil
+                        parent = psutil.Process(proc.pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: proc.kill()
+                elif pid > 0:
+                    try:
+                        import psutil
+                        parent = psutil.Process(pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: pass
+                del_nested(bot_processes, uid, strategy)
+
     return {"message": "Credentials updated successfully."}
 
 @app.get("/api/bot/positions")
