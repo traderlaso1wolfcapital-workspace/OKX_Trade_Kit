@@ -1748,58 +1748,62 @@ function SingleChartPane({
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
-            <button
-              className={`chart-indicators-btn ${activeIndicators.length > 0 ? "active" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIndicatorsModalTab("system");
-                setShowIndicatorsModal(true);
-              }}
-              title="Indicators, metrics & strategies"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M3 3v18h18" />
-                <path d="M7 16l4-6 4 3 6-8" />
-              </svg>
-              <span>Indicators</span>
-              {activeIndicators.length > 0 && (
-                <span
-                  className="indicator-badge"
-                  title="Đang kích hoạt: Bấm để quản lý bật/tắt"
+            {false && (
+              <>
+                <button
+                  className={`chart-indicators-btn ${activeIndicators.length > 0 ? "active" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIndicatorsModalTab("active");
+                    setIndicatorsModalTab("system");
                     setShowIndicatorsModal(true);
                   }}
+                  title="Indicators, metrics & strategies"
                 >
-                  {activeIndicators.length}
-                </span>
-              )}
-            </button>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M3 3v18h18" />
+                    <path d="M7 16l4-6 4 3 6-8" />
+                  </svg>
+                  <span>Indicators</span>
+                  {activeIndicators.length > 0 && (
+                    <span
+                      className="indicator-badge"
+                      title="Đang kích hoạt: Bấm để quản lý bật/tắt"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIndicatorsModalTab("active");
+                        setShowIndicatorsModal(true);
+                      }}
+                    >
+                      {activeIndicators.length}
+                    </span>
+                  )}
+                </button>
 
-            {/* Chế độ Hybrid: Chuyển đổi giữa Standard và TV Pro - Hoàn toàn không có icon */}
-            <div className="chart-mode-pill-group">
-              <button
-                className={`chart-mode-pill ${chartMode === "standard" ? "active" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleChartMode("standard");
-                }}
-                title="Biểu đồ Tiêu Chuẩn (Khối Order Block live từ Bot)"
-              >
-                Standard
-              </button>
-              <button
-                className={`chart-mode-pill tv ${chartMode === "tv" ? "active" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleChartMode("tv");
-                }}
-                title="Biểu đồ TradingView Gốc (Full công cụ vẽ & indicator chính hãng)"
-              >
-                TradingView
-              </button>
-            </div>
+                {/* Chế độ Hybrid: Chuyển đổi giữa Standard và TV Pro - Hoàn toàn không có icon */}
+                <div className="chart-mode-pill-group">
+                  <button
+                    className={`chart-mode-pill ${chartMode === "standard" ? "active" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleChartMode("standard");
+                    }}
+                    title="Biểu đồ Tiêu Chuẩn (Khối Order Block live từ Bot)"
+                  >
+                    Standard
+                  </button>
+                  <button
+                    className={`chart-mode-pill tv ${chartMode === "tv" ? "active" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleChartMode("tv");
+                    }}
+                    title="Biểu đồ TradingView Gốc (Full công cụ vẽ & indicator chính hãng)"
+                  >
+                    TradingView
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <div style={{ fontSize: "10px", color: "#888", fontWeight: "bold" }}>

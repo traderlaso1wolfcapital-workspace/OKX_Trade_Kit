@@ -2194,7 +2194,7 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(3px);
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
