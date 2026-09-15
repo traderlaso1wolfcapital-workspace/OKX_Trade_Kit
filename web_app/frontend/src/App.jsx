@@ -2545,8 +2545,9 @@ function App() {
   const [chartRatio, setChartRatio] = useState(50);
 
   const startResizing = (e) => {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const isVertical = layoutMode === "vertical";
+    const isTouch = e.type === "touchstart";
 
     // Add is-resizing to body to prevent iframe capturing mouse events
     document.body.classList.add("is-resizing");
@@ -2555,16 +2556,20 @@ function App() {
     }
 
     const doDrag = (dragEvent) => {
+      if (isTouch && dragEvent.cancelable) dragEvent.preventDefault();
+      const clientX = isTouch ? dragEvent.touches[0].clientX : dragEvent.clientX;
+      const clientY = isTouch ? dragEvent.touches[0].clientY : dragEvent.clientY;
+      
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
       if (isVertical) {
-        let newRatio = ((dragEvent.clientY - rect.top) / rect.height) * 100;
+        let newRatio = ((clientY - rect.top) / rect.height) * 100;
         if (newRatio < 25) newRatio = 25;
         if (newRatio > 75) newRatio = 75;
         setChartRatio(newRatio);
       } else {
-        let newRatio = ((dragEvent.clientX - rect.left) / rect.width) * 100;
+        let newRatio = ((clientX - rect.left) / rect.width) * 100;
         if (newRatio < 25) newRatio = 25;
         if (newRatio > 75) newRatio = 75;
         setChartRatio(newRatio);
@@ -2573,11 +2578,22 @@ function App() {
     const stopDrag = () => {
       document.body.classList.remove("is-resizing");
       document.body.classList.remove("is-resizing-vertical");
-      document.removeEventListener("mousemove", doDrag);
-      document.removeEventListener("mouseup", stopDrag);
+      if (isTouch) {
+        document.removeEventListener("touchmove", doDrag);
+        document.removeEventListener("touchend", stopDrag);
+      } else {
+        document.removeEventListener("mousemove", doDrag);
+        document.removeEventListener("mouseup", stopDrag);
+      }
     };
-    document.addEventListener("mousemove", doDrag);
-    document.addEventListener("mouseup", stopDrag);
+    
+    if (isTouch) {
+      document.addEventListener("touchmove", doDrag, { passive: false });
+      document.addEventListener("touchend", stopDrag);
+    } else {
+      document.addEventListener("mousemove", doDrag);
+      document.addEventListener("mouseup", stopDrag);
+    }
   };
 
   const [activeTab, setActiveTab] = useState("positions");
@@ -3233,6 +3249,9 @@ function App() {
           } else {
             // Log đến liên tục => gộp vào block ĐẦU TIÊN theo chiều xuôi (để bảng không bị lộn ngược)
             newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
+            if (newBlocks[0].lines.length > 20) {
+              newBlocks[0].lines = newBlocks[0].lines.slice(newBlocks[0].lines.length - 20);
+            }
           }
           // Giữ tối đa 20 blocks gần nhất để không lag
           if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
@@ -3935,10 +3954,10 @@ function App() {
                   </div>
                 </section>
 
-                {/* Resizer */}
                 <div
                   className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
                   onMouseDown={startResizing}
+                  onTouchStart={startResizing}
                 />
 
                 <section className="pane-tabs">
@@ -4121,20 +4140,8 @@ function App() {
                                           })}
                                         </div>
                                       </td>
-                                      {/* Cột trạng thái bot: badge Shadow khi chạy ngầm */}
                                       <td style={{ padding: "6px 10px", textAlign: "center" }}>
-                                        {isShadow ? (
-                                          <span style={{
-                                            display: "inline-flex", alignItems: "center", gap: "4px",
-                                            background: "rgba(255, 180, 0, 0.1)", border: "1px solid rgba(255, 180, 0, 0.3)",
-                                            color: "#ffb400", borderRadius: "12px", padding: "2px 9px",
-                                            fontSize: "11px", fontWeight: "600"
-                                          }}>
-                                            🌑 Ngầm
-                                          </span>
-                                        ) : (
-                                          <span style={{ color: "#444", fontSize: "11px" }}>—</span>
-                                        )}
+                                        <span style={{ color: "#444", fontSize: "11px" }}>—</span>
                                       </td>
                                     </tr>
                                   );

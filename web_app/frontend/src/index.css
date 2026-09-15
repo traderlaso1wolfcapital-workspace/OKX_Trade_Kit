@@ -1945,6 +1945,11 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   border-radius: 2px;
   box-sizing: border-box;
   transition: border-color 0.15s ease;
+  z-index: 1;
+}
+
+.single-chart-card:first-child {
+  z-index: 2;
 }
 
 .single-chart-card.active {
@@ -1952,6 +1957,7 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
 }
 
 .single-chart-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
