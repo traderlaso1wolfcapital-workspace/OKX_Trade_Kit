@@ -644,6 +644,56 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
         }
     return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True}
 
+@app.on_event("startup")
+async def auto_resume_bots():
+    print("[SYSTEM] Bắt đầu tự động khôi phục các bot đang chạy...")
+    base_dir = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users")
+    if not os.path.exists(base_dir): return
+    try:
+        for uid in os.listdir(base_dir):
+            user_dir = os.path.join(base_dir, uid, "TLS1_Trading", "bots")
+            if not os.path.exists(user_dir): continue
+            for strategy in os.listdir(user_dir):
+                strat_dir = os.path.join(user_dir, strategy)
+                flag_dir = os.path.join(strat_dir, "json_data")
+                if not os.path.exists(flag_dir): continue
+                
+                kill_flag = os.path.join(flag_dir, f"kill_{strategy}.flag")
+                if os.path.exists(kill_flag): continue
+                
+                activate_flag = os.path.join(flag_dir, f"activate_{strategy}.flag")
+                stop_flag = os.path.join(flag_dir, f"stop_{strategy}.flag")
+                
+                if os.path.exists(activate_flag) or os.path.exists(stop_flag):
+                    strat_env_file = f".api_{strategy}"
+                    if not os.path.exists(os.path.join(strat_dir, strat_env_file)): continue
+                    
+                    print(f"[SYSTEM] Tự động khởi động lại bot {strategy} cho user {uid}")
+                    cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
+                    custom_env = os.environ.copy()
+                    custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
+                    custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+                    custom_env["PYTHONUNBUFFERED"] = "1"
+                    custom_env["PYTHONIOENCODING"] = "utf-8"
+                    
+                    try:
+                        new_proc = subprocess.Popen(
+                            cmd, cwd=OKX_TRADE_KIT_DIR,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            env=custom_env,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                        )
+                        set_nested(bot_processes, uid, strategy, new_proc)
+                        set_nested(bot_start_times, uid, strategy, time.time())
+                        if uid not in bot_log_queues: bot_log_queues[uid] = {}
+                        bot_log_queues[uid][strategy] = asyncio.Queue()
+                        loop = asyncio.get_event_loop()
+                        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
+                    except Exception as e:
+                        print(f"[SYSTEM] Lỗi khi tự động khởi động bot {strategy} (UID: {uid}): {e}")
+    except Exception as e:
+        print(f"[SYSTEM] Lỗi quét thư mục auto_resume_bots: {e}")
+
 @app.post("/api/bot/start")
 async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, account_id: str = None):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
