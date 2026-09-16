@@ -4151,12 +4151,11 @@ function App() {
                         <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
                           <thead>
                             <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cặp giao dịch</th>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Điểm vào</th>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap", minWidth: "150px" }}>PNL thả nổi</th>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>TF trade</th>
-                              <th style={{ textAlign: "center", padding: "6px 10px", fontSize: "14px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
+                              <th style={{ textAlign: "left", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Cặp vị thế</th>
+                              <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Ký quỹ</th>
+                              <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap", minWidth: "130px" }}>PNL thả nổi</th>
+                              <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>TF trade</th>
+                              <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4202,48 +4201,51 @@ function App() {
 
                                 if (posList.length === 0) {
                                   return (
-                                    <tr key={coin.value} style={{ borderBottom: "1px solid #333" }}>
-                                      <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}>
-                                          {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
-                                          <input
-                                            type="checkbox"
-                                            className="coin-toggle"
-                                            checked={isChecked}
-                                            onChange={() => togglePair(coin.value)}
-                                            onClick={e => e.stopPropagation()}
-                                            title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
-                                          />
-                                          <span style={{ color: "#aaa", fontSize: "15px" }}>{coin.label.replace("-SWAP", "")}</span>
+                                    <tr key={coin.value} style={{ borderBottom: "1px solid #262626" }}>
+                                      <td style={{ textAlign: "left", padding: "4px 6px", whiteSpace: "nowrap" }}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", margin: 0 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <input
+                                              type="checkbox"
+                                              className="coin-toggle"
+                                              checked={isChecked}
+                                              onChange={() => togglePair(coin.value)}
+                                              onClick={e => e.stopPropagation()}
+                                              title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                                            />
+                                            <span style={{ color: "#fff", fontSize: "13px", fontWeight: "400" }}>{coin.label.replace("-SWAP", "")}</span>
+                                          </div>
+                                          <span style={{ color: "#666", fontSize: "11px", marginLeft: "22px" }}>Chờ tín hiệu...</span>
                                         </div>
                                       </td>
-                                      <td></td><td></td><td></td>
-                                      <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                      <td style={{ padding: "4px 6px", textAlign: "center", color: "#555", fontSize: "13px" }}>--</td>
+                                      <td style={{ padding: "4px 6px", textAlign: "center", color: "#555", fontSize: "13px" }}>--</td>
+                                      <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                                         <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                                           {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
                                             const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : (enabledTfs[coin.value] || []);
                                             const isOn = coinTfs.includes(tf);
                                             const label = tf.replace("M", "");
                                             return (
-                                              <span
-                                                key={tf}
-                                                onClick={() => handleTfToggle(coin.value, tf)}
-                                                style={{
-                                                  cursor: "pointer", padding: "0px", borderRadius: "6px",
-                                                  fontSize: "12px", fontWeight: "bold",
-                                                  background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
-                                                  border: isOn ? "1px solid #1d766b" : "1px solid #444444",
-                                                  width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
-                                                }}
-                                              >
-                                                {label}
-                                              </span>
+                                                <span
+                                                  key={tf}
+                                                  onClick={() => handleTfToggle(coin.value, tf)}
+                                                  style={{
+                                                    cursor: "pointer", padding: "0px", borderRadius: "4px",
+                                                    fontSize: "12px", fontWeight: "bold",
+                                                    background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
+                                                    border: isOn ? "1px solid #1d766b" : "1px solid #444444",
+                                                    width: "24px", height: "19px", textAlign: "center", display: "inline-flex", alignItems: "center", justifyContent: "center"
+                                                  }}
+                                                >
+                                                  {label}
+                                                </span>
                                             );
                                           })}
                                         </div>
                                       </td>
-                                      <td style={{ padding: "6px 10px", textAlign: "center" }}>
-                                        <span style={{ color: "#444", fontSize: "11px" }}>—</span>
+                                      <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                                        <span style={{ color: "#555", fontSize: "13px" }}>--</span>
                                       </td>
                                     </tr>
                                   );
@@ -4257,26 +4259,24 @@ function App() {
                                   const isAggregate = pos.is_aggregate || (!isChild && ticketIndex === 0);
 
                                   return (
-                                    <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #333" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
-                                      <td style={{ textAlign: "left", padding: "6px 10px", whiteSpace: "nowrap" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0, paddingLeft: isChild ? "20px" : "0px" }}>
-                                          {/* Tạm ẩn vạch màu 4x20 theo yêu cầu CEO */}
-                                          {!isChild ? (
-                                            <input
-                                              type="checkbox"
-                                              className="coin-toggle"
-                                              checked={isChecked}
-                                              onChange={() => togglePair(coin.value)}
-                                              onClick={e => e.stopPropagation()}
-                                              title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
-                                            />
-                                          ) : (
-                                            <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
-                                          )}
-
-                                          <span style={{ fontSize: isChild ? "13px" : "15px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <tr key={`${coin.value}-${pos.ticket_id || ticketIndex}`} style={{ borderBottom: ticketIndex === posList.length - 1 ? "1px solid #262626" : (isChild ? "1px solid transparent" : "1px solid rgba(255, 255, 255, 0.03)"), backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent" }}>
+                                      <td style={{ textAlign: "left", padding: "4px 6px", whiteSpace: "nowrap" }}>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "2px", margin: 0, paddingLeft: isChild ? "20px" : "0px" }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                            {!isChild ? (
+                                              <input
+                                                type="checkbox"
+                                                className="coin-toggle"
+                                                checked={isChecked}
+                                                onChange={() => togglePair(coin.value)}
+                                                onClick={e => e.stopPropagation()}
+                                                title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                                              />
+                                            ) : (
+                                              <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
+                                            )}
                                             <span 
-                                              style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff", cursor: "pointer" }}
+                                              style={{ color: isChild ? "rgba(255,255,255,0.4)" : "#fff", cursor: "pointer", fontSize: "13px", fontWeight: "400" }}
                                               onClick={() => {
                                                 const rawTf = pos.tf ? pos.tf.split(' ')[0].toUpperCase() : "1H";
                                                 let mappedTf = "1H";
@@ -4296,40 +4296,31 @@ function App() {
                                             </span>
 
                                             {!isChild && (
-                                              <>
-                                                <span style={{ fontSize: "12px", color: isLong ? "#4caf50" : "#ff5252", backgroundColor: isLong ? "rgba(76, 175, 80, 0.1)" : "rgba(255, 82, 82, 0.1)", padding: "2px 6px", borderRadius: "4px" }}>
-                                                  {isLong ? "Long" : "Short"} {pos.lever || "100"}x
-                                                </span>
-                                                {pos.tf && pos.tf.split(' ').length === 1 && (
-                                                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
-                                                    {pos.tf.toLowerCase()}
-                                                  </span>
-                                                )}
-                                              </>
-                                            )}
-
-                                            {isChild && pos.tf && (
-                                              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", padding: "1px 6px" }}>
-                                                {pos.tf.toLowerCase()}
+                                              <span style={{ fontSize: "12px", color: isLong ? "#00c087" : "#ff4d4f", fontWeight: "normal", marginLeft: "4px" }}>
+                                                {isLong ? "Long" : "Short"}
                                               </span>
                                             )}
-                                          </span>
+                                          </div>
+                                          
+                                          <div style={{ color: "#888", fontSize: "11.5px", marginLeft: isChild ? "26px" : "22px" }}>
+                                            {pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"} ➔ {pos.lastPx ? parseFloat(pos.lastPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : (pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0")}
+                                          </div>
                                         </div>
                                       </td>
-                                      <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}</td>
-                                      <td style={{ textAlign: "center", padding: "6px 10px", fontSize: isChild ? "13px" : "15px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap" }}>{margin.toFixed(2)} $</td>
-                                      <td style={{ padding: "6px 10px", textAlign: "center", fontSize: "15px", whiteSpace: "nowrap" }}>
+                                      <td style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", color: isChild ? "rgba(255,255,255,0.4)" : "#fff", whiteSpace: "nowrap", fontWeight: "400" }}>{margin.toFixed(2)} $</td>
+                                      <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
                                         {(() => {
                                           const roi = parseFloat(pos.roi || 0);
-                                          const color = roi >= 0 ? "#26a69a" : "#ef5350";
+                                          const color = roi >= 0 ? "#00c087" : "#ff4d4f";
                                           return (
-                                            <span style={{ color }}>
-                                              <span style={{ fontSize: "17px" }}>{upl >= 0 ? "+" : ""}{upl.toFixed(2)}</span> USDT &nbsp;&nbsp; <span style={{ opacity: 0.97 }}>({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)</span>
-                                            </span>
+                                            <div style={{ color, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                                              <span style={{ fontWeight: "400", fontSize: "14.2px" }}>{upl >= 0 ? "+" : ""}{upl.toFixed(2)} USDT</span>
+                                              <span style={{ fontSize: "11.5px" }}>({roi > 0 ? "+" : ""}{roi.toFixed(2)}%)</span>
+                                            </div>
                                           );
                                         })()}
                                       </td>
-                                      <td style={{ padding: "6px 10px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                      <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                                         {!isChild && ticketIndex === 0 && (
                                           <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                                             {["M5", "M15", "M30", "H1", "H2", "H4"].map(tf => {
@@ -4341,7 +4332,7 @@ function App() {
                                                   key={tf}
                                                   onClick={() => handleTfToggle(coin.value, tf)}
                                                   style={{
-                                                    cursor: "pointer", padding: "0px", borderRadius: "6px",
+                                                    cursor: "pointer", padding: "0px", borderRadius: "4px",
                                                     fontSize: "12px", fontWeight: "bold",
                                                     background: isOn ? "#1d766b" : "#222222", color: isOn ? "#f0f0f0" : "#aaaaaa",
                                                     border: isOn ? "1px solid #1d766b" : "1px solid #444444",
@@ -4355,7 +4346,7 @@ function App() {
                                           </div>
                                         )}
                                       </td>
-                                      <td style={{ textAlign: "center", padding: "6px 10px" }}>
+                                      <td style={{ textAlign: "center", padding: "4px 6px" }}>
                                         <button
                                           onClick={async () => {
                                             const coinName = coin.label.replace("-SWAP", "");
@@ -4387,9 +4378,9 @@ function App() {
                                             }
                                           }}
                                           style={{
-                                            background: "#c62828", color: "white", border: "none",
-                                            borderRadius: "6px", padding: "6px 16px", cursor: "pointer",
-                                            fontSize: "14px", fontWeight: "bold"
+                                            background: "#b32626", color: "white", border: "none",
+                                            borderRadius: "4px", padding: "4px 14px", cursor: "pointer",
+                                            fontSize: "12px", fontWeight: "bold"
                                           }}>
                                           Đóng
                                         </button>
