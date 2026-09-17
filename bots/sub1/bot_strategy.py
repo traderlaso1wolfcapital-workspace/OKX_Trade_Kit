@@ -599,72 +599,64 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # ==============================================================================
             # ALTCOIN ĐỆM LÕM TUYỆT ĐỐI THEO BTC (Bỏ qua EMA của Altcoin)
             # ==============================================================================
-            # btc_tk = state_matrix.get("BTC-USDT-SWAP")
-            # --- [OFF] TẠM THỜI TẮT LỌC ĐÀN HỒI (ELASTICITY) THEO YÊU CẦU ---
-            # if not btc_tk or btc_tk.live_price <= 0:
+            btc_tk = state_matrix.get("BTC-USDT-SWAP")
             
-            # Dùng công thức thuần túy: Giá Limit = EMA200 của chính Altcoin đó ± Khoảng lùi
-            volatility_mult = getattr(tracker, 'current_vol_mult', Decimal("1.0"))
-            tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
-            offset = base_buffer * volatility_mult * tf_vol_mult
-            if side == "long":
-                raw_px = target_ema * (Decimal("1") + offset)
+            if not _is_alt_synced or not btc_tk or btc_tk.live_price <= 0:
+                # Nếu TẮT "Đồng pha BTC" HOẶC mất kết nối data BTC:
+                # Dùng công thức thuần túy: Giá Limit = EMA200 của chính Altcoin đó ± Khoảng lùi
+                volatility_mult = getattr(tracker, 'current_vol_mult', Decimal("1.0"))
+                tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                offset = base_buffer * volatility_mult * tf_vol_mult
+                if side == "long":
+                    raw_px = target_ema * (Decimal("1") + offset)
+                else:
+                    raw_px = target_ema * (Decimal("1") - offset)
             else:
-                raw_px = target_ema * (Decimal("1") - offset)
-                
-            # else:
-            #     # 1. Tính cản EMA200 của BTC ở TF hiện tại (dùng get_ema200_for_tf từ closure)
-            #     # Lưu tạm tracker gốc, thay bằng BTC tracker để gọi get_ema200_for_tf
-            #     _orig_tracker = tracker
-            #     # Dùng tham chiếu tạm — vì get_ema200_for_tf dùng biến tracker trong closure
-            #     btc_ema = Decimal("0")
-            #     if tf == "M5": btc_ema = btc_tk.ema200
-            #     elif tf == "M15": btc_ema = getattr(btc_tk, "m15_ema200", Decimal("0"))
-            #     elif tf == "M30": btc_ema = getattr(btc_tk, "m30_ema200", Decimal("0"))
-            #     elif tf == "H1": btc_ema = getattr(btc_tk, "h1_ema200", Decimal("0"))
-            #     elif tf == "H2": btc_ema = getattr(btc_tk, "h2_ema200", Decimal("0"))
-            #     elif tf == "H4": btc_ema = getattr(btc_tk, "h4_ema200", Decimal("0"))
-            #     if btc_ema <= 0:
-            #         btc_ema = btc_tk.live_price # Fallback
-            # 
-            #     # 2. Lấy khoảng cách từ Giá Live BTC tới Cản EMA200 của BTC
-            #     btc_ema_dist = (btc_ema - btc_tk.live_price) / btc_tk.live_price
-            # 
-            #     # 3. Lấy hệ số biến động riêng của Altcoin
-            #     _coin_vol_mult = Decimal("1.0")
-            #     for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
-            #         if item["coin"] == coin_name:
-            #             _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
-            #             break
-            # 
-            #     # 4. Nhân bản khoảng cách EMA theo độ biến động của Altcoin
-            #     alt_base_dist = btc_ema_dist * _coin_vol_mult
-            # 
-            #     # 5. Đệm lùi cho Altcoin: dùng base_buffer (= BASE_ENTRY_OFFSET_PCT × TF_MULTIPLIERS[tf])
-            #     # Giống hệt BTC — KHÔNG nhân thêm volatility_mult hay TF_VOLUME_MULTIPLIERS
-            #     # base_buffer đã được tính sẵn ở trên: TF_ENTRY_OFFSETS.get(tf) = BASE_ENTRY_OFFSET_PCT * TF_MULTIPLIERS[tf]
-            #     alt_offset = base_buffer
-            # 
-            #     # 6. Chốt giá Limit cuối cùng
-            #     if side == "long":
-            #         alt_final_pct = alt_base_dist + alt_offset
-            #     else:
-            #         alt_final_pct = alt_base_dist - alt_offset
-            # 
-            #     raw_px = tracker.live_price * (Decimal("1") + alt_final_pct)
-            # 
-            #     # ⚡ EMA FLOOR CLAMP: Giới hạn entry Altcoin không vượt quá EMA200 của chính nó
-            #     # Ngăn chặn 2 kịch bản nguy hiểm:
-            #     # (A) BTC gần EMA200 → alt_final_pct dương → entry trên giá live (fill ngay như market)
-            #     # (B) BTC overshoots → btc_ema_dist dương → entry trên giá live (vô nghĩa)
-            #     alt_own_ema = get_ema200_for_tf(tf)  # EMA200 của Altcoin tại TF hiện tại
-            #     if alt_own_ema > 0:
-            #         if side == "long":
-            #             ema_floor = alt_own_ema * (Decimal("1") + base_buffer)
-            #             raw_px = min(raw_px, ema_floor)  # LONG: không đặt cao hơn EMA200 Altcoin + buffer
-            #         else:
-            #             ema_ceiling = alt_own_ema * (Decimal("1") - base_buffer)
-            #             raw_px = max(raw_px, ema_ceiling)  # SHORT: không đặt thấp hơn EMA200 Altcoin - buffer
+                # Nếu BẬT "Đồng pha BTC": Dùng Lọc đàn hồi (Elasticity) chiếu theo khoảng cách của BTC
+                # 1. Tính cản EMA200 của BTC ở TF hiện tại
+                btc_ema = Decimal("0")
+                if tf == "M5": btc_ema = btc_tk.ema200
+                elif tf == "M15": btc_ema = getattr(btc_tk, "m15_ema200", Decimal("0"))
+                elif tf == "M30": btc_ema = getattr(btc_tk, "m30_ema200", Decimal("0"))
+                elif tf == "H1": btc_ema = getattr(btc_tk, "h1_ema200", Decimal("0"))
+                elif tf == "H2": btc_ema = getattr(btc_tk, "h2_ema200", Decimal("0"))
+                elif tf == "H4": btc_ema = getattr(btc_tk, "h4_ema200", Decimal("0"))
+                if btc_ema <= 0:
+                    btc_ema = btc_tk.live_price # Fallback
+
+                # 2. Lấy khoảng cách từ Giá Live BTC tới Cản EMA200 của BTC
+                btc_ema_dist = (btc_ema - btc_tk.live_price) / btc_tk.live_price
+
+                # 3. Lấy hệ số biến động riêng của Altcoin (Đã bỏ ethVolMult UI, mặc định 1.0)
+                _coin_vol_mult = Decimal("1.0")
+                for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
+                    if item["coin"] == coin_name:
+                        _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
+                        break
+
+                # 4. Nhân bản khoảng cách EMA theo độ biến động của Altcoin
+                alt_base_dist = btc_ema_dist * _coin_vol_mult
+
+                # 5. Đệm lùi cho Altcoin
+                alt_offset = base_buffer
+
+                # 6. Chốt giá Limit cuối cùng
+                if side == "long":
+                    alt_final_pct = alt_base_dist + alt_offset
+                else:
+                    alt_final_pct = alt_base_dist - alt_offset
+
+                raw_px = tracker.live_price * (Decimal("1") + alt_final_pct)
+
+                # ⚡ EMA FLOOR CLAMP: Giới hạn entry Altcoin không vượt quá EMA200 của chính nó
+                alt_own_ema = get_ema200_for_tf(tf)  # EMA200 của Altcoin tại TF hiện tại
+                if alt_own_ema > 0:
+                    if side == "long":
+                        ema_floor = alt_own_ema * (Decimal("1") + base_buffer)
+                        raw_px = min(raw_px, ema_floor)  # LONG: không đặt cao hơn EMA200 Altcoin + buffer
+                    else:
+                        ema_ceiling = alt_own_ema * (Decimal("1") - base_buffer)
+                        raw_px = max(raw_px, ema_ceiling)  # SHORT: không đặt thấp hơn EMA200 Altcoin - buffer
 
         # ⚡ SAFETY CLAMP: Giới hạn limit không vượt quá EMA200 của TF tín hiệu chủ đạo
         # Khi TF lưới nhỏ hơn TF tín hiệu, EMA200 của TF nhỏ có thể lệch pha gây limit vô nghĩa
