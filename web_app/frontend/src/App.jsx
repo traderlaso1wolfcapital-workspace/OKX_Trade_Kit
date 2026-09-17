@@ -3319,8 +3319,9 @@ function App() {
           } else {
             // Log đến liên tục => gộp vào block ĐẦU TIÊN theo chiều xuôi (để bảng không bị lộn ngược)
             newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
-            if (newBlocks[0].lines.length > 20) {
-              newBlocks[0].lines = newBlocks[0].lines.slice(newBlocks[0].lines.length - 20);
+            // Bỏ giới hạn 20 dòng để hiển thị trọn vẹn Bảng SYS (Dashboard)
+            if (newBlocks[0].lines.length > 500) {
+              newBlocks[0].lines = newBlocks[0].lines.slice(newBlocks[0].lines.length - 500);
             }
           }
           // Giữ tối đa 20 blocks gần nhất để không lag

@@ -428,6 +428,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     _asset_class = cfg.get("asset_class", "crypto")
     _is_alt_synced = (coin_name != "BTC" and _asset_class == "crypto" and getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True))
     
+    # ⚡ EARLY EXIT: Bỏ qua hoàn toàn coin không được kích hoạt và không có vị thế
+    if not is_enabled and not tracker.has_long and not tracker.has_short:
+        if not getattr(tracker, "_disabled_cleaned", False):
+            from bots.sub1.bot_orders import clean_limit_orders
+            clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
+            tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
+            tracker.placed_entry_px_long_by_tf, tracker.placed_entry_px_short_by_tf = {}, {}
+            tracker._disabled_cleaned = True
+        return
+    else:
+        tracker._disabled_cleaned = False
+    
     # Khởi tạo giá trị mặc định để IDE/Pylance không báo lỗi NameError "Could not find name"
     closes_asc = []
     is_new_candle_closed = False
