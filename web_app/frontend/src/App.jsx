@@ -4729,7 +4729,7 @@ function App() {
                               </div>
                               <div className="toggle-row">
                                 <ToggleSwitch checked={entryCfg.altcoinFollowBtc} onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))} />
-                                <span className="toggle-name">Lọc Vĩ mô (Đồng pha BTC)</span>
+                                <span className="toggle-name">Altcoin đồng pha BTC</span>
                                 <button className="btn-help" onClick={() => alert("BẬT: Altcoin phải đồng pha với xu hướng BTC. TẮT: Đánh độc lập theo sóng của từng Altcoin (Mặc định).")} title="BẬT: Altcoin phải đồng pha với xu hướng BTC. TẮT: Đánh độc lập theo sóng của từng Altcoin (Mặc định).">[?]</button>
                               </div>
                             </div>
