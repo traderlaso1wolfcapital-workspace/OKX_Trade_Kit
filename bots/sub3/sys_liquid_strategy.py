@@ -13,6 +13,8 @@ class LiquidationStrategy:
         self.DynamicRR = 2.0
         self.bulkyCandleATR = 2.1
         self.atrLenCRT = 50
+        self.atrLenBulky = 10
+        self.sweep_time = None
         
         self.tpslMethod = "Dynamic"
         self.fixedSlPct = 1.0
@@ -22,6 +24,7 @@ class LiquidationStrategy:
             self.slATRMult = float(config.get("SL_ATR_MULT", self.slATRMult))
             self.DynamicRR = float(config.get("DYNAMIC_RR", self.DynamicRR))
             self.bulkyCandleATR = float(config.get("BULKY_ATR_MULT", self.bulkyCandleATR))
+            self.atrLenBulky = int(config.get("ATR_LEN_BULKY", self.atrLenBulky))
             self.tpslMethod = config.get("TPSL_METHOD", self.tpslMethod)
             self.fixedSlPct = float(config.get("FIXED_SL_PCT", self.fixedSlPct))
             self.fixedTpPct = float(config.get("FIXED_TP_PCT", self.fixedTpPct))
@@ -32,6 +35,7 @@ class LiquidationStrategy:
         self.bulkyLow = None
         self.overlapDirection = None
         self.ob = None
+        self.sweep_time = None
 
     def get_signal(self, htf_klines, ltf_klines):
         """
@@ -45,7 +49,7 @@ class LiquidationStrategy:
         highs = np.array([k['high'] for k in htf_klines])
         lows = np.array([k['low'] for k in htf_klines])
         closes = np.array([k['close'] for k in htf_klines])
-        atr_1h = calculate_atr(highs, lows, closes, self.atrLenCRT)
+        atr_1h = calculate_atr(highs, lows, closes, self.atrLenBulky)
         
         # 1. Waiting For Bulky Candle
         if self.state == "Waiting For Bulky Candle":
@@ -77,16 +81,18 @@ class LiquidationStrategy:
             if bear_overlap and not bull_overlap:
                 self.overlapDirection = "Bear"
                 self.state = "Waiting For OB"
+                self.sweep_time = last_ltf.get('timestamp', len(ltf_klines))
                 return {"status": "Bearish Sweep, Waiting OB"}
                 
             if bull_overlap and not bear_overlap:
                 self.overlapDirection = "Bull"
                 self.state = "Waiting For OB"
+                self.sweep_time = last_ltf.get('timestamp', len(ltf_klines))
                 return {"status": "Bullish Sweep, Waiting OB"}
 
         # 3. Waiting For OB
         elif self.state == "Waiting For OB":
-            ob = find_order_block(ltf_klines, direction=self.overlapDirection, window=10)
+            ob = find_order_block(ltf_klines, direction=self.overlapDirection, window=10, min_time=self.sweep_time)
             if ob:
                 self.ob = ob
                 self.state = "Waiting For OB Retracement"
@@ -96,10 +102,16 @@ class LiquidationStrategy:
         elif self.state == "Waiting For OB Retracement":
             last_ltf = ltf_klines[-1]
             if self.overlapDirection == "Bull":
-                if last_ltf['low'] <= self.ob['top']:  # Giá chạm về vùng đỉnh của OB
+                if last_ltf['low'] < self.ob['bottom']:
+                    self.reset()
+                    return {"status": "OB Invalidated, Reset"}
+                elif last_ltf['low'] <= self.ob['top']:  # Giá chạm về vùng đỉnh của OB
                     self.state = "Enter Position"
             else:
-                if last_ltf['high'] >= self.ob['bottom']: # Giá chạm về vùng đáy của OB
+                if last_ltf['high'] > self.ob['top']:
+                    self.reset()
+                    return {"status": "OB Invalidated, Reset"}
+                elif last_ltf['high'] >= self.ob['bottom']: # Giá chạm về vùng đáy của OB
                     self.state = "Enter Position"
 
         # 5. Enter Position
@@ -137,3 +149,5 @@ class LiquidationStrategy:
                 return {"action": "SHORT", "entry": entry_price, "sl": sl, "tp": tp}
                 
         return None
+
+# z1949 | 2026-09-17: Sửa ATR(10) cho nến Bulky, track thời gian sweep để lọc OB sau sweep, và fix điều kiện Invalidate OB.

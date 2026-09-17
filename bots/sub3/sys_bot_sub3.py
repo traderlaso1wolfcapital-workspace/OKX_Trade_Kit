@@ -119,11 +119,6 @@ def main():
         if os.path.isdir(os.path.join(base_dir, "bots", "sub3")):
             break
         base_dir = os.path.dirname(base_dir)
-        
-    config_dir = os.path.join(base_dir, "config")
-    os.makedirs(config_dir, exist_ok=True)
-    pid_file = os.path.join(config_dir, "bot_sub3.pid")
-    stop_flag = os.path.join(config_dir, "stop_sub3.flag")
     
     # Đọc env_file từ argv (GUI truyền vào)
     env_file_name = ".api"
@@ -132,14 +127,28 @@ def main():
     elif len(sys.argv) >= 2:
         env_file_name = sys.argv[1]
 
+    acc_name = os.path.splitext(env_file_name)[0] if "." in env_file_name else env_file_name
+
+    json_data_dir = os.path.join(USER_DATA_DIR, "bots", "sub3", "json_data")
+    os.makedirs(json_data_dir, exist_ok=True)
+    pid_file = os.path.join(json_data_dir, f"{acc_name}.pid")
+    stop_flag = os.path.join(json_data_dir, f"stop_{acc_name}.flag")
+
     # Check PID
     if os.path.exists(pid_file):
         try:
             with open(pid_file, 'r') as f:
                 old_pid = int(f.read().strip())
             if HAS_PSUTIL and psutil.pid_exists(old_pid):
-                print(f"⚠️ [CẢNH BÁO]: Tiến trình Bot Sub3 (PID={old_pid}) đang chạy. Thoát bản sao mới.")
-                sys.exit(0)
+                try:
+                    p = psutil.Process(old_pid)
+                    if p.status() == psutil.STATUS_ZOMBIE:
+                        os.remove(pid_file)
+                    else:
+                        print(f"⚠️ [CẢNH BÁO]: Tiến trình Bot Sub3 (PID={old_pid}) đang chạy. Thoát bản sao mới.")
+                        sys.exit(0)
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    os.remove(pid_file)
             else:
                 os.remove(pid_file)
         except Exception:
@@ -430,3 +439,4 @@ def main():
 if __name__ == "__main__":
     main()
 
+# z1949 | Khôi phục lại khởi tạo biến base_dir trong hàm main() bị xoá nhầm

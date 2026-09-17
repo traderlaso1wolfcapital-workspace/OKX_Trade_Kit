@@ -878,7 +878,8 @@ a#tv-attr-logo,
   color: #c8c8c8;
   font-family: Consolas, "Courier New", monospace;
   font-size: 12px;
-  padding: 8px 12px;
+  padding: 8px 14px 42px 14px;
+  box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
@@ -886,9 +887,9 @@ a#tv-attr-logo,
 }
 
 .log-line {
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre;
-  border-bottom: 1px solid #111;
+  border-bottom: 1px solid #141414;
   padding: 1px 0;
 }
 

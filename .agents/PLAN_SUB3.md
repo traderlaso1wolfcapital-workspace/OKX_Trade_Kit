@@ -18,7 +18,7 @@
 ## 3. THUẬT TOÁN CHI TIẾT
 ### Giai đoạn 1: Tìm nến dẫn hướng (Bulky Candle) trên HTF (1H)
 - Duyệt lịch sử nến 1H gần nhất.
-- Nến Bulky khi: `True Range (High - Low) > ATR(50) * 2.1`.
+- Nến Bulky khi: `True Range (High - Low) > ATR(10) * 2.1`.
 - Ghi nhận `bulkyHigh` và `bulkyLow`.
 
 ### Giai đoạn 2: Quét Thanh Lý (Liquidation Sweep) trên LTF (5m)
@@ -28,9 +28,9 @@
 - *(Nếu đóng nến 5m hoàn toàn vượt qua vùng Bulky thì Reset trạng thái).*
 
 ### Giai đoạn 3: Chờ xác nhận (Order Block) & Retest (5m)
-- **Sau khi có Bullish Sweep:** Chờ một Bullish Order Block (OB) hình thành trên khung 5m.
-- Khi xuất hiện OB, vì `Retracement = True`, hệ thống CHƯA vào lệnh vội, mà lưu lại giá vùng OB (`ob_top`, `ob_bottom`). Chờ các nến 5m tiếp theo có `Low <= ob_top` (chạm/retest lại OB) mới kích hoạt Long.
-- **Sau khi có Bearish Sweep:** Chờ một Bearish OB hình thành. Lưu vùng OB và chờ các nến tiếp theo có `High >= ob_bottom` mới kích hoạt Short.
+- **Sau khi có Bullish Sweep:** Chờ một Bullish Order Block (OB) hình thành trên khung 5m SAU thời điểm Sweep. OB được xác định qua cơ chế Swing High/Low (window=10).
+- Khi xuất hiện OB, vì `Retracement = True`, hệ thống CHƯA vào lệnh vội, mà lưu lại giá vùng OB (`ob_top`, `ob_bottom`). Chờ các nến 5m tiếp theo có `Low <= ob_top` (chạm/retest lại OB) mới kích hoạt Long. Nếu giá giảm quá `ob_bottom`, OB bị huỷ (Invalidated) và Bot reset chu trình.
+- **Sau khi có Bearish Sweep:** Chờ một Bearish OB hình thành SAU thời điểm Sweep. Lưu vùng OB và chờ các nến tiếp theo có `High >= ob_bottom` mới kích hoạt Short. Nếu giá tăng vượt `ob_top`, OB bị huỷ.
 
 ### Giai đoạn 4: Tính toán SL, TP & Ra Tín Hiệu
 - Tính toán theo Dynamic:

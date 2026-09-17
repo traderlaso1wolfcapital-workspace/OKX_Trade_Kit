@@ -424,9 +424,12 @@ class BotSubprocessWorker(QtCore.QThread):
         if self.process:
             self.log_signal.emit("\n🛑 Đang gửi tín hiệu dừng tiến trình...")
             try:
-                flag_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy}", "json_data", f"stop_{self.strategy}.flag")
-                os.makedirs(os.path.dirname(flag_path), exist_ok=True)
-                with open(flag_path, "w") as f: f.write("stop")
+                flag_path1 = os.path.join(USER_DATA_DIR, f"bots/{self.strategy}", "json_data", f"stop_{self.strategy}.flag")
+                acc_name = os.path.splitext(os.path.basename(self.api_file))[0] if '.' in self.api_file else self.api_file
+                flag_path2 = os.path.join(USER_DATA_DIR, f"bots/{self.strategy}", "json_data", f"stop_{acc_name}.flag")
+                os.makedirs(os.path.dirname(flag_path1), exist_ok=True)
+                with open(flag_path1, "w") as f: f.write("stop")
+                with open(flag_path2, "w") as f: f.write("stop")
                 
                 for _ in range(15):
                     if self.process.poll() is not None: break
@@ -4353,10 +4356,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
-        flag_path = os.path.join(flag_dir, f"stop_{self.strategy_id}.flag")
-        if os.path.exists(flag_path):
-            try: os.remove(flag_path)
-            except: pass
+        acc_name = os.path.splitext(os.path.basename(env_file))[0] if "." in env_file else env_file
+        flag_path1 = os.path.join(flag_dir, f"stop_{self.strategy_id}.flag")
+        flag_path2 = os.path.join(flag_dir, f"stop_{acc_name}.flag")
+        for fp in [flag_path1, flag_path2]:
+            if os.path.exists(fp):
+                try: os.remove(fp)
+                except: pass
             
         # self.log_display.clear()
         self.append_log_system(f"\n=======================================================\n🔄 Đang khởi động Bot [{self.strategy_name}] trên {env_file}...")
@@ -5152,9 +5158,18 @@ del /f /q "%~f0"
                 strategy_id = getattr(panel, 'strategy_id', None) or getattr(panel, 'strategy', None)
                 if strategy_id:
                     try:
-                        flag_path = os.path.join(USER_DATA_DIR, f"bots/{strategy_id}", "json_data", f"stop_{strategy_id}.flag")
-                        os.makedirs(os.path.dirname(flag_path), exist_ok=True)
-                        with open(flag_path, "w") as f: f.write("stop")
+                        flag_path1 = os.path.join(USER_DATA_DIR, f"bots/{strategy_id}", "json_data", f"stop_{strategy_id}.flag")
+                        env_file = self.cbb_api_accounts.currentData()
+                        if env_file:
+                            acc_name = os.path.splitext(os.path.basename(env_file))[0] if "." in env_file else env_file
+                            flag_path2 = os.path.join(USER_DATA_DIR, f"bots/{strategy_id}", "json_data", f"stop_{acc_name}.flag")
+                        else:
+                            flag_path2 = flag_path1 # dummy
+                        
+                        os.makedirs(os.path.dirname(flag_path1), exist_ok=True)
+                        with open(flag_path1, "w") as f: f.write("stop")
+                        if flag_path2 != flag_path1:
+                            with open(flag_path2, "w") as f: f.write("stop")
                     except: pass
 
                 if hasattr(panel, 'worker'):

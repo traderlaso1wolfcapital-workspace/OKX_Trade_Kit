@@ -17,6 +17,29 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[17/09/2026]** - Sửa Lỗi Crash Frontend "TypeError: setActiveBotTab is not a function" khi mở tab Bot Liquidation:
+  - **Mô tả:** Khi nhấn sang tab Bot Liquidation, ứng dụng React bị crash với lỗi `setActiveBotTab is not a function` ở `AppHeader.jsx`.
+  - **Nguyên nhân:** Lỗi bóng ma (ghost error) sinh ra do bộ nhớ đệm (cache) HMR của Vite chưa xóa sạch module cũ sau khi tái cấu trúc lớn (chia nhỏ `App.jsx` ra nhiều component con). Hàm `setActiveBotTab` là hàm set state hợp lệ của React nhưng cache HMR cũ vẫn giữ lại tham chiếu sai lệch đến module cũ.
+  - **Đã thực hiện:** Kích hoạt lại module HMR bằng cách force refresh (thêm log tạm thời để báo Vite nạp lại module) để xóa cache. Component `AppHeader` hiện đã tiếp nhận prop function chuẩn xác và không còn lỗi.
+
+- **[17/09/2026]** - Sửa Lỗi Logs Thiếu Thông Tin, Phân Tách Component App.jsx, Chuyển Polling Sang WebSocket & Triệt Tiêu Delay Chart:
+  - **Yêu cầu của CEO:** "cái logs đang bị thiếu thông tin e fix lại hộ a luôn. Và phân tách source thành các component như trong thằng app.jsx tách ra thành các component hoàn chỉnh, Chuyển Poling sang Websocket. Tối ưu lại chart cho đỡ bị delay".
+  - **Đã thực hiện:**
+    1. **Khắc phục triệt để lỗi Logs thiếu thông tin:**
+       - Nâng cấp bộ đệm lưu trữ log trên Backend (`bot_log_queues`) từ `asyncio.Queue` sang `collections.deque(maxlen=400)` và phát lại 400 dòng log gần nhất khi client kết nối.
+       - Loại bỏ logic cắt gọt 20 dòng ở Frontend (`LogsTerminal.jsx`), giữ trọn vẹn toàn bộ các khối in: Tình trạng vị thế, Win Streak, Bảng nến đa khung và Số dư tài khoản.
+       - Cập nhật CSS `.logs-terminal`: Thêm `padding-bottom: 42px` và `box-sizing: border-box`, giúp dòng cuối cùng không còn bị thanh cuộn ngang che khuất nửa chữ.
+    2. **Phân tách toàn diện `App.jsx` khổng lồ (5.281 dòng ➔ ~800 dòng sạch):**
+       - Tách thành các component con độc lập trong `src/components/`: `AppHeader`, `SidebarLeft`, `PositionsTable`, `HistoryTable`, `LogsTerminal`, `SingleChartPane`, `LoginModal`, `LiquidV5SettingsModal`, `SystemSettingsModal`, `AccountPromptModals`, `ToggleSwitch`, `NumberSpinBox`, `LayoutIcons`.
+       - Tách các hằng số dùng chung vào `src/constants/tradeConfig.js`.
+    3. **Chuyển cơ chế Polling sang WebSocket hai chiều thời gian thực:**
+       - Backend: Bổ sung endpoint `/ws/bot_data/{uid}/{strategy}` tự động stream trạng thái bot, uptime, số dư khả dụng, vị thế đang mở và lịch sử lệnh.
+       - Frontend: Tạo custom hook `useBotWebSocket` thay thế hoàn toàn các interval polling HTTP (2s, 5s, 10s, 15s), hỗ trợ phản hồi tức thì khi đổi tài khoản hoặc đóng lệnh.
+    4. **Tối ưu hóa triệt để Chart không còn giật lag/delay:**
+       - Tích hợp custom hook `useMarketWebSocket` kết nối trực tiếp OKX Public WebSocket (`wss://ws.okx.com:8443/ws/v5/public`, kênh `candle*`), đẩy từng tick biến động giá theo thời gian thực trực tiếp vào `candleSeries.update(candle)` mà không cần tải lại toàn bộ 2500 nến.
+       - Sử dụng `requestAnimationFrame` (RAF) throttling cho các tác vụ vẽ Order Blocks (`drawObs`) và Liquid V5 boxes (`drawLiquidV5Boxes`), loại bỏ tình trạng đơ chuột khi cuộn hoặc zoom nến.
+    5. **Kiểm thử:** Biên dịch production frontend bằng Vite thành công 100% không lỗi (`npm run build`), kiểm tra biên dịch Python backend thành công (`py_compile`).
+
 - **[13/09/2026]** - Tái Cấu Trúc Tín Hiệu Long/Short Bot Liqui Chuẩn TradingView (Ảnh 1) & Đồng Bộ SMC OB:
   - **Yêu cầu của CEO:** "toàn bộ tín hiệu long short hiện tại của bot liqui thiết kế lại giống như ảnh 1, ko nên dùng các kẻ nét đứt, và cho độ dài của chúng luôn dài ra bao chọn 25 cây nến. các box smc ở bot liqui chỉ cần thể hiện OB giống như thông số bên bot smc là đc".
   - **Đã thực hiện:**

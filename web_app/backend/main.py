@@ -11,6 +11,7 @@ import base64
 import requests
 import csv
 from datetime import datetime, timezone
+from collections import deque
 from typing import Optional, List, Dict, Union
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -225,22 +226,22 @@ def login_with_password(req: LoginRequest):
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
 
 async def log_reader_task(stream, uid, strategy):
-    """Đọc stdout/stderr của tiến trình bot và đẩy vào Queue"""
+    """Đọc stdout/stderr của tiến trình bot và đẩy vào ring buffer (deque)"""
     if uid not in bot_log_queues: bot_log_queues[uid] = {}
-    if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = asyncio.Queue()
-    queue = bot_log_queues[uid][strategy]
+    if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = deque(maxlen=400)
+    log_deque = bot_log_queues[uid][strategy]
     try:
         while True:
             line = await asyncio.to_thread(stream.readline)
             if not line: break
             line_str = line.decode("utf-8", errors="replace").rstrip("\n")
-            await queue.put(line_str)
+            log_deque.append(line_str)
             if uid in active_connections and strategy in active_connections[uid]:
-                for connection in active_connections[uid][strategy]:
+                for connection in list(active_connections[uid][strategy]):
                     try: await connection.send_text(line_str)
-                    except: pass
+                    except Exception: pass
     except Exception as e:
-        await queue.put(f"[SYSTEM ERROR] Log reader task failed: {e}")
+        log_deque.append(f"[SYSTEM ERROR] Log reader task failed: {e}")
 
 # Cache for USDT.D candles to avoid spamming websocket
 _tv_cache = {}
@@ -703,7 +704,7 @@ async def auto_resume_bots():
                         set_nested(bot_processes, uid, strategy, new_proc)
                         set_nested(bot_start_times, uid, strategy, time.time())
                         if uid not in bot_log_queues: bot_log_queues[uid] = {}
-                        bot_log_queues[uid][strategy] = asyncio.Queue()
+                        bot_log_queues[uid][strategy] = deque(maxlen=400)
                         loop = asyncio.get_event_loop()
                         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
                     except Exception as e:
@@ -806,7 +807,7 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
         set_nested(bot_processes, uid, strategy, new_proc)
         set_nested(bot_start_times, uid, strategy, time.time())
         if uid not in bot_log_queues: bot_log_queues[uid] = {}
-        bot_log_queues[uid][strategy] = asyncio.Queue()
+        bot_log_queues[uid][strategy] = deque(maxlen=400)
         loop = asyncio.get_event_loop()
         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
 
@@ -927,7 +928,7 @@ async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = N
         set_nested(bot_processes, uid, strategy, new_proc)
         set_nested(bot_start_times, uid, strategy, time.time())
         if uid not in bot_log_queues: bot_log_queues[uid] = {}
-        bot_log_queues[uid][strategy] = asyncio.Queue()
+        bot_log_queues[uid][strategy] = deque(maxlen=400)
         loop = asyncio.get_event_loop()
         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
         return {"status": "success", "message": "Shadow Bot đã được khởi động (chạy ngầm)."}
@@ -1873,20 +1874,14 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     
     await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy}) cho user {uid}...")
     
-    temp_list = []
+    # Gửi toàn bộ các dòng gần nhất từ ring buffer (đầy đủ dashboard mới nhất, không bị mất dòng)
     if uid in bot_log_queues and strategy in bot_log_queues[uid]:
-        q = bot_log_queues[uid][strategy]
-        size = min(q.qsize(), 100)
-        for _ in range(size):
+        recent_logs = list(bot_log_queues[uid][strategy])
+        for log_line in recent_logs:
             try:
-                val = q.get_nowait()
-                temp_list.append(val)
-                q.put_nowait(val)
+                await websocket.send_text(log_line)
             except Exception:
                 break
-                
-    for log_line in temp_list:
-        await websocket.send_text(log_line)
         
     try:
         while True:
@@ -1896,6 +1891,91 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     finally:
         if uid in active_connections and strategy in active_connections[uid] and websocket in active_connections[uid][strategy]:
             active_connections[uid][strategy].remove(websocket)
+
+bot_data_connections = {}
+
+@app.websocket("/ws/bot_data/{uid}/{strategy}")
+async def websocket_bot_data(websocket: WebSocket, uid: str, strategy: str):
+    await websocket.accept()
+    if uid not in bot_data_connections: bot_data_connections[uid] = {}
+    if strategy not in bot_data_connections[uid]: bot_data_connections[uid][strategy] = []
+    bot_data_connections[uid][strategy].append(websocket)
+    
+    current_acc = [strategy]
+    
+    async def get_state_payload():
+        acc = current_acc[0]
+        try:
+            status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
+        except Exception:
+            status_data = {"status": "STOPPED", "uptime": 0}
+        try:
+            pos_data = await asyncio.to_thread(get_bot_positions, uid, strategy, acc)
+        except Exception:
+            pos_data = []
+        try:
+            bal_data = await asyncio.to_thread(get_account_balance, uid, strategy, "USDT", acc)
+        except Exception:
+            bal_data = {"status": "error", "availBal": 0}
+        try:
+            closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy)
+        except Exception:
+            closed_data = []
+            
+        return {
+            "type": "bot_data",
+            "strategy": strategy,
+            "account_id": acc,
+            "status": status_data,
+            "positions": pos_data if isinstance(pos_data, list) else [],
+            "balance": bal_data,
+            "closed_positions": closed_data if isinstance(closed_data, list) else []
+        }
+
+    # Gửi snapshot ban đầu
+    init_data = await get_state_payload()
+    await websocket.send_text(json.dumps(init_data))
+    
+    is_active = True
+    
+    async def bg_push():
+        while is_active:
+            try:
+                await asyncio.sleep(2.0)
+                if not is_active: break
+                payload = await get_state_payload()
+                await websocket.send_text(json.dumps(payload))
+            except (asyncio.CancelledError, WebSocketDisconnect):
+                break
+            except Exception:
+                await asyncio.sleep(1.0)
+                
+    bg_task = asyncio.create_task(bg_push())
+    
+    try:
+        while True:
+            text = await websocket.receive_text()
+            try:
+                msg = json.loads(text)
+                if msg.get("action") == "refresh":
+                    if msg.get("account_id"):
+                        current_acc[0] = str(msg["account_id"]).strip()
+                    payload = await get_state_payload()
+                    await websocket.send_text(json.dumps(payload))
+                elif msg.get("action") == "switch_account":
+                    if msg.get("account_id"):
+                        current_acc[0] = str(msg["account_id"]).strip()
+                        payload = await get_state_payload()
+                        await websocket.send_text(json.dumps(payload))
+            except Exception:
+                pass
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        is_active = False
+        bg_task.cancel()
+        if uid in bot_data_connections and strategy in bot_data_connections[uid] and websocket in bot_data_connections[uid][strategy]:
+            bot_data_connections[uid][strategy].remove(websocket)
 
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
@@ -1918,3 +1998,5 @@ if __name__ == "__main__":
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 
 # z7719 | Sửa lỗi close-position khi đóng vị thế lẻ (do dùng int()) và bổ sung cảnh báo 400 khi khối lượng khả dụng bị khóa bởi TP/SL trên OKX.
+
+# z7720 | Nâng cấp deque 400 dòng lưu trữ logs, sửa lỗi logs thiếu thông tin, và bổ sung WebSocket /ws/bot_data streaming trạng thái/vị thế/số dư thời gian thực.
