@@ -255,10 +255,24 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict], dry_run: bool =
     except Exception as e:
         hft_logger.error(f"Lỗi cleanup_all_orders_on_startup: {e}", exc_info=True)
 
+SHOW_DRY_RUN_LOGS = False  # Ẩn log lặp vô tận của dry-run shadow mode theo yêu cầu của CEO
+
+def _clean_num_str(val) -> str:
+    """Loại bỏ các số 0 thừa ở phần thập phân (VD: 0.1900000000000000000000000000 -> 0.19)"""
+    try:
+        s = str(val)
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
+    except Exception:
+        return str(val)
+
 def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
     # 🔒 DRY-RUN
     if dry_run:
-        print(f"🌑 [DRY-RUN] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={size} (shadow mode, bỏ qua)")
+        if SHOW_DRY_RUN_LOGS:
+            clean_sz = _clean_num_str(size)
+            print(f"🌑 [DRY-RUN] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={clean_sz} (shadow mode, bỏ qua)")
         return None
     try:
         resp = client.request("POST", "/api/v5/trade/order", body={
@@ -287,7 +301,10 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
 def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
     # 🔒 DRY-RUN: Ghi log ảo thay vì đặt lệnh thật lên OKX
     if dry_run:
-        print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{price} sz={size} (shadow mode, bỏ qua)")
+        if SHOW_DRY_RUN_LOGS:
+            clean_sz = _clean_num_str(size)
+            clean_px = _clean_num_str(price)
+            print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz} (shadow mode, bỏ qua)")
         return None
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     try:
@@ -329,8 +346,11 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
 def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
     # 🔒 DRY-RUN: Ghi log ảo thay vì đặt TP/SL thật
     if dry_run:
-        tp_or_sl = "TP" if is_tp else "SL"
-        print(f"🌑 [DRY-RUN] place_algo_tpsl: Sẽ đặt {tp_or_sl} {inst_id} {pos_side.upper()} @{trigger_px} sz={size} (shadow mode, bỏ qua)")
+        if SHOW_DRY_RUN_LOGS:
+            tp_or_sl = "TP" if is_tp else "SL"
+            clean_sz = _clean_num_str(size)
+            clean_px = _clean_num_str(trigger_px)
+            print(f"🌑 [DRY-RUN] place_algo_tpsl: Sẽ đặt {tp_or_sl} {inst_id} {pos_side.upper()} @{clean_px} sz={clean_sz} (shadow mode, bỏ qua)")
         return
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "conditional", "sz": size, "clOrdId": cl_id}
     tp_or_sl = "TP" if is_tp else "SL"

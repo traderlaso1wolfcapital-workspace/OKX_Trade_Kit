@@ -12,7 +12,7 @@ import requests
 import csv
 from datetime import datetime, timezone
 from collections import deque
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -105,6 +105,7 @@ class ConfigUpdate(BaseModel):
     position_volume: Optional[float] = None
     scalping_tp_pct: Optional[float] = None
     scalping_sl_pct: Optional[float] = None
+    strategy_config: Optional[Dict[str, Any]] = None
 
 class CredentialsUpdate(BaseModel):
     api_key: str
@@ -944,9 +945,9 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
     if not os.path.exists(config_path):
         # Mặc định cấu hình nếu chưa tồn tại
         default_cfg = {
-            "ENABLED_TFS": ["M5", "M15", "M30", "H1", "H2", "H4"],
+            "ENABLED_TFS": {},
             "ENABLED_COINS": ["BTC", "ETH", "XAU"],
-            "POSITION_VOLUME_HIGH_CONFIDENCE": 40.0,
+            "POSITION_VOLUME_HIGH_CONFIDENCE": 1.0,
             "SCALPING_TP_PCT": 0.008,
             "SCALPING_SL_PCT": 0.008
         }
@@ -961,6 +962,10 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
         with open(config_path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
         dirty = False
+        # Migration: chuyển ENABLED_TFS từ list sang dict (TF mặc định OFF cho từng coin)
+        if "ENABLED_TFS" not in cfg or isinstance(cfg.get("ENABLED_TFS"), list):
+            cfg["ENABLED_TFS"] = {}
+            dirty = True
         if "POSITION_VOLUME_HIGH_CONFIDENCE" not in cfg:
             cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 40.0
             dirty = True
@@ -1004,6 +1009,9 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         cfg["SCALPING_TP_PCT"] = update_data.scalping_tp_pct
     if update_data.scalping_sl_pct is not None:
         cfg["SCALPING_SL_PCT"] = update_data.scalping_sl_pct
+    if update_data.strategy_config is not None:
+        for k, v in update_data.strategy_config.items():
+            cfg[k] = v
     
     try:
         with open(config_path, "w", encoding="utf-8") as f:

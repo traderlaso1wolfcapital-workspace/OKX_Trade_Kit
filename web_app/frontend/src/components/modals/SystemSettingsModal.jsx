@@ -249,7 +249,7 @@ export default function SystemSettingsModal({
 
                 {/* 2. QUẢN LÝ VỐN & RỦI RO */}
                 <div className="settings-group">
-                  <div className="settings-group-title">QUẢN LÝ VỐN & RỦI RO</div>
+                  <div className="settings-group-title">QUẢN LÝ VỐN</div>
                   <div className="entry-setup-list">
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -257,12 +257,20 @@ export default function SystemSettingsModal({
                         <div style={{ display: "flex", gap: "2px" }}>
                           <button
                             type="button"
-                            onClick={() => setRisk(r => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
+                            onClick={() => setRisk(r => {
+                              const currentVal = r.posVol;
+                              const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
+                              return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
+                            })}
                             style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
                           >USDT</button>
                           <button
                             type="button"
-                            onClick={() => setRisk(r => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
+                            onClick={() => setRisk(r => {
+                              const currentVal = r.posVol;
+                              const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
+                              return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
+                            })}
                             style={{ padding: "1px 6px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
                           >% VỐN</button>
                         </div>
@@ -270,9 +278,12 @@ export default function SystemSettingsModal({
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         <NumberSpinBox
                           value={risk.posVol}
-                          onChange={val => setRisk(r => ({ ...r, posVol: val }))}
-                          min={risk.volUnit === "LOT" ? 0.01 : 1}
-                          step={risk.volUnit === "LOT" ? 0.01 : 10}
+                          onChange={val => setRisk(r => {
+                            if (r.volUnit === "USDT") return { ...r, posVol: val, volUsdt: val };
+                            return { ...r, posVol: val, volPct: val };
+                          })}
+                          min={risk.volUnit === "LOT" ? 0.05 : 0.1}
+                          step={risk.volUnit === "LOT" ? 0.05 : 0.1}
                           suffix={risk.volUnit === "USDT" ? "$" : "%"}
                           width="95px"
                         />
@@ -313,49 +324,42 @@ export default function SystemSettingsModal({
                     <div className="settings-group">
                       <div className="settings-group-title">Công Tắc Chiến Thuật</div>
                       <div className="tactics-toggles-layout">
-                        <div className="toggle-row tactics-left-col">
-                          <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
-                          <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
-                          <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
+                        <div className="tactics-left-col">
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
+                            <ToggleSwitch checked={strat.pyramidDca ?? false} onChange={v => setStrat(s => ({ ...s, pyramidDca: v, negativeDca: v ? false : s.negativeDca }))} />
+                            <span className="toggle-name">DCA Dương</span>
+                            <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.negativeDca ?? false} onChange={v => setStrat(s => ({ ...s, negativeDca: v, pyramidDca: v ? false : s.pyramidDca }))} />
+                            <span className="toggle-name">DCA Âm</span>
+                            <button className="btn-help" onClick={() => alert("BẬT: Cho phép trung bình giá DCA khi âm.")}>[?]</button>
+                          </div>
                         </div>
                         <div className="tactics-right-col">
-                          <div className="toggle-row">
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
                             <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
                             <button className="btn-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%">[?]</button>
                           </div>
-                          <div className="toggle-row">
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
                             <span className="toggle-name">Chốt lời bám EMA200</span>
                             <button className="btn-help" onClick={() => alert("Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")} title="Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={entryCfg.altcoinFollowBtc ?? false} onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))} />
+                            <span className="toggle-name">Đồng pha BTC & Lọc Vĩ mô</span>
+                            <button className="btn-help" onClick={() => alert("BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4 | TẮT: Từng TF hoạt động hoàn toàn độc lập")}>[?]</button>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="settings-group">
-                      <div className="settings-group-title">Bảo Vệ & Cắt Lệnh Tự Động</div>
-                      <div className="toggle-grid">
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.safeguardEntry} onChange={v => setStrat(s => ({ ...s, safeguardEntry: v }))} />
-                          <span className="toggle-name">Thoát hòa vốn khi giá hồi</span>
-                          <button className="btn-help" onClick={() => alert("Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")} title="Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.">[?]</button>
-                        </div>
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.trailingSl} onChange={v => setStrat(s => ({ ...s, trailingSl: v }))} />
-                          <span className="toggle-name">Khóa lời động (Trailing SL)</span>
-                          <button className="btn-help" onClick={() => alert("Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")} title="Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.">[?]</button>
-                        </div>
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.maxRoi} onChange={v => setStrat(s => ({ ...s, maxRoi: v }))} />
-                          <span className="toggle-name">Chốt lời lớn (ROI ≥ 120%)</span>
-                          <button className="btn-help" onClick={() => alert("Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")} title="Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).">[?]</button>
-                        </div>
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.h4Flip} onChange={v => setStrat(s => ({ ...s, h4Flip: v }))} />
-                          <span className="toggle-name">Cắt lệnh khi H4 đảo chiều</span>
-                          <button className="btn-help" onClick={() => alert("Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")} title="Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).">[?]</button>
-                        </div>
+                      <div className="settings-group-title">🛡️ Phòng Thủ Vị Thế Tự Động Hoá AI</div>
+                      <div style={{ padding: "10px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                        Tính năng đang phát triển..
                       </div>
                     </div>
                   </>
@@ -518,6 +522,7 @@ export default function SystemSettingsModal({
                         onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
                         step={0.01}
                         min={0}
+                        max={0.3}
                         suffix="%"
                         width="95px"
                       />
@@ -533,6 +538,7 @@ export default function SystemSettingsModal({
                         onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
                         step={0.05}
                         min={0}
+                        max={0.5}
                         suffix="%"
                         width="95px"
                       />
@@ -546,22 +552,14 @@ export default function SystemSettingsModal({
                       <NumberSpinBox
                         value={entryCfg.accumCandles}
                         onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
-                        min={1}
+                        min={12}
                         max={200}
                         step={1}
                         width="95px"
                       />
                     </div>
 
-                    <div className="entry-setup-row">
-                      <div className="entry-label-wrap">
-                        <span style={{ fontWeight: "bold", color: "#ffffff" }}>Đồng pha BTC & Lọc Vĩ mô:</span>
-                      </div>
-                      <ToggleSwitch
-                        checked={entryCfg.altcoinFollowBtc}
-                        onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
-                      />
-                    </div>
+
 
                     {entryCfg.altcoinFollowBtc && (
                       <div className="entry-setup-row">
@@ -588,23 +586,23 @@ export default function SystemSettingsModal({
                     <thead>
                       <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
                         <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
-                        <th style={{ padding: "6px 8px" }}>Hệ số đón trước</th>
-                        <th style={{ padding: "6px 8px" }}>Hệ số Volume</th>
+                        <th style={{ padding: "6px 8px" }}>Hệ số Ký Quỹ (Vốn)</th>
+                        <th style={{ padding: "6px 8px" }}>Hệ số Vào Lệnh (Entry)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {[
-                        ["M5", "1.0x", "1.0x"],
-                        ["M15", "1.5x", "1.2x"],
-                        ["M30", "2.3x", "1.5x"],
-                        ["H1", "3.3x", "2.0x"],
-                        ["H2", "4.7x", "3.0x"],
-                        ["H4", "6.8x", "5.0x"],
-                      ].map(([tf, offset, vol]) => (
+                        ["M5",  "1.0x", "1.0x"],
+                        ["M15", "1.2x", "1.5x"],
+                        ["M30", "1.5x", "2.3x"],
+                        ["H1",  "2.0x", "3.3x"],
+                        ["H2",  "3.0x", "4.7x"],
+                        ["H4",  "5.0x", "6.8x"],
+                      ].map(([tf, vol, offset]) => (
                         <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
                           <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
-                          <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
                           <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
+                          <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
                         </tr>
                       ))}
                     </tbody>

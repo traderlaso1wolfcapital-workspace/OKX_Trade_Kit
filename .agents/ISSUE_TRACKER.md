@@ -17,6 +17,31 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[17/09/2026]** - Sửa Lỗi "Lỗi kết nối khi khởi động bot" khi nhấn CHẠY BOT:
+  - **Mô tả:** Khi nhấn nút "▶ CHẠY BOT", hộp thoại thông báo "Lỗi kết nối khi khởi động bot!" xuất hiện.
+  - **Nguyên nhân:** Hàm `handleStartBot` và `handleStopBot` trong `App.jsx` gọi trực tiếp `setIsBotRunning(true)` / `setIsBotRunning(false)` nhưng biến `isBotRunning` không được khai báo `useState` (trước đây trạng thái bot lấy trực tiếp từ `botStatus` của WebSocket). Lệnh gọi hàm không tồn tại gây ra lỗi JavaScript `ReferenceError: setIsBotRunning is not defined` bên trong khối `try`, khiến chương trình nhảy ngay vào nhánh `catch` và hiển thị alert lỗi kết nối.
+  - **Đã thực hiện:**
+    1. Bổ sung state `overrideBotRunning` để phục vụ chuyển đổi UI mượt mà tức thì (optimistic update) khi bấm Chạy Bot / Dừng Bot mà không cần chờ trễ.
+    2. Cập nhật `isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING")`.
+    3. Cải thiện khối `catch` để parse chi tiết lỗi API trả về thay vì báo chung chung.
+    4. Kiểm thử: Đã chạy `npm run build` thành công 100% và test thử nghiệm API Start/Stop Bot trả về HTTP 200 OK.
+
+
+- **[17/09/2026]** - Sửa Lỗi Mặc Định Ký Quỹ % VỐN (0.1%) & Tách Biệt Hoàn Toàn Nút ON/OFF Cặp Vị Thế Với "Thêm Mã Giao Dịch":
+  - **Yêu cầu của CEO:**
+    1. `% VỐN` mặc định phải là `0.1%` (không bị nhảy về `0.01%`).
+    2. Các nút ON/OFF trước các cặp vị thế khi chuyển sang OFF không được tự động ẩn cặp vị thế đó đi. Nút ON/OFF ngoài bảng vị thế là công tắc cho phép/ngăn chặn bot trade cặp đó (`activePairs`), hoạt động độc lập với tính năng "THÊM MÃ GIAO DỊCH" trong Cài Đặt (dùng để chọn danh sách coin hiển thị - `watchlistCoins`).
+  - **Đã thực hiện:**
+    1. **Sửa Ký Quỹ % VỐN:**
+       - Sửa `SystemSettingsModal.jsx` đồng bộ hoàn toàn với `SidebarLeft.jsx`: khi bấm chọn `% VỐN` hoặc reset, giá trị mặc định là `0.1%` (`posVol: r.volPct || 0.1`), lưu trữ riêng `volPct` và `volUsdt` khi chuyển đổi qua lại để không bị đè về 0.01.
+       - Cấu hình NumberSpinBox với `min={0.05}` và `step={0.05}` cho `% VỐN`.
+    2. **Độc lập hóa Nút ON/OFF Cặp Vị Thế:**
+       - Trong `PositionsTable.jsx`: Sửa trạng thái `isChecked` của switch ON/OFF kiểm tra theo `(activePairs || []).includes(coin.value)` thay vì `watchlistCoins`.
+       - Trong `App.jsx`: Truyền đúng hàm `togglePair={togglePair}` (quản lý `activePairs` và gửi cấu hình bot `/api/bot/config`) vào `PositionsTable`, thay vì truyền nhầm `handleToggleWatchlistCoin`.
+       - Danh sách hàng trong `PositionsTable` luôn được giữ nguyên theo `watchlistCoins` và các vị thế mở, khi người dùng gạt OFF cặp coin thì hàng vị thế đó vẫn hiển thị đầy đủ, không bị ẩn/mất.
+    3. **Kiểm thử:** Đã chạy `npm run build` thành công 100% không có lỗi.
+
+
 - **[17/09/2026]** - Sửa Lỗi Crash Frontend "TypeError: setActiveBotTab is not a function" khi mở tab Bot Liquidation:
   - **Mô tả:** Khi nhấn sang tab Bot Liquidation, ứng dụng React bị crash với lỗi `setActiveBotTab is not a function` ở `AppHeader.jsx`.
   - **Nguyên nhân:** Lỗi bóng ma (ghost error) sinh ra do bộ nhớ đệm (cache) HMR của Vite chưa xóa sạch module cũ sau khi tái cấu trúc lớn (chia nhỏ `App.jsx` ra nhiều component con). Hàm `setActiveBotTab` là hàm set state hợp lệ của React nhưng cache HMR cũ vẫn giữ lại tham chiếu sai lệch đến module cũ.

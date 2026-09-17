@@ -401,12 +401,21 @@ def run_strategy_cycle(*args, **kwargs):
     coin_name = cfg.get("coin", "")
     inst_id = cfg.get("instId", "")
     
-    original_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+    original_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", {})
     
     if isinstance(original_enabled_tfs, dict):
-        current_coin_tfs = original_enabled_tfs.get(swap_id, original_enabled_tfs.get(coin_name, original_enabled_tfs.get(inst_id, ["M5", "M15", "M30", "H1", "H2", "H4"])))
-    else:
+        if swap_id in original_enabled_tfs:
+            current_coin_tfs = original_enabled_tfs[swap_id]
+        elif coin_name in original_enabled_tfs:
+            current_coin_tfs = original_enabled_tfs[coin_name]
+        elif inst_id in original_enabled_tfs:
+            current_coin_tfs = original_enabled_tfs[inst_id]
+        else:
+            current_coin_tfs = []
+    elif isinstance(original_enabled_tfs, list):
         current_coin_tfs = original_enabled_tfs
+    else:
+        current_coin_tfs = []
         
     globals_ref.ENABLED_TFS = current_coin_tfs
     try:
@@ -439,6 +448,23 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         return
     else:
         tracker._disabled_cleaned = False
+    
+    # ⚡ EARLY EXIT CHO COIN KHÔNG CÓ TF NÀO ĐƯỢC CHỌN TRONG TF TRADE:
+    current_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", [])
+    if not current_enabled_tfs:
+        if not tracker.has_long and not tracker.has_short:
+            if not getattr(tracker, "_no_tf_cleaned", False):
+                from bots.sub1.bot_orders import clean_limit_orders
+                clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
+                tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
+                tracker.placed_entry_px_long_by_tf, tracker.placed_entry_px_short_by_tf = {}, {}
+                tracker._no_tf_cleaned = True
+                print(f"🧹 [TF TRADE CLEANUP] {coin_name}: Không có TF nào được chọn, đã dọn sạch toàn bộ lệnh limit.")
+            return
+        else:
+            tracker._no_tf_cleaned = False
+    else:
+        tracker._no_tf_cleaned = False
     
     # Khởi tạo giá trị mặc định để IDE/Pylance không báo lỗi NameError "Could not find name"
     closes_asc = []
@@ -2636,11 +2662,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if tf not in target_long_tfs:
                     try:
                         long_orders_tf = [o for o in actual_pending
-                                          if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
-                                          and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "buy"]
+                                          if (o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
+                                              or o.get("clOrdId","").startswith(f"scvlmtEL{tf}")
+                                              or o.get("clOrdId","").startswith(f"scv25EL{tf}"))
+                                          and o.get("side") == "buy"]
                         if long_orders_tf:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
+                            for o in long_orders_tf:
+                                if o in actual_pending: actual_pending.remove(o)
+                            print(f"🗑️ [TF / DCA CLEANUP] Đã hủy {len(long_orders_tf)} lệnh Limit LONG {tf} của {coin_name} vì không thuộc mục tiêu hợp lệ")
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     tracker.placed_entry_px_long_by_tf[tf] = "---"
 
@@ -2820,11 +2851,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if tf not in target_short_tfs:
                     try:
                         short_orders_tf = [o for o in actual_pending
-                                           if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")
-                                           and o.get("tdMode") == _get_td_mode(tf) and o.get("side") == "sell"]
+                                           if (o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")
+                                               or o.get("clOrdId","").startswith(f"scvlmtES{tf}")
+                                               or o.get("clOrdId","").startswith(f"scv25ES{tf}"))
+                                           and o.get("side") == "sell"]
                         if short_orders_tf:
                             client.request("POST", "/api/v5/trade/cancel-batch-orders",
                                            body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
+                            for o in short_orders_tf:
+                                if o in actual_pending: actual_pending.remove(o)
+                            print(f"🗑️ [TF / DCA CLEANUP] Đã hủy {len(short_orders_tf)} lệnh Limit SHORT {tf} của {coin_name} vì không thuộc mục tiêu hợp lệ")
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     tracker.placed_entry_px_short_by_tf[tf] = "---"
 

@@ -9,7 +9,6 @@ os.environ['SSL_CERT_FILE'] = certifi.where()
 ssl._create_default_https_context = lambda: ssl.create_default_context(cafile=certifi.where())
 
 # Trigger build v129 for crisp icon
-import multiprocessing
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
@@ -1618,7 +1617,7 @@ class SingleChartPane(QtWidgets.QFrame):
                         self.chart_widget.win.run_script(js_code)
                     except Exception:
                         pass
-            except Exception as e:
+            except Exception:
                 import traceback
                 traceback.print_exc()
 
@@ -3252,21 +3251,30 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         self.chk_main = ToggleSwitch()
         self.chk_pyramid = ToggleSwitch(width=40, height=20)
+        self.chk_negative_dca = ToggleSwitch()
         self.chk_xole = ToggleSwitch()
         self.chk_dynamic_ema200_tp = ToggleSwitch()
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
         self.chk_altcoin_follow_btc_ema = ToggleSwitch()
         
-        # add_checkbox(l_toggles, 0, 0, "Đánh Đa Khung EMA200", self.chk_main, "Bật/Tắt chiến thuật Đa Khung EMA200 chính.")
-        add_checkbox(l_toggles, 0, 0, "Chế độ: DCA Dương (Mới)", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).", rowspan=2)
-        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%.")
+        add_checkbox(l_toggles, 0, 0, "DCA Dương", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.")
+        add_checkbox(l_toggles, 1, 0, "DCA Âm", self.chk_negative_dca, "BẬT: Cho phép trung bình giá DCA khi âm.")
+        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều.")
         add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
-        # add_checkbox(l_toggles, 2, 0, "Chốt lời sóng Ping-Pong", self.chk_dynamic_pingpong_tp, "Chốt lời ngắn hạn ưu tiên khi phát hiện sóng nảy Ping-Pong.")
-        # add_checkbox(l_toggles, 3, 0, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4 | TẮT: Từng TF hoạt động hoàn toàn độc lập", colspan=2)
+        add_checkbox(l_toggles, 2, 0, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.", colspan=2)
+        
+        def on_pyramid_toggled(checked):
+            if checked and self.chk_negative_dca.isChecked():
+                self.chk_negative_dca.setChecked(False)
+        def on_negative_dca_toggled(checked):
+            if checked and self.chk_pyramid.isChecked():
+                self.chk_pyramid.setChecked(False)
+        self.chk_pyramid.toggled.connect(on_pyramid_toggled)
+        self.chk_negative_dca.toggled.connect(on_negative_dca_toggled)
         layout.addWidget(grp_toggles)
 
-        # 2. BẢO VỆ & CẮT LỆNH TỰ ĐỘNG
-        grp_safeguard = QtWidgets.QGroupBox("Bảo Vệ & Cắt Lệnh Tự Động")
+        # 2. PHÒNG THỦ VỊ THẾ TỰ ĐỘNG HOÁ AI
+        grp_safeguard = QtWidgets.QGroupBox("🛡️ Phòng Thủ Vị Thế Tự Động Hoá AI")
 
         l_safeguard = QtWidgets.QGridLayout(grp_safeguard)
         
@@ -3287,8 +3295,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_checkbox(l_safeguard, 1, 1, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
         layout.addWidget(grp_safeguard)
 
-        # 3. QUẢN LÝ VỐN & RỦI RO
-        grp_risk = QtWidgets.QGroupBox("Quản Lý Vốn & Rủi Ro")
+        # 3. QUẢN LÝ VỐN
+        grp_risk = QtWidgets.QGroupBox("Quản Lý Vốn")
 
         l_risk = QtWidgets.QGridLayout(grp_risk)
         
@@ -3322,10 +3330,10 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_confluence_pct = QtWidgets.QDoubleSpinBox(); self.input_confluence_pct.setSuffix(" %"); self.input_confluence_pct.setDecimals(3)
         add_field(l_filter, 2, "Độ chụm đa khung (%):", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
         
-        self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4)
-        add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (VD: 0.06%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
+        self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4); self.input_entry_offset.setMinimum(0.0); self.input_entry_offset.setMaximum(0.3)
+        add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
-        self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMaximum(9999)
+        self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMinimum(10); self.input_accum_candles.setMaximum(9999)
         add_field(l_filter, 4, "Số nến xu hướng tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")
         # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_filter)
@@ -3399,7 +3407,8 @@ class BotInstanceWidget(QtWidgets.QWidget):
         )
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             if hasattr(self, 'chk_main'): self.chk_main.setChecked(True)
-            if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(True)
+            if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(False)
+            if hasattr(self, 'chk_negative_dca'): self.chk_negative_dca.setChecked(False)
             if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(True)
             if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(False)
             if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(False)
@@ -3793,7 +3802,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     if name == "COIN_PORTFOLIO": return []
                     raise AttributeError(name)
             bot_config = DummyConfig()
-        except Exception as e:
+        except Exception:
             with open("config_load_error.txt", "w") as err_f:
                 import traceback
                 err_f.write(traceback.format_exc())
@@ -3838,6 +3847,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             elif self.strategy_id == "sub1":
                 if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
                 if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", True))))
+                if hasattr(self, 'chk_negative_dca'): self.chk_negative_dca.setChecked(bool(cfg.get("ENABLE_NEGATIVE_DCA", getattr(bot_config, "ENABLE_NEGATIVE_DCA", False))))
                 if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_HEDGE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))))
                 if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
                 if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
@@ -4018,7 +4028,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 player.setSource(QUrl.fromLocalFile(path))
                 player.play()
                 self._audio_players.append(player)
-        except Exception as e:
+        except Exception:
             pass
 
     def save_api_settings(self):
@@ -4149,7 +4159,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if api_key or secret_key:
                 f.write(f"OKX_DOMAIN=\"{success_domain}\"\n")
             else:
-                f.write(f"OKX_DOMAIN=\"www.okx.com\"\n")
+                f.write("OKX_DOMAIN=\"www.okx.com\"\n")
         msg = QtWidgets.QMessageBox(self)
         msg.setWindowTitle("Thành Công")
         if not api_key and not secret_key:
@@ -4230,6 +4240,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', ["M5", "M15", "M30", "H1", "H2", "H4"]),
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_PYRAMID_DCA": self.chk_pyramid.isChecked(),
+                "ENABLE_NEGATIVE_DCA": self.chk_negative_dca.isChecked() if hasattr(self, 'chk_negative_dca') else False,
                 "ENABLE_STRATEGY_HEDGE": self.chk_xole.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
@@ -4972,7 +4983,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "• <b>Để sau</b>: Hủy để Sếp kiểm tra lại tài khoản trước."
             )
             btn_confirm = msg_box.addButton("Cập nhật ngay", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
-            btn_cancel = msg_box.addButton("Để sau", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+            msg_box.addButton("Để sau", QtWidgets.QMessageBox.ButtonRole.RejectRole)
             msg_box.setDefaultButton(btn_confirm)
             
             msg_box.setStyleSheet("""
@@ -5025,7 +5036,7 @@ class MainWindow(QtWidgets.QMainWindow):
             
             current_exe_path = sys.executable
             base_dir = os.path.dirname(current_exe_path)
-            current_exe_name = os.path.basename(current_exe_path)
+            _current_exe_name = os.path.basename(current_exe_path)  # noqa: F841
             
             import time
             new_exe_path = os.path.join(base_dir, f"TLS1_Update_Temp_{int(time.time())}.exe")
@@ -6267,7 +6278,7 @@ def main():
             import ctypes
             mutex_name = "Global\\TLS1_Trading_App_Single_Instance_Mutex"
             kernel32 = ctypes.windll.kernel32
-            mutex = kernel32.CreateMutexW(None, False, mutex_name)
+            _mutex = kernel32.CreateMutexW(None, False, mutex_name)  # keep handle alive to prevent GC
             last_error = kernel32.GetLastError()
             
             if last_error == 183: # ERROR_ALREADY_EXISTS
@@ -6277,7 +6288,7 @@ def main():
                 msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
                 msg.exec()
                 sys.exit(0)
-        except Exception as e:
+        except Exception:
             pass
     # -------------------------------------------------------------
     
@@ -6370,7 +6381,7 @@ def main():
             info_icon = window.style().standardIcon(QtWidgets.QStyle.StandardPixmap.SP_MessageBoxInformation)
             msgBox.setIconPixmap(info_icon.pixmap(48, 48))
             
-            btn_confirm = msgBox.addButton("Đã hiểu và vui vẻ xác nhận", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+            msgBox.addButton("Đã hiểu và vui vẻ xác nhận", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
             
             # Phát âm thanh meme cảnh báo trước khi hiện bảng
             try:
@@ -6428,7 +6439,7 @@ def main():
                         except: pass
                 
                 window.player.mediaStatusChanged.connect(on_status_changed)
-            except Exception as e:
+            except Exception:
                 pass
         else:
             sys.exit(0)

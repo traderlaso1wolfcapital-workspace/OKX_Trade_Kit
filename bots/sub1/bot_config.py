@@ -12,14 +12,15 @@ from typing import Any
 # ==============================================================================
 # ------------------------------------------------------------------------------
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
-ENABLE_PYRAMID_DCA = True         # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - MẶC ĐỊNH BẬT
-ENABLE_STRATEGY_HEDGE = True      # ❷ CHIẾN THUẬT ĐẢO CHIỀU (HEDGE)
-ENABLE_STRATEGY_XOLE = True       # Alias tương thích ngược
+ENABLE_PYRAMID_DCA = False        # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - MẶC ĐỊNH TẮT
+ENABLE_NEGATIVE_DCA = False       # 🔄 CHẾ ĐỘ DCA ÂM - MẶC ĐỊNH TẮT
+ENABLE_STRATEGY_HEDGE = False     # ❷ CHIẾN THUẬT ĐẢO CHIỀU (HEDGE) - MẶC ĐỊNH TẮT
+ENABLE_STRATEGY_XOLE = False      # Alias tương thích ngược
 
 ENABLE_DYNAMIC_EMA200_TP = False  # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO) - MẶC ĐỊNH TẮT
 ENABLE_DYNAMIC_PINGPONG_TP = False # CHỐT LỜI ĐỘNG TẠM THỜI (PING-PONG)
 
-ALTCOIN_FOLLOW_BTC_EMA = True     # 🔄 ON: Altcoin neo limit theo BTC | LOCK: Altcoin dùng EMA200 của chính nó
+ALTCOIN_FOLLOW_BTC_EMA = False    # 🔄 ON: Altcoin neo limit theo BTC | OFF: Altcoin dùng EMA200 của chính nó (Mặc định: OFF)
 # ------------------------------------------------------------------------------
 
 # ==============================================================================
@@ -31,9 +32,9 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("100")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("0.4")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 0.4$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
-DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệnh (0.005 = 0.5%)
+DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
 
 
 # ==============================================================================
@@ -41,12 +42,12 @@ DYNAMIC_RISK_PCT = Decimal("0.005")                # Tỷ lệ % vốn vào lệ
 # ==============================================================================
 # --- Các dung sai & Ngưỡng lệch ---
 EMA_CONFLUENCE_TOLERANCE_PCT = Decimal("0.0023")   # Dung sai hợp lưu EMA đa khung (0.0020 = 0.2%)
-BASE_ENTRY_OFFSET_PCT = Decimal("0.0005")          # Đệm 0.09% đón lõm Entry và trừ lùi TP để dễ khớp trước vạch cản
-DCA_GAP_THRESHOLD_PCT = Decimal("0.0020")          # Ngưỡng khoảng cách tối thiểu (Base Gap = 0.5%) để rải limit. Sẽ nhân với TF_MULTIPLIERS cho các khung lớn.
+BASE_ENTRY_OFFSET_PCT = Decimal("0.0005")          # Đệm 0.05% đón lõm Entry và trừ lùi TP để dễ khớp trước vạch cản
+DCA_GAP_THRESHOLD_PCT = Decimal("0.0020")          # Ngưỡng khoảng cách tối thiểu (Base Gap = 0.20%) để rải limit. Sẽ nhân với TF_MULTIPLIERS cho các khung lớn.
 
 # --- Lợi nhuận (TP) & Cắt lỗ (SL) cơ sở ---
-SCALPING_TP_PCT = Decimal("0.0120")               # TP (M5 base = 0.82%)
-SCALPING_SL_PCT = Decimal("0.0120")               # SL (M5 base = 0.82%)
+SCALPING_TP_PCT = Decimal("0.0080")               # TP (M5 base = 0.80%)
+SCALPING_SL_PCT = Decimal("0.0080")               # SL (M5 base = 0.80%)
 
 # --- Cấu trúc xu hướng (Nến tích lũy) ---
 REQUIRED_ACCUMULATION_CANDLES = 60      

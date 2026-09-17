@@ -102,7 +102,11 @@ export default function SidebarLeft({
                   <div style={{ display: "flex", gap: "2px" }}>
                     <button
                       type="button"
-                      onClick={() => setRisk((r) => ({ ...r, volUnit: "USDT", posVol: r.volUnit === "LOT" ? 1 : r.posVol }))}
+                      onClick={() => setRisk((r) => {
+                        const currentVal = r.posVol;
+                        const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
+                        return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
+                      })}
                       style={{
                         padding: "1px 6px",
                         fontSize: "10px",
@@ -118,7 +122,11 @@ export default function SidebarLeft({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setRisk((r) => ({ ...r, volUnit: "LOT", posVol: r.volUnit === "USDT" ? 0.01 : r.posVol }))}
+                      onClick={() => setRisk((r) => {
+                        const currentVal = r.posVol;
+                        const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
+                        return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
+                      })}
                       style={{
                         padding: "1px 6px",
                         fontSize: "10px",
@@ -136,9 +144,12 @@ export default function SidebarLeft({
                 </div>
                 <NumberSpinBox
                   value={risk.posVol}
-                  onChange={(val) => setRisk((r) => ({ ...r, posVol: val }))}
-                  min={risk.volUnit === "LOT" ? 0.01 : 1}
-                  step={risk.volUnit === "LOT" ? 0.01 : 10}
+                  onChange={(val) => setRisk((r) => {
+                    if (r.volUnit === "USDT") return { ...r, posVol: val, volUsdt: val };
+                    return { ...r, posVol: val, volPct: val };
+                  })}
+                  min={risk.volUnit === "LOT" ? 0.05 : 0.1}
+                  step={risk.volUnit === "LOT" ? 0.05 : 0.1}
                   suffix={risk.volUnit === "USDT" ? "$" : "%"}
                 />
               </div>

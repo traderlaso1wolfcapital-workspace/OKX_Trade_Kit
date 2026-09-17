@@ -9,12 +9,22 @@ export default function PositionsTable({
   watchlistCoins = [],
   enabledTfs = {},
   handleTfToggle,
+  onSelectCoinForChart,
   updateChartConfig,
   activeChartIndex = 0,
   selectedAccount = "sub1",
   loginUid = "",
   onRefreshPositions,
 }) {
+  const handleCoinClick = (coinValue, tf = "1H") => {
+    const rawCoin = coinValue || "BTC-USDT-SWAP";
+    if (onSelectCoinForChart) {
+      onSelectCoinForChart(rawCoin, tf);
+    } else if (updateChartConfig) {
+      updateChartConfig(activeChartIndex, { coin: rawCoin, tf });
+    }
+  };
+
   const allCoinValues = new Set([...watchlistCoins, ...safePos.map((p) => p.instId)]);
   const displayCoins = Array.from(allCoinValues)
     .map((val) => {
@@ -94,14 +104,14 @@ export default function PositionsTable({
               const children = rawPosList.filter((p) => p.is_child && p.parent_id === parent.ticket_id);
               posList.push(...children);
             });
-            const isChecked = activePairs.includes(coin.value);
+            const isChecked = (activePairs || []).includes(coin.value);
 
             if (posList.length === 0) {
               return (
-                <tr key={coin.value} style={{ borderBottom: "1px solid #262626" }}>
-                  <td style={{ textAlign: "left", padding: "4px 6px", whiteSpace: "nowrap" }}>
+                <tr key={`${coin.value}-empty`} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.03)" }}>
+                  <td style={{ textAlign: "left", padding: "4px 6px" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px", margin: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <input
                           type="checkbox"
                           className="coin-toggle"
@@ -110,7 +120,11 @@ export default function PositionsTable({
                           onClick={(e) => e.stopPropagation()}
                           title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
                         />
-                        <span style={{ color: "#fff", fontSize: "13px", fontWeight: "400" }}>
+                        <span
+                          style={{ color: "#fff", fontSize: "13px", fontWeight: "400", cursor: "pointer" }}
+                          onClick={() => handleCoinClick(coin.value, "1H")}
+                          title="Click để xem biểu đồ"
+                        >
                           {coin.label.replace("-SWAP", "")}
                         </span>
                       </div>
@@ -122,7 +136,7 @@ export default function PositionsTable({
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                       {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
-                        const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : enabledTfs[coin.value] || [];
+                        const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
                         const isOn = coinTfs.includes(tf);
                         const label = tf.replace("M", "");
                         return (
@@ -219,9 +233,7 @@ export default function PositionsTable({
                             else if (rawTf.includes("2H") || rawTf.includes("H2")) mappedTf = "2H";
                             else if (rawTf.includes("4H") || rawTf.includes("H4")) mappedTf = "4H";
                             else if (rawTf.includes("1D") || rawTf.includes("D1")) mappedTf = "1D";
-                            if (updateChartConfig) {
-                              updateChartConfig(activeChartIndex, { coin: coin.value, tf: mappedTf });
-                            }
+                            handleCoinClick(coin.value, mappedTf);
                           }}
                           title="Click để xem biểu đồ"
                         >
@@ -306,7 +318,7 @@ export default function PositionsTable({
                     {!isChild && ticketIndex === 0 && (
                       <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                         {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
-                          const coinTfs = Array.isArray(enabledTfs) ? enabledTfs : enabledTfs[coin.value] || [];
+                          const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
                           const isOn = coinTfs.includes(tf);
                           const label = tf.replace("M", "");
                           return (

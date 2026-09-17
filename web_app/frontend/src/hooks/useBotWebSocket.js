@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-export function useBotWebSocket(uid, strategy, accountId, isAuthenticated) {
+export function useBotWebSocket(uid, strategy, accountId) {
   const [botStatus, setBotStatus] = useState("STOPPED");
   const [uptime, setUptime] = useState(0);
   const [activeAccounts, setActiveAccounts] = useState({});
@@ -13,7 +13,7 @@ export function useBotWebSocket(uid, strategy, accountId, isAuthenticated) {
   const isMountedRef = useRef(true);
 
   const connectWS = useCallback(() => {
-    if (!isAuthenticated || !uid) return;
+    if (!uid) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${window.location.host}/ws/bot_data/${uid}/${strategy}`;
     const ws = new WebSocket(url);
@@ -70,7 +70,7 @@ export function useBotWebSocket(uid, strategy, accountId, isAuthenticated) {
         ws.close();
       } catch {}
     };
-  }, [isAuthenticated, uid, strategy, accountId]);
+  }, [uid, strategy, accountId]);
 
   useEffect(() => {
     isMountedRef.current = true;
