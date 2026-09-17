@@ -427,21 +427,24 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         # Lấy hệ số theo TF của vị thế đang mở
         tracker = state_matrix.get(inst_id)
         # Dùng TF lớn nhất đã thực sự khớp, không phải active_pos_tf (có thể đã sync từ BTC)
+        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
         if tracker:
             filled = getattr(tracker, "pos_cycle_filled_tfs", [])
             if filled:
-                if getattr(globals_ref, "ENABLE_PYRAMID_DCA", False):
+                if _is_pyramid:
                     max_filled_tf = min(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                else:
+                elif _is_neg_dca:
                     max_filled_tf = max(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+                else:
+                    max_filled_tf = filled[0]
             else:
                 max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
         else:
             max_filled_tf = "M5"
 
-        # --- UPGRADE TF LOGIC (Chỉ áp dụng cho DCA Âm, không áp dụng cho DCA Dương) ---
-        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-        if tracker and not is_pyramid:
+        # --- UPGRADE TF LOGIC (Chỉ áp dụng cho DCA Âm, không áp dụng cho DCA Dương hoặc Đơn Lệnh) ---
+        if tracker and _is_neg_dca:
             try:
                 tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
                 next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}

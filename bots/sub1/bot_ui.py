@@ -144,8 +144,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     # Calculate Uptime
     bot_start_time = system_config.get("BOT_START_TIME", time.time())
     
-    # Hiển thị Chế độ DCA (DCA Dương / DCA Âm)
+    # Hiển thị Chế độ DCA (DCA Dương / DCA Âm / Đơn Lệnh)
     is_pyramid = False
+    is_neg_dca = False
     try:
         cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
         if cfg_path and os.path.exists(cfg_path):
@@ -155,12 +156,23 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                     is_pyramid = bool(_cfg["ENABLE_PYRAMID_DCA"])
                 else:
                     is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+                if "ENABLE_NEGATIVE_DCA" in _cfg:
+                    is_neg_dca = bool(_cfg["ENABLE_NEGATIVE_DCA"])
+                else:
+                    is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
         else:
             is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
     except:
         is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
         
-    mode_txt = "Mode: DCA Dương" if is_pyramid else "Mode: DCA Âm"
+    if is_pyramid:
+        mode_txt = "Mode: DCA Dương"
+    elif is_neg_dca:
+        mode_txt = "Mode: DCA Âm"
+    else:
+        mode_txt = "Mode: Đơn Lệnh"
     r2_c1 = f"{mode_txt:^21}"
     
     r2_c2 = f" PNL: {pnl_str:>8} $ "
@@ -444,17 +456,20 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         return "[TREND]"
 
     def _get_waiting_str(tk):
-        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", True)
+        is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
         enabled_tfs = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
         if isinstance(enabled_tfs, dict):
             enabled_tfs = enabled_tfs.get(getattr(tk, "symbol", ""), enabled_tfs.get(getattr(tk, "coin", ""), ["M5", "M15", "M30", "H1", "H2", "H4"]))
         best_tf = getattr(tk, "active_target_tf", "M5")
         
-        # Trend entry TF phụ thuộc vào DCA Âm/Dương
+        # Trend entry TF phụ thuộc vào DCA Âm/Dương/Đơn Lệnh
         if is_pyramid:
             entry_tf = max(enabled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0)) if enabled_tfs else "H4"
-        else:
+        elif is_neg_dca:
             entry_tf = min(enabled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0)) if enabled_tfs else "M5"
+        else:
+            entry_tf = best_tf if best_tf in enabled_tfs else (enabled_tfs[0] if enabled_tfs else "M5")
             
         trend = getattr(tk, "trend", "SIDEWAY")
         is_macro = getattr(tk, "is_macro_overextended", False)

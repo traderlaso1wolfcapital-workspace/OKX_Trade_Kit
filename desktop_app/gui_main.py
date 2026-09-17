@@ -3846,7 +3846,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
 
             elif self.strategy_id == "sub1":
                 if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
-                if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", True))))
+                if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", False))))
                 if hasattr(self, 'chk_negative_dca'): self.chk_negative_dca.setChecked(bool(cfg.get("ENABLE_NEGATIVE_DCA", getattr(bot_config, "ENABLE_NEGATIVE_DCA", False))))
                 if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_HEDGE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))))
                 if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))

@@ -94,7 +94,8 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
             "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "200"))),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
-            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", True))),
+            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
+            "ENABLE_NEGATIVE_DCA": bool(existing_cfg.get("ENABLE_NEGATIVE_DCA", getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False))),
             "ENABLE_STRATEGY_HEDGE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
             "ENABLE_STRATEGY_XOLE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
             "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
@@ -161,6 +162,7 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
                 if "ENABLE_PYRAMID_DCA" in cfg: set_val("ENABLE_PYRAMID_DCA", bool(cfg["ENABLE_PYRAMID_DCA"]))
+                if "ENABLE_NEGATIVE_DCA" in cfg: set_val("ENABLE_NEGATIVE_DCA", bool(cfg["ENABLE_NEGATIVE_DCA"]))
                 if "ENABLE_STRATEGY_HEDGE" in cfg or "ENABLE_STRATEGY_XOLE" in cfg:
                     _h_val = bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", True)))
                     set_val("ENABLE_STRATEGY_HEDGE", _h_val)
@@ -1046,6 +1048,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             })
 
             _is_pyramid_reconstruct = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            _is_neg_reconstruct = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
             _tfs_enabled = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
             valid_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in _tfs_enabled]
             
@@ -1078,7 +1081,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             break
                     if not filled_tfs:
                         filled_tfs = [valid_tfs[0]] if valid_tfs else ["M5"]
-            else:
+            elif _is_neg_reconstruct:
                 # DCA Âm: Khớp từ TF nhỏ lên TF lớn
                 tfs_order = list(valid_tfs)
                 cum_prev = Decimal("0")
@@ -1093,6 +1096,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         break
                 if not filled_tfs:
                     filled_tfs = [tfs_order[0]] if tfs_order else ["M5"]
+            else:
+                # ⚡ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 DCA): Không nhồi lệnh, chỉ 1 khung khớp gần nhất với volume
+                filled_tfs = []
+                best_tf = valid_tfs[0] if valid_tfs else "M5"
+                min_diff = None
+                for tf in valid_tfs:
+                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
+                    diff = abs(pos_vol_usdt - cur_vol)
+                    if min_diff is None or diff < min_diff:
+                        min_diff = diff
+                        best_tf = tf
+                filled_tfs = [best_tf]
 
             return filled_tfs
 
@@ -2485,6 +2500,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             _filled_long = tracker.pos_cycle_filled_tfs if tracker.has_long else []
             
             _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
             if _is_pyramid:
                 TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
@@ -2512,8 +2528,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 break
                             
                 target_long_tfs = new_target_long_tfs
-            else:
+            elif _is_neg_dca:
                 target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
+            else:
+                # ⚡ CHẾ ĐỘ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
+                if not tracker.has_long:
+                    target_long_tfs = list(aligned_long_tfs)
+                else:
+                    # Đã có vị thế -> TUYỆT ĐỐI KHÔNG NHỒI LỆNH (huỷ mọi lệnh limit treo)
+                    target_long_tfs = []
                 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
@@ -2543,8 +2566,15 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 break
                             
                 target_short_tfs = new_target_short_tfs
-            else:
+            elif _is_neg_dca:
                 target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+            else:
+                # ⚡ CHẾ ĐỘ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
+                if not tracker.has_short:
+                    target_short_tfs = list(aligned_short_tfs)
+                else:
+                    # Đã có vị thế -> TUYỆT ĐỐI KHÔNG NHỒI LỆNH (huỷ mọi lệnh limit treo)
+                    target_short_tfs = []
                 
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
 
@@ -2565,6 +2595,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     else:
                         fallback_tf = None
                 else:
+                    # DCA Âm hoặc Đơn Lệnh: Lấy best_tf nếu nằm trong TFS
                     if best_tf in TFS:
                         fallback_tf = best_tf
                     elif TFS:

@@ -17,6 +17,23 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[17/09/2026]** - Đồng Bộ Triệt Để Logic 3 Trạng Thái DCA (DCA Dương, DCA Âm & Tắt Cả 2 - Đơn Lệnh):
+  - **Mô tả:** Khi tắt cả 2 nút DCA Dương và DCA Âm trên giao diện Web/Desktop để đánh đơn lệnh (độc lập, không nhồi lệnh), Bot Core (`sub1`) vẫn âm thầm chạy chiến thuật DCA Âm (nhồi lệnh trung bình giá ngược hướng khi gồng lỗ). Ngoài ra, biến `ENABLE_NEGATIVE_DCA` không được nạp định kỳ lúc bot đang chạy (`run_ai_self_evolution`).
+  - **Nguyên nhân:** Logic trong `bot_strategy.py` và `bot_orders.py` trước đây được lập trình theo kiểu nhị phân `if _is_pyramid: (DCA Dương) else: (mặc định DCA Âm)`. Nhánh `else` tự động nhồi các tầng TF còn lại và nâng dần Stop Loss theo khung lớn (Upgrade TF).
+  - **Đã thực hiện:**
+    1. **Bổ sung đủ 3 trạng thái tại Bot Core:**
+       - `ENABLE_PYRAMID_DCA = True`: Chế độ DCA Dương (nhồi thuận xu hướng từ H4 xuống M5).
+       - `ENABLE_NEGATIVE_DCA = True`: Chế độ DCA Âm (trung bình giá ngược hướng từ M5 lên H4, kích hoạt Upgrade TF cho SL).
+       - Cả 2 nút `False` (**Chế độ Đơn Lệnh / Độc Lập**): Khi chưa có vị thế -> cho phép mở lệnh đầu tiên theo tín hiệu. Khi đã có vị thế (`has_long` hoặc `has_short`) -> `target_tfs = []`, tuyệt đối không nhồi thêm lệnh, tự động huỷ sạch các lệnh Limit DCA treo trên OKX, không nâng SL dãn khung thời gian.
+    2. **Đồng bộ nạp cấu hình thời gian thực (`run_ai_self_evolution`):**
+       - Thêm `ENABLE_NEGATIVE_DCA` vào hàm nạp JSON định kỳ của bot và cơ chế Two-way sync, cho phép đổi chế độ live mà không cần khởi động lại bot.
+    3. **Tái cấu trúc vòng đời vị thế (`reconstruct_position_cycles`):**
+       - Khối tái cấu trúc vị thế hỗ trợ cả 3 mode, tránh bị tính đảo lộn khung thời gian volume khi đổi mode.
+    4. **Cập nhật hiển thị Console Bot UI (`bot_ui.py`):**
+       - Thêm nhãn `Mode: Đơn Lệnh` bên cạnh `Mode: DCA Dương` và `Mode: DCA Âm`.
+       - Đồng bộ fallback `ENABLE_PYRAMID_DCA = False` tại Desktop GUI (`gui_main.py`).
+    5. **Kiểm thử:** Đã biên dịch cú pháp Python (`py_compile`) thành công 100% cho `bot_strategy.py`, `bot_orders.py`, `bot_ui.py` và `gui_main.py`.
+
 - **[17/09/2026]** - Sửa Lỗi "Lỗi kết nối khi khởi động bot" khi nhấn CHẠY BOT:
   - **Mô tả:** Khi nhấn nút "▶ CHẠY BOT", hộp thoại thông báo "Lỗi kết nối khi khởi động bot!" xuất hiện.
   - **Nguyên nhân:** Hàm `handleStartBot` và `handleStopBot` trong `App.jsx` gọi trực tiếp `setIsBotRunning(true)` / `setIsBotRunning(false)` nhưng biến `isBotRunning` không được khai báo `useState` (trước đây trạng thái bot lấy trực tiếp từ `botStatus` của WebSocket). Lệnh gọi hàm không tồn tại gây ra lỗi JavaScript `ReferenceError: setIsBotRunning is not defined` bên trong khối `try`, khiến chương trình nhảy ngay vào nhánh `catch` và hiển thị alert lỗi kết nối.
