@@ -584,7 +584,26 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
         print(f"[ENV SAVE ERROR] Failed to save {fpath}: {e}", flush=True)
 
 def get_running_pid(uid: str, strategy: str) -> int:
-    pid_file = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", f"{strategy}.pid")
+    data_dir = get_user_data_dir(uid)
+    acc_name = strategy
+    
+    # Lấy tài khoản đang chạy hiện tại của strategy này
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    if os.path.exists(running_acc_file):
+        try:
+            with open(running_acc_file, "r") as f:
+                content = f.read().strip()
+                if content:
+                    acc_name = content
+        except:
+            pass
+
+    pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{acc_name}.pid")
+    
+    # Fallback nếu dùng tên strategy mặc định
+    if not os.path.exists(pid_file):
+        pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{strategy}.pid")
+
     if os.path.exists(pid_file):
         try:
             with open(pid_file, "r") as f:
