@@ -3139,7 +3139,7 @@ function App() {
     confluencePct: "0.23",
     accumCandles: 60,
     altcoinFollowBtc: true,
-    ethVolMult: "1.30",
+
   });
 
   // Cấu hình Điểm vào lệnh SMC (Entry Config - SMC)
@@ -4720,11 +4720,18 @@ function App() {
                         <div className="settings-group">
                           <div className="settings-group-title">Công Tắc Chiến Thuật</div>
                           <div className="tactics-toggles-layout">
-                            {/* Cột trái: DCA Dương chiếm trọn chiều cao */}
-                            <div className="toggle-row tactics-left-col">
-                              <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
-                              <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
-                              <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
+                            {/* Cột trái: DCA Dương và Đồng pha BTC */}
+                            <div className="tactics-left-col">
+                              <div className="toggle-row">
+                                <ToggleSwitch checked={strat.pyramidDca ?? true} onChange={v => setStrat(s => ({ ...s, pyramidDca: v }))} />
+                                <span className="toggle-name">Chế độ: DCA Dương (Mới)</span>
+                                <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5. TẮT: DCA âm từ M5->H4 (Mặc định).">[?]</button>
+                              </div>
+                              <div className="toggle-row">
+                                <ToggleSwitch checked={entryCfg.altcoinFollowBtc} onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))} />
+                                <span className="toggle-name">Lọc Vĩ mô (Đồng pha BTC)</span>
+                                <button className="btn-help" onClick={() => alert("BẬT: Altcoin phải đồng pha với xu hướng BTC. TẮT: Đánh độc lập theo sóng của từng Altcoin (Mặc định).")} title="BẬT: Altcoin phải đồng pha với xu hướng BTC. TẮT: Đánh độc lập theo sóng của từng Altcoin (Mặc định).">[?]</button>
+                              </div>
                             </div>
 
                             {/* Cột phải: Đánh Sóng Đảo Chiều ở trên, Chốt lời bám EMA200 ở dưới */}
@@ -4967,31 +4974,7 @@ function App() {
                           />
                         </div>
 
-                        <div className="entry-setup-row">
-                          <div className="entry-label-wrap">
-                            <span style={{ fontWeight: "bold", color: "#ffffff" }}>Đồng pha BTC & Lọc Vĩ mô:</span>
-                          </div>
-                          <ToggleSwitch
-                            checked={entryCfg.altcoinFollowBtc}
-                            onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))}
-                          />
-                        </div>
 
-                        {entryCfg.altcoinFollowBtc && (
-                          <div className="entry-setup-row">
-                            <div className="entry-label-wrap">
-                              <span>Hệ số nhạy ETH (Vol Mult):</span>
-                              <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
-                            </div>
-                            <NumberSpinBox
-                              value={entryCfg.ethVolMult}
-                              onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
-                              step={0.1}
-                              min={0}
-                              width="95px"
-                            />
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -5048,7 +5031,7 @@ function App() {
                               confluencePct: "0.23",
                               accumCandles: 60,
                               altcoinFollowBtc: true,
-                              ethVolMult: "1.30",
+
                             });
                           } else if (activeBotTab === "sub2") {
                             setRisk({ posVol: 1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
@@ -5074,7 +5057,7 @@ function App() {
                               confluencePct: "0.23",
                               accumCandles: 60,
                               altcoinFollowBtc: true,
-                              ethVolMult: "1.30",
+
                             });
                           } else {
                             setRisk({ posVol: 1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
@@ -5085,7 +5068,7 @@ function App() {
                               confluencePct: "0.23",
                               accumCandles: 60,
                               altcoinFollowBtc: true,
-                              ethVolMult: "1.30",
+
                             });
                           }
                           alert("Đã khôi phục cài đặt về mặc định của nhà sản xuất!");

@@ -1710,8 +1710,8 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
 
 .tactics-left-col {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .tactics-right-col {
