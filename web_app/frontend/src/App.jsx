@@ -15,8 +15,8 @@ import "./App.css";
 
 function App() {
   // 1. Auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [loginUid, setLoginUid] = useState("12345678");
+  const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem("tls1_auth") === "true");
+  const [loginUid, setLoginUid] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authStep, setAuthStep] = useState("uid");
@@ -1544,12 +1544,7 @@ function App() {
         onConfirm={confirmDeleteAccount}
       />
 
-      {/* FOOTER MARQUEE */}
-      <div className="marquee-footer">
-        <div className="marquee-content">
-          ⚠️ CẢNH BÁO: Bot chỉ là công cụ hỗ trợ điểm giao dịch, không phải là lời kêu gọi đầu tư. Bot is only a trading point support tool, not an investment call. ⚠️
-        </div>
-      </div>
+
     </div>
   );
 }

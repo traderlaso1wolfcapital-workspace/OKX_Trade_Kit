@@ -84,14 +84,14 @@ export default function PositionsTable({
       className="positions-table-wrapper"
       style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
     >
-      <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
+      <table className="positions-table">
         <thead>
-          <tr style={{ background: "#252526", borderBottom: "1px solid #333" }}>
-            <th style={{ textAlign: "left", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Cặp vị thế</th>
-            <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Ký quỹ</th>
-            <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap", minWidth: "130px" }}>PNL thả nổi</th>
-            <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>TF trade</th>
-            <th style={{ textAlign: "center", padding: "4px 6px", fontSize: "13px", whiteSpace: "nowrap" }}>Cắt lệnh</th>
+          <tr style={{ background: "#252526" }}>
+            <th style={{ textAlign: "left" }}>Cặp vị thế</th>
+            <th style={{ textAlign: "center" }}>Ký quỹ</th>
+            <th style={{ textAlign: "center", minWidth: "130px" }}>PNL thả nổi</th>
+            <th style={{ textAlign: "center" }}>TF trade</th>
+            <th style={{ textAlign: "center" }}>Cắt lệnh</th>
           </tr>
         </thead>
         <tbody>

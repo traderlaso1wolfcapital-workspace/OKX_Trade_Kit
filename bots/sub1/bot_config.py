@@ -32,7 +32,7 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("0.4")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 0.4$)
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 1$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
 
@@ -177,3 +177,4 @@ VÍ DỤ H4 LONG thực tế:
   sau đó cộng thêm một lớp đệm an toàn riêng theo TF (base_buffer).
   → Chạy song song tuyệt đối với BTC, không bao giờ nằm sát giá Live!
 '''
+# z101 | Update default margin to 1$

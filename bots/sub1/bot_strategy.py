@@ -92,7 +92,7 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "AI_CONFIDENCE_SCORE": str(globals_ref.AI_CONFIDENCE_SCORE),
             "TP_TARGET_OPTIMAL": str(globals_ref.SCALPING_TP_PCT),
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
-            "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "200"))),
+            "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "1"))),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
             "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
             "ENABLE_NEGATIVE_DCA": bool(existing_cfg.get("ENABLE_NEGATIVE_DCA", getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False))),
@@ -761,7 +761,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "40")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "1")))
 
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
@@ -1033,7 +1033,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "40")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "1")))
 
             _coin_vol_mult = Decimal("1.0")
             for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
@@ -1450,7 +1450,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if not okx_fetched:
             exit_roi = ((tracker.live_price - tracker.entry_price_long) / tracker.entry_price_long) * Decimal("100") * Decimal(str(cfg["leverage"]))
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 40)))
+                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 1)))
                 _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                 if _risk > 0:
                     _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
@@ -1662,7 +1662,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if not okx_fetched:
             exit_roi = ((tracker.entry_price_short - tracker.live_price) / tracker.entry_price_short) * Decimal("100") * Decimal(str(cfg["leverage"]))
             try:
-                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 40)))
+                _base = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", 1)))
                 _risk = getattr(globals_ref, "RISK_PER_TRADE_PCT", Decimal("0"))
                 if _risk > 0:
                     _base = (Decimal(str(getattr(globals_ref, "von_hien_tai", 10000))) * _risk) / Decimal("0.015")
@@ -3085,3 +3085,4 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 # z307 | Fix local variable 'target_short_tfs' referenced before assignment during ALTCOIN FALLBACK logic
 # z308 | Fix duplicate marker generation on bot startup syncing to prevent position merge in UI
 
+# z309 | Update default margin to 1$ and logic volume fallbacks to 1

@@ -630,13 +630,6 @@ export default function SingleChartPane({
             endX = Math.floor((entryIdx + 25 - logicalRange.from) * barWidth);
           }
 
-          if (pos.exitTime) {
-            const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
-            const exitIdx = candles.findIndex(item => item.time >= exitTimeSec);
-            if (exitIdx > entryIdx) {
-              endX = Math.floor((exitIdx - logicalRange.from) * barWidth);
-            }
-          }
           if (pos._fixedStartX === undefined) {
             pos._fixedStartX = startX;
             pos._fixedEndX = endX;
@@ -662,15 +655,6 @@ export default function SingleChartPane({
               endX = Math.floor(startX + 25 * barSpacing);
             }
 
-            if (pos.exitTime) {
-              try {
-                const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
-                const scExit = c.timeScale().timeToCoordinate(exitTimeSec);
-                if (scExit !== null && scExit > startX) {
-                  endX = Math.floor(scExit);
-                }
-              } catch (e) { }
-            }
             if (pos._fixedStartX === undefined) {
               pos._fixedStartX = startX;
               pos._fixedEndX = endX;

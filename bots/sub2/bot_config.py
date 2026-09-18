@@ -20,7 +20,7 @@ M30_LIMIT_CANDLES = 600             # Số nến M30 fetch (600 nến 30m ≈ 30
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
 USE_DYNAMIC_RISK = False            # Bắt buộc dùng Volume cố định
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("100") # Vốn cố định mặc định (100 USDT)
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1") # Vốn cố định mặc định (1 USDT)
 RISK_PER_TRADE_PCT = Decimal("0.01") # Risk per trade theo % vốn (1%)
 LEVERAGE = 100                      # Đòn bẩy
 POSITION_MODE = "cross"             # Chế độ Margin
@@ -142,3 +142,4 @@ COIN_PORTFOLIO = [
     {"coin": "ETH", "swap": "ETH-USDT-SWAP", "vol_mult": "0.8"},
 ]
 ENABLED_COINS = ["XAU", "BTC", "ETH"]
+# z101 | Update default margin to 1$

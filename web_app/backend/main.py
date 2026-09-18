@@ -986,7 +986,7 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             cfg["ENABLED_TFS"] = {}
             dirty = True
         if "POSITION_VOLUME_HIGH_CONFIDENCE" not in cfg:
-            cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 40.0
+            cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 1.0
             dirty = True
         if "SCALPING_TP_PCT" not in cfg:
             cfg["SCALPING_TP_PCT"] = 0.008
@@ -2027,3 +2027,4 @@ if __name__ == "__main__":
 # z7719 | Sửa lỗi close-position khi đóng vị thế lẻ (do dùng int()) và bổ sung cảnh báo 400 khi khối lượng khả dụng bị khóa bởi TP/SL trên OKX.
 
 # z7720 | Nâng cấp deque 400 dòng lưu trữ logs, sửa lỗi logs thiếu thông tin, và bổ sung WebSocket /ws/bot_data streaming trạng thái/vị thế/số dư thời gian thực.
+# z7721 | Update default margin/volume settings to 1.0

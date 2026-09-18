@@ -148,10 +148,6 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span>
-            Bot: <strong style={{ color: "#26a69a" }}>{displayBotName}</strong>
-          </span>
-          <span>•</span>
           <span>{normalizedLogs.length} chu kỳ gần nhất</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
