@@ -817,3 +817,41 @@ Trong đó `(+5.30%)` = offset entry thực tế (alt_dist + btc_dist × vol_mul
    - BotSubprocessWorker trong gui_main.py chạy độc lập với giao diện chính.
    - Khi closeEvent (Tắt App) được gọi, không được block GUI Thread. Phải gọi .stop() cho tất cả các Bot chạy song song, sau đó mới tiến hành .wait(3000) và .terminate().
    - Trình phát âm thanh toàn cục (_GLOBAL_AUDIO_PLAYERS) phải được .stop() và .clear() khi tắt App để tránh lỗi QThread: Destroyed while thread is still running.
+
+
+## XI. QUY CHUẨN VÀ LOGIC VẬN HÀNH BOT SMC (SUB2 - SMART MONEY CONCEPTS)
+*(Cập nhật chuẩn hóa: 19/09/2026 - zWebSMC)*
+
+### 1. Bản Chất Kiến Trúc Order Block (OB) & Lọc Mitigation
+- **Bullish Order Block (OB Long):** Khối nến giảm cuối cùng trước sóng tăng mạnh phá vỡ cấu trúc (tạo FVG). Hiển thị dải màu xanh dương (`rgba(21, 101, 192, 0.2)`). Đóng vai trò là khối cản hỗ trợ (Support/Demand).
+- **Bearish Order Block (OB Short):** Khối nến tăng cuối cùng trước sóng giảm mạnh phá vỡ cấu trúc (tạo FVG). Hiển thị dải màu đỏ (`rgba(198, 40, 40, 0.2)`). Đóng vai trò là khối cản kháng cự (Resistance/Supply).
+- **Bộ lọc loại bỏ OB đã bị đâm thủng (Mitigation Filter):**
+  - Khối Bullish OB bị loại bỏ ngay khi có nến đóng cửa thấp hơn đáy OB (`close < ob.low`).
+  - Khối Bearish OB bị loại bỏ ngay khi có nến đóng cửa cao hơn đỉnh OB (`close > ob.high`).
+  - Đảm bảo trên biểu đồ chỉ lưu giữ các vùng OB còn nguyên hiệu lực phòng thủ.
+
+### 2. Quy Tắc Ánh Xạ 1-1: Khối OB → Box Vị Thế Long / Short
+Mọi Box Long/Short vẽ trên biểu đồ bắt buộc phải ánh xạ trực tiếp và trùng khớp 100% với các khối OB hiển thị:
+- **OB Long (xanh dương) → BẮT BUỘC TƯƠNG ỨNG VỚI BOX LONG:**
+  - **Entry:** Luôn đặt chính xác tại **Biên Trên** của OB (`entryPrice = ob.high`).
+  - **Stop Loss (SL):** Luôn đặt chính xác tại **Biên Dưới** của OB (`slTarget = ob.low`), dính khít vào đáy khối OB xanh.
+  - **Take Profit (TP):** Phía trên theo tỷ lệ 1.5R dựa trên chiều cao OB (`tpTarget = ob.high + (ob.high - ob.low) * 1.5`).
+- **OB Short (đỏ) → BẮT BUỘC TƯƠNG ỨNG VỚI BOX SHORT:**
+  - **Entry:** Luôn đặt chính xác tại **Biên Dưới** của OB (`entryPrice = ob.low`).
+  - **Stop Loss (SL):** Luôn đặt chính xác tại **Biên Trên** của OB (`slTarget = ob.high`), dính khít vào đỉnh khối OB đỏ.
+  - **Take Profit (TP):** Phía dưới theo tỷ lệ 1.5R dựa trên chiều cao OB (`tpTarget = ob.low - (ob.high - ob.low) * 1.5`).
+
+### 3. Chu trình Vận Hành Lệnh (Breakout → Sliding Waiting Box → Retest → Fixed Box)
+- **Giai đoạn 1: Breakout (Thoát ly OB):** Sau khi hình thành OB, giá phải bứt phá thoát hoàn toàn ra ngoài vùng OB (`low > entryPrice` với Long, `high < entryPrice` với Short).
+- **Giai đoạn 2: Box Chờ Tịnh Tiến (Sliding Waiting Box):** Trong suốt thời gian giá chưa quay về, box Long/Short ở trạng thái chờ (`waiting`), cạnh bên trái **luôn dóng thẳng hàng theo cây nến live hiện tại**, vươn sang phải 10 nến và liên tục tịnh tiến sang phải theo từng cây nến mới.
+- **Giai đoạn 3: Retest & Fix Vị Trí:** Khi có cây nến sau đó quay đầu (pullback) vòng về chạm đúng biên entry của OB (`c.low <= entryPrice` với Long, `c.high >= entryPrice` với Short) mà không thủng SL, box **dừng tịnh tiến và FIX vị trí bắt đầu** tại chính cây nến đó (`entryTime = candles[hitEntryIdx].time`).
+- **Giai đoạn 4: Chốt Lời / Cắt Lỗ & Fix Độ Rộng Box:** Khi nến sau đó chạm TP hoặc SL, độ rộng của box sẽ dừng lại và **cố định vĩnh viễn** tại cây nến chạm TP/SL (`exitTime = c.time`).
+
+### 4. Kỷ Luật Vào Lệnh: Mỗi OB 1 Lệnh Duy Nhất (Không Overlap)
+- Mỗi khối OB chỉ được phép vào **DUY NHẤT 1 LỆNH**: Khớp TP hay SL 1 lần là OB đó hoàn tất (mitigated), tuyệt đối không đặt thêm lệnh limit ở OB đó nữa.
+- **Không mở lệnh chồng lấn (`lastExitIdx`):** Trong khi một lệnh đang mở chạy từ entry đến exit, bot không mở thêm lệnh nào khác, triệt tiêu hoàn toàn hiện tượng các box bị đè nhau di dít trong vùng sideway.
+
+### 5. Chuẩn Hiển Thị Giao Diện & Bảng Backtesting
+- **Trục giá (Right Price Scale):** Định dạng chuẩn Hyperliquid (ngăn cách hàng nghìn bằng dấu chấm, phần thập phân bằng dấu phẩy theo `vi-VN`). BTC $\ge 10.000$ không số lẻ, ETH 1 số lẻ, NEAR 4 số lẻ. Độ rộng trục giá co nhỏ tự động vừa khít chữ số, không thừa khoảng đen bên phải.
+- **Bảng Backtesting:** Bảng nổi nằm sát mép trục giá, hiển thị 4 chỉ số minh bạch: `Total Entries`, `Wins`, `Losses`, `Winrate (%)`. Đã loại bỏ chỉ số `Total Profit` không cần thiết.
+- **Bảo toàn thẩm mỹ biểu đồ:** Trên biểu đồ chỉ render tối đa 15 box vị thế gần nhất để nến luôn thông thoáng, sạch đẹp, đúng chuẩn TradingView chuyên nghiệp.
