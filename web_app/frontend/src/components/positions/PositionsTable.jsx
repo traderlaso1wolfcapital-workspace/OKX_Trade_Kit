@@ -25,7 +25,7 @@ export default function PositionsTable({
     }
   };
 
-  const allCoinValues = new Set([...watchlistCoins, ...safePos.map((p) => p.instId)]);
+  const allCoinValues = new Set([...watchlistCoins, ...(activePairs || []), ...safePos.map((p) => p.instId)]);
   const displayCoins = Array.from(allCoinValues)
     .map((val) => {
       const found = COIN_LIST.find((c) => c.value === val);

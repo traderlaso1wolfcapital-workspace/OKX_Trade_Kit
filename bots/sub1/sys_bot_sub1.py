@@ -366,9 +366,14 @@ def main():
     bot_sub1.send_telegram_notification(f"🤖 Bot v23.0 PURE LIMIT CROSS đã kích hoạt trên {env_file}! Cấu trúc Dual-Core chống mất trạng thái.")
 
     last_realtime_scan, last_limit_setup, last_dashboard_update = 0.0, 0.0, 0.0
+    _bot_folder = os.path.dirname(os.path.abspath(__file__))
     try:
-        last_logic_mtime = os.path.getmtime(os.path.join(CURRENT_DIR, "bots/sub1", "bot_sub1.py"))
-    except FileNotFoundError:
+        last_logic_mtime = max(
+            os.path.getmtime(os.path.join(_bot_folder, f))
+            for f in ["bot_sub1.py", "bot_strategy.py", "bot_config.py", "bot_ui.py"]
+            if os.path.exists(os.path.join(_bot_folder, f))
+        )
+    except Exception:
         last_logic_mtime = 0.0
     
     last_config_mtime = 0.0
@@ -475,19 +480,19 @@ def main():
 
 
             # 🔥 HOT-RELOAD CHECKER
-            logic_path = os.path.join(CURRENT_DIR, "bots/sub1", "bot_sub1.py")
-            try:
-                current_mtime = os.path.getmtime(logic_path)
-            except FileNotFoundError:
-                current_mtime = 0.0
+            current_mtime = 0.0
+            for _f_hot in ["bot_sub1.py", "bot_strategy.py", "bot_config.py", "bot_ui.py"]:
+                _p_hot = os.path.join(_bot_folder, _f_hot)
+                if os.path.exists(_p_hot):
+                    _mt = os.path.getmtime(_p_hot)
+                    if _mt > current_mtime:
+                        current_mtime = _mt
             
-            config_path_hot = os.path.join(CURRENT_DIR, "bots/sub1", "bot_config.py")
-            ui_path_hot = os.path.join(CURRENT_DIR, "bots/sub1", "bot_ui.py")
-            if os.path.exists(config_path_hot) and os.path.getmtime(config_path_hot) > current_mtime: current_mtime = os.path.getmtime(config_path_hot)
-            if os.path.exists(ui_path_hot) and os.path.getmtime(ui_path_hot) > current_mtime: current_mtime = os.path.getmtime(ui_path_hot)
+            config_path_hot = os.path.join(_bot_folder, "bot_config.py")
 
             if current_mtime > last_logic_mtime:
                 importlib.reload(sys.modules.get('bots.sub1.bot_config', sys.modules.get('bot_config'))) if 'bots.sub1.bot_config' in sys.modules or 'bot_config' in sys.modules else None
+                importlib.reload(sys.modules.get('bots.sub1.bot_strategy', sys.modules.get('bot_strategy'))) if 'bots.sub1.bot_strategy' in sys.modules or 'bot_strategy' in sys.modules else None
                 importlib.reload(sys.modules.get('bots.sub1.bot_ui', sys.modules.get('bot_ui'))) if 'bots.sub1.bot_ui' in sys.modules or 'bot_ui' in sys.modules else None
                 importlib.reload(bot_sub1) # XÓA SẠCH VÀ NẠP LẠI TOÀN BỘ LOGIC
                 print("\n🔄 [HOT-RELOAD]: Phát hiện sửa đổi thuật toán! Nạp lại bộ não mới thành công.")
@@ -548,11 +553,9 @@ def main():
                 except:
                     enabled_coins = ["BTC", "ETH", "XAU"]
                 
-                futures = []
                 for cfg in bot_sub1.COIN_PORTFOLIO: 
                     is_enabled = (cfg["coin"] in enabled_coins)
-                    futures.append(sys._bot_sub1_executor.submit(process_coin, cfg, is_enabled))
-                concurrent.futures.wait(futures)
+                    process_coin(cfg, is_enabled)
                 # ----------------------------------------------------------------
                 
                 # 📊 IN BẢNG ĐIỀU KHIỂN

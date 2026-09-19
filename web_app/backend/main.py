@@ -324,6 +324,31 @@ def fetch_tradingview_candles(symbol: str = "CRYPTOCAP:USDT.D", bar: str = "1H",
 _okx_session = requests.Session()
 _okx_cache = {}
 _historical_pool = {}
+_bg_fetch_tasks = set()
+
+def _background_fill_candles(instId: str, bar: str, pool_key: tuple, target_limit: int = 2500):
+    """Luồng nền (Pha 2): Âm thầm cào nốt nến lịch sử cũ hơn lấp đầy 2500 nến vào RAM không block giao diện."""
+    try:
+        while True:
+            curr = _historical_pool.get(pool_key)
+            if not curr or len(curr) >= target_limit:
+                break
+            remain = target_limit - len(curr)
+            fetch_count = min(remain, 100)
+            last_ts = curr[-1][0]
+            h_url = f"https://www.okx.com/api/v5/market/history-candles?instId={instId}&bar={bar}&limit={fetch_count}&after={last_ts}"
+            h_resp = _okx_session.get(h_url, timeout=6)
+            h_data = h_resp.json()
+            if h_data.get("code") == "0" and h_data.get("data"):
+                curr.extend(h_data["data"])
+                _historical_pool[pool_key] = curr
+                time.sleep(0.08)  # Nhịp nghỉ tránh bị OKX rate-limit
+            else:
+                break
+    except Exception:
+        pass
+    finally:
+        _bg_fetch_tasks.discard(pool_key)
 
 def compute_ob_boxes(all_candles):
     """Tính toán Order Blocks từ dữ liệu nến."""
@@ -333,35 +358,65 @@ def compute_ob_boxes(all_candles):
     try:
         candles = all_candles.copy()
         candles.reverse()  # Newest to oldest -> oldest to newest
-        import bots.sub2.bot_strategy as sub2_strat
-        from bots.sub2.bot_models import AssetTracker
-        from decimal import Decimal
-        tk = AssetTracker()
+        n = len(candles)
+        if n < 5:
+            return ob_boxes
+            
         times = [int(c[0]) for c in candles]
         opens = [Decimal(c[1]) for c in candles]
         highs = [Decimal(c[2]) for c in candles]
         lows = [Decimal(c[3]) for c in candles]
         closes = [Decimal(c[4]) for c in candles]
-        vol = sub2_strat.get_volatility_measure(closes, highs, lows)
-        sub2_strat.replay_history(tk, closes, opens, highs, lows, times, vol)
         
+        atr_period = 14
+        tr_list = []
+        for i in range(1, n):
+            tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
+            tr_list.append(tr)
+            
+        if len(tr_list) >= atr_period:
+            atr = sum(tr_list[-atr_period:]) / Decimal(atr_period)
+        else:
+            atr = sum(tr_list) / Decimal(len(tr_list)) if tr_list else Decimal("100")
+            
+        # Tìm FVG và OB
+        recent_count = min(n, 150)
+        start_idx = n - recent_count
         raw_obs = []
-        for ob in (tk.swing_obs + tk.internal_obs):
-            if not ob.crossed:
-                raw_obs.append({
-                    "high": float(ob.bar_high),
-                    "low": float(ob.bar_low),
-                    "time": int(ob.bar_time) if hasattr(ob, 'bar_time') else 0,
-                    "bias": int(ob.bias),
-                    "source": str(ob.source)
-                })
-        
+        for i in range(max(2, start_idx), n - 1):
+            # Bullish FVG & Bullish OB
+            if lows[i+1] > highs[i-1]:
+                gap = lows[i+1] - highs[i-1]
+                if gap >= atr * Decimal("0.2"):
+                    for j in range(i, max(-1, i - 4), -1):
+                        if closes[j] < opens[j]:
+                            raw_obs.append({
+                                "bias": 1,
+                                "time": times[j],
+                                "high": float(highs[j]),
+                                "low": float(lows[j])
+                            })
+                            break
+            # Bearish FVG & Bearish OB
+            elif highs[i+1] < lows[i-1]:
+                gap = lows[i-1] - highs[i+1]
+                if gap >= atr * Decimal("0.2"):
+                    for j in range(i, max(-1, i - 4), -1):
+                        if closes[j] > opens[j]:
+                            raw_obs.append({
+                                "bias": -1,
+                                "time": times[j],
+                                "high": float(highs[j]),
+                                "low": float(lows[j])
+                            })
+                            break
+                            
+        # Lọc và gộp các vùng OB đè nhau
         for bias in [1, -1]:
-            b_obs = [o for o in raw_obs if o["bias"] == bias]
-            if not b_obs: continue
-            b_obs.sort(key=lambda x: x["low"])
+            biased = [o for o in raw_obs if o["bias"] == bias]
+            biased.sort(key=lambda x: x["low"])
             merged = []
-            for o in b_obs:
+            for o in biased:
                 if not merged:
                     merged.append(o)
                 else:
@@ -381,13 +436,13 @@ def compute_ob_boxes(all_candles):
 
 @app.get("/api/market/candles")
 def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
-    """Proxy OKX candle API với cơ chế Sliding Window Pool 2500 nến & Cache siêu tốc."""
+    """Proxy OKX candle API với cơ chế 2 Pha Tức Thì (0.15s Pha 1 + Nền Pha 2 lấp đầy 2500 nến)."""
     try:
         limit = int(limit)
         now = time.time()
         cache_key = f"{instId}_{bar}_{limit}"
         cached = _okx_cache.get(cache_key)
-        if cached and (now - cached["time"] < 6):
+        if cached and (now - cached["time"] < 4):
             return cached["data"]
 
         # Hỗ trợ USDT.D từ TradingView
@@ -406,48 +461,50 @@ def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
         cached_pool = _historical_pool.get(pool_key)
         all_candles = []
 
-        # Nếu đã có sẵn pool nến lịch sử trong RAM: chỉ cần fetch 100 nến mới nhất để update (cực nhanh ~0.08s)
-        if cached_pool and len(cached_pool) >= min(limit, 1000):
+        # TRƯỜNG HỢP 1: Đã có sẵn pool trong RAM >= 300 nến
+        # Cập nhật nhanh 100 nến mới nhất (~0.08s)
+        if cached_pool and len(cached_pool) >= 300:
             try:
                 url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit=100"
-                resp = _okx_session.get(url, timeout=5)
+                resp = _okx_session.get(url, timeout=4)
                 d = resp.json()
                 if d.get("code") == "0" and d.get("data"):
                     new_candles = d["data"]
                     merged_dict = {c[0]: c for c in cached_pool}
                     for c in new_candles:
                         merged_dict[c[0]] = c
-                    all_candles = sorted(merged_dict.values(), key=lambda x: int(x[0]), reverse=True)[:limit]
+                    all_candles = sorted(merged_dict.values(), key=lambda x: int(x[0]), reverse=True)
                     _historical_pool[pool_key] = all_candles
+                else:
+                    all_candles = cached_pool
             except Exception:
-                all_candles = cached_pool[:limit]
+                all_candles = cached_pool
 
-        # Nếu chưa có trong pool: fetch toàn bộ lịch sử nến với Session tái sử dụng kết nối
+            # Nếu pool chưa đủ 2500 nến và chưa có task chạy ngầm -> kích hoạt Pha 2 chạy ngầm
+            if len(all_candles) < limit and pool_key not in _bg_fetch_tasks:
+                _bg_fetch_tasks.add(pool_key)
+                threading.Thread(target=_background_fill_candles, args=(instId, bar, pool_key, limit), daemon=True).start()
+
+        # TRƯỜNG HỢP 2: Pool chưa có hoặc < 300 nến (Lần đầu mở Coin / TF mới)
+        # PHA 1 (Tức thì ~0.15s): Chỉ gọi đúng 1 request OKX lấy 300 nến mới nhất
         if not all_candles:
-            first_limit = min(limit, 300)
-            url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit={first_limit}"
-            resp = _okx_session.get(url, timeout=6)
+            url = f"https://www.okx.com/api/v5/market/candles?instId={instId}&bar={bar}&limit=300"
+            resp = _okx_session.get(url, timeout=5)
             data = resp.json()
             if data.get("code") == "0" and data.get("data"):
-                all_candles.extend(data["data"])
-                while len(all_candles) < limit:
-                    remain = limit - len(all_candles)
-                    fetch_count = min(remain, 100)
-                    last_ts = all_candles[-1][0]
-                    h_url = f"https://www.okx.com/api/v5/market/history-candles?instId={instId}&bar={bar}&limit={fetch_count}&after={last_ts}"
-                    h_resp = _okx_session.get(h_url, timeout=6)
-                    h_data = h_resp.json()
-                    if h_data.get("code") == "0" and h_data.get("data"):
-                        all_candles.extend(h_data["data"])
-                    else:
-                        break
-            _historical_pool[pool_key] = all_candles
+                all_candles = data["data"]
+                _historical_pool[pool_key] = all_candles
+
+                # PHA 2 (Chạy ngầm): Kích hoạt Thread nền cào nốt các nến cũ lùi về sau tới 2500 nến
+                if limit > 300 and pool_key not in _bg_fetch_tasks:
+                    _bg_fetch_tasks.add(pool_key)
+                    threading.Thread(target=_background_fill_candles, args=(instId, bar, pool_key, limit), daemon=True).start()
 
         ob_boxes = compute_ob_boxes(all_candles)
         res_data = {
             "code": "0",
             "msg": "",
-            "data": all_candles,
+            "data": all_candles[:limit],
             "ob_boxes": ob_boxes
         }
         _okx_cache[cache_key] = {"time": now, "data": res_data}
@@ -456,14 +513,22 @@ def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
         return {"code": "-1", "msg": str(e), "data": []}
 
 def _warmup_backend_candles():
+    """Tự động nạp sẵn nến các khung giờ chính cho BTC, ETH, XAU ngay khi khởi động."""
     import time
-    import threading
-    time.sleep(1.5)
-    for p, b in [("BTC-USDT-SWAP", "1H"), ("ETH-USDT-SWAP", "1H"), ("XAU-USDT-SWAP", "1H"), ("CRYPTOCAP:USDT.D", "1H")]:
-        try:
-            proxy_market_candles(instId=p, bar=b, limit=2500)
-        except Exception:
-            pass
+    time.sleep(1.0)
+    top_coins = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "XAU-USDT-SWAP"]
+    top_bars = ["5m", "15m", "30m", "1H", "4H"]
+    for c in top_coins:
+        for b in top_bars:
+            try:
+                proxy_market_candles(instId=c, bar=b, limit=300)
+                time.sleep(0.04)
+            except Exception:
+                pass
+    try:
+        proxy_market_candles(instId="CRYPTOCAP:USDT.D", bar="1H", limit=300)
+    except Exception:
+        pass
 
 import threading
 threading.Thread(target=_warmup_backend_candles, daemon=True).start()

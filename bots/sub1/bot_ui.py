@@ -172,7 +172,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     elif is_neg_dca:
         mode_txt = "Mode: DCA Âm"
     else:
-        mode_txt = "Mode: Đơn Lệnh"
+        mode_txt = "Mode: Lưới Đa Khung"
     r2_c1 = f"{mode_txt:^21}"
     
     r2_c2 = f" PNL: {pnl_str:>8} $ "

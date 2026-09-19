@@ -7,6 +7,7 @@ export default function SystemSettingsModal({
   isOpen,
   onClose,
   activeBotTab,
+  isRunning = false,
   settingsTab,
   setSettingsTab,
   accounts,
@@ -40,7 +41,8 @@ export default function SystemSettingsModal({
   setEntryCfg,
   onResetDefaultStrat,
   onSaveStratConfig,
-  onLogout
+  onLogout,
+  onToggleMultiplyVolume
 }) {
   if (!isOpen) return null;
 
@@ -289,9 +291,59 @@ export default function SystemSettingsModal({
                         />
                       </div>
                     </div>
+                    <div
+                      className="entry-setup-row"
+                      style={{
+                        marginTop: "4px",
+                        marginBottom: "4px",
+                        opacity: isRunning ? 0.6 : 1,
+                      }}
+                      title={isRunning ? "Vui lòng dừng bot để thay đổi thiết lập này" : ""}
+                    >
+                      <div className="entry-label-wrap" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input
+                          type="checkbox"
+                          className="coin-toggle"
+                          checked={risk.multiplyVolumeByTf ?? false}
+                          disabled={isRunning}
+                          onChange={(e) => {
+                            if (isRunning) return;
+                            if (onToggleMultiplyVolume) {
+                              onToggleMultiplyVolume(e.target.checked);
+                            } else {
+                              setRisk(r => ({ ...r, multiplyVolumeByTf: e.target.checked }));
+                            }
+                          }}
+                          style={{ cursor: isRunning ? "not-allowed" : "pointer" }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "11.5px",
+                            color: risk.multiplyVolumeByTf ? "#26a69a" : "#888",
+                            fontWeight: risk.multiplyVolumeByTf ? 600 : "normal",
+                            cursor: isRunning ? "not-allowed" : "pointer",
+                            userSelect: "none",
+                            transition: "color 0.2s ease",
+                          }}
+                          onClick={() => {
+                            if (isRunning) return;
+                            const nextVal = !(risk.multiplyVolumeByTf ?? false);
+                            if (onToggleMultiplyVolume) {
+                              onToggleMultiplyVolume(nextVal);
+                            } else {
+                              setRisk(r => ({ ...r, multiplyVolumeByTf: nextVal }));
+                            }
+                          }}
+                        >
+                          nhân Hệ số Ký Quỹ (Vốn)
+                        </span>
+                        <button type="button" className="btn-help" onClick={(e) => { e.stopPropagation(); alert("BẬT: Khối lượng ký quỹ của từng khung thời gian sẽ nhân với Hệ số Ký Quỹ tương ứng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0). Khung càng lớn vốn vào lệnh càng lớn theo bảng hệ số.\n\nTẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian (mọi khung đều vào cùng 1 lượng vốn bằng nhau)."); }} title="BẬT: Khối lượng ký quỹ nhân theo hệ số TF | TẮT: Cố định 1 mức vốn cho mọi khung.">[?]</button>
+                      </div>
+                    </div>
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap">
                         <span>Mức chốt lời gốc M5:</span>
+                        <button type="button" className="btn-help" onClick={() => alert("Tỷ lệ % chốt lời cơ sở tính trên khung M5 (mặc định 0.5%). Khi khớp lệnh ở các khung lớn hơn (M15, H1, H4...), mức chốt lời sẽ tự động nhân với Hệ số Ký Quỹ (Vốn) của khung đó (ví dụ M5 0.5% * H1 x2.0 = TP 1.0%).")} title="Tỷ lệ % chốt lời cơ sở M5 (nhân với Hệ số Ký Quỹ ở các khung lớn).">[?]</button>
                       </div>
                       <NumberSpinBox
                         value={risk.tpPct}
@@ -305,6 +357,7 @@ export default function SystemSettingsModal({
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap">
                         <span>Mức cắt lỗ gốc M5:</span>
+                        <button type="button" className="btn-help" onClick={() => alert("Tỷ lệ % cắt lỗ an toàn cơ sở tính trên khung M5 (mặc định 0.5%). Khi khớp lệnh ở các khung lớn hơn, mức cắt lỗ sẽ tự động nhân với Hệ số Ký Quỹ (Vốn) tương ứng để tương thích với biên độ nến khung lớn (ví dụ H1 x2.0 -> SL 1.0%).")} title="Tỷ lệ % cắt lỗ cơ sở M5 (nhân với Hệ số Ký Quỹ ở các khung lớn).">[?]</button>
                       </div>
                       <NumberSpinBox
                         value={risk.slPct}
@@ -314,6 +367,9 @@ export default function SystemSettingsModal({
                         suffix="%"
                         width="95px"
                       />
+                    </div>
+                    <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                      * Chỉ số trên sẽ nhân với Hệ số Ký Quỹ (Vốn)
                     </div>
                   </div>
                 </div>
@@ -328,36 +384,36 @@ export default function SystemSettingsModal({
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.pyramidDca ?? false} onChange={v => setStrat(s => ({ ...s, pyramidDca: v, negativeDca: v ? false : s.negativeDca }))} />
                             <span className="toggle-name">DCA Dương</span>
-                            <button className="btn-help" onClick={() => alert("BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.")} title="BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.">[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT (Pyramid DCA): Nhồi vị thế có lãi theo bậc thang xu hướng. Bắt buộc mở lệnh đầu tiên tại khung lớn nhất được tích chọn (ví dụ H4). Chỉ khi lệnh khung lớn đã khớp và vị thế đang CÓ LÃI, bot mới mở khóa đặt tiếp Limit ở các khung nhỏ hơn liền kề (H4 -> H2 -> H1 -> M30 -> M15 -> M5). Tuyệt đối không nhồi khi vị thế đang âm.\n\nTẮT: Không áp dụng cơ chế nhồi dương.")} title="BẬT: Nhồi thêm vị thế khi đang có lãi theo bậc thang xu hướng từ khung lớn xuống nhỏ.">[?]</button>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={strat.negativeDca ?? false} onChange={v => setStrat(s => ({ ...s, negativeDca: v, pyramidDca: v ? false : s.pyramidDca }))} />
                             <span className="toggle-name">DCA Âm</span>
-                            <button className="btn-help" onClick={() => alert("BẬT: Cho phép trung bình giá DCA khi âm.")}>[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT (Negative DCA): Trung bình giá khi vị thế gồng lỗ. Khi giá tiếp tục lùi về cản EMA200 của các khung lớn hơn, bot sẽ khớp thêm lệnh Limit để kéo giá vào lệnh bình quân (Average Entry). Đồng thời kích hoạt cơ chế Nâng cấp TF (Upgrade TF) để nới rộng biên độ TP/SL theo hệ số của khung lớn hơn vừa khớp.\n\nTẮT: Không trung bình giá khi đang âm.")} title="BẬT: Trung bình giá khi gồng lỗ và tự động nâng cấp biên độ TP/SL theo khung lớn.">[?]</button>
                           </div>
                         </div>
                         <div className="tactics-right-col">
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
                             <span className="toggle-name">Đánh Sóng Đảo Chiều (Hedge)</span>
-                            <button className="btn-help" onClick={() => alert("Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%")} title="Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều khi giá cách EMA200 H4 > 8%">[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT (Hedge Reversal): Đánh sóng hồi đảo chiều khi thị trường rướn quá đà. Khi giá chạy cách xa đường EMA200 H4 vượt quá ngưỡng an toàn (> 8%):\n1. Cầu dao bảo vệ tự động kích hoạt: Khóa không rải thêm Limit thuận trend ở các khung nhỏ để tránh đu đỉnh/bắt đáy non.\n2. Mở lệnh Hedge ngược xu hướng nhằm bắt nhịp sóng hồi kỹ thuật hồi quy về vùng cân bằng EMA200 H2/H4.\n\nTẮT: Tắt cơ chế bắt sóng hồi và không tự động khóa lưới theo ngưỡng rướn 8%.")} title="BẬT: Bắt sóng hồi đảo chiều và kích hoạt cầu dao bảo vệ khi giá rướn cách EMA200 H4 > 8%.">[?]</button>
                           </div>
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
                             <span className="toggle-name">Chốt lời bám EMA200</span>
-                            <button className="btn-help" onClick={() => alert("Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")} title="Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.">[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT (Dynamic EMA200 TP): Điểm chốt lời (TP) không cố định theo % mà liên tục bám động theo đường EMA200 của khung thời gian đối diện hoặc khung lớn hơn liền kề, giúp tối ưu hóa lợi nhuận tối đa theo toàn bộ con sóng hồi quy về cản.\n\nTẮT: Điểm TP cố định theo tỷ lệ % cài đặt ban đầu (nhân với hệ số TF).")} title="BẬT: TP tự động bám động theo đường EMA200 | TẮT: TP cố định theo % cài đặt.">[?]</button>
                           </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={entryCfg.altcoinFollowBtc ?? false} onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))} />
                             <span className="toggle-name">Đồng pha BTC & Lọc Vĩ mô</span>
-                            <button className="btn-help" onClick={() => alert("BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4 | TẮT: Từng TF hoạt động hoàn toàn độc lập")}>[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT: Altcoin (ETH, SOL...) neo chặt hướng giao dịch theo BTC (Đầu tàu). Nếu BTC đang xu hướng Long thì Altcoin chỉ được tìm điểm Long; nếu BTC Short thì chỉ tìm điểm Short. Đồng thời trần khung thời gian vào lệnh của Altcoin không được vượt quá khung thời gian cao nhất của BTC.\n\nTẮT: Cơ chế lọc theo BTC bị vô hiệu hóa. Từng coin và từng khung thời gian hoạt động độc lập 100% theo EMA200 của chính cặp coin đó.")} title="BẬT: Altcoin neo hướng & trần TF theo BTC | TẮT: Từng coin và từng TF tự do hoạt động độc lập.">[?]</button>
                           </div>
                         </div>
                       </div>
                     </div>
 
                     <div className="settings-group">
-                      <div className="settings-group-title">🛡️ Phòng Thủ Vị Thế Tự Động Hoá AI</div>
+                      <div className="settings-group-title">Phòng Thủ Vị Thế Tự Động Hoá AI</div>
                       <div style={{ padding: "10px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
                         Tính năng đang phát triển..
                       </div>
@@ -373,7 +429,7 @@ export default function SystemSettingsModal({
                         <div className="toggle-row">
                           <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
                           <span className="toggle-name">Đánh SMC Order Block</span>
-                          <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán nhận diện Order Block và tự động giao dịch SMC.")}>[?]</button>
+                          <button className="btn-help" onClick={() => alert("Kích hoạt chiến lược Smart Money Concepts (SMC): Tự động quét vùng mất cân bằng cung cầu (Order Block / FVG) để đặt lệnh đón thanh khoản theo cấu trúc sóng thị trường.")} title="Kích hoạt chiến lược Smart Money Concepts (Order Block / FVG).">[?]</button>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung thời gian gốc (Base TF):</span>
@@ -487,7 +543,7 @@ export default function SystemSettingsModal({
                       <div className="toggle-row">
                         <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
                         <span className="toggle-name">Quét Thanh Khoản Tự Động</span>
-                        <button className="btn-help" onClick={() => alert("Kích hoạt thuật toán săn thanh khoản các cụm lệnh Liquidation.")}>[?]</button>
+                        <button className="btn-help" onClick={() => alert("Kích hoạt chiến lược Săn Thanh Khoản (Liquidation Hunter): Quét các cụm thanh lý đòn bẩy lớn trên thị trường để tìm điểm quét râu đảo chiều.")} title="Kích hoạt chiến lược săn thanh lý Liquidation.">[?]</button>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ color: "#e0e0e0", fontSize: "12px" }}>Khung quét thanh khoản:</span>
@@ -515,7 +571,7 @@ export default function SystemSettingsModal({
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap">
                         <span>Đón trước cản:</span>
-                        <button className="btn-help" onClick={() => alert("Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")}>[?]</button>
+                        <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh Limit đón sớm hơn một khoảng % trước khi giá chạm đúng vào vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Ở các khung thời gian lớn hơn, độ lệch này sẽ tự động nhân với Hệ số Vào Lệnh (Entry) của khung đó (ví dụ H4 x6.8 -> đệm 0.34%).")} title="Độ lệch đệm đón trước cản EMA200 để lệnh dễ khớp trước khi giá bật nảy.">[?]</button>
                       </div>
                       <NumberSpinBox
                         value={entryCfg.entryOffset}
@@ -531,7 +587,7 @@ export default function SystemSettingsModal({
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap">
                         <span>Khoảng cách nhồi DCA:</span>
-                        <button className="btn-help" onClick={() => alert("Khoảng cách tối thiểu giữa 2 trục EMA200 liền kề (VD: 0.20%) để rải limit. Dưới mức này sẽ gộp lệnh.")}>[?]</button>
+                        <button className="btn-help" onClick={() => alert("Khoảng cách an toàn tối thiểu (Base Gap %): Ngưỡng cách biệt giá tối thiểu giữa 2 đường EMA200 liền kề để được rải lệnh Limit (mặc định 0.20% ở M5). Nếu 2 đường EMA200 quá sát nhau (nhỏ hơn khoảng cách này nhân với Hệ số Vào Lệnh), bot sẽ tự động bỏ qua khung nhỏ để dồn vào cản khung lớn hơn, tránh rải lệnh quá dày đặc.")} title="Khoảng cách an toàn tối thiểu giữa 2 đường EMA200 để tránh rải lệnh quá dày.">[?]</button>
                       </div>
                       <NumberSpinBox
                         value={entryCfg.dcaGapPct}
@@ -547,7 +603,7 @@ export default function SystemSettingsModal({
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap">
                         <span>Số nến xu hướng tối thiểu:</span>
-                        <button className="btn-help" onClick={() => alert("Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")}>[?]</button>
+                        <button className="btn-help" onClick={() => alert("Bộ lọc nến tích lũy (Accumulation Candles): Số lượng nến đóng cửa liên tục nằm hoàn toàn về một phía của EMA200 (mặc định 60 nến). Đảm bảo thị trường đã tích lũy và xác nhận một xu hướng vững chắc trước khi mở lệnh đón cản, loại bỏ tín hiệu nhiễu khi giá đang sideway cắt qua cắt lại EMA200.")} title="Số nến liên tục cùng phía EMA200 để xác nhận xu hướng vững chắc trước khi vào lệnh.">[?]</button>
                       </div>
                       <NumberSpinBox
                         value={entryCfg.accumCandles}
@@ -565,7 +621,7 @@ export default function SystemSettingsModal({
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
                           <span>Hệ số nhạy ETH (Vol Mult):</span>
-                          <button className="btn-help" onClick={() => alert("Hệ số nhân Volume cho ETH khi đánh theo BTC.")}>[?]</button>
+                          <button className="btn-help" onClick={() => alert("Hệ số nhạy ETH (Vol Mult): Trọng số điều chỉnh khối lượng riêng cho ETH khi bật chế độ Đồng pha BTC. Giúp tự động cân đối quy mô vào lệnh của ETH tương quan với biên độ biến động của thị trường so với BTC.")} title="Hệ số điều chỉnh khối lượng cho ETH khi bật chế độ Đồng pha BTC.">[?]</button>
                         </div>
                         <NumberSpinBox
                           value={entryCfg.ethVolMult}
@@ -576,6 +632,9 @@ export default function SystemSettingsModal({
                         />
                       </div>
                     )}
+                    <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                      * Chỉ số trên sẽ nhân với Hệ số Vào Lệnh (Entry)
+                    </div>
                   </div>
                 </div>
 
@@ -586,8 +645,28 @@ export default function SystemSettingsModal({
                     <thead>
                       <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
                         <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung</th>
-                        <th style={{ padding: "6px 8px" }}>Hệ số Ký Quỹ (Vốn)</th>
-                        <th style={{ padding: "6px 8px" }}>Hệ số Vào Lệnh (Entry)</th>
+                        <th style={{ padding: "6px 8px" }}>
+                          Hệ số Ký Quỹ (Vốn)
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert("Hệ số Ký Quỹ (Vốn) theo Khung Thời Gian:\n1. Tỷ lệ nhân khối lượng vào lệnh: Khi bật 'nhân Hệ số Ký Quỹ (Vốn)', khối lượng ký quỹ ở các khung M15, M30, H1, H2, H4 sẽ được nhân tương ứng theo hệ số này (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0).\n2. Hệ số nhân TP và SL: Mức TP và SL cơ sở của khung M5 sẽ được nhân với hệ số này để mở rộng biên độ tương ứng cho từng khung thời gian.")}
+                            title="Hệ số nhân khối lượng vốn và biên độ TP/SL cho từng khung thời gian."
+                          >
+                            [?]
+                          </button>
+                        </th>
+                        <th style={{ padding: "6px 8px" }}>
+                          Hệ số Vào Lệnh (Entry)
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert("Hệ số Vào Lệnh (Entry) theo Khung Thời Gian:\n- Dùng để nhân tỷ lệ với thông số 'Đón trước cản' (Base Offset %) và 'Khoảng cách nhồi DCA' (Base Gap %).\n- Giúp khung thời gian càng lớn thì vùng đệm đón cản và khoảng cách giữa các tầng Limit càng rộng, phù hợp với biên độ nến của khung đó.")}
+                            title="Hệ số nhân vùng đệm đón cản và khoảng cách tối thiểu giữa các đường EMA200."
+                          >
+                            [?]
+                          </button>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -600,9 +679,9 @@ export default function SystemSettingsModal({
                         ["H4",  "5.0x", "6.8x"],
                       ].map(([tf, vol, offset]) => (
                         <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
-                          <td style={{ padding: "6px 8px", textAlign: "left", fontWeight: "bold", color: "#26a69a" }}>{tf}</td>
-                          <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{vol}</td>
-                          <td style={{ padding: "6px 8px", color: "#e0e0e0" }}>{offset}</td>
+                          <td style={{ padding: "6px 8px", textAlign: "left", color: "#e0e0e0" }}>{tf}</td>
+                          <td style={{ padding: "6px 8px", color: "#26a69a", fontWeight: "bold" }}>{vol}</td>
+                          <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{offset}</td>
                         </tr>
                       ))}
                     </tbody>

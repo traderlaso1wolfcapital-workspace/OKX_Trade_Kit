@@ -12,6 +12,8 @@ export default function SidebarLeft({
   setIsRiskCollapsed,
   risk,
   setRisk,
+  isRunning = false,
+  onToggleMultiplyVolume,
 }) {
   const getBotLabel = () => {
     if (activeBotTab === "sub1") return "Bot EMA200";
@@ -153,10 +155,82 @@ export default function SidebarLeft({
                   suffix={risk.volUnit === "USDT" ? "$" : "%"}
                 />
               </div>
+              <div
+                className="risk-row"
+                style={{
+                  marginTop: "2px",
+                  marginBottom: "4px",
+                  justifyContent: "flex-start",
+                  gap: "8px",
+                  opacity: isRunning ? 0.6 : 1,
+                }}
+                title={isRunning ? "Vui lòng dừng bot để thay đổi thiết lập này" : ""}
+              >
+                <input
+                  type="checkbox"
+                  className="coin-toggle"
+                  checked={risk.multiplyVolumeByTf ?? false}
+                  disabled={isRunning}
+                  onChange={(e) => {
+                    if (isRunning) return;
+                    if (onToggleMultiplyVolume) {
+                      onToggleMultiplyVolume(e.target.checked);
+                    } else {
+                      setRisk((r) => ({ ...r, multiplyVolumeByTf: e.target.checked }));
+                    }
+                  }}
+                  style={{ cursor: isRunning ? "not-allowed" : "pointer" }}
+                />
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: risk.multiplyVolumeByTf ? "#26a69a" : "#888",
+                    fontWeight: risk.multiplyVolumeByTf ? 600 : "normal",
+                    cursor: isRunning ? "not-allowed" : "pointer",
+                    userSelect: "none",
+                    transition: "color 0.2s ease",
+                  }}
+                  onClick={() => {
+                    if (isRunning) return;
+                    const nextVal = !(risk.multiplyVolumeByTf ?? false);
+                    if (onToggleMultiplyVolume) {
+                      onToggleMultiplyVolume(nextVal);
+                    } else {
+                      setRisk((r) => ({ ...r, multiplyVolumeByTf: nextVal }));
+                    }
+                  }}
+                >
+                  nhân Hệ số Ký Quỹ (Vốn)
+                </span>
+                <button
+                  type="button"
+                  className="btn-help"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alert("BẬT: Khối lượng ký quỹ của từng khung thời gian sẽ nhân với Hệ số Ký Quỹ tương ứng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0). Khung càng lớn vốn vào lệnh càng lớn theo bảng hệ số.\n\nTẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian (mọi khung đều vào cùng 1 lượng vốn bằng nhau).");
+                  }}
+                  title="BẬT: Khối lượng ký quỹ nhân theo hệ số TF | TẮT: Cố định 1 mức vốn cho mọi khung."
+                >
+                  [?]
+                </button>
+              </div>
               {activeBotTab === "sub1" ? (
                 <>
                   <div className="risk-row">
-                    <label>Mức chốt lời gốc M5:</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <label style={{ margin: 0 }}>Mức chốt lời gốc M5:</label>
+                      <button
+                        type="button"
+                        className="btn-help"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          alert("Tỷ lệ % chốt lời cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn (M15, H1, H4...), mức chốt lời sẽ tự động nhân với Hệ số Ký Quỹ của khung đó (ví dụ M5 0.5% * H1 x2.0 = TP 1.0%).");
+                        }}
+                        title="Tỷ lệ % chốt lời cơ sở M5 (nhân hệ số TF ở các khung lớn)."
+                      >
+                        [?]
+                      </button>
+                    </div>
                     <NumberSpinBox
                       value={risk.tpPct}
                       onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
@@ -166,7 +240,20 @@ export default function SidebarLeft({
                     />
                   </div>
                   <div className="risk-row">
-                    <label>Mức cắt lỗ gốc M5:</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <label style={{ margin: 0 }}>Mức cắt lỗ gốc M5:</label>
+                      <button
+                        type="button"
+                        className="btn-help"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          alert("Tỷ lệ % cắt lỗ an toàn cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn, mức cắt lỗ sẽ tự động nhân với Hệ số Ký Quỹ tương ứng để tương thích với biên độ nến khung lớn.");
+                        }}
+                        title="Tỷ lệ % cắt lỗ cơ sở M5 (nhân hệ số TF ở các khung lớn)."
+                      >
+                        [?]
+                      </button>
+                    </div>
                     <NumberSpinBox
                       value={risk.slPct}
                       onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}

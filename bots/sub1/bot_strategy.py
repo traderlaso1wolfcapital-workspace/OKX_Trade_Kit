@@ -179,6 +179,7 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 if "ENABLE_MAX_ROI_EXIT" in cfg: set_val("ENABLE_MAX_ROI_EXIT", bool(cfg["ENABLE_MAX_ROI_EXIT"]))
                 if "ENABLE_SIDEWAY_VAP_EXIT" in cfg: set_val("ENABLE_SIDEWAY_VAP_EXIT", bool(cfg["ENABLE_SIDEWAY_VAP_EXIT"]))
                 if "ENABLE_H4_FLIP_CLOSE" in cfg: set_val("ENABLE_H4_FLIP_CLOSE", bool(cfg["ENABLE_H4_FLIP_CLOSE"]))
+                if "ENABLE_TF_VOLUME_MULTIPLIER" in cfg: set_val("ENABLE_TF_VOLUME_MULTIPLIER", bool(cfg["ENABLE_TF_VOLUME_MULTIPLIER"]))
 
                 # Thông số kỹ thuật & dung sai
                 if "DCA_GAP_THRESHOLD_PCT" in cfg:
@@ -2288,12 +2289,21 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             try:
                 cfg_file = env_paths.get("FILE_GLOBAL_CONFIG", "")
+                if not cfg_file or not os.path.exists(cfg_file):
+                    _possible = os.path.join(os.path.dirname(cfg_file) if cfg_file else "", "sub1_global_config.json")
+                    if os.path.exists(_possible):
+                        cfg_file = _possible
                 if cfg_file and os.path.exists(cfg_file):
                     with open(cfg_file, "r", encoding="utf-8") as _f:
                         _cfg = json.load(_f)
                         if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
                             globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
-            except: pass
+                        if "ENABLE_TF_VOLUME_MULTIPLIER" in _cfg:
+                            globals_ref.ENABLE_TF_VOLUME_MULTIPLIER = bool(_cfg["ENABLE_TF_VOLUME_MULTIPLIER"])
+                if getattr(tracker, "_last_seen_mult_flag", None) != getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False):
+                    tracker._last_seen_mult_flag = getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)
+                    print(f"⚙️ [CONFIG SYNC] Ký quỹ đa khung (ENABLE_TF_VOLUME_MULTIPLIER): {globals_ref.ENABLE_TF_VOLUME_MULTIPLIER}")
+            except Exception: pass
             target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
 
             if not is_enabled:
@@ -2461,36 +2471,30 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             
 
             
-            # ⚡ CẦU DAO CHỐNG RƯỚN VĨ MÔ (Macro Extension Breaker)
-            # Khi ALTCOIN_FOLLOW_BTC_EMA = ON, dùng trạng thái của BTC làm chuẩn
-            # Tránh Altcoin bị kẹt khóa vĩnh viễn do lệch pha H2/H4 EMA200 với BTC
-            # Khi Đồng pha = OFF, tắt luôn cầu dao vĩ mô
-            _is_sync = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
-            if not _is_sync:
+            # ⚡ CẦU DAO CHỐNG RƯỚN VĨ MÔ (Macro Extension Breaker) - PHỤC VỤ RIÊNG CHO SÓNG ĐẢO CHIỀU (HEDGE)
+            # Quản lý ĐỘC QUYỀN bởi nút "Đánh Sóng Đảo Chiều (Hedge)" (ENABLE_STRATEGY_HEDGE)
+            # Khi TẮT Hedge: Cầu dao rướn tắt hoàn toàn, tuyệt đối không khóa lưới thuận trend của người dùng!
+            _enable_hedge = getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", False))
+            if not _enable_hedge:
                 tracker.is_macro_overextended = False
             else:
-                if _is_alt_synced:
-                    _btc_tk_macro = state_matrix.get("BTC-USDT-SWAP")
-                    if _btc_tk_macro:
-                        tracker.is_macro_overextended = getattr(_btc_tk_macro, "is_macro_overextended", False)
-                else:
-                    _h4_ema200 = get_ema200_for_tf("H4")
-                    _h2_ema200 = get_ema200_for_tf("H2")
-                    if _h4_ema200 > 0 and _h2_ema200 > 0:
-                        _macro_dist_pct = abs(tracker.live_price - _h4_ema200) / _h4_ema200
-                        _limit_pct = getattr(globals_ref, "MACRO_EXTENSION_LIMIT_PCT", Decimal("0.08")) * getattr(tracker, "vol_mult", Decimal("1.0"))
-                        _is_overextended = getattr(tracker, "is_macro_overextended", False)
-                        
-                        if _macro_dist_pct > _limit_pct:
-                            if not _is_overextended:
-                                tracker.is_macro_overextended = True
-                                print(f"\n🚨 [CẦU DAO VĨ MÔ] {coin_name} vượt ngưỡng rướn {_limit_pct*100:.1f}% (Cách H4 {_macro_dist_pct*100:.1f}%). Khóa rải lưới M5, M15, M30!")
-                        elif _is_overextended:
-                            # Mở khóa ở mốc 2%
-                            _unlock_limit = Decimal("0.02")
-                            if _macro_dist_pct <= _unlock_limit:
-                                tracker.is_macro_overextended = False
-                                print(f"\n🔓 [MỞ KHÓA VĨ MÔ] {coin_name} đã điều chỉnh về gần H4 (Cách {_macro_dist_pct*100:.1f}% <= 2%). Mở lại lưới thuận xu hướng!")
+                _h4_ema200 = get_ema200_for_tf("H4")
+                _h2_ema200 = get_ema200_for_tf("H2")
+                if _h4_ema200 > 0 and _h2_ema200 > 0:
+                    _macro_dist_pct = abs(tracker.live_price - _h4_ema200) / _h4_ema200
+                    _limit_pct = getattr(globals_ref, "MACRO_EXTENSION_LIMIT_PCT", Decimal("0.08")) * getattr(tracker, "vol_mult", Decimal("1.0"))
+                    _is_overextended = getattr(tracker, "is_macro_overextended", False)
+                    
+                    if _macro_dist_pct > _limit_pct:
+                        if not _is_overextended:
+                            tracker.is_macro_overextended = True
+                            print(f"\n🚨 [HEDGE - CẦU DAO VĨ MÔ] {coin_name} vượt ngưỡng rướn {_limit_pct*100:.1f}% (Cách H4 {_macro_dist_pct*100:.1f}%). Khóa lưới thuận để kích hoạt Hedge!")
+                    elif _is_overextended:
+                        # Mở khóa ở mốc 2%
+                        _unlock_limit = Decimal("0.02")
+                        if _macro_dist_pct <= _unlock_limit:
+                            tracker.is_macro_overextended = False
+                            print(f"\n🔓 [HEDGE - MỞ KHÓA VĨ MÔ] {coin_name} đã điều chỉnh về gần H4 (Cách {_macro_dist_pct*100:.1f}% <= 2%). Mở lại lưới thuận xu hướng!")
 
             _is_overextended = getattr(tracker, "is_macro_overextended", False)
             _blocked_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])] if _is_overextended else []
@@ -2531,12 +2535,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             elif _is_neg_dca:
                 target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
             else:
-                # ⚡ CHẾ ĐỘ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
-                if not tracker.has_long:
-                    target_long_tfs = list(aligned_long_tfs)
-                else:
-                    # Đã có vị thế -> TUYỆT ĐỐI KHÔNG NHỒI LỆNH (huỷ mọi lệnh limit treo)
-                    target_long_tfs = []
+                # ⚡ LƯỚI LIMIT ĐA KHUNG ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
+                # Theo yêu cầu CEO: Vẫn giữ nguyên toàn bộ lưới limit ở các TF chưa khớp,
+                # thị trường chạy đến đâu khớp đến đó, không chuyển sang chế độ đơn lệnh.
+                target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
                 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
@@ -2569,12 +2571,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             elif _is_neg_dca:
                 target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
             else:
-                # ⚡ CHẾ ĐỘ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
-                if not tracker.has_short:
-                    target_short_tfs = list(aligned_short_tfs)
-                else:
-                    # Đã có vị thế -> TUYỆT ĐỐI KHÔNG NHỒI LỆNH (huỷ mọi lệnh limit treo)
-                    target_short_tfs = []
+                # ⚡ LƯỚI LIMIT ĐA KHUNG ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
+                # Theo yêu cầu CEO: Vẫn giữ nguyên toàn bộ lưới limit ở các TF chưa khớp,
+                # thị trường chạy đến đâu khớp đến đó, không chuyển sang chế độ đơn lệnh.
+                target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
                 
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
 
@@ -2728,7 +2728,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if _is_this_tf_hedge:
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
-                    tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    if getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False):
+                        tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    else:
+                        tf_vol_mult = Decimal("1.0")
                 tf_target_usdt = target_usdt * tf_vol_mult * Decimal(str(_get_leverage(tf)))
                 px_tf = calculate_entry_px(tf, "long")
                 if px_tf <= 0: continue
@@ -2774,6 +2777,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     matching_order = tf_orders[0]
                 
                 last_closed_ts_for_tf = get_current_candle_start_ms(tf)
+                tf_cooldown_sec = 900 if tf in ("M5", "M15") else 1800
+                now_sec = time.time()
                 
                 if matching_order:
                     try:
@@ -2782,39 +2787,57 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         pct_diff = abs(new_px - old_px) / old_px
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
+                        size_changed = abs(new_sz - old_sz) / max(old_sz, Decimal("0.0001")) > Decimal("0.05")
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
-                        # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
-                        if old_sz == new_sz and last_closed_ts_for_tf > 0 and last_closed_ts_for_tf == tracker.last_limit_update_ts.get(tf, 0):
+                        last_placed_sec = getattr(tracker, "last_limit_order_sec_long", {}).get(tf, 0)
+                        in_cooldown = (now_sec - last_placed_sec) < tf_cooldown_sec
+
+                        # ⚡ BẢO VỆ LỆNH LIMIT HỢP LỆ THEO YÊU CẦU:
+                        # Nếu đang trong cooldown (15p cho M5/M15, 30p cho M30/H1/H2/H4) và size không đổi và giá chênh lệch < 1.0%:
+                        # TUYỆT ĐỐI GIỮ NGUYÊN LỆNH ĐANG TREO TRÊN SÀN, KHÔNG HỦY, KHÔNG AMEND!
+                        if not size_changed and in_cooldown and pct_diff < Decimal("0.01"):
                             tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
                             continue
                     except Exception as e:
-                        hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                        hft_logger.error(f"Lỗi kiểm tra cooldown lệnh LONG: {e}")
                 
-                # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ để tránh khoảng trống lệnh trên sàn
+                # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ khi cần (hết cooldown hoặc size đổi hoặc giá lệch > 1%)
                 amend_ok = False
                 if matching_order:
                     try:
+                        old_px = Decimal(matching_order["px"])
+                        new_px = Decimal(px_str)
+                        old_sz = Decimal(matching_order["sz"])
+                        new_sz = Decimal(str(sz_for_tf))
+                        if old_px == new_px and old_sz == new_sz:
+                            amend_ok = True
+                            tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
+                            if not hasattr(tracker, "last_limit_order_sec_long"): tracker.last_limit_order_sec_long = {}
+                            tracker.last_limit_order_sec_long[tf] = now_sec
+                            tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
+                            continue
+
                         amend_body = {"ordId": matching_order["ordId"], "instId": swap_id, "newPx": px_str}
                         if Decimal(str(sz_for_tf)) != Decimal(matching_order["sz"]):
                             amend_body["newSz"] = str(sz_for_tf)
                         resp = client.request("POST", "/api/v5/trade/amend-order", body=amend_body)
-                        if resp.get("code") == "0":
+                        if resp.get("code") in ("0", "51403"):
                             tracker.placed_entry_px_long_by_tf[tf] = px_str
                             amend_ok = True
+                            if not hasattr(tracker, "last_limit_order_sec_long"): tracker.last_limit_order_sec_long = {}
+                            tracker.last_limit_order_sec_long[tf] = now_sec
                             tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
-                if not amend_ok:
-                    # Fallback: Hủy lệnh cũ rồi đặt lệnh mới
-                    try:
-                        long_orders_tf = [o for o in actual_pending
-                                          if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}EL{tf}")
-                                          and o.get("tdMode") == tf_mode and o.get("side") == "buy"]
-                        if long_orders_tf:
-                            client.request("POST", "/api/v5/trade/cancel-batch-orders",
-                                           body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in long_orders_tf])
-                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                # ⚡ BẢO VỆ LỆNH TRÊN SÀN:
+                # Nếu matching_order ĐÃ CÓ trên sàn nhưng amend thất bại tạm thời (ví dụ lag API):
+                # TUYỆT ĐỐI KHÔNG HỦY LỆNH ĐANG TREO! Bảo lưu lệnh cũ trên sàn.
+                if matching_order and not amend_ok:
+                    tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
+                    continue
+
+                if not amend_ok and not matching_order:
+                    # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
                         try:
                             _lever = str(_get_leverage(tf))
@@ -2864,6 +2887,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
                                          f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
+                        if not hasattr(tracker, "last_limit_order_sec_long"): tracker.last_limit_order_sec_long = {}
+                        tracker.last_limit_order_sec_long[tf] = time.time()
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf
                     except Exception as _e:
                         tracker.placed_entry_px_long_by_tf[tf] = "ERR"
@@ -2917,7 +2942,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if _is_this_tf_hedge:
                     tf_vol_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf, Decimal("1.0"))
                 else:
-                    tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    if getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False):
+                        tf_vol_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                    else:
+                        tf_vol_mult = Decimal("1.0")
                 tf_target_usdt = target_usdt * tf_vol_mult * Decimal(str(_get_leverage(tf)))
                 px_tf = calculate_entry_px(tf, "short")
                 if px_tf <= 0: continue
@@ -2963,6 +2991,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     matching_order = tf_orders[0]
                 
                 last_closed_ts_for_tf_s = get_current_candle_start_ms(tf)
+                tf_cooldown_sec = 900 if tf in ("M5", "M15") else 1800
+                now_sec = time.time()
                 
                 if matching_order:
                     try:
@@ -2971,39 +3001,57 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         pct_diff = abs(new_px - old_px) / old_px
                         old_sz = Decimal(matching_order["sz"])
                         new_sz = Decimal(str(sz_for_tf))
+                        size_changed = abs(new_sz - old_sz) / max(old_sz, Decimal("0.0001")) > Decimal("0.05")
                         
-                        # ⚡ PER-TF CANDLE COOLDOWN: Chỉ skip amend nếu nến chưa đóng mới VÀ size không thay đổi
-                        # Nếu User vừa lưu Volume mới (old_sz != new_sz) → Thực hiện amend cập nhật size lên OKX ngay lập tức!
-                        if old_sz == new_sz and last_closed_ts_for_tf_s > 0 and last_closed_ts_for_tf_s == tracker.last_limit_update_ts.get(tf, 0):
+                        last_placed_sec = getattr(tracker, "last_limit_order_sec_short", {}).get(tf, 0)
+                        in_cooldown = (now_sec - last_placed_sec) < tf_cooldown_sec
+
+                        # ⚡ BẢO VỆ LỆNH LIMIT HỢP LỆ THEO YÊU CẦU:
+                        # Nếu đang trong cooldown (15p cho M5/M15, 30p cho M30/H1/H2/H4) và size không đổi và giá chênh lệch < 1.0%:
+                        # TUYỆT ĐỐI GIỮ NGUYÊN LỆNH ĐANG TREO TRÊN SÀN, KHÔNG HỦY, KHÔNG AMEND!
+                        if not size_changed and in_cooldown and pct_diff < Decimal("0.01"):
                             tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
                             continue
                     except Exception as e:
-                        hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                        hft_logger.error(f"Lỗi kiểm tra cooldown lệnh SHORT: {e}")
                 
-                # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ để tránh khoảng trống lệnh trên sàn
+                # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ khi cần (hết cooldown hoặc size đổi hoặc giá lệch > 1%)
                 amend_ok = False
                 if matching_order:
                     try:
+                        old_px = Decimal(matching_order["px"])
+                        new_px = Decimal(px_str)
+                        old_sz = Decimal(matching_order["sz"])
+                        new_sz = Decimal(str(sz_for_tf))
+                        if old_px == new_px and old_sz == new_sz:
+                            amend_ok = True
+                            tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
+                            if not hasattr(tracker, "last_limit_order_sec_short"): tracker.last_limit_order_sec_short = {}
+                            tracker.last_limit_order_sec_short[tf] = now_sec
+                            tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
+                            continue
+
                         amend_body = {"ordId": matching_order["ordId"], "instId": swap_id, "newPx": px_str}
                         if Decimal(str(sz_for_tf)) != Decimal(matching_order["sz"]):
                             amend_body["newSz"] = str(sz_for_tf)
                         resp = client.request("POST", "/api/v5/trade/amend-order", body=amend_body)
-                        if resp.get("code") == "0":
+                        if resp.get("code") in ("0", "51403"):
                             tracker.placed_entry_px_short_by_tf[tf] = px_str
                             amend_ok = True
+                            if not hasattr(tracker, "last_limit_order_sec_short"): tracker.last_limit_order_sec_short = {}
+                            tracker.last_limit_order_sec_short[tf] = now_sec
                             tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                 
-                if not amend_ok:
-                    # Fallback: Hủy lệnh cũ rồi đặt lệnh mới
-                    try:
-                        short_orders_tf = [o for o in actual_pending
-                                           if o.get("clOrdId","").startswith(f"{CL_ORD_PREFIX}ES{tf}")
-                                           and o.get("tdMode") == tf_mode and o.get("side") == "sell"]
-                        if short_orders_tf:
-                            client.request("POST", "/api/v5/trade/cancel-batch-orders",
-                                           body=[{"ordId": o["ordId"], "instId": o["instId"]} for o in short_orders_tf])
-                    except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
+                # ⚡ BẢO VỆ LỆNH TRÊN SÀN:
+                # Nếu matching_order ĐÃ CÓ trên sàn nhưng amend thất bại tạm thời (ví dụ lag API):
+                # TUYỆT ĐỐI KHÔNG HỦY LỆNH ĐANG TREO! Bảo lưu lệnh cũ trên sàn.
+                if matching_order and not amend_ok:
+                    tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
+                    continue
+
+                if not amend_ok and not matching_order:
+                    # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
                         try:
                             _lever = str(_get_leverage(tf))
@@ -3049,6 +3097,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
                                          f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
+                        if not hasattr(tracker, "last_limit_order_sec_short"): tracker.last_limit_order_sec_short = {}
+                        tracker.last_limit_order_sec_short[tf] = time.time()
                         tracker.last_limit_update_ts[tf] = last_closed_ts_for_tf_s
                     except Exception as _e:
                         print(f"🚨 [Hệ thống] Lỗi đặt lệnh Limit Short {tf}: {_e}")

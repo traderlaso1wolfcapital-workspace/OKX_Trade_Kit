@@ -17,6 +17,148 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[19/09/2026]** - Rà Soát Logic Lưới Limit Đa Khung (Tại Sao Chỉ Đặt Limit H4 Mà Bỏ Qua M5, M15):
+  - **Mô tả:** Người dùng tắt cả 2 nút DCA Dương & DCA Âm, bật Đồng pha BTC, tích chọn đầy đủ các TF trade (M5, M15, M30, H1, H2, H4). Tuy nhiên trên terminal bot chỉ hiển thị đang limit H4 cho BTC và ETH, dù M5 (▲ 517-0) và M15 (▲ 156-0) đều thỏa mãn điều kiện.
+  - **Nguyên nhân phát hiện:**
+    1. **Tiểu trình bot đang chạy mã nguồn cũ:** Tại thời điểm 07:15:02, tiến trình bot chạy từ 07:12:00 vẫn đang giữ mã nguồn cũ trong bộ nhớ (terminal hiển thị `Mode: Đơn Lệnh`).
+    2. **Cơ chế Hot-Reload chưa theo dõi `bot_strategy.py`:** Bộ kiểm tra sửa đổi file trong `sys_bot_sub1.py` chỉ lắng nghe `bot_sub1.py`, `bot_config.py`, và `bot_ui.py`, bỏ sót `bot_strategy.py`. Do đó khi cập nhật logic lưới đa khung trong `bot_strategy.py`, bot đang chạy không tự động nạp lại.
+    3. **Cấu hình ENABLED_TFS của ETH thiếu M15:** Trong `sub1_global_config.json`, danh sách khung thời gian của `ETH-USDT-SWAP` chỉ mới lưu `["H4", "H2", "H1", "M5"]`, chưa có `M15`.
+    4. **Biến loop timer:** Sửa lỗi thiếu dòng khai báo `last_realtime_scan, last_limit_setup, last_dashboard_update = 0.0, 0.0, 0.0` trong [sys_bot_sub1.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/sys_bot_sub1.py#L368).
+    5. **Xử lý tuần tự loại bỏ Race Condition (Multi-coin):** Chuyển vòng lặp quét coin trong [sys_bot_sub1.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/sys_bot_sub1.py#L555) từ đa luồng (thread pool) sang tuần tự (BTC trước, ETH sau). Đảm bảo BTC cập nhật trạng thái xong 100% để Altcoin đồng pha chính xác, đồng thời triệt tiêu hoàn toàn hiện tượng các luồng ghi đè biến `globals_ref.ENABLED_TFS` của nhau.
+    6. **Tối ưu không gian Logs Terminal:** Ẩn hoàn toàn thanh công cụ mini ("1 chu kỳ gần nhất - Ghim log mới nhất - Sao chép - Xóa") trong [LogsTerminal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx) theo yêu cầu CEO để giải phóng tối đa diện tích hiển thị.
+
+  - **Đã thực hiện & Kiểm chứng:**
+    1. **Kiểm chứng thuật toán trực tiếp trên dữ liệu OKX thật (`test_cycle.py`):**
+       - BTC đặt đồng thời 3 khung: **M5** (80,070.1), **M15** (78,463.4), **H4** (75,906.3) ✅
+       - ETH đặt đồng thời 4 khung: **M5** (2,570.23), **M15** (2,499.58), **H2** (2,465.77), **H4** (2,382.75) ✅
+       - Xác nhận thuật toán trong [bot_strategy.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py) hoạt động hoàn toàn chính xác 100%.
+    2. **Cập nhật hiển thị UI:** Sửa [bot_ui.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py#L174-L175) hiển thị `Mode: Lưới Đa Khung` thay vì `Mode: Đơn Lệnh` khi tắt cả 2 nút DCA.
+    3. **Kích hoạt Hot-Reload:** Đã cập nhật version stamp trong [bot_sub1.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_sub1.py) để ép tiểu trình bot nạp lại toàn bộ logic mới ngay lập tức.
+    4. **Đồng bộ config:** Bổ sung `"M15"` vào `ETH-USDT-SWAP` trong `sub1_global_config.json`.
+
+
+- **[19/09/2026]** - Chuẩn Hóa & Nâng Cấp Giải Thích Chức Năng Các Nút [?] Trên Toàn Bộ Giao Diện:
+  - **Mô tả:** Rà soát và viết lại toàn bộ nội dung hướng dẫn, chú giải chức năng ở tất cả các nút `[?]` (cả modal Cài Đặt Hệ Thống và thanh Sidebar bên trái) để thông tin đạt độ chuẩn xác, chuyên sâu và bám sát 100% logic thuật toán của bot.
+  - **Đã thực hiện:**
+    1. **Bổ sung nút `[?]` tại SidebarLeft:** Thêm `[?]` cạnh nhãn "nhân Hệ số Ký Quỹ (Vốn)", "Mức chốt lời gốc M5", và "Mức cắt lỗ gốc M5" giúp người dùng tra cứu nhanh mà không cần mở modal cài đặt.
+    2. **Chuẩn hóa nội dung các nút `[?]` trong SystemSettingsModal:**
+       - **DCA Dương (Pyramid DCA):** Giải thích rõ cơ chế nhồi thuận xu hướng từ khung lớn nhất (H4) xuống nhỏ dần, chỉ mở khoá khung nhỏ khi vị thế đang có LÃI.
+       - **DCA Âm (Negative DCA):** Giải thích rõ cơ chế kéo Average Entry khi gồng lỗ và tự động Nâng cấp TF (Upgrade TF) mở rộng biên độ TP/SL theo hệ số khung lớn.
+       - **Đánh Sóng Đảo Chiều (Hedge):** Phân định rạch ròi cơ chế kích hoạt khi giá rướn > 8% so với EMA200 H4: tự động khóa lưới thuận trend để phòng thủ, đồng thời mở lệnh Hedge ngược hướng bắt nhịp hồi về EMA200 H2/H4.
+       - **Chốt lời bám EMA200 (Dynamic EMA200 TP):** Giải thích cơ chế TP bám động theo đường EMA200 của khung lớn hơn / khung đối diện để ăn trọn con sóng lớn.
+       - **Đồng pha BTC & Lọc Vĩ mô:** Làm rõ cơ chế Altcoin neo chặt hướng giao dịch và áp trần khung thời gian theo BTC (BẬT) hoặc độc lập 100% (TẮT).
+       - **Điểm Vào Lệnh (Entry Setup):** Giải thích cặn kẽ "Đón trước cản" (Base Offset %), "Khoảng cách nhồi DCA" (Base Gap %), "Số nến xu hướng tối thiểu" (Accumulation Candles), và "Hệ số nhạy ETH".
+       - **Hệ Số Nhân Đa Khung:** Bổ sung trực tiếp nút `[?]` trên tiêu đề cột "Hệ số Ký Quỹ (Vốn)" và "Hệ số Vào Lệnh (Entry)" để người dùng hiểu rõ vai trò nhân vốn/TP/SL và nhân vùng đệm của từng khung.
+    3. **Hỗ trợ đa nền tảng:** Mỗi nút `[?]` đều hỗ trợ cả rê chuột xem Tooltip nhanh (`title`) lẫn click chuột để bật hộp thoại chi tiết (`onClick alert`).
+
+- **[19/09/2026]** - Rà Soát Toàn Bộ Mã Nguồn & Bóc Tách Triệt Để Chồng Chéo Logic:
+  - **Mô tả:** CEO yêu cầu rà soát toàn bộ các khối lệnh, hàm và biến chiến thuật từ đầu đến cuối để đảm bảo mọi biến khi thay đổi đều hoạt động độc lập, liên kết chặt chẽ, tuyệt đối không bị chồng chéo hoặc gộp nhầm lẫn nhau.
+  - **Phát hiện chồng chéo:** Biến `is_macro_overextended` (Cầu dao rướn vĩ mô >8% H4) vốn là điều kiện kích hoạt của chiến thuật "Đánh Sóng Đảo Chiều (Hedge)", nhưng trước đây bị gộp nhầm vào biến `ALTCOIN_FOLLOW_BTC_EMA` ("Đồng pha BTC & Lọc Vĩ mô"). Khiến cho khi bật Đồng pha BTC thì bot tự động khóa lưới limit của người dùng dù không bật Hedge.
+  - **Đã thực hiện:**
+    1. **Bóc tách độc quyền:** Chuyển `is_macro_overextended` sang quản lý độc quyền bởi `ENABLE_STRATEGY_HEDGE`. Khi tắt Hedge, cầu dao rướn tắt hoàn toàn, lưới thuận xu hướng không bao giờ bị khóa. Chỉ khi bật Hedge mới kiểm tra rướn >8% để tìm điểm vào lệnh Hedge.
+    2. **Độc lập tính năng:**
+       - `ALTCOIN_FOLLOW_BTC_EMA`: Chỉ thuần túy điều hướng Altcoin theo BTC hoặc chạy độc lập đa khung.
+       - `ENABLE_PYRAMID_DCA` / `ENABLE_NEGATIVE_DCA`: Quản lý nhồi bậc thang hoặc DCA âm; khi tắt cả 2 thì kích hoạt Lưới Limit Đa Khung Độc Lập (giữ nguyên các TF chưa khớp).
+       - `ENABLE_TF_VOLUME_MULTIPLIER`: Quản lý hệ số nhân vốn đa khung độc lập.
+       - Bộ đệm Cooldown 15p/30p: Bảo vệ lệnh treo sàn độc lập khỏi chu kỳ phân tích 2s.
+       - 7 lớp Safeguards AI: Chạy độc lập trong khâu quản lý thoát lệnh vị thế.
+
+
+- **[19/09/2026]** - Chuyển Mặc Định "Đồng Pha BTC & Lọc Vĩ Mô" Sang BẬT (ON):
+  - **Mô tả:** Chuyển trạng thái mặc định của tính năng "Đồng pha BTC & Lọc Vĩ mô" (`ALTCOIN_FOLLOW_BTC_EMA`) sang BẬT (ON) ở cả tầng core chiến thuật backend và giao diện web.
+  - **Đã thực hiện:**
+    1. Cập nhật `ALTCOIN_FOLLOW_BTC_EMA = True` làm mặc định trong [bot_config.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_config.py#L23).
+    2. Cập nhật mặc định `altcoinFollowBtc: true` cho toàn bộ state khởi tạo và reset mặc định trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx).
+    3. Cập nhật file cấu hình live của người dùng `sub1_global_config.json` với `"ALTCOIN_FOLLOW_BTC_EMA": true`.
+
+
+- **[19/09/2026]** - Giữ Nguyên Lưới Limit Đa Khung Khi Khớp Vị Thế (Tắt Cả 2 Nút DCA Dương & DCA Âm):
+  - **Mô tả:** Khi người dùng tắt cả 2 nút "DCA Dương" và "DCA Âm", hệ thống trước đây chuyển sang chế độ Đơn Lệnh (ngay khi 1 TF khớp thì huỷ sạch toàn bộ lệnh limit còn lại). CEO yêu cầu không huỷ lưới, mà tiếp tục duy trì các lệnh limit ở những TF chưa khớp (thị trường chạy đến đâu khớp đến đó, TF nào được tích chọn trong TF trade thì mở khoá limit ở TF đó).
+  - **Đã thực hiện:**
+    1. Cập nhật nhánh `else` trong [bot_strategy.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py#L2544-L2588) cho cả LONG và SHORT: `target_tfs = [tf for tf in aligned_tfs if tf not in _filled]`.
+    2. Khi có 1 lệnh Limit khớp (ví dụ M15): Khung M15 đã vào `_filled` nên không đặt lại M15, nhưng các khung khác (M5, M30, H1, H2, H4...) nếu được tích chọn trong TF Trade và thoả mãn điều kiện nến/EMA vẫn ĐƯỢC GIỮ NGUYÊN trên sàn OKX.
+    3. Kết hợp với cơ chế cooldown 15p/30p, toàn bộ lưới limit sẽ nằm yên trên sàn đón giá, không bị huỷ bỏ bất ngờ.
+
+
+- **[19/09/2026]** - Sửa Lỗi Không Click Được Nút "DỪNG BOT":
+  - **Mô tả:** Người dùng bấm vào nút "■ DỪNG BOT" nhưng hệ thống không phản hồi, không dừng được bot.
+  - **Nguyên nhân:** Hàm `handleStopBot` trong `App.jsx` bị kẹt bởi dòng chặn `if (!window.confirm("...")) return;`. Trên trình duyệt thực tế, hộp thoại `window.confirm` bị chặn/chống spam hoặc trả về `false` tự động khiến lệnh dừng bot bị huỷ ngay tức khắc trước khi kịp gọi API.
+  - **Đã thực hiện:**
+    1. Gỡ bỏ hoàn toàn `window.confirm` khỏi `handleStopBot`.
+    2. Khi click "■ DỪNG BOT", bot lập tức chuyển sang trạng thái loading xoay tròn (`[spinner] ĐANG DỪNG BOT...`), gửi ngay POST `/api/bot/stop` và dừng bot dứt khoát.
+    3. Thêm fallback an toàn cho tham số `strategy` và `uid`.
+
+
+- **[19/09/2026]** - Sửa Lỗi Không Áp Dụng Hệ Số Ký Quỹ & Chống Vòng Lặp Huỷ/Đặt Lệnh Limit Sau 2 Giây:
+  - **Mô tả:** 
+    1. Khi người dùng gạt nút "nhân Hệ số Ký Quỹ (Vốn)", lệnh limit trên sàn OKX vẫn bám theo ký quỹ cơ sở M5 mà chưa nhân với hệ số đa khung (ví dụ H4 x5.0).
+    2. Trong khi bot đang chạy, lệnh limit vừa đặt lên sàn sau 2 giây đã bị huỷ và đặt lại liên tục theo chu kỳ bot.
+  - **Nguyên nhân:**
+    1. Công tắc `nhân Hệ số Ký Quỹ (Vốn)` ở giao diện frontend chỉ cập nhật local React state `risk.multiplyVolumeByTf` mà không tự động gửi API POST tới `/api/bot/config`, khiến file cấu hình backend `sub1_global_config.json` thiếu key `ENABLE_TF_VOLUME_MULTIPLIER` (mặc định False). Ngoài ra hàm `handleStartBot` cũng không gửi đồng bộ cờ này trước khi khởi động.
+    2. Chu kỳ bot chạy mỗi 2 giây, giá entry tính toán (`calculate_entry_px`) rung lắc nhẹ theo tick giá nến. Khi lệnh đã có trên sàn, bot so sánh thấy sai lệch timestamp hoặc giá rồi gọi amend; nếu sàn trả về mã 51403 ("no change") hoặc lỗi, bot fallback hủy toàn bộ batch lệnh và đặt lại, tạo thành vòng lặp hủy/đặt 2s.
+  - **Đã thực hiện:**
+    1. **Tự Động Lưu & Đồng Bộ Hệ Số Ký Quỹ:**
+       - Thêm hàm `handleToggleMultiplyVolume` trong `App.jsx`, gọi trực tiếp API `/api/bot/config` lưu ngay lập tức cờ `ENABLE_TF_VOLUME_MULTIPLIER` khi người dùng gạt công tắc.
+       - Trong `handleStartBot`: Tự động đồng bộ `position_volume` và `ENABLE_TF_VOLUME_MULTIPLIER` lên backend trước khi gọi lệnh khởi động bot.
+       - Cập nhật `bot_strategy.py` tự động nạp `ENABLE_TF_VOLUME_MULTIPLIER` từ `FILE_GLOBAL_CONFIG` (kèm fallback) và log ngay khi có thay đổi.
+       - Cập nhật file cấu hình người dùng `sub1_global_config.json` với `ENABLE_TF_VOLUME_MULTIPLIER: True`.
+    2. **Cơ Chế Bảo Vệ Cooldown 15p/30p & Tuyệt Đối Không Huỷ Lệnh Limit Hợp Lệ:**
+       - Áp dụng thời gian chờ (cooldown): 15 phút (900s) cho M5/M15, 30 phút (1800s) cho M30/H1/H2/H4.
+       - Nếu lệnh Limit đang treo trên sàn và đang trong thời gian cooldown: Nếu khối lượng không đổi (>5%) và giá chênh lệch < 1.0%, bot TUYỆT ĐỐI GIỮ NGUYÊN lệnh, bỏ qua không gọi sàn (`continue`), chấm dứt 100% vòng lặp hủy/đặt 2s.
+       - Trường hợp giá và khối lượng hoàn toàn không đổi (`old_px == new_px and old_sz == new_sz`), bot giữ nguyên lệnh mà không tốn request API.
+       - Khi amend lệnh, ghi nhận mã 51403 của OKX ("no change") là thành công (`amend_ok = True`).
+       - Thêm cơ chế bảo vệ tối thượng: Nếu lệnh đã có trên sàn nhưng lệnh amend thất bại tạm thời (lag mạng), bot BẢO LƯU LỆNH CŨ, tuyệt đối không huỷ lệnh đang treo.
+
+
+- **[19/09/2026]** - Thêm Trạng Thái Loading Trực Quan Khi Bấm CHẠY BOT / DỪNG BOT:
+  - **Mô tả:** Thêm hiệu ứng xoay tròn (spinner) và trạng thái loading khi chuyển đổi giữa 2 nút "CHẠY BOT" và "DỪNG BOT" để người dùng/khán giả theo dõi livestream biết được hệ thống đã nhận lệnh click và đang tiến hành kích hoạt.
+  - **Nguyên nhân:** Trước đây khi click CHẠY/DỪNG BOT, code lập tức gán đè biến `setOverrideBotRunning` sang trạng thái đích trước khi API fetch hoàn tất. Điều này làm nút nhảy vọt sang nút đích ngay tức khắc, nuốt chửng hoàn toàn trạng thái loading.
+  - **Đã thực hiện:**
+    1. Tách riêng nhánh render loading cho cả 2 hành động:
+       - Khi bấm "CHẠY BOT": Hiển thị nút xanh phát sáng kèm spinner xoay: `[spinner] ĐANG KHỞI ĐỘNG BOT...` (cursor: wait).
+       - Khi bấm "DỪNG BOT": Hiển thị nút đỏ phát sáng kèm spinner xoay: `[spinner] ĐANG DỪNG BOT...` (cursor: wait).
+    2. Cập nhật `handleStartBot` và `handleStopBot`: Giữ trạng thái loading tối thiểu 800ms để khán giả nhìn rõ ràng, và chỉ kích hoạt chuyển đổi sang trạng thái mới sau khi nhận phản hồi thành công từ backend.
+    3. Bổ sung style `.btn-action-start.btn-action-loading` và `.btn-action-stop.btn-action-loading` trong `index.css`.
+
+- **[19/09/2026]** - Khóa Nút Gạt "Nhân Hệ Số Ký Quỹ (Vốn)" Khi Bot Chạy & Đổi Màu Cột Bảng Đa Khung:
+  - **Mô tả:** Khóa không cho người dùng gạt nút "nhân Hệ số Ký Quỹ (Vốn)" khi bot đang chạy (`isRunning === true`) nhằm bảo đảm an toàn vốn, tránh lệch margin các lệnh DCA đang treo; muốn thay đổi phải dừng bot. Đồng thời đổi màu 2 cột trong bảng "Hệ Số Nhân Đa Khung (TF Multipliers)": cột "Hệ số Ký Quỹ (Vốn)" thành xanh ngọc (`#26a69a`), cột "Hệ số Vào Lệnh (Entry)" thành cam (`#ff9900`).
+  - **Đã thực hiện:**
+    1. Truyền prop `isRunning={isRunning}` vào `<SidebarLeft>` và `<SystemSettingsModal>` trong `App.jsx`.
+    2. Khóa checkbox (`disabled={isRunning}`, `cursor: not-allowed`, `opacity: 0.6`) cùng tooltip hướng dẫn "Vui lòng dừng bot để thay đổi thiết lập này" ở cả Sidebar và Modal Cài Đặt khi bot đang hoạt động.
+    3. Đổi màu cột trong bảng TF Multipliers tại `SystemSettingsModal.jsx`: Cột 2 (Vốn) -> `#26a69a`, Cột 3 (Entry) -> `#ff9900`.
+    4. Hiệu ứng đổi màu trực quan: Khi gạt bật (ON) công tắc `nhân Hệ số Ký Quỹ (Vốn)`, nhãn chữ tự động chuyển sang màu xanh ngọc đồng bộ (`#26a69a`, `fontWeight: 600`) ở cả Sidebar và Modal. Khi tắt (OFF) trở lại màu xám (`#888`).
+
+- **[19/09/2026]** - Khắc Phục Lệnh Limit ADA Bị Treo Khi Không Bật & Đồng Bộ Font Nhạt:
+  - **Mô tả:** Người dùng không tích chọn trade ADA nhưng trên sàn OKX lại xuất hiện lệnh Limit ADA lúc 06:16:07. Đồng thời chỉnh chữ `nhân Hệ số Ký Quỹ (Vốn)` sang màu xám nhạt (`#888`) kích thước nhỏ (`11px`) như dòng giá `4,385.1 ➔ 4,385.0`.
+  - **Nguyên nhân:**
+    1. File cấu hình bot `sub1_global_config.json` của tài khoản `adb` trước đó còn sót `"ADA"` trong mảng `ENABLED_COINS`.
+    2. Trong `PositionsTable.jsx`, mảng coin hiển thị chỉ gộp `watchlistCoins` và `safePos` mà thiếu `activePairs`. Do ADA không được tích trong watchlist và chưa có vị thế khớp thực tế (mới chỉ treo lệnh limit), ADA bị ẩn khỏi bảng vị thế khiến người dùng không nhìn thấy nút ON/OFF của nó.
+  - **Đã thực hiện:**
+    1. Đã xóa sạch `"ADA"` khỏi `sub1_global_config.json`. Bot sẽ tự động hủy lệnh limit ADA trên OKX theo cơ chế dọn dẹp coin tắt (`clean_limit_orders`).
+    2. Trong `PositionsTable.jsx`, bổ sung `...(activePairs || [])` vào `allCoinValues`. Bất cứ coin nào đang được bật trade trong bot BẮT BUỘC phải hiện diện trên Bảng Vị Thế để CEO có thể kiểm soát và gạt tắt ngay lập tức.
+    3. Đổi style chữ `nhân Hệ số Ký Quỹ (Vốn)` sang `color: "#888", fontSize: "11px"` ở cả Sidebar và Modal Cài Đặt.
+
+- **[19/09/2026]** - Thêm Công Tắc "Nhân Hệ Số Ký Quỹ (Vốn)" & Đổi Màu Bảng Đa Khung:
+  - **Mô tả:** Thêm công tắc bật/tắt chế độ nhân khối lượng theo khung thời gian (Hệ số Ký quỹ). Mặc định tắt (OFF) để cố định 1 mức ký quỹ ban đầu cho mọi khung, tránh rủi ro phình to vốn khi DCA.
+  - **Đã thực hiện:**
+    1. Bổ sung switch kiểu `coin-toggle` dưới mục Ký Quỹ ở cả Modal Cài Đặt và Sidebar: `nhân Hệ số Ký Quỹ (Vốn)`.
+    2. Cập nhật `bot_config.py` và `bot_strategy.py` với cờ `ENABLE_TF_VOLUME_MULTIPLIER` (mặc định `False`).
+    3. Đổi màu 2 cột trong bảng "Hệ Số Nhân Đa Khung (TF Multipliers)": Cột "Khung" chuyển sang màu xám (`#e0e0e0`), Cột "Hệ số Vào Lệnh (Entry)" chuyển sang màu xanh ngọc (`#26a69a`, in đậm).
+
+- **[19/09/2026]** - Sửa Lỗi Sai Hệ Số Nhân Đa Khung & Đồng Bộ Kích Thước Hộp Long/Short Bot EMA200:
+  - **Mô tả:** Khi xem nến trên các khung thời gian (H4, H2, H1, M30, M15, M5) của Bot EMA200, độ dài/chiều cao hộp vị thế Long/Short (tỷ lệ % TP/SL) không khớp chuẩn với hệ số nhân đa khung. Cụ thể ở H4 (Ảnh 1 BTC vs Ảnh 2 ETH), hộp bị gán cứng hoặc kẹp trần sai lệch so với thông số thiết lập trong cấu hình.
+  - **Nguyên nhân:**
+    1. Hàm `calculateEMA200Positions` trong `SingleChartPane.jsx` sử dụng logic kiểm tra chuỗi `normTf.includes("5M")` trước tiên. Do `"15M".includes("5M") === true`, khung 15M bị nhận nhầm thành 5M và áp hệ số nhân 1.0 thay vì 1.5333.
+    2. Tỷ lệ % TP/SL cơ sở bị hardcode cứng mức `0.0120` (1.2%) thay vì lấy theo cấu hình người dùng cài đặt ở Sidebar ("Mức chốt lời gốc M5", "Mức cắt lỗ gốc M5", mặc định 0.8% = `0.0080`).
+    3. Tồn tại dòng kẹp trần `rawTpPct > 0.05 ? 0.05 : rawTpPct` khiến toàn bộ các khung thời gian lớn như H2, H4, 1D bị cắt cụt về 5.0% (trong khi công thức chuẩn của H4 với M5 0.8% là: `0.8% * 6.772 = 5.4176%`).
+    4. Chiều dài theo trục thời gian (`endX`) của các vị thế đang chạy (Active Position) bị chặn ở `Math.max(entryIdx + 25, curIdx)` khiến hộp bị cụt sát vào nến hiện tại nếu entry xảy ra cách đó hơn 25 nến.
+  - **Đã thực hiện:**
+    1. Tạo hàm `getTfMultiplier` phân tích chuẩn xác từng khung thời gian (`M5: 1.0`, `M15: 1.5333`, `M30: 2.3333`, `H1: 3.333`, `H2: 4.667`, `H4: 6.772`, `1D: 10.0`) theo đúng `TF_CONFIG` của Bot Core (`bot_config.py`).
+    2. Truyền prop `risk` từ `App.jsx` vào `SingleChartPane` và đọc trực tiếp `risk.tpPct`, `risk.slPct` phản hồi tức thì khi người dùng thay đổi giá trị trên sidebar.
+    3. Gỡ bỏ hoàn toàn dòng clamp `> 0.05`, đảm bảo biên độ hộp tính đúng chuẩn công thức `baseTp * offsetMult` (H4 đạt chuẩn 5.42%, khớp hoàn toàn với thực tế ở Ảnh 1).
+    4. Mở rộng biên vẽ hộp đang chạy (`curIdx + 15`) giúp hộp vị thế vươn ra vùng nến tương lai rõ ràng, trực quan chuẩn TradingView.
+
+
 - **[17/09/2026]** - Đồng Bộ Triệt Để Logic 3 Trạng Thái DCA (DCA Dương, DCA Âm & Tắt Cả 2 - Đơn Lệnh):
   - **Mô tả:** Khi tắt cả 2 nút DCA Dương và DCA Âm trên giao diện Web/Desktop để đánh đơn lệnh (độc lập, không nhồi lệnh), Bot Core (`sub1`) vẫn âm thầm chạy chiến thuật DCA Âm (nhồi lệnh trung bình giá ngược hướng khi gồng lỗ). Ngoài ra, biến `ENABLE_NEGATIVE_DCA` không được nạp định kỳ lúc bot đang chạy (`run_ai_self_evolution`).
   - **Nguyên nhân:** Logic trong `bot_strategy.py` và `bot_orders.py` trước đây được lập trình theo kiểu nhị phân `if _is_pyramid: (DCA Dương) else: (mặc định DCA Âm)`. Nhánh `else` tự động nhồi các tầng TF còn lại và nâng dần Stop Loss theo khung lớn (Upgrade TF).
@@ -1519,3 +1661,21 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
      - Chiều dài khối vị thế cố định bao trọn đúng 25 cây nến mới nhất.
   5. **Bảng TLS1 Backtesting Thu gọn:** Tích hợp nút toggle `▲`/`▼` trên header cho phép thu nhỏ thành thanh pill gọn gàng `TLS1 Backtesting (84%) ▼`, giải phóng 100% tầm nhìn biểu đồ.
   *(Mã patch: `z-web-indicators-legend-v5`)*
+
+- **[19/09/2026]** - Lỗi lăn chuột (wheel) hoặc kéo dãn (zoom/pan) làm biểu đồ Web App bị đen xì, mất toàn bộ nến và trục giá.
+  - **Nguyên nhân gốc rễ:** 
+    1. Hook `useEffect` khởi tạo biểu đồ trong `SingleChartPane.jsx` đặt cờ `isAutoFit` vào Dependency Array. Khi người dùng lăn chuột hoặc kéo dãn, sự kiện `onWheel`/`pointerdown` gọi `setIsAutoFit(false)` -> React kích hoạt cleanup `chart.remove()` hủy biểu đồ và tạo mới đối tượng chart rỗng nhưng không kích hoạt lại effect nạp dữ liệu nến (`fetchCandles`), làm toàn bộ nến biến mất.
+    2. Hàm `autoscaleInfoProvider` của `CandlestickSeries` ép cứng `min`/`max` theo cây nến cuối cùng ngay cả khi người dùng đang zoom/pan ở quá khứ, dẫn đến trường hợp `minValue >= maxValue` làm Lightweight Charts crash render loop của canvas.
+  - **Đã fix:**
+    1. Tách `isAutoFit` thành `isAutoFitRef` (useRef) và loại bỏ `isAutoFit` khỏi Dependency Array của `useEffect` khởi tạo Chart (chỉ phụ thuộc `[scheduleDraw]`).
+    2. Bổ sung cơ chế Hydrate dữ liệu nến tức thì: Khi biểu đồ khởi tạo hoặc re-render, nếu bộ đệm `candlesRef.current` đã có dữ liệu thì nạp ngay `setData(candlesRef.current)` vào CandlestickSeries, VolumeSeries và EMA.
+    3. Bảo vệ an toàn trong `autoscaleInfoProvider`: Ngay lập tức trả về `original()` khi `userInteractedRef.current` hoặc `!isAutoFitRef.current`, đồng thời bổ sung điều kiện `newMin < max && newMin > 0` và `newMax > min` đảm bảo `minValue < maxValue` tuyệt đối.
+  *(Mã patch: `z-web-chart-zoom-fix`)*
+
+- **[19/09/2026]** - Nâng cấp Cơ chế Tải Nến 2 Pha (0.15s) và Khôi phục toàn bộ Khối Vị thế Long/Short của Bot EMA200.
+  - **Vấn đề 1: Nến load lâu khi đổi coin/TF:** Do backend cào lặp tuần tự 22 request OKX API để lấy 2500 nến khiến người dùng phải đợi 5-8s và bị chớp đen màn hình.
+    - **Đã fix:** Triển khai cơ chế 2 Pha: Pha 1 lấy ngay 300 nến trong 1 request duy nhất (~0.15s) trả về cho UI render tức thì; Pha 2 spawn Background Thread âm thầm lấp đầy 2500 nến vào RAM. Frontend tự động nhận trọn bộ nến mà không giật hay chớp màn hình.
+  - **Vấn đề 2: Chỉ báo Long/Short của Bot EMA200 bị biến mất:**
+    - Do điều kiện tích lũy trong `calculateEMA200Positions` bị siết chặt quá mức (`bodyMin > ema` thay vì `candle.close >= ema`), thiếu logic hủy lệnh trôi EMA (drift) khiến lệnh kẹt ở `waiting`, và dev Thọ xóa mất logic tọa độ `exitTime` kết hợp cờ `_fixedStartX` làm đứng cứng pixel và crash `logicalRange is not defined`.
+    - **Đã fix:** Sửa chuẩn xác logic vào/thoát lệnh của Bot EMA200 theo `bot_strategy.py`, khôi phục tính `exitTime`, xóa bỏ ghim cứng pixel để các khối vị thế di chuyển mượt mà theo nến, và sửa lỗi `logicalRange`. Bảng Backtesting và các khối Long/Short xanh đỏ quanh EMA200 hiển thị đầy đủ 100%.
+  *(Mã patch: `z-web-2phase-ema200-restore`)*

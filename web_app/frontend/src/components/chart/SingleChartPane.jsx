@@ -25,6 +25,7 @@ export default function SingleChartPane({
   chartIndex,
   coin,
   tf,
+  risk,
   onChangeCoin,
   onChangeTf,
   isActive,
@@ -49,9 +50,13 @@ export default function SingleChartPane({
   const candlesRef = useRef([]);
   const activeBotTabRef = useRef(activeBotTab);
   const tfRef = useRef(tf);
+  const riskRef = useRef(risk);
+  riskRef.current = risk;
   const rafIdRef = useRef(null);
 
   const [isAutoFit, setIsAutoFit] = useState(true);
+  const isAutoFitRef = useRef(isAutoFit);
+  isAutoFitRef.current = isAutoFit;
   const [isLogScale, setIsLogScale] = useState(false);
   const userInteractedRef = useRef(false);
   const hasInitializedRef = useRef(false);
@@ -164,6 +169,11 @@ export default function SingleChartPane({
     tfRef.current = tf;
     scheduleDraw();
   }, [activeBotTab, tf, scheduleDraw]);
+
+  useEffect(() => {
+    riskRef.current = risk;
+    scheduleDraw();
+  }, [risk?.tpPct, risk?.slPct, scheduleDraw]);
 
   useEffect(() => {
     if (!activeBotTab) return;
@@ -285,6 +295,27 @@ export default function SingleChartPane({
     } catch (e) { }
   };
 
+  const getTfMultiplier = (rawTf) => {
+    if (!rawTf) return 1.0;
+    const str = rawTf.toString().toUpperCase().trim();
+    if (str === "5M" || str === "5" || str === "M5") return 1.0;
+    if (str === "15M" || str === "15" || str === "M15") return 1.5333;
+    if (str === "30M" || str === "30" || str === "M30") return 2.3333;
+    if (str === "1H" || str === "60M" || str === "60" || str === "H1") return 3.333;
+    if (str === "2H" || str === "120M" || str === "120" || str === "H2") return 4.667;
+    if (str === "4H" || str === "240M" || str === "240" || str === "H4") return 6.772;
+    if (str === "1D" || str === "D" || str === "1440M" || str === "D1") return 10.0;
+
+    if (/^5m?$/i.test(str)) return 1.0;
+    if (/^15m?$/i.test(str)) return 1.5333;
+    if (/^30m?$/i.test(str)) return 2.3333;
+    if (/^(1h|60m?|h1)$/i.test(str)) return 3.333;
+    if (/^(2h|120m?|h2)$/i.test(str)) return 4.667;
+    if (/^(4h|240m?|h4)$/i.test(str)) return 6.772;
+    if (/^(1d|d|d1)$/i.test(str)) return 10.0;
+    return 1.0;
+  };
+
   const calculateEMA200Positions = (candles, currentTf) => {
     if (!candles || candles.length < 205) return [];
     const emaData = calculateEMA(candles, 200);
@@ -293,20 +324,17 @@ export default function SingleChartPane({
     const emaMap = new Map();
     emaData.forEach(item => emaMap.set(item.time, item.value));
 
-    const normTf = (currentTf || "4H").toUpperCase();
-    let offsetMult = 6.772;
-    if (normTf.includes("5M")) offsetMult = 1.0;
-    else if (normTf.includes("15M")) offsetMult = 1.5333;
-    else if (normTf.includes("30M")) offsetMult = 2.3333;
-    else if (normTf.includes("1H") || normTf.includes("60M")) offsetMult = 3.333;
-    else if (normTf.includes("2H") || normTf.includes("120M")) offsetMult = 4.667;
-    else if (normTf.includes("4H") || normTf.includes("240M")) offsetMult = 6.772;
-    else if (normTf.includes("1D") || normTf.includes("D")) offsetMult = 10.0;
+    const offsetMult = getTfMultiplier(currentTf);
+    const baseTp = (riskRef.current && riskRef.current.tpPct)
+      ? (parseFloat(riskRef.current.tpPct) / 100)
+      : 0.0080;
+    const baseSl = (riskRef.current && riskRef.current.slPct)
+      ? (parseFloat(riskRef.current.slPct) / 100)
+      : 0.0080;
 
     const entryOffsetPct = 0.0005 * offsetMult;
-    const rawTpPct = 0.0120 * offsetMult;
-    const tpPct = rawTpPct > 0.05 ? 0.05 : rawTpPct;
-    const slPct = tpPct;
+    const tpPct = baseTp * offsetMult;
+    const slPct = baseSl * offsetMult;
 
     const results = [];
     let activeTrade = null;
@@ -318,59 +346,53 @@ export default function SingleChartPane({
       const ema = emaMap.get(candle.time);
       if (!ema) continue;
 
-      const bodyMin = Math.min(candle.open, candle.close);
-      const bodyMax = Math.max(candle.open, candle.close);
-
-      if (bodyMin > ema) {
+      if (candle.close >= ema) {
         consecutiveAbove++;
         consecutiveBelow = 0;
-      } else if (bodyMax < ema) {
+      } else {
         consecutiveBelow++;
         consecutiveAbove = 0;
-      } else {
-        consecutiveAbove = 0;
-        consecutiveBelow = 0;
       }
 
       if (activeTrade) {
         if (activeTrade.state === 'waiting') {
-          if (activeTrade.entryType === 'Long' && candle.low <= activeTrade.entryPrice) {
+          const isLong = activeTrade.entryType === 'Long';
+          const entryHit = isLong
+            ? candle.low <= activeTrade.entryPrice
+            : candle.high >= activeTrade.entryPrice;
+
+          if (entryHit) {
             activeTrade.state = 'open';
-          } else if (activeTrade.entryType === 'Short' && candle.high >= activeTrade.entryPrice) {
-            activeTrade.state = 'open';
+            activeTrade.entryTime = candle.time;
+          } else {
+            const emaDrift = Math.abs(ema - activeTrade.entryEma) / activeTrade.entryEma;
+            if (emaDrift > 0.005) {
+              activeTrade = null;
+            }
+            if (isLong && consecutiveBelow > 0) activeTrade = null;
+            if (!isLong && consecutiveAbove > 0) activeTrade = null;
           }
         } else if (activeTrade.state === 'open') {
-          if (activeTrade.entryType === 'Long') {
-            if (candle.high >= activeTrade.tpTarget) {
-              activeTrade.state = 'closed';
-              activeTrade.exitResult = 'TP';
-              activeTrade.exitTime = candle.time;
-            } else if (candle.low <= activeTrade.slTarget) {
-              activeTrade.state = 'closed';
-              activeTrade.exitResult = 'SL';
-              activeTrade.exitTime = candle.time;
-            }
-          } else {
-            if (candle.low <= activeTrade.tpTarget) {
-              activeTrade.state = 'closed';
-              activeTrade.exitResult = 'TP';
-              activeTrade.exitTime = candle.time;
-            } else if (candle.high >= activeTrade.slTarget) {
-              activeTrade.state = 'closed';
-              activeTrade.exitResult = 'SL';
-              activeTrade.exitTime = candle.time;
-            }
-          }
-        }
+          const isLong = activeTrade.entryType === 'Long';
+          const tpHit = isLong
+            ? candle.high >= activeTrade.tpTarget
+            : candle.low <= activeTrade.tpTarget;
+          const slHit = isLong
+            ? candle.low <= activeTrade.slTarget
+            : candle.high >= activeTrade.slTarget;
 
-        if (activeTrade.state === 'closed') {
-          results.push({ ...activeTrade });
-          activeTrade = null;
+          if (tpHit || slHit) {
+            activeTrade.exitTime = candle.time;
+            activeTrade.exitResult = tpHit ? 'TP' : 'SL';
+            activeTrade.state = 'closed';
+            results.push({ ...activeTrade });
+            activeTrade = null;
+          }
         }
       }
 
-      if (!activeTrade && (consecutiveAbove >= 60 || consecutiveBelow >= 60)) {
-        const isBull = consecutiveAbove >= 60;
+      if (!activeTrade && (consecutiveAbove >= 15 || consecutiveBelow >= 15)) {
+        const isBull = consecutiveAbove >= 15;
         const ep = isBull ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
         const tp = isBull ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
         const sl = isBull ? (ep * (1 - slPct)) : (ep * (1 + slPct));
@@ -617,32 +639,43 @@ export default function SingleChartPane({
         const entryIdx = candles.findIndex(item => item.time >= entryTimeSec);
         if (entryIdx < 0) return;
 
+        let startX = null;
+        let endX = null;
         const logicalRange = c.timeScale().getVisibleLogicalRange();
-        let startX = pos._fixedStartX ?? null;
-        let endX = pos._fixedEndX ?? null;
 
         if (logicalRange && logicalRange.to > logicalRange.from) {
           const barWidth = maxRightX / (logicalRange.to - logicalRange.from);
-          if (startX === null) {
-            startX = Math.floor((entryIdx - logicalRange.from) * barWidth);
-          }
-          if (endX === null) {
-            endX = Math.floor((entryIdx + 25 - logicalRange.from) * barWidth);
-          }
+          startX = Math.floor((entryIdx - logicalRange.from) * barWidth);
 
-          if (pos._fixedStartX === undefined) {
-            pos._fixedStartX = startX;
-            pos._fixedEndX = endX;
+          if (pos.exitTime) {
+            const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
+            const exitIdx = candles.findIndex(item => item.time >= exitTimeSec);
+            if (exitIdx > entryIdx) {
+              endX = Math.floor((exitIdx - logicalRange.from) * barWidth);
+            } else {
+              endX = Math.floor((entryIdx + 25 - logicalRange.from) * barWidth);
+            }
+          } else {
+            const curIdx = candles.length - 1;
+            endX = Math.floor((Math.max(entryIdx + 25, curIdx + 15) - logicalRange.from) * barWidth);
           }
         } else {
-          let sc = null;
           try {
-            sc = c.timeScale().timeToCoordinate(candles[entryIdx].time);
+            const sc = c.timeScale().timeToCoordinate(candles[entryIdx].time);
+            if (sc !== null) startX = Math.floor(sc);
           } catch (e) { }
-          if (sc !== null) {
-            if (startX === null) {
-              startX = Math.floor(sc);
-            }
+
+          if (pos.exitTime) {
+            try {
+              const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
+              const scExit = c.timeScale().timeToCoordinate(exitTimeSec);
+              if (scExit !== null && startX !== null && scExit > startX) {
+                endX = Math.floor(scExit);
+              }
+            } catch (e) { }
+          }
+
+          if (startX !== null && endX === null) {
             let barSpacing = 14;
             if (candles.length >= 2) {
               try {
@@ -651,14 +684,7 @@ export default function SingleChartPane({
                 if (c1 !== null && c2 !== null && c1 > c2) barSpacing = c1 - c2;
               } catch (e) { }
             }
-            if (endX === null) {
-              endX = Math.floor(startX + 25 * barSpacing);
-            }
-
-            if (pos._fixedStartX === undefined) {
-              pos._fixedStartX = startX;
-              pos._fixedEndX = endX;
-            }
+            endX = Math.floor(startX + 25 * barSpacing);
           }
         }
 
@@ -1205,6 +1231,7 @@ export default function SingleChartPane({
       autoscaleInfoProvider: (original) => {
         const res = original();
         if (!res || !res.priceRange) return res;
+        if (userInteractedRef.current || !isAutoFitRef.current) return res;
 
         let min = res.priceRange.minValue;
         let max = res.priceRange.maxValue;
@@ -1225,14 +1252,22 @@ export default function SingleChartPane({
         } catch (e) { }
 
         const range = max - min;
+        if (range <= 0) return res;
+
         const pos = (currentPrice - min) / range;
         const minAllowedPos = 0.38;
         const maxAllowedPos = 0.62;
 
         if (pos < minAllowedPos) {
-          min = currentPrice - (max - currentPrice);
+          const newMin = currentPrice - (max - currentPrice);
+          if (newMin > 0 && newMin < max) {
+            min = newMin;
+          }
         } else if (pos > maxAllowedPos) {
-          max = currentPrice + (currentPrice - min);
+          const newMax = currentPrice + (currentPrice - min);
+          if (newMax > min) {
+            max = newMax;
+          }
         }
 
         return {
@@ -1263,6 +1298,20 @@ export default function SingleChartPane({
     setChartInstance(chart);
     setSeriesInstance(cs);
 
+    // Nạp ngay dữ liệu nến hiện có nếu có sẵn trong bộ nhớ
+    if (candlesRef.current && candlesRef.current.length > 0) {
+      try {
+        cs.setData(candlesRef.current);
+        const vols = candlesRef.current.map(c => ({
+          time: c.time,
+          value: c.volume || 0,
+          color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+        }));
+        vs.setData(vols);
+        es.setData(calculateEMA(candlesRef.current, 200));
+      } catch (e) { }
+    }
+
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
       scheduleDraw();
     });
@@ -1285,7 +1334,7 @@ export default function SingleChartPane({
         if (width > 0 && height > 0) {
           chartRef.current.applyOptions({ width, height });
           scheduleDraw();
-          if (isAutoFit && !userInteractedRef.current) {
+          if (isAutoFitRef.current && !userInteractedRef.current) {
             applyDefaultZoom();
           }
         }
@@ -1305,7 +1354,7 @@ export default function SingleChartPane({
       setChartInstance(null);
       setSeriesInstance(null);
     };
-  }, [scheduleDraw, isAutoFit]);
+  }, [scheduleDraw]);
 
   useEffect(() => {
     activeIndicatorsRef.current = activeIndicators;
@@ -1404,19 +1453,9 @@ export default function SingleChartPane({
         (updateIndicatorsRef.current || updateIndicators)();
       }
     } else {
-      if (candleSeriesRef.current) {
-        try { candleSeriesRef.current.setData([]); } catch { }
-      }
-      if (volumeSeriesRef.current) {
-        try { volumeSeriesRef.current.setData([]); } catch { }
-      }
-      if (emaSeriesRef.current) {
-        try { emaSeriesRef.current.setData([]); } catch { }
-      }
+      // Giữ biểu đồ mượt mà không chớp đen trong 0.15s chờ API 2-Pha phản hồi
       if (overlayRef.current) overlayRef.current.innerHTML = "";
       if (liquidV5OverlayRef.current) liquidV5OverlayRef.current.innerHTML = "";
-      candlesRef.current = [];
-      activeObsRef.current = [];
     }
 
     const fetchCandles = async () => {
@@ -1498,6 +1537,13 @@ export default function SingleChartPane({
             if (!isMounted) return;
             scheduleDraw();
           }, 30);
+        }
+
+        // PHA 2: Tự động tải nốt toàn bộ nến lịch sử sau 1.2s khi backend gom xong để vẽ trọn bộ các vị thế Long/Short quá khứ
+        if (unique.length < 900) {
+          setTimeout(() => {
+            if (isMounted) fetchCandles();
+          }, 1200);
         }
       } catch (e) {
         console.warn("fetchCandles error:", e);

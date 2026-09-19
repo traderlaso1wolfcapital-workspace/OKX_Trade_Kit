@@ -373,11 +373,11 @@ function App() {
   };
 
   // 9. Risk & Strategy Settings State
-  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false });
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const [strat, setStrat] = useState({
     main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
-    dynamicPingpongTp: false, altcoinFollowBtc: false,
+    dynamicPingpongTp: false, altcoinFollowBtc: true,
     sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
     trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
     timeframeBase: "1H",
@@ -387,7 +387,7 @@ function App() {
     dcaGapPct: "0.20",
     confluencePct: "0.23",
     accumCandles: 60,
-    altcoinFollowBtc: false,
+    altcoinFollowBtc: true,
     ethVolMult: "1.30",
   });
   const [smcEntryCfg, setSmcEntryCfg] = useState({
@@ -431,7 +431,7 @@ function App() {
       setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
         main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
-        dynamicPingpongTp: false, altcoinFollowBtc: false,
+        dynamicPingpongTp: false, altcoinFollowBtc: true,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
       });
@@ -439,7 +439,7 @@ function App() {
       setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: false,
-        dynamicPingpongTp: false, altcoinFollowBtc: false,
+        dynamicPingpongTp: false, altcoinFollowBtc: true,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
         timeframeBase: "1H",
@@ -511,7 +511,8 @@ function App() {
             ...r,
             posVol: Number(d.POSITION_VOLUME_HIGH_CONFIDENCE),
             tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
-            slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct
+            slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct,
+            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : r.multiplyVolumeByTf
           }));
         }
         if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined) {
@@ -540,7 +541,7 @@ function App() {
             dcaGapPct: String(d.DCA_GAP_PCT ?? e.dcaGapPct),
             confluencePct: String(d.CONFLUENCE_PCT ?? e.confluencePct),
             accumCandles: Number(d.ACCUM_CANDLES ?? e.accumCandles),
-            altcoinFollowBtc: d.ALTCOIN_FOLLOW_BTC_EMA !== undefined ? Boolean(d.ALTCOIN_FOLLOW_BTC_EMA) : e.altcoinFollowBtc,
+            altcoinFollowBtc: d.ALTCOIN_FOLLOW_BTC_EMA !== undefined ? Boolean(d.ALTCOIN_FOLLOW_BTC_EMA) : true,
           }));
         }
       })
@@ -644,6 +645,26 @@ function App() {
     };
   }, [isAuthenticated, activeBotTab, currentUid]);
 
+  const handleToggleMultiplyVolume = async (val) => {
+    const nextVal = Boolean(val);
+    setRisk(r => ({ ...r, multiplyVolumeByTf: nextVal }));
+    try {
+      await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          position_volume: risk.posVol,
+          strategy_config: {
+            ENABLE_TF_VOLUME_MULTIPLIER: nextVal
+          }
+        })
+      });
+      addSystemLog(`⚙️ [CẤU HÌNH] Đã lưu thiết lập Nhân hệ số Ký quỹ (Vốn): ${nextVal ? "BẬT" : "TẮT"}`);
+    } catch (err) {
+      console.error("Lỗi cập nhật ENABLE_TF_VOLUME_MULTIPLIER:", err);
+    }
+  };
+
   // Bot Start / Stop Handlers
   const handleStartBot = async () => {
     const currentAcc = effectiveAccId;
@@ -664,9 +685,28 @@ function App() {
 
     try {
       setIsStartingBot(true);
-      setOverrideBotRunning(true);
-      const r = await fetch(`/api/bot/start?uid=${currentUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
+      // Tự động đồng bộ Ký quỹ cơ sở và Hệ số nhân trước khi Start bot
+      try {
+        await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            position_volume: risk.posVol,
+            strategy_config: {
+              ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf)
+            }
+          })
+        });
+      } catch (e) {
+        console.error("Lỗi đồng bộ cấu hình trước khi Start:", e);
+      }
+
+      const [r] = await Promise.all([
+        fetch(`/api/bot/start?uid=${currentUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" }),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]);
       if (r.ok) {
+        setOverrideBotRunning(true);
         addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}`);
         refreshBotData();
         setTimeout(() => setOverrideBotRunning(null), 3000);
@@ -690,16 +730,28 @@ function App() {
   };
 
   const handleStopBot = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn DỪNG CHẠY BOT không?")) return;
     try {
       setIsStoppingBot(true);
-      setOverrideBotRunning(false);
-      const r = await fetch(`/api/bot/stop?strategy=${activeBotTab}&uid=${currentUid}`, { method: "POST" });
+      const targetStrat = activeBotTab || "sub1";
+      const targetUid = currentUid || "default";
+      const [r] = await Promise.all([
+        fetch(`/api/bot/stop?strategy=${targetStrat}&uid=${targetUid}`, { method: "POST" }),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]);
       if (r.ok) {
+        setOverrideBotRunning(false);
         addSystemLog(`🛑 [BOT] Đã gửi lệnh dừng bot.`);
         refreshBotData();
         setTimeout(() => setOverrideBotRunning(null), 3000);
       } else {
+        let errMsg = "Không rõ nguyên nhân";
+        try {
+          const err = await r.json();
+          errMsg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail || err);
+        } catch {
+          errMsg = await r.text();
+        }
+        alert(`❌ Lỗi dừng bot: ${errMsg || r.statusText}`);
         setOverrideBotRunning(null);
       }
     } catch (e) {
@@ -815,7 +867,7 @@ function App() {
         dcaGapPct: "0.20",
         confluencePct: "0.23",
         accumCandles: 60,
-        altcoinFollowBtc: false,
+        altcoinFollowBtc: true,
       }));
       setWatchlistCoins(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
     } else if (activeBotTab === "sub2") {
@@ -823,7 +875,7 @@ function App() {
       setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: false,
-        dynamicPingpongTp: false, altcoinFollowBtc: false,
+        dynamicPingpongTp: false, altcoinFollowBtc: true,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
         timeframeBase: "1H",
@@ -915,6 +967,7 @@ function App() {
         DCA_GAP_PCT: parseFloat(entryCfg.dcaGapPct) || 0.20,
         CONFLUENCE_PCT: parseFloat(entryCfg.confluencePct) || 0.23,
         ACCUM_CANDLES: parseInt(entryCfg.accumCandles) || 60,
+        ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf),
       };
 
       const res = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
@@ -963,7 +1016,7 @@ function App() {
           dcaGapPct: "0.20",
           confluencePct: "0.23",
           accumCandles: 60,
-          altcoinFollowBtc: false,
+          altcoinFollowBtc: true,
         }));
         setEnabledTfs({});
         const curUid = localStorage.getItem("tls1_uid") || "guest";
@@ -975,7 +1028,7 @@ function App() {
         setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
         setStrat({
           main: true, xole: false, dynamicEma200Tp: false,
-          dynamicPingpongTp: false, altcoinFollowBtc: false,
+          dynamicPingpongTp: false, altcoinFollowBtc: true,
           sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
           trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
           timeframeBase: "1H",
@@ -1279,6 +1332,8 @@ function App() {
           onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}
           risk={risk}
           setRisk={setRisk}
+          isRunning={isRunning}
+          onToggleMultiplyVolume={handleToggleMultiplyVolume}
         />
 
         {/* MAIN SECTION */}
@@ -1295,23 +1350,39 @@ function App() {
           <div className="bot-panel-card">
             {/* ACTION BAR: START / STOP BOT */}
             <div className="bot-action-bar" style={{ display: 'flex', justifyContent: 'center' }}>
-              {isRunning ? (
+              {isStartingBot ? (
+                <button
+                  disabled
+                  className="btn-action-start btn-action-loading"
+                  style={{ width: "fit-content", alignSelf: "center" }}
+                >
+                  <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
+                  ĐANG KHỞI ĐỘNG BOT...
+                </button>
+              ) : isStoppingBot ? (
+                <button
+                  disabled
+                  className="btn-action-stop btn-action-loading"
+                  style={{ width: "fit-content", alignSelf: "center" }}
+                >
+                  <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
+                  ĐANG DỪNG BOT...
+                </button>
+              ) : isRunning ? (
                 <button
                   onClick={handleStopBot}
-                  disabled={isStoppingBot}
                   className="btn-action-stop"
                   style={{ width: "fit-content", alignSelf: "center" }}
                 >
-                  {isStoppingBot ? '⏳ ĐANG DỪNG...' : '■ DỪNG BOT'}
+                  ■ DỪNG BOT
                 </button>
               ) : (
                 <button
                   onClick={handleStartBot}
-                  disabled={isStartingBot}
                   className="btn-action-start"
                   style={{ width: "fit-content", alignSelf: "center" }}
                 >
-                  {isStartingBot ? '⏳ ĐANG KHỞI ĐỘNG...' : '▶ CHẠY BOT'}
+                  ▶ CHẠY BOT
                 </button>
               )}
             </div>
@@ -1330,6 +1401,7 @@ function App() {
                         chartIndex={idx}
                         coin={cfg.coin}
                         tf={cfg.tf}
+                        risk={risk}
                         onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
                         onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
                         isActive={activeChartIndex === idx}
@@ -1487,6 +1559,7 @@ function App() {
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         activeBotTab={activeBotTab}
+        isRunning={isRunning}
         settingsTab={settingsTab}
         setSettingsTab={setSettingsTab}
         accounts={accounts}
@@ -1521,6 +1594,8 @@ function App() {
         onResetDefaultStrat={handleResetDefaultStrat}
         onSaveStratConfig={handleSaveStratConfig}
         onLogout={handleLogout}
+        isRunning={isRunning}
+        onToggleMultiplyVolume={handleToggleMultiplyVolume}
       />
 
 
