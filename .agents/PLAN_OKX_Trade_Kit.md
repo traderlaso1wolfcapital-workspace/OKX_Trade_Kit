@@ -3,14 +3,16 @@
 # Cập nhật: 2026-09-19
 
 > [!CAUTION]
-> ### 🛡️ NGUYÊN TẮC BẢO TOÀN CODE LOCAL CỦA CEO KHI PULL TỪ GITHUB
-> **Khi CEO pull mã nguồn từ GitHub (do thọ dev hoặc đối tác push lên), nếu xảy ra xung đột (Git merge conflict):**
-> 1. **ƯU TIÊN TUYỆT ĐỐI BẢN VÁ TRÊN MÁY TÍNH LOCAL CỦA CEO** (`ours`).
-> 2. Tuyệt đối KHÔNG được để code từ xa (remote/theirs) ghi đè làm mất các bản vá chuẩn đã kiểm thử trên máy CEO:
+> ### 🛡️ NGUYÊN TẮC ĐỒNG BỘ GIT: ƯU TIÊN ĐIỂM MỚI DEV THỌ & BẢO TOÀN BẢN VÁ CEO
+> **Khi pull mã nguồn từ GitHub (do thọ dev push lên), AI tuân thủ 3 nguyên tắc thép:**
+> 1. **Ưu tiên tích hợp tối đa các điểm thêm mới của Thọ dev:** Tiếp nhận đầy đủ tính năng mới, giao diện mới, module mới mà Thọ dev phát triển.
+> 2. **Bảo toàn nền tảng bản vá máy CEO:** Tuyệt đối không để code remote đè làm mất các thuật toán và bản vá chuẩn đã kiểm thử trên máy CEO:
 >    - **Bot SMC:** Ánh xạ 1-1 khối OB chuẩn; Entry tại biên OB; SL tại biên đối diện; TP 1.5R; 1 OB = 1 lệnh duy nhất; Box chờ tịnh tiến theo nến live hiện tại.
 >    - **Bot EMA200:** Bộ đếm tích lũy chuẩn 60 nến; Lệnh chờ Limit bám theo đường EMA200 động (Dynamic Trailing Limit); Tự động khớp chính xác khi nến retest chạm EMA200; Chốt độ dài box tại nến TP/SL.
 >    - **Biểu đồ & Giao diện:** Tự động khóa và bật sẵn 2 chế độ **A (Auto Fit)** và **L (Logarithmic Scale)** trên mọi khung thời gian/coin; Định dạng giá Hyperliquid; Nút thu gọn cài đặt tài khoản mượt mà.
-> 3. Khi giải quyết xung đột Git, AI bắt buộc phải thực thi lệnh ưu tiên local:
+> 3. **Hàn gắn mối nối logic (Semantic Merge):** Điều chỉnh tham số, hàm, prop để tính năng mới của Thọ dev vận hành trơn tru trên nền tảng bản vá của máy CEO, không đứt gãy và không phát sinh lỗi.
+> 
+> Khi giải quyết xung đột Git, AI bắt buộc phải thực thi lệnh ưu tiên local:
 >    ```powershell
 >    git checkout --ours <tên_file_xung_đột>
 >    # Hoặc:

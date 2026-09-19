@@ -18,6 +18,15 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[19/09/2026]** - Tạo Công Cụ Tự Động Kéo Code `zzPull_From_GitHub.py` (Ưu Tiên Tuyệt Đối Máy CEO):
+  - **Mô tả:** Tạo file script tự động kéo code [zzPull_From_GitHub.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPull_From_GitHub.py) để mỗi khi CEO kéo cập nhật từ GitHub về (do Thọ dev hoặc đối tác push lên), code tự động hợp nhất và bảo vệ 100% các bản vá trên máy CEO nếu có xung đột (conflict).
+  - **Quy trình hoạt động tự động của script:**
+    1. **Bảo vệ Local:** Tự động kiểm tra và commit niêm phong mọi thay đổi cục bộ của CEO trước khi fetch.
+    2. **Tải Remote:** Thực hiện `git fetch origin main`.
+    3. **Merge chiến lược `-X ours`:** Gộp code với ưu tiên bản máy tính của CEO (`ours`).
+    4. **Tự động xử lý Conflict:** Nếu có bất kỳ file nào xung đột, tự động chạy `git checkout --ours .`, `git add .` và commit hoàn tất gộp mã nguồn, loại bỏ hoàn toàn nguy cơ bị ghi đè mất bản vá.
+  - **Kiểm chứng:** Chạy thử nghiệm thành công `python zzPull_From_GitHub.py` (Exit code 0, working tree sạch sẽ, bảo toàn 100% bản vá).
+
 - **[19/09/2026]** - Tự Động Khóa Chế Độ A (Auto Fit) & L (Log Scale), Giữ Nến Luôn Trong Tầm Nhìn Khi Đổi Coin/TF & Nạp 300+ Nến:
   - **Mô tả:** Khi chuyển chart, chuyển coin hoặc khi dữ liệu nến cập nhật thêm (nạp tiếp từ 300 nến lên 1000+ nến), tầm nhìn biểu đồ đôi khi bị nhảy trôi về quá khứ khiến không nhìn thấy nến hiện tại. CEO yêu cầu tự động bật sẵn và cố định ở cả 2 chế độ **A (Auto Scale)** và **L (Log Scale)** sau mỗi lần chuyển chart hay chuyển TF.
   - **Nguyên nhân:**
