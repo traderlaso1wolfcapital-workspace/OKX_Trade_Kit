@@ -435,7 +435,18 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     coin_name = cfg["coin"]
     if swap_id not in state_matrix: return
     tracker = state_matrix[swap_id]
-    # 🔒 DRY-RUN MODE: Đọc từ system_config — khi True thì toàn bộ lệnh POST lên OKX bị bỏ qua
+    # 🔒 DRY-RUN MODE: Đọc từ system_config & cờ đĩa trực tiếp — khi True thì toàn bộ lệnh POST lên OKX bị bỏ qua
+    try:
+        json_dir = env_paths.get("JSON_DATA_DIR", "")
+        if json_dir:
+            if os.path.exists(os.path.join(json_dir, "stop_sub1.flag")):
+                system_config["DRY_RUN"] = True
+            elif os.path.exists(os.path.join(json_dir, "dry_run_sub1.flag")):
+                with open(os.path.join(json_dir, "dry_run_sub1.flag"), "r") as _rf:
+                    if _rf.read().strip() == "1":
+                        system_config["DRY_RUN"] = True
+    except Exception:
+        pass
     dry_run: bool = bool(system_config.get("DRY_RUN", False))
     
     # Phân nhóm tài sản: crypto (neo BTC nếu ON) | forex (kim loại, cổ phiếu, cặp tiền - giao dịch độc lập)
@@ -2370,40 +2381,51 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     tracker.missing_count = {"long": {}, "short": {}}
                     
                 _emergency_needed = False
-                for tf in TFS_ALL:
-                    # LONG
-                    found_px_l = exchange_longs_cross.get(tf)
-                        
-                    if found_px_l:
-                        tracker.placed_entry_px_long_by_tf[tf] = found_px_l
-                        tracker.missing_count["long"][tf] = 0
-                    else:
-                        if tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR", ""):
-                            tracker.missing_count["long"][tf] = tracker.missing_count["long"].get(tf, 0) + 1
-                            if tracker.missing_count["long"][tf] >= 5:
-                                tracker.placed_entry_px_long_by_tf[tf] = "---"
-                                _emergency_needed = True
-                        else:
-                            tracker.placed_entry_px_long_by_tf[tf] = "---"
-                            tracker.missing_count["long"][tf] = 0
+                # 🔒 Chỉ kiểm tra mất lệnh Limit khi KHÔNG PHẢI chế độ dừng / DRY_RUN
+                is_currently_dry = dry_run or bool(system_config.get("DRY_RUN", False))
+                if not is_currently_dry:
+                    for tf in TFS_ALL:
+                        # LONG
+                        found_px_l = exchange_longs_cross.get(tf)
                             
-                    # SHORT
-                    found_px_s = exchange_shorts_cross.get(tf)
-                        
-                    if found_px_s:
-                        tracker.placed_entry_px_short_by_tf[tf] = found_px_s
-                        tracker.missing_count["short"][tf] = 0
-                    else:
-                        if tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR", ""):
-                            tracker.missing_count["short"][tf] = tracker.missing_count["short"].get(tf, 0) + 1
-                            if tracker.missing_count["short"][tf] >= 5:
-                                tracker.placed_entry_px_short_by_tf[tf] = "---"
-                                _emergency_needed = True
+                        if found_px_l:
+                            tracker.placed_entry_px_long_by_tf[tf] = found_px_l
+                            tracker.missing_count["long"][tf] = 0
                         else:
-                            tracker.placed_entry_px_short_by_tf[tf] = "---"
+                            if tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR", ""):
+                                tracker.missing_count["long"][tf] = tracker.missing_count["long"].get(tf, 0) + 1
+                                if tracker.missing_count["long"][tf] >= 5:
+                                    tracker.placed_entry_px_long_by_tf[tf] = "---"
+                                    _emergency_needed = True
+                            else:
+                                tracker.placed_entry_px_long_by_tf[tf] = "---"
+                                tracker.missing_count["long"][tf] = 0
+                                
+                        # SHORT
+                        found_px_s = exchange_shorts_cross.get(tf)
+                            
+                        if found_px_s:
+                            tracker.placed_entry_px_short_by_tf[tf] = found_px_s
+                            tracker.missing_count["short"][tf] = 0
+                        else:
+                            if tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR", ""):
+                                tracker.missing_count["short"][tf] = tracker.missing_count["short"].get(tf, 0) + 1
+                                if tracker.missing_count["short"][tf] >= 5:
+                                    tracker.placed_entry_px_short_by_tf[tf] = "---"
+                                    _emergency_needed = True
+                            else:
+                                tracker.placed_entry_px_short_by_tf[tf] = "---"
+                                tracker.missing_count["short"][tf] = 0
+                else:
+                    # Khi đang dừng / shadow mode: xóa cache limit, tuyệt đối không re-place
+                    for tf in TFS_ALL:
+                        tracker.placed_entry_px_long_by_tf[tf] = "---"
+                        tracker.placed_entry_px_short_by_tf[tf] = "---"
+                        if hasattr(tracker, "missing_count"):
+                            tracker.missing_count["long"][tf] = 0
                             tracker.missing_count["short"][tf] = 0
 
-                if _emergency_needed:
+                if _emergency_needed and not is_currently_dry:
                     is_limit_setup_cycle = True
                     print(f"⚡ [EMERGENCY RE-PLACE] {coin_name}: Phát hiện lệnh Limit bị hủy trên sàn → Đặt lại ngay!")
             except Exception as e:
@@ -2886,30 +2908,28 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.missing_count_long[tf] = 0
                             
 
-                        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA): Gắn TP/SL riêng độc lập cho từng TF qua attachAlgoOrds (chế độ Split/Chia trên OKX)
+                        # ⚡ Gắn TP/SL tức thì cho mọi chế độ (Lưới Đa Khung, DCA Âm, DCA Dương) qua native attachAlgoOrds của OKX V5
                         attach_algo_long = None
-                        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-                        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
-                        if not _is_pyramid and not _is_neg_dca:
-                            try:
-                                _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
-                                _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
-                                _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
-                                _calc_tp = round_to_tick(px_tf * (Decimal("1") + _tp_pct), spec["tickSz"])
-                                _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
-                                attach_algo_long = [{
-                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                    "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last",
-                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                    "slOrdPx": "-1",
-                                    "slTriggerPxType": "last"
-                                }]
-                            except Exception:
-                                attach_algo_long = None
+                        try:
+                            _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                            _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
+                            _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
+                            _calc_tp = round_to_tick(px_tf * (Decimal("1") + _tp_pct), spec["tickSz"])
+                            _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
+                            attach_algo_long = [{
+                                "attachAlgoClOrdId": f"{CL_ORD_PREFIX}ATL{tf}{int(time.time() * 1000000)}"[:32],
+                                "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                "tpOrdPx": "-1",
+                                "tpTriggerPxType": "last",
+                                "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                "slOrdPx": "-1",
+                                "slTriggerPxType": "last"
+                            }]
+                        except Exception:
+                            attach_algo_long = None
 
                         place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
-                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run, attach_algo_ords=attach_algo_long)
+                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run or bool(system_config.get("DRY_RUN", False)), attach_algo_ords=attach_algo_long)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
                         if not hasattr(tracker, "last_limit_order_sec_long"): tracker.last_limit_order_sec_long = {}
                         tracker.last_limit_order_sec_long[tf] = time.time()
@@ -3118,30 +3138,28 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         else:
                             tracker.missing_count_short[tf] = 0
                             
-                        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA): Gắn TP/SL riêng độc lập cho từng TF qua attachAlgoOrds (chế độ Split/Chia trên OKX)
+                        # ⚡ Gắn TP/SL tức thì cho mọi chế độ (Lưới Đa Khung, DCA Âm, DCA Dương) qua native attachAlgoOrds của OKX V5
                         attach_algo_short = None
-                        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-                        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
-                        if not _is_pyramid and not _is_neg_dca:
-                            try:
-                                _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
-                                _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
-                                _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
-                                _calc_tp = round_to_tick(px_tf * (Decimal("1") - _tp_pct), spec["tickSz"])
-                                _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
-                                attach_algo_short = [{
-                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                    "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last",
-                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                    "slOrdPx": "-1",
-                                    "slTriggerPxType": "last"
-                                }]
-                            except Exception:
-                                attach_algo_short = None
+                        try:
+                            _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                            _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
+                            _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
+                            _calc_tp = round_to_tick(px_tf * (Decimal("1") - _tp_pct), spec["tickSz"])
+                            _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
+                            attach_algo_short = [{
+                                "attachAlgoClOrdId": f"{CL_ORD_PREFIX}ATS{tf}{int(time.time() * 1000000)}"[:32],
+                                "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                "tpOrdPx": "-1",
+                                "tpTriggerPxType": "last",
+                                "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                "slOrdPx": "-1",
+                                "slTriggerPxType": "last"
+                            }]
+                        except Exception:
+                            attach_algo_short = None
 
                         place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
-                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run, attach_algo_ords=attach_algo_short)
+                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run or bool(system_config.get("DRY_RUN", False)), attach_algo_ords=attach_algo_short)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
                         if not hasattr(tracker, "last_limit_order_sec_short"): tracker.last_limit_order_sec_short = {}
                         tracker.last_limit_order_sec_short[tf] = time.time()

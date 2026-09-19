@@ -100,11 +100,25 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
             })
         except:
             pass
-        resp = client.request("POST", "/api/v5/trade/order", body={
+        body_limit = {
             "instId": inst_id, "tdMode": td_mode,
             "side": side, "posSide": pos_side, "ordType": "limit", "sz": sz_str,
             "px": px_str, "clOrdId": cl_id
-        })
+        }
+        if setup.take_profit and setup.stop_loss:
+            tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
+            sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
+            body_limit["attachAlgoOrds"] = [{
+                "attachAlgoClOrdId": f"{cl_prefix}AT{int(time.time() * 1000000)}"[:32],
+                "tpTriggerPx": tp_px,
+                "tpOrdPx": "-1",
+                "tpTriggerPxType": "last",
+                "slTriggerPx": sl_px,
+                "slOrdPx": "-1",
+                "slTriggerPxType": "last"
+            }]
+
+        resp = client.request("POST", "/api/v5/trade/order", body=body_limit)
         if resp and resp.get("code") == "0":
             return True, ""
         err_msg = resp.get("msg", "Unknown") if resp else "No response"
@@ -115,14 +129,20 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
                     err_msg = s_msg
                     break
 
-        # Nếu gặp lỗi posSide error (51000), tự động fallback retry giữa net và long/short
+        # Fallback 1: Nếu lỗi liên quan attachAlgoOrds (51046, 51047, 51048, 51049), đặt lại Limit trơn
+        if "attachAlgoOrds" in body_limit and any(k in err_msg for k in ["attachAlgoOrds", "51046", "51047", "51048", "51049", "tpTriggerPx", "slTriggerPx"]):
+            body_no_algo = dict(body_limit)
+            body_no_algo.pop("attachAlgoOrds", None)
+            resp_fallback = client.request("POST", "/api/v5/trade/order", body=body_no_algo)
+            if resp_fallback and resp_fallback.get("code") == "0":
+                return True, ""
+
+        # Fallback 2: Nếu gặp lỗi posSide error (51000), tự động fallback retry giữa net và long/short
         if "posSide" in err_msg or "51000" in str(resp.get("code", "")) or "51000" in err_msg:
             fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
-            resp_retry = client.request("POST", "/api/v5/trade/order", body={
-                "instId": inst_id, "tdMode": td_mode,
-                "side": side, "posSide": fallback_pos_side, "ordType": "limit", "sz": sz_str,
-                "px": px_str, "clOrdId": cl_id
-            })
+            body_retry = dict(body_limit)
+            body_retry["posSide"] = fallback_pos_side
+            resp_retry = client.request("POST", "/api/v5/trade/order", body=body_retry)
             if resp_retry and resp_retry.get("code") == "0":
                 client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
                 return True, ""
@@ -183,6 +203,16 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
     elif not pos_side:
         pos_side = "long" if setup.bias == BULLISH else "short"
         
+    # ⚡ Kiểm tra nếu vị thế đã có TP và SL sẵn trên sàn (từ attachAlgoOrds khi khớp limit)
+    try:
+        pending_algos = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"}).get("data", [])
+        has_tp = any(Decimal(o.get("tpTriggerPx", "0")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
+        has_sl = any(Decimal(o.get("slTriggerPx", "0")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
+        if has_tp and has_sl:
+            return True
+    except Exception:
+        pass
+
     tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
     sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
     tp_side = "sell" if setup.bias == BULLISH else "buy"

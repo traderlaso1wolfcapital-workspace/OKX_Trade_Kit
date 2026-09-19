@@ -406,6 +406,21 @@ def main():
                     try: os.remove(stop_flag_path)
                     except: pass
 
+                    # 🧹 Dọn sạch toàn bộ Limit chưa khớp trên sàn OKX (Secondary Guarantee, bảo lưu 100% TP/SL)
+                    try:
+                        bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
+                    except Exception as _ce:
+                        print(f"⚠️ Lỗi dọn dẹp limit khi vào Shadow Mode: {_ce}")
+
+                    # 🔄 Reset cache lệnh limit trong RAM của bot để tránh re-place nhầm
+                    for coin_tracker in state_matrix.values():
+                        coin_tracker.placed_entry_px_long = "---"
+                        coin_tracker.placed_entry_px_short = "---"
+                        coin_tracker.placed_entry_px_long_by_tf = {}
+                        coin_tracker.placed_entry_px_short_by_tf = {}
+                        if hasattr(coin_tracker, "missing_count"):
+                            coin_tracker.missing_count = {"long": {}, "short": {}}
+
                 # Kích hoạt bot thật (chuyển từ shadow → live)
                 activate_flag_path = os.path.join(JSON_DATA_DIR, f"activate_{acc_name}.flag")
                 if os.path.exists(activate_flag_path):

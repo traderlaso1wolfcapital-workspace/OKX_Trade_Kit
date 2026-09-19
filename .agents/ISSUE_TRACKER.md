@@ -18,6 +18,48 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[20/09/2026]** - Điều Chỉnh Cấu Hình Mặc Định: Mặc Định TẮT (OFF) Nút "Nhân Hệ Số Ký Quỹ (Vốn)":
+  - **Mô tả:** Chuyển trạng thái mặc định của tùy chọn "nhân Hệ số Ký Quỹ (Vốn)" (`ENABLE_TF_VOLUME_MULTIPLIER` / `multiplyVolumeByTf`) sang TẮT (OFF / False) khi người dùng bấm "KHÔI PHỤC MẶC ĐỊNH" cũng như khởi tạo cấu hình mới, nhằm triệt tiêu rủi ro tăng vốn ngoài ý muốn cho người mới dùng bot.
+  - **Đã thực hiện:**
+    - [`bots/sub1/bot_config.py`](file:///d:/4./Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_config.py): Cập nhật giá trị mặc định `ENABLE_TF_VOLUME_MULTIPLIER = False`.
+    - [`web_app/backend/main.py`](file:///d:/4./Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Khởi tạo config mặc định với `ENABLE_TF_VOLUME_MULTIPLIER = False`.
+    - [`web_app/frontend/src/App.jsx`](file:///d:/4./Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Cập nhật state mặc định `multiplyVolumeByTf: false`, cấu hình reset mặc định `handleResetDefaultStrat` set `multiplyVolumeByTf: false` và `ENABLE_TF_VOLUME_MULTIPLIER: false`.
+    - Rebuild frontend production (`npm run build`) thành công vào `web_app/frontend/dist`.
+  - **Kiểm chứng:** Rebuild Vite thành công 100%, đồng bộ cả 3 tầng UI - Backend - Bot Core.
+
+
+- **[20/09/2026]** - Triển Khai Native `attachAlgoOrds` Toàn Diện Cho Bot SMC (`sub2`):
+  - **Mô tả:** Mở rộng cơ chế gắn TP/SL native tức thì (`attachAlgoOrds`) của OKX V5 cho toàn bộ các lệnh Limit Order Block trong bot SMC (`sub2`). Khi Limit cắn, sàn tự động kích hoạt ngay TP/SL đã tính toán từ setup OB; đồng thời trong `apply_ob_tpsl` tự nhận diện lệnh đã có TP/SL trên sàn để tránh spam API đặt đè.
+  - **Đã thực hiện:**
+    - [`bots/sub2/bot_orders.py`](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py): Trong `place_ob_limit_order`, tự động gắn `attachAlgoOrds` mang theo `setup.take_profit` và `setup.stop_loss`. Tích hợp 2 lớp fallback: (1) Fallback đặt Limit trơn nếu sàn từ chối algo; (2) Fallback posSide (51000). Trong `apply_ob_tpsl`, thêm bước kiểm tra lệnh algo đang có trên sàn để tránh trùng lặp.
+  - **Kiểm chứng:** `python -m py_compile` đạt 100%.
+
+- **[20/09/2026]** - Triển Khai Native `attachAlgoOrds` Kèm Cơ Chế Tự Động Gộp & Nâng Cấp TP/SL Cho DCA Âm & DCA Dương:
+  - **Mô tả:** Mở rộng cơ chế gắn TP/SL native tức thì (`attachAlgoOrds`) của OKX V5 cho mọi lệnh Limit của cả 2 chế độ DCA Âm và DCA Dương (thay vì chỉ Lưới Đa Khung). Đồng thời, khi vị thế cắn thêm các tầng DCA ở TF lớn hơn (khối lượng thay đổi), bot tự động hủy các TP/SL con tạm thời và gộp lại thành 1 cặp TP/SL tổng hợp duy nhất bao trọn 100% vị thế theo Giá Vào Trung Bình (`avg_px`) và hệ số TP/SL của TF lớn nhất (`max_filled_tf`).
+  - **Đã thực hiện:**
+    1. **`bots/sub1/bot_strategy.py`:** Mọi lệnh Limit đặt lên sàn (Long & Short) đều được gắn kèm `attachAlgoOrds` kèm `attachAlgoClOrdId`, tính sẵn mức TP/SL theo giá Limit và hệ số của TF đó làm lưới bảo hiểm phần cứng chống rớt mạng.
+    2. **`bots/sub1/bot_orders.py`:**
+       - Nâng cấp `clean_algo_orders` để quét sạch cả các lệnh algo sinh ra từ `attachAlgoOrds`.
+       - Trong `apply_emergency_tpsl`: Đồng bộ cả DCA Âm và DCA Dương luôn lấy TF lớn nhất đã cắn (`max_filled_tf`). Khi khối lượng vị thế thay đổi (`not status["size_matched"]`), bot tự động dọn dẹp TP/SL con và gài lại 1 cặp TP/SL tổng mới theo `avg_px` và hệ số TF lớn nhất, kèm log thông báo trực quan.
+  - **Kiểm chứng:** `python -m py_compile` đạt 100%.
+
+- **[20/09/2026]** - Sửa Lỗi Đặt Lại Limit Sau Khi Dừng Bot (Race Condition giữa Hủy Lệnh & Emergency Re-Place):
+  - **Mô tả:** Khi ấn nút "■ DỪNG BOT", bot đã quét và xóa sạch toàn bộ limit trên OKX, nhưng ngay sau đó bot lại đặt lại một loạt limit mới lên sàn dù trên giao diện bot đã ở chế độ dừng (Shadow mode).
+  - **Nguyên nhân cốt lõi (Race Condition):**
+    1. Trong `web_app/backend/main.py` (`stop_bot`), hàm `_cancel_unfilled_limit_orders(...)` được gọi trước khi ghi cờ `stop_sub1.flag` và `dry_run_sub1.flag = "1"`.
+    2. Trong khoảng thời gian 1-2 giây lệnh gọi API OKX đang hủy limit, luồng bot nền (`sys_bot_sub1.py` / `bot_strategy.py`) vẫn đang chạy với `dry_run = False`.
+    3. Khi các lệnh limit biến mất khỏi sàn, `bot_strategy.py` kiểm tra thấy thiếu lệnh, bộ đếm `missing_count` chạm ngưỡng 5 và kích hoạt `_emergency_needed = True` ("Phát hiện lệnh Limit bị hủy trên sàn → Đặt lại ngay!").
+    4. Do `dry_run` trong RAM vẫn là `False`, `place_pure_limit` lập tức gửi lại toàn bộ loạt limit mới lên OKX! Ngay sau đó backend mới ghi cờ dừng, khiến bot hiển thị dừng nhưng các lệnh limit vừa đặt lại tồn đọng trên sàn.
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Backend (`web_app/backend/main.py`):** Đảo ngược thứ tự xử lý trong `stop_bot`: Ghi cờ `stop_{acc_name}.flag` và `dry_run_{acc_name}.flag = "1"` lên đĩa TRƯỚC, xóa `activate_{acc_name}.flag`, ngủ 0.5s để thread bot nhận diện ngay trạng thái dừng, sau đó mới gọi `_cancel_unfilled_limit_orders(...)`.
+    2. **Chiến thuật Core (`bots/sub1/bot_strategy.py`):**
+       - Đọc cờ `stop_sub1.flag` và `dry_run_sub1.flag` trực tiếp từ đĩa ngay tại đầu hàm `_run_strategy_cycle_impl` để cập nhật `system_config["DRY_RUN"] = True` tức thì.
+       - Khóa chặt `_emergency_needed`: Khi bot ở chế độ `dry_run` (dừng/shadow), vô hiệu hóa hoàn toàn cơ chế quét thiếu lệnh và cấm tuyệt đối `_emergency_needed` kích hoạt. Đồng thời reset sạch cache `placed_entry_px_*_by_tf` và `missing_count`.
+       - Truyền tham số `dry_run=dry_run or bool(system_config.get("DRY_RUN", False))` vào cả 2 hàm gọi `place_pure_limit` (Long & Short).
+    3. **Tiến trình Bot (`bots/sub1/sys_bot_sub1.py`):** Khi phát hiện `stop_flag_path`, ngoài việc bật `DRY_RUN = True`, bot tự động gọi `bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)` bên trong tiến trình và reset bộ nhớ RAM limit của tất cả coin (Secondary Guarantee).
+    4. **Dọn dẹp thực tế:** Đã chạy script quét sàn OKX và dọn dẹp sạch sẽ 5 lệnh limit tồn đọng cho tài khoản hiện tại, bảo lưu 100% TP/SL.
+  - **Kiểm chứng:** Đã chạy hủy lệnh trực tiếp thành công 5 lệnh tồn đọng, biên dịch `py_compile` 3 file đạt 100%.
+
 - **[20/09/2026]** - Chuẩn Hóa Cấu Hình Mặc Định (Khớp 100% Hình 1), Tự Động Quét Hủy Lệnh Chờ OKX Khi Lưu/Reset Cấu Hình & Tối Ưu Hiển Thị Bảng Logs:
   - **Mô tả:**
     1. Thiết lập cấu hình mặc định cho người dùng mới và khôi phục mặc định chuẩn xác theo ảnh CEO cung cấp: Cặp giao dịch: `XAU, BTC, ETH` (các coin khác tắt); Ký quỹ `1$`, Bật `nhân Hệ số Ký Quỹ (Vốn)`; TP/SL `0.8%`; Công tắc chiến thuật: Chỉ Bật `Lưới Đa Khung` và `Đồng pha BTC & Lọc Vĩ mô` (tất cả các công tắc khác tắt); Điểm vào lệnh: Đón trước cản `0.05%`, Khoảng cách DCA `0.2%`, Nến xu hướng `60`, Hệ số nhạy ETH `1.30`.

@@ -1107,10 +1107,7 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
 
-    # 1. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
-    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
-
-    # 2. Ghi stop flag → bot sẽ chuyển về DRY_RUN (không kill process)
+    # 1. Ghi stop flag & dry_run flag TRƯỚC TIÊN → để tiến trình bot chuyển ngay về DRY_RUN ngầm, cấm đặt lệnh mới
     try:
         with open(os.path.join(flag_dir, f"stop_{acc_name}.flag"), "w") as f:
             f.write("stop")
@@ -1124,6 +1121,12 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     if os.path.exists(activate_flag):
         try: os.remove(activate_flag)
         except: pass
+
+    # Đợi 0.5s để tiến trình bot nhận cờ DRY_RUN và không nhảy vào EMERGENCY RE-PLACE
+    await asyncio.sleep(0.5)
+
+    # 2. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
+    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
 
     msg = f"Bot {strategy} đã dừng! Toàn bộ lệnh Limit chưa khớp đã được hủy ({canceled_orders} lệnh). TP/SL của các vị thế đang chạy được giữ nguyên 100%."
     return {"message": msg, "status": "SHADOW", "canceled_count": canceled_orders}
@@ -1199,7 +1202,7 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             "POSITION_VOLUME_HIGH_CONFIDENCE": 1.0,
             "SCALPING_TP_PCT": 0.008,
             "SCALPING_SL_PCT": 0.008,
-            "ENABLE_TF_VOLUME_MULTIPLIER": True,
+            "ENABLE_TF_VOLUME_MULTIPLIER": False,
             "ENABLE_STRATEGY_MAIN": True,
             "ENABLE_PYRAMID_DCA": False,
             "ENABLE_NEGATIVE_DCA": False,
@@ -1239,7 +1242,7 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             cfg["SCALPING_SL_PCT"] = 0.008
             dirty = True
         if "ENABLE_TF_VOLUME_MULTIPLIER" not in cfg:
-            cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = True
+            cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = False
             dirty = True
         if "ENABLE_MULTITF_GRID" not in cfg:
             cfg["ENABLE_MULTITF_GRID"] = True

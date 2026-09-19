@@ -385,6 +385,12 @@ def main():
             stop_flag = os.path.join(JSON_DATA_DIR, f"stop_{acc_name}.flag")
             if os.path.exists(stop_flag) or system_config["SHOULD_STOP"]:
                 print(f"\n🛑 Nhận tín hiệu DỪNG TỪ GUI hoặc Terminal. Đang tắt Bot tài khoản [{acc_name}]...")
+                try: os.remove(stop_flag)
+                except: pass
+                try:
+                    bot_sub2.cleanup_all_orders_on_startup(client, bot_sub2.COIN_PORTFOLIO)
+                except Exception as _ce:
+                    print(f"⚠️ Lỗi dọn dẹp lệnh khi dừng bot: {_ce}")
                 sys.exit(0)
                 
             reset_wallet_flag = os.path.join(JSON_DATA_DIR, f"reset_wallet_{acc_name}.flag")

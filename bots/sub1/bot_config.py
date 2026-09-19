@@ -36,7 +36,7 @@ LIMIT_CANDLES = "900"
 POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 1$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
-ENABLE_TF_VOLUME_MULTIPLIER = True                 # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: BẬT)
+ENABLE_TF_VOLUME_MULTIPLIER = False                # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: TẮT)
 
 
 # ==============================================================================

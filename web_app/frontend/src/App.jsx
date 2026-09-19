@@ -383,7 +383,7 @@ function App() {
   };
 
   // 9. Risk & Strategy Settings State
-  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: true });
+  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false });
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const [strat, setStrat] = useState({
     main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
@@ -1047,7 +1047,7 @@ function App() {
     try {
       const targetAcc = selectedAccount || effectiveAccId || "";
       if (activeBotTab === "sub1") {
-        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80, multiplyVolumeByTf: true };
+        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80, multiplyVolumeByTf: false };
         const defaultStrat = {
           main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false,
@@ -1097,7 +1097,7 @@ function App() {
           CONFLUENCE_PCT: 0.23,
           ACCUM_CANDLES: 60,
           ETH_VOL_MULT: 1.30,
-          ENABLE_TF_VOLUME_MULTIPLIER: true,
+          ENABLE_TF_VOLUME_MULTIPLIER: false,
         };
 
         const res = await fetch(`/api/bot/config?strategy=sub1&uid=${currentUid}&account_id=${targetAcc}`, {
@@ -1123,7 +1123,7 @@ function App() {
         addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định Bot EMA200: Ký quỹ 1$, Lưới Đa Khung, Đồng pha BTC, XAU/BTC/ETH${cancelMsg}`);
         refreshBotData();
       } else if (activeBotTab === "sub2") {
-        setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT", multiplyVolumeByTf: true });
+        setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT", multiplyVolumeByTf: false });
         setStrat({
           main: true, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -1370,7 +1370,7 @@ function App() {
             posVol: (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : r.posVol,
             tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
             slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct,
-            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? true),
+            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? false),
           }));
         }
       } catch { }

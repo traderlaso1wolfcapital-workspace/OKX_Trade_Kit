@@ -186,8 +186,12 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
         return
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
-        # Quét sạch cả hai tiền tố lệnh cũ (scv25) và mới (scvlmt) để tránh sót lệnh trên sàn
-        ours_algo = [o for o in pending_algo if (o.get("clOrdId", "").startswith("scvlmt") or o.get("clOrdId", "").startswith("scv25") or o.get("clOrdId", "").startswith(CL_ORD_PREFIX)) and o.get("tdMode") == td_mode]
+        # Quét sạch các lệnh algo của bot (cả tiền tố cũ scv25, mới scvlmt, attachAlgoOrds hoặc không có clOrdId do sàn tự sinh)
+        ours_algo = [
+            o for o in pending_algo 
+            if (o.get("clOrdId", "").startswith("scvlmt") or o.get("clOrdId", "").startswith("scv25") or o.get("clOrdId", "").startswith(CL_ORD_PREFIX) or not o.get("clOrdId")) 
+            and (o.get("tdMode") == td_mode or not o.get("tdMode"))
+        ]
         if pos_side: ours_algo = [o for o in ours_algo if o.get("posSide") == pos_side]
         if ours_algo: 
             body_cancel = [{"algoId": o["algoId"], "instId": o["instId"]} for o in ours_algo]
@@ -453,9 +457,7 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         if tracker:
             filled = getattr(tracker, "pos_cycle_filled_tfs", [])
             if filled:
-                if _is_pyramid:
-                    max_filled_tf = min(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                elif _is_neg_dca:
+                if _is_pyramid or _is_neg_dca:
                     max_filled_tf = max(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
                 else:
                     max_filled_tf = filled[0]
@@ -566,7 +568,7 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
                         tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
                 return
 
-        # ⚡ TÔN TRỌNG TP/SL CỦA CEO:
+        # ⚡ TÔN TRỌNG TP/SL CỦA CEO & TỰ ĐỘNG GỘP/NÂNG CẤP KHI CẮN DCA:
         # Nếu trên sàn ĐÃ CÓ TP hoặc SL và khối lượng khớp với vị thế hiện tại:
         # Tuyệt đối KHÔNG xóa và KHÔNG gài đè lại khi lệch giá. Giữ nguyên giá do CEO thiết lập.
         # Chỉ hủy và gài lại khi khối lượng vị thế thay đổi (ví dụ vừa cắn DCA nhồi thêm lệnh).
@@ -574,6 +576,7 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             clean_algo_orders(client, inst_id, td_mode, side)
             status["has_tp"] = False
             status["has_sl"] = False
+            print(f"🎯 [DCA TP/SL UPGRADE] {inst_id} {norm_side.upper()}: Khối lượng vị thế thay đổi ({abs_size_dec}) → Tự động gộp & nâng cấp TP/SL tổng theo TF Max {max_filled_tf} (Hệ số x{tp_tf_mult:.2f})!")
 
         if tracker:
             if norm_side == "long":
