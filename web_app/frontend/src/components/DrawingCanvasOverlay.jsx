@@ -37,7 +37,7 @@ export default function DrawingCanvasOverlay({
     }
     setSelectedId(null);
     setCurrentShape(null);
-  }, [coin]);
+  }, [coin, onDrawingsCountChange]);
 
   // 2. Lưu nét vẽ vào localStorage khi có thay đổi
   const saveDrawings = useCallback((newDrawings) => {
@@ -296,7 +296,7 @@ export default function DrawingCanvasOverlay({
   }, [selectedId, drawings, saveDrawings]);
 
   // 8. Render các phần tử SVG
-  const renderShape = (shape, isPreview = false) => {
+  const renderShape = (shape, _isPreview = false) => {
     const isSelected = selectedId === shape.id;
     const strokeWidth = isSelected ? 2.5 : 1.5;
 
@@ -420,7 +420,6 @@ export default function DrawingCanvasOverlay({
 
     // --- VỊ THẾ LONG / SHORT (Chuẩn TradingView như Ảnh 5) ---
     if (shape.type === DRAWING_TOOLS.LONG_POS || shape.type === DRAWING_TOOLS.SHORT_POS) {
-      const isLong = shape.type === DRAWING_TOOLS.LONG_POS;
       const sEntry = toScreenCoord(shape.entry);
       if (!sEntry || !series) return null;
 

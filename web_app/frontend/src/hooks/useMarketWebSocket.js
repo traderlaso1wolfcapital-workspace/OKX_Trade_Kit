@@ -81,7 +81,7 @@ export function useMarketWebSocket(instId, tf, onCandleUpdate) {
                 onUpdateRef.current(candle);
               }
             }
-          } catch (e) {
+          } catch {
             // Ignore parse errors
           }
         };

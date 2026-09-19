@@ -17,6 +17,95 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[19/09/2026]** - Chuẩn Hóa Tuyệt Đối 100% Khối OB và Box Long/Short Bot SMC:
+  - **Mô tả:** CEO chỉ rõ 3 lỗi logic trên biểu đồ Bot SMC:
+    1. Box 1: Entry bị lệch ở giữa OB thay vì nằm ở biên OB.
+    2. Box 2: OB Long (xanh dương) lại bị vẽ Box Short (màu đỏ).
+    3. Box 3: Stop Loss (SL) bị lơ lửng, không nằm đúng ở biên dưới của OB.
+  - **Nguyên nhân:** Hàm `calculateSMCPositions` tự quét FVG theo từng nến lẻ độc lập thay vì ánh xạ trực tiếp từ các khối OB chuẩn (`validObs`) của biểu đồ, dẫn đến sinh ra các box sai loại và sai lệch tọa độ so với dải OB hiển thị.
+  - **Đã thực hiện:**
+    1. Ánh xạ trực tiếp 1-1 từ các khối OB chuẩn trên biểu đồ (`validObs`):
+       - **OB Long (xanh dương):** Bắt buộc là **Box Long** (`entryType = 'Long'`).
+         + **Entry:** Luôn đặt chính xác tại **Biên trên của OB** (`entryPrice = ob.high`).
+         + **Stop Loss:** Luôn đặt chính xác tại **Biên dưới của OB** (`slTarget = ob.low`).
+         + **Take Profit:** Phía trên theo tỷ lệ 1.5R (`entryPrice + (ob.high - ob.low) * 1.5`).
+       - **OB Short (đỏ):** Bắt buộc là **Box Short** (`entryType = 'Short'`).
+         + **Entry:** Luôn đặt chính xác tại **Biên dưới của OB** (`entryPrice = ob.low`).
+         + **Stop Loss:** Luôn đặt chính xác tại **Biên trên của OB** (`slTarget = ob.high`).
+         + **Take Profit:** Phía dưới theo tỷ lệ 1.5R (`entryPrice - (ob.high - ob.low) * 1.5`).
+    2. Mỗi OB chỉ tương ứng với 1 lệnh duy nhất; khớp TP hoặc SL 1 lần là hoàn tất; OB chưa khớp thì box tịnh tiến theo nến live hiện tại.
+  - **Kiểm chứng:** Đã kiểm tra trực quan qua Browser Agent (`smc_chart_verification_1789818227450.png`):
+    - Khối OB Long xanh dương khớp khít 100% với Box Long: Entry nằm ngay mép trên `2.629,59`, SL nằm ngay mép dưới `2.607,9`.
+    - Không còn bất kỳ box Short nào xuất hiện trên OB Long.
+
+
+- **[19/09/2026]** - Sửa Triệt Để Box SMC Di Dít Đè Nhau: Mỗi OB 1 Lệnh Duy Nhất, Không Mở Lệnh Chồng Lấn:
+  - **Mô tả:** Biểu đồ Bot SMC xuất hiện nhiều box Long/Short nằm đè lên nhau, san sát nhau trong vùng sideway do nhiều FVG/OB liên tiếp sinh ra lệnh trong khi lệnh trước chưa kết thúc.
+  - **Nguyên tắc cốt lõi đã áp dụng:**
+    1. **Mỗi OB chỉ tạo tối đa 1 lệnh duy nhất:** Khi giá đã chạm entry của OB và chốt TP hoặc SL (hoặc bị đâm thủng), OB đó kết thúc hoàn toàn (mitigated/consumed), không đặt thêm lệnh limit ở OB đó nữa.
+    2. **Không mở lệnh chồng lấn (`lastExitIdx`):** Trong suốt thời gian một lệnh đang chạy (từ entry đến exit), bot không mở thêm lệnh nào khác. Lệnh chỉ được phép tìm kiếm và mở sau khi lệnh trước đã đóng xong hoàn toàn.
+    3. **Box chờ duy nhất ở nến live:** Khi không có lệnh nào đang chạy và có OB mới xuất hiện chưa chạm entry, chỉ có 1 box chờ duy nhất dóng thẳng hàng nến live hiện tại và tịnh tiến theo giá.
+  - **Kiểm chứng:** Đã kiểm tra qua Browser Agent (`smc_chart_check_1789817763209.png`): Vùng giá sideway không còn cảnh 4-5 box đè nhau di dít, chỉ có các lệnh nối tiếp tuần tự rõ ràng, biểu đồ cực kỳ sạch sẽ và thoáng mắt.
+
+
+- **[19/09/2026]** - Loại Bỏ "Total Profit", Nâng Cấp Backtesting SMC Quét 50 Lệnh Gần Nhất:
+  - **Mô tả:** CEO yêu cầu bỏ chỉ số `Total Profit` trên bảng Backtesting vì không cần thiết; đồng thời nâng cấp Bot SMC mở rộng quét toàn bộ chiều dài nến để thống kê 30 - 50 lệnh gần nhất (thay vì chỉ 1-3 lệnh như trước).
+  - **Đã thực hiện:**
+    1. **Bảng Backtesting:** Xóa hoàn toàn dòng `Total Profit`, chỉ tập trung hiển thị 4 chỉ số cốt lõi: `Total Entries`, `Wins`, `Losses`, `Winrate`.
+    2. **Hàm `calculateSMCPositions`:** Quét toàn bộ chiều dài lịch sử nến (tối đa 1500 nến gần nhất) để nhận diện tất cả các cấu trúc FVG & Order Block (OB), mô phỏng breakout & retest chạm entry và tính kết quả TP/SL cho từng lệnh.
+    3. **Thống kê 50 lệnh:** Bảng Backtesting lấy 50 lệnh gần nhất (`positions.slice(-50)`) để tính toán tỷ lệ Winrate khách quan, chuẩn xác theo giai đoạn thị trường gần nhất.
+    4. **Tối ưu hiển thị chart:** Giới hạn chỉ vẽ 15 box vị thế gần nhất lên màn hình để giữ chart thông thoáng, sạch đẹp, không bị che nến; box chờ ở nến live vẫn tịnh tiến chuẩn xác.
+  - **Kiểm chứng:** Đã kiểm tra trực quan trên trình duyệt (`chart_pane_backtest_1789817643605.png`): Bảng Backtesting hiển thị chuẩn xác `Total Entries: 50 | Wins: 19 | Losses: 31 | Winrate: 38.00%`, dòng `Total Profit` đã biến mất 100%.
+
+
+- **[19/09/2026]** - Sửa Logic Box SMC: Tịnh Tiến Theo Nến Hiện Tại, Chỉ Fix Vị Trí Khi Giá Vòng Về Chạm Entry OB:
+  - **Mô tả:** Khi xuất hiện Order Block (OB) mới, box Long/Short bị gán cố định (fix) ngay tại cây nến đầu tiên tạo ra OB đó, thay vì tịnh tiến di chuyển về bên phải theo cây nến hiện tại đến khi giá vòng về chạm biên entry.
+  - **Nguyên nhân:**
+    1. Khi hình thành OB, các nến ban đầu xuất phát từ bên trong OB hoặc quanh mép OB. Logic cũ kiểm tra `c.high > entryPrice * 1.0005` (quá nhạy, chỉ nhú qua 1 giá) đã kích hoạt ngay cờ `hasBrokenOut`.
+    2. Cây nến tiếp theo ngay sau đó vẫn nằm quanh chân OB nên thỏa mãn ngay `c.low <= entryPrice`, khiến hàm nhận nhầm nến xuất phát của OB thành nến vòng về test entry (`hitEntryIdx`), làm box bị ghim cố định ngay ở đầu sóng tạo OB và không còn tịnh tiến ở nến hiện tại.
+  - **Đã thực hiện:**
+    1. Chuẩn hóa điều kiện `hasBrokenOut`: Giá phải thực sự thoát hoàn toàn ra khỏi vùng OB (với Long: toàn bộ chân nến `c.low > entryPrice` và đỉnh nến `c.high >= entryPrice + Math.max(obHeight * 0.25, entryPrice * 0.0015)`).
+    2. Chỉ sau khi đã thoát ly hoàn toàn ra ngoài OB, ở các cây nến tiếp theo trong tương lai, khi có cây nến quay đầu giảm (pullback) có `c.low <= entryPrice` và không đóng cửa thủng đáy OB, cây nến đó mới được ghi nhận là `hitEntryIdx`.
+    3. Khi chưa có nến vòng về chạm entry (`hitEntryIdx === -1`), box Long/Short ở trạng thái chờ (`waiting`), cạnh trái luôn tịnh tiến dóng thẳng hàng theo cây nến live hiện tại (`candles[candles.length - 1].time`), vươn sang phải 10 nến.
+    4. Khi giá thực sự vòng về chạm entry, box mới dừng tịnh tiến và fix vị trí bắt đầu tại nến khớp entry đó; khi chạm TP hoặc SL, độ rộng box được ghim cố định vĩnh viễn tại nến chạm TP/SL.
+  - **Kiểm chứng:** Đã kiểm tra trực quan trên biểu đồ ETH-USDT 15m qua Browser Agent (`eth_smc_15m_chart_1789816674538.png`): các OB chưa chạm entry không còn bị dính box oan uổng, box Long đang chờ tịnh tiến mượt mà dóng thẳng hàng nến hiện tại bên phải cùng biểu đồ.
+
+
+- **[19/09/2026]** - Lọc & Ẩn Các Order Block (OB) Đã Bị Đâm Thủng / Lấp Hết Tại Bot SMC:
+  - **Mô tả:** CEO yêu cầu trên biểu đồ Bot SMC, tự động ẩn toàn bộ các khối Order Block (OB) đã bị nến đâm thủng qua (lấp hết OB), chỉ giữ lại những OB còn đủ điều kiện (chưa bị đâm thủng).
+  - **Nguyên nhân:** Trước đây hàm `compute_ob_boxes` trong `main.py` chỉ tìm kiếm OB trong 150 nến gần nhất rồi gộp đè nhau mà không kiểm tra quá trình giảm/tăng của các cây nến sau đó (mitigation check). Do đó các OB cũ đã bị giá đâm xuyên qua vẫn tiếp tục hiển thị đè lên biểu đồ, gây rối mắt.
+  - **Đã thực hiện:**
+    1. **Backend (`main.py`):** Trong hàm `compute_ob_boxes`, bổ sung cờ `candle_idx` và bộ lọc loại bỏ các OB đã bị giá đóng cửa đâm thủng qua:
+       - Với Bullish OB (`bias == 1`): Bị loại bỏ nếu có bất kỳ nến nào sau đó đóng cửa thấp hơn đáy OB (`closes[k] < ob.low`).
+       - Với Bearish OB (`bias == -1`): Bị loại bỏ nếu có bất kỳ nến nào sau đó đóng cửa cao hơn đỉnh OB (`closes[k] > ob.high`).
+       - Chỉ gom và gộp các OB còn nguyên giá trị phòng thủ (unmitigated).
+    2. **Frontend (`SingleChartPane.jsx`):** Cập nhật cả hàm `drawObs` và `calculateSMCPositions` tự động lọc đối chiếu trực tiếp với `candlesRef.current` theo thời gian thực. Bất kỳ khi nào giá live hoặc nến đóng cửa đâm thủng qua OB, OB đó sẽ lập tức biến mất trên biểu đồ.
+    3. **Kiểm chứng Browser Subagent:** Đã truy cập trực tiếp `http://localhost:5173` trên Bot SMC (BTC 4H): 2 khối OB cũ bị đâm thủng ở khoảng 77k-78k và 78k-79k đã biến mất 100%, chỉ còn lại 1 OB Bearish cản phía trên (80.4k - 81.4k) và 1 OB Bullish đỡ phía dưới (76.2k - 76.7k).
+    4. Build production `npm run build` thành công.
+
+- **[19/09/2026]** - Sửa Lỗi Crash Màn Hình Đỏ "ReferenceError: setDrawingsCount is not defined" & "indicatorsModalTab is not defined":
+  - **Mô tả:** Trình duyệt web khi mở trang `http://192.168.2.92:5173` bị crash màn hình đỏ (ErrorBoundary) với lỗi `ReferenceError: setDrawingsCount is not defined` tại `SingleChartPane.jsx`.
+  - **Nguyên nhân:** Khi dọn dẹp các biến linter cảnh báo không sử dụng, biến `setDrawingsCount`, `clearDrawingsTrigger` và `indicatorsModalTab` bị xóa nhầm, trong khi chúng vẫn được truyền vào props của component con `<DrawingCanvasOverlay>` và `<IndicatorsModal>`.
+  - **Đã thực hiện:**
+    1. Khôi phục khai báo state `const [, setDrawingsCount] = useState(0);` và `const [clearDrawingsTrigger] = useState(0);` tại [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx#L64-L65).
+    2. Khôi phục `const [indicatorsModalTab] = useState("system");` tại [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx#L229).
+    3. Đã vào trực tiếp trình duyệt thông qua Browser Agent kiểm thử toàn diện cả 3 tab: `Bot EMA200`, `Bot SMC`, `Bot Liquidation`. Toàn bộ giao diện nến, volume, bảng vị thế, thanh cài đặt hiển thị mượt mà 100%, không còn màn hình đỏ crash.
+    4. Build production `npm run build` thành công.
+
+- **[19/09/2026]** - Sửa Triệt Để Các Lỗi Chấm Đỏ / Diagnostics Trong Dự Án (Backend & Frontend):
+  - **Mô tả:** IDE xuất hiện nhiều chấm đỏ và số báo lỗi 9 tại `main.py`, cũng như chấm đỏ cảnh báo trên các thư mục `backend` và `frontend/src`.
+  - **Nguyên nhân phát hiện:**
+    1. **Backend (`main.py` - 9 lỗi đỏ):** Thiếu import `from decimal import Decimal`, dẫn đến 9 lỗi `undefined name 'Decimal'` tại các dòng 366, 367, 368, 369, 378, 380 (2 lần), 390, 403 khi tính toán FVG/OB.
+    2. **Frontend Hook (`useBotWebSocket.js` & `App.jsx`):** Hook `useBotWebSocket` thiếu export `setClosedPositions`, và `App.jsx` chưa destructure `setPositions` / `setClosedPositions` nhưng lại gọi trực tiếp trong hàm `fetchPositions`.
+    3. **Frontend (`App.jsx`):** Trùng lặp prop `isRunning={isRunning}` hai lần trong component `SystemSettingsModal`, khai báo các biến và import không sử dụng (`TF_LIST`, `uptime`, `availBal`, `selectedCoin`, `safeEnabledTfs`, `isShadow`), và thiếu dependency trong polling effect.
+    4. **Frontend (`SingleChartPane.jsx`, `DrawingCanvasOverlay.jsx`, `IndicatorsModal.jsx`, `NumberSpinBox.jsx`, `SystemSettingsModal.jsx`):** Chứa các biến/import khai báo thừa (`drawingsCount`, `clearDrawingsTrigger`, `handleToggleChartMode`, `indicatorsModalTab`, `useState` thừa) và các khối `catch (e) { }` không dùng `e`.
+  - **Đã thực hiện:**
+    1. Bổ sung `from decimal import Decimal` vào `main.py`. Dọn dẹp các cảnh báo biến thừa trong `main.py` (`_ = psutil.Process(pid)`, `except Exception:`). Pyflakes đạt 0 lỗi.
+    2. Export `setClosedPositions` từ `useBotWebSocket.js` và destructure đầy đủ vào `App.jsx`.
+    3. Chuyển `fetchPositions` trong `App.jsx` thành `useCallback`, xóa sạch prop trùng `isRunning` và dọn các biến không dùng.
+    4. Tối ưu hóa `SingleChartPane.jsx`, `DrawingCanvasOverlay.jsx`, `NumberSpinBox.jsx`, `SystemSettingsModal.jsx`.
+    5. Kiểm thử: Oxlint quét 26 files đạt **0 warnings và 0 errors**, Vite build production thành công 100% trong 0.2s.
+
 - **[19/09/2026]** - Rà Soát Logic Lưới Limit Đa Khung (Tại Sao Chỉ Đặt Limit H4 Mà Bỏ Qua M5, M15):
   - **Mô tả:** Người dùng tắt cả 2 nút DCA Dương & DCA Âm, bật Đồng pha BTC, tích chọn đầy đủ các TF trade (M5, M15, M30, H1, H2, H4). Tuy nhiên trên terminal bot chỉ hiển thị đang limit H4 cho BTC và ETH, dù M5 (▲ 517-0) và M15 (▲ 156-0) đều thỏa mãn điều kiện.
   - **Nguyên nhân phát hiện:**
@@ -1679,3 +1768,57 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Do điều kiện tích lũy trong `calculateEMA200Positions` bị siết chặt quá mức (`bodyMin > ema` thay vì `candle.close >= ema`), thiếu logic hủy lệnh trôi EMA (drift) khiến lệnh kẹt ở `waiting`, và dev Thọ xóa mất logic tọa độ `exitTime` kết hợp cờ `_fixedStartX` làm đứng cứng pixel và crash `logicalRange is not defined`.
     - **Đã fix:** Sửa chuẩn xác logic vào/thoát lệnh của Bot EMA200 theo `bot_strategy.py`, khôi phục tính `exitTime`, xóa bỏ ghim cứng pixel để các khối vị thế di chuyển mượt mà theo nến, và sửa lỗi `logicalRange`. Bảng Backtesting và các khối Long/Short xanh đỏ quanh EMA200 hiển thị đầy đủ 100%.
   *(Mã patch: `z-web-2phase-ema200-restore`)*
+
+- **[19/09/2026]** - Chuẩn hoá Trục Giá (Price Scale) theo chuẩn Hyperliquid & Khắc phục Bảng Backtesting đè trục giá:
+  - **Khái niệm:** Cột hiển thị mức giá ở mép phải biểu đồ gọi là **Right Price Scale** (Trục giá / Cột thang giá bên phải). Nhãn giá live màu đỏ/xanh đang nhảy theo thời gian thực là **Price Label / Current Price Badge**.
+  - **Vấn đề 1: Format số trên trục giá chưa chuẩn phong cách Hyperliquid:**
+    - Trước đó dùng format `en-US` ép 1 số lẻ (`82,000.0`, `81,258.5`) gây vướng víu và không tương thích các coin giá nhỏ.
+    - **Đã fix:** Xây dựng hàm `formatHyperliquidPrice` theo locale chuẩn (`vi-VN`):
+      + Coin giá lớn $\ge 1.000$ (BTC, ETH...): 0 số thập phân, phân cách hàng nghìn bằng dấu chấm `.` (ví dụ: `81.750`, `81.500`, `81.262`).
+      + Coin giá vừa $100 - 1.000$: 1 số thập phân (ví dụ: `145,6`).
+      + Coin giá nhỏ $1 - 100$ (NEAR, XRP...): cố định 4 số thập phân với dấu phẩy `,` (ví dụ: `3,8000`, `3,7023`).
+      + Coin siêu nhỏ $< 1$: 5 đến 6 số thập phân (ví dụ: `0,18524`).
+      + Đặt `minimumWidth: 75` cho `rightPriceScale` để đảm bảo độ rộng trục ổn định.
+  - **Vấn đề 2: Bảng Backtesting bị đè lên trục giá:**
+    - Lớp `.chart-backtest-table-wrap` đặt `right: 55px`, trong khi trục giá rộng ~75px dẫn đến góc phải của bảng lấn 20px đè lên số giá và đường trục giá.
+    - **Đã fix:** Chuyển `right: 80px` trong `index.css` và điều chỉnh bo góc `border-radius: 0 0 6px 6px`. Cụm nút công cụ `[A]` và `[L]` dưới đáy cũng được dời sang `right: 80px`. Bảng Backtesting và các nút nằm hoàn toàn gọn gàng bên trái trục giá, giải phóng 100% trục giá không còn bị che khuất.
+  *(Mã patch: `z-web-hyperliquid-price-scale`)*
+
+- **[19/09/2026]** - Dừng Box Long/Short Bot SMC tại nến chạm TP/SL, Thu gọn Biên độ Trục giá vừa khít & Định dạng số lẻ ETH:
+  - **Vấn đề 1: Box Long/Short Bot SMC vẽ dài miên man sang tương lai dù đã chạm SL/TP:**
+    - `calculateSMCPositions` không quét các cây nến sau entry để tìm điểm chạm TP/SL, thiếu `exitTime`; đồng thời hàm vẽ box ép `endX = curIdx + 15` vẽ tràn ra tương lai.
+    - **Đã fix:** Quét nến từ `entryIdx + 1`, nếu nến chạm TP (`high >= tpTarget` với Long, `low <= tpTarget` với Short) hoặc chạm SL (`low <= slTarget` với Long, `high >= slTarget` với Short) thì gán ngay `exitTime = candle.time`, `state = 'Take Profit'/'Stop Loss'` và ngắt quét. Hàm vẽ box kết thúc chính xác tại cây nến chạm TP/SL (`exitIdx + 1`); với lệnh đang mở chỉ vẽ đến nến hiện tại cuối cùng, triệt tiêu 100% việc vẽ dài miên man.
+  - **Vấn đề 2: Trục giá thừa khoảng đen trống ở mép phải:**
+    - Do cấu hình `minimumWidth: 75` ép trục giá rộng cố định 75px dù chữ số chỉ cần ~50px.
+    - **Đã fix:** Loại bỏ `minimumWidth: 75` để Lightweight Charts tự động co nhỏ vừa khít với độ dài con số của từng coin. Đồng thời đo `pScaleWidth` thực tế để gán động `right: ${pScaleWidth + 4}px` cho Bảng Backtesting và cụm nút `[A] [L]`, giữ vị trí bám sát hoàn hảo và không bao giờ bị đè hay hở xa.
+  - **Vấn đề 3: ETH hiển thị 1 chữ số thập phân chuẩn Hyperliquid (`2.560,0`, `2.647,3`):**
+    - Cập nhật ngưỡng `price >= 10000` (0 số lẻ cho BTC: `81.750`, `81.262`) và `price >= 1000 && price < 10000` (1 số lẻ dấu phẩy cho ETH: `2.560,0`, `2.647,3`).
+  - **Vấn đề 4: Fix lỗi ReferenceError `setSelectedCoin`:**
+    - Bổ sung `const [selectedCoin, setSelectedCoin] = useState(...)` trong `App.jsx` sửa dứt điểm lỗi crash console khi click chuyển coin.
+  *(Mã patch: `z-web-smc-box-fit-scale`)*
+
+- **[19/09/2026]** - Triển khai Cơ chế Co giãn & Tịnh tiến Động cho Box Vị thế (Bot SMC, Bot EMA200):
+  - **Yêu cầu:** 
+    1. Khi giá chưa chạm Entry của OB (hoặc điểm vào lệnh của Bot), box tự động xê dịch tịnh tiến bám sát theo cây nến hiện tại với độ dài mặc định ban đầu là **10 cây nến** của TF hiện tại. Cạnh bên trái của box BẮT BUỘC phải luôn dóng thẳng hàng cây nến hiện tại và kéo dài 10 nến sang phải, triệt tiêu hoàn toàn lỗi lùi về quá khứ đè lên box liền kề.
+    2. Khi giá chạm vào Entry (`entryPrice`), vị trí bắt đầu của box được **FIX CỐ ĐỊNH** lại ngay tại cây nến chạm Entry đó.
+    3. Khi giá chạm vào điểm TP hoặc SL, độ rộng của box được **FIX CỐ ĐỊNH** vĩnh viễn đúng từ nến Entry đến nến chạm TP/SL.
+  - **Đã fix:**
+    - Cập nhật `calculateSMCPositions` & `calculateEMA200Positions`: Khi ở trạng thái `waiting`, gán `entryTime = candles[curIdx].time` (chính là nến live hiện tại).
+    - Cập nhật `drawPositions`: Khi `pos.isWaiting`, cạnh trái (`startX`) bắt đầu chính xác từ cây nến hiện tại và vươn dài 10 nến sang phải (`targetIdx = entryIdx + 10`). Khi nến mới hình thành, cạnh trái trượt theo nến mới; loại bỏ 100% hiện tượng đè lấn lên các box đã đóng liền kề trước đó.
+  *(Mã patch: `z-web-smc-sliding-box-v2`)*
+
+- **[19/09/2026]** - Ẩn hoàn toàn dải Box OB nền trong Bot Liquidation (TLS1 - Charts Liquid v5):
+  - **Yêu cầu:** Bot Liquidation không cần hiển thị các khối OB nền nằm ngang trên biểu đồ, loại bỏ phần này để tránh rối mắt nhưng TUYỆT ĐỐI không ảnh hưởng đến Bot SMC.
+  - **Đã fix:** 
+    - Trong hàm `drawLiquidV5Boxes` của [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx), loại bỏ hoàn toàn vòng lặp vẽ các dải `activeObsRef.current` vào lớp `oBoxes`.
+    - Biểu đồ Bot Liquidation giờ đây hoàn toàn trong trẻo, sạch sẽ, chỉ hiển thị đúng các khối vị thế Long/Short (E1, E2, TP, SL).
+    - Hàm `drawObs` dành riêng cho Bot SMC được giữ nguyên 100%, không bị ảnh hưởng.
+  *(Mã patch: `z-web-hide-liquid-ob-boxes`)*
+
+- **[19/09/2026]** - Sửa Logic Bot SMC: Box tịnh tiến theo nến hiện tại đến khi giá vòng về chạm biên Entry mới Fix vị trí:
+  - **Vấn đề:** Trước đây thuật toán quét ngay sau nến tạo OB (`obIdx + 1`), do nến ngay sau OB mở cửa tại mép OB nên điều kiện `low <= entryPrice` bị thỏa mãn lập tức -> Box Long/Short bị ghim cứng ngay tại cây nến đầu tiên tạo OB thay vì tịnh tiến theo nến hiện tại chờ giá quay về retest.
+  - **Đã fix:** 
+    - Bổ sung cơ chế Breakout & Retest chuẩn SMC: Giá bắt buộc phải bứt phá thoát ra ngoài vùng OB trước (`hasBrokenOut = true`, giá đóng cửa vượt qua OB).
+    - Sau khi đã bứt phá, box Long/Short tiếp tục **tịnh tiến dóng thẳng hàng theo cây nến hiện tại** (10 nến về phía trước).
+    - Chỉ khi nào có một cây nến sau đó **vòng quay trở lại chạm vào biên entry của OB** (`c.low <= entryPrice` với Long, `c.high >= entryPrice` với Short) thì box mới dừng tịnh tiến và **FIX VỊ TRÍ** tại cây nến chạm biên entry đó.
+  *(Mã patch: `z-web-smc-breakout-retest-fix`)*

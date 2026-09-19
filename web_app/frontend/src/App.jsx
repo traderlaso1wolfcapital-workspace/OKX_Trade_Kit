@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { COIN_LIST, TF_LIST, ADMIN_UID } from "./constants/tradeConfig";
+import { COIN_LIST, ADMIN_UID } from "./constants/tradeConfig";
 import { renderLayoutIcon } from "./components/common/LayoutIcons";
 import AppHeader from "./components/header/AppHeader";
 import SidebarLeft from "./components/sidebar/SidebarLeft";
@@ -104,10 +104,10 @@ function App() {
   const currentUid = localStorage.getItem("tls1_uid") || loginUid;
   const {
     botStatus,
-    uptime,
-    availBal,
     positions,
+    setPositions,
     closedPositions,
+    setClosedPositions,
     refresh: refreshBotData,
   } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
 
@@ -150,8 +150,8 @@ function App() {
     ];
   });
 
+  const [, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [activeChartIndex, setActiveChartIndex] = useState(0);
-  const [selectedCoin, setSelectedCoin] = useState("BTC-USDT-SWAP");
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const layoutSelectorRef = useRef(null);
   const terminalRef = useRef(null);
@@ -1204,6 +1204,26 @@ function App() {
     }
   }, [logs]);
 
+  const fetchPositions = useCallback(async () => {
+    try {
+      const acc = effectiveAccId;
+      if (!acc) return;
+      const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      if (r.ok) setPositions(await r.json());
+
+      const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      if (r2.ok) {
+        setClosedPositions(await r2.json());
+      }
+
+      // Fetch admin data for backtest stats
+      const rAdmin = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${ADMIN_UID}`);
+      if (rAdmin.ok) {
+        setAdminClosedPositions(await rAdmin.json());
+      }
+    } catch { }
+  }, [effectiveAccId, activeBotTab, loginUid, setPositions, setClosedPositions]);
+
   // Periodic polling
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1261,29 +1281,7 @@ function App() {
     const s = setInterval(fetchStatus, 2000);
     const p = setInterval(fetchPositions, 5000);
     return () => { clearInterval(s); clearInterval(p); };
-  }, [isAuthenticated, activeBotTab, selectedAccount, botAccountMap, loginUid]);
-
-  const fetchPositions = async () => {
-    try {
-      const acc = effectiveAccId;
-      if (!acc) return;
-      const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-      if (r.ok) setPositions(await r.json());
-
-      const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-      if (r2.ok) {
-        setClosedPositions(await r2.json());
-      }
-
-      // Fetch admin data for backtest stats
-      const rAdmin = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${ADMIN_UID}`);
-      if (rAdmin.ok) {
-        setAdminClosedPositions(await rAdmin.json());
-      }
-    } catch { }
-  };
-  const safeEnabledTfs = Array.isArray(enabledTfs) ? enabledTfs : [];
-  const isShadow = botStatus === "SHADOW";
+  }, [isAuthenticated, activeBotTab, selectedAccount, botAccountMap, loginUid, effectiveAccId, fetchPositions]);
 
 
   if (!isAuthenticated) {
@@ -1594,7 +1592,6 @@ function App() {
         onResetDefaultStrat={handleResetDefaultStrat}
         onSaveStratConfig={handleSaveStratConfig}
         onLogout={handleLogout}
-        isRunning={isRunning}
         onToggleMultiplyVolume={handleToggleMultiplyVolume}
       />
 

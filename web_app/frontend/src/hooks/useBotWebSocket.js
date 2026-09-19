@@ -108,6 +108,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
     setPositions,
     availBal,
     closedPositions,
+    setClosedPositions,
     isConnected,
     refresh,
   };

@@ -342,7 +342,7 @@ export function calculateLiquidV5(candles, options = {}) {
     tpslMethod = 'Dynamic',
     tpPercent = 0.3,
     slPercent = 0.4,
-    maxFVGLength = 2,
+    _maxFVGLength = 2,
     higherTF = 'H4',
   } = options;
 

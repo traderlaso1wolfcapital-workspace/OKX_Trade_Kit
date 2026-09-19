@@ -107,7 +107,7 @@ export default function IndicatorsModal({
   onClose,
   activeIndicators = [],
   onToggleIndicator,
-  customScripts = [],
+  _customScripts = [],
   onUpdateCustomScripts,
   candles = [],
   initialCategory = "system",
@@ -169,7 +169,7 @@ export default function IndicatorsModal({
     try {
       localStorage.setItem("tls1_coder_scripts", JSON.stringify(coderScripts));
     } catch {}
-  }, [coderScripts]);
+  }, [coderScripts, onUpdateCustomScripts]);
 
   const toggleFavorite = (id, e) => {
     e.stopPropagation();

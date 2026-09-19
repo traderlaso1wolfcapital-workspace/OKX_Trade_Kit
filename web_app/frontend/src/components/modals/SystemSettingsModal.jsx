@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ToggleSwitch from '../common/ToggleSwitch';
 import NumberSpinBox from '../common/NumberSpinBox';
 import { COIN_LIST } from '../../constants/tradeConfig';

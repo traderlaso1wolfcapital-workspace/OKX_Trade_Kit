@@ -4,12 +4,12 @@ import json
 import time
 import asyncio
 import subprocess
-import psutil
 import hmac
 import hashlib
 import base64
 import requests
 import csv
+from decimal import Decimal
 from datetime import datetime, timezone
 from collections import deque
 from typing import Optional, List, Dict, Union, Any
@@ -394,7 +394,8 @@ def compute_ob_boxes(all_candles):
                                 "bias": 1,
                                 "time": times[j],
                                 "high": float(highs[j]),
-                                "low": float(lows[j])
+                                "low": float(lows[j]),
+                                "candle_idx": j
                             })
                             break
             # Bearish FVG & Bearish OB
@@ -407,13 +408,31 @@ def compute_ob_boxes(all_candles):
                                 "bias": -1,
                                 "time": times[j],
                                 "high": float(highs[j]),
-                                "low": float(lows[j])
+                                "low": float(lows[j]),
+                                "candle_idx": j
                             })
                             break
                             
+        # Lọc bỏ các OB đã bị giá đâm thủng qua (mitigated / lấp hết)
+        unmitigated_obs = []
+        for ob in raw_obs:
+            j = ob.get("candle_idx", 0)
+            ob_low = Decimal(str(ob["low"]))
+            ob_high = Decimal(str(ob["high"]))
+            is_pierced = False
+            for k in range(j + 1, n):
+                if ob["bias"] == 1 and closes[k] < ob_low:
+                    is_pierced = True
+                    break
+                elif ob["bias"] == -1 and closes[k] > ob_high:
+                    is_pierced = True
+                    break
+            if not is_pierced:
+                unmitigated_obs.append(ob)
+
         # Lọc và gộp các vùng OB đè nhau
         for bias in [1, -1]:
-            biased = [o for o in raw_obs if o["bias"] == bias]
+            biased = [o for o in unmitigated_obs if o["bias"] == bias]
             biased.sort(key=lambda x: x["low"])
             merged = []
             for o in biased:
@@ -430,7 +449,7 @@ def compute_ob_boxes(all_candles):
                     else:
                         merged.append(o)
             ob_boxes.extend(merged)
-    except Exception as e:
+    except Exception:
         pass
     return ob_boxes
 
@@ -677,7 +696,7 @@ def get_running_pid(uid: str, strategy: str) -> int:
             try:
                 import psutil
                 if psutil.pid_exists(pid):
-                    p = psutil.Process(pid)
+                    _ = psutil.Process(pid)
                     # Chỉ cần tiến trình tồn tại (vì lock file này là do chính bot tạo ra)
                     return pid
             except ImportError:
@@ -1265,7 +1284,7 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     except HTTPException:
         raise
     except requests.exceptions.Timeout:
-        print(f"[API CHECK] OKX API Timeout!", flush=True)
+        print("[API CHECK] OKX API Timeout!", flush=True)
         raise HTTPException(status_code=400, detail="Kết nối đến OKX API bị timeout. Vui lòng thử lại.")
     except requests.exceptions.ConnectionError as e:
         print(f"[API CHECK] OKX Connection Error: {e}", flush=True)

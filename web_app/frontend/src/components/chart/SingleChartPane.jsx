@@ -21,6 +21,31 @@ import {
 // Module-level global candle cache across all chart panes and layout transitions
 const _webCandlesCache = new Map(); // key: `${coin}_${bar}` -> { candles, volume, ema, ob_boxes, timestamp }
 
+// Format giá theo chuẩn Hyperliquid (vi-VN locale: chấm phân cách nghìn, phẩy thập phân)
+const formatHyperliquidPrice = (price) => {
+  if (typeof price !== 'number' || isNaN(price)) return '';
+  let decimals = 2;
+  if (price >= 10000) {
+    decimals = 0; // BTC: 81.750, 81.334
+  } else if (price >= 1000) {
+    decimals = 1; // ETH: 2.560,0, 2.647,3 (chuẩn ảnh 3 của Hyperliquid)
+  } else if (price >= 100) {
+    decimals = 2; // SOL: 145,60
+  } else if (price >= 10) {
+    decimals = 3; // LINK: 18,250
+  } else if (price >= 1) {
+    decimals = 4; // NEAR: 3,8000, 3,7023 (chuẩn ảnh NEAR của Hyperliquid)
+  } else if (price >= 0.1) {
+    decimals = 5; // DOGE: 0,18524
+  } else {
+    decimals = 6;
+  }
+  return new Intl.NumberFormat('vi-VN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(price);
+};
+
 export default function SingleChartPane({
   chartIndex,
   coin,
@@ -53,7 +78,10 @@ export default function SingleChartPane({
   const riskRef = useRef(risk);
   riskRef.current = risk;
   const rafIdRef = useRef(null);
+  const drawObsRef = useRef(null);
+  const drawLiquidV5BoxesRef = useRef(null);
 
+  const [priceScaleWidth, setPriceScaleWidth] = useState(55);
   const [isAutoFit, setIsAutoFit] = useState(true);
   const isAutoFitRef = useRef(isAutoFit);
   isAutoFitRef.current = isAutoFit;
@@ -61,13 +89,13 @@ export default function SingleChartPane({
   const userInteractedRef = useRef(false);
   const hasInitializedRef = useRef(false);
   const [activeDrawingTool, setActiveDrawingTool] = useState(DRAWING_TOOLS.CURSOR);
-  const [drawingsCount, setDrawingsCount] = useState(0);
-  const [clearDrawingsTrigger, setClearDrawingsTrigger] = useState(0);
+  const [, setDrawingsCount] = useState(0);
+  const [clearDrawingsTrigger] = useState(0);
   const [chartInstance, setChartInstance] = useState(null);
   const [seriesInstance, setSeriesInstance] = useState(null);
 
   // Chế độ biểu đồ Hybrid: 'standard' hoặc 'tv'
-  const [chartMode, setChartMode] = useState(() => {
+  const [chartMode] = useState(() => {
     try {
       const saved = localStorage.getItem(`tls1_chart_mode_${chartIndex}`);
       if (saved === "smc") return "standard";
@@ -76,13 +104,6 @@ export default function SingleChartPane({
       return "standard";
     }
   });
-
-  const handleToggleChartMode = (mode) => {
-    setChartMode(mode);
-    try {
-      localStorage.setItem(`tls1_chart_mode_${chartIndex}`, mode);
-    } catch { }
-  };
 
   // Trạng thái Indicators & Coder Custom Scripts
   const [showIndicatorsModal, setShowIndicatorsModal] = useState(false);
@@ -159,8 +180,8 @@ export default function SingleChartPane({
     if (rafIdRef.current) return;
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
-      drawObs();
-      drawLiquidV5Boxes();
+      drawObsRef.current?.();
+      drawLiquidV5BoxesRef.current?.();
     });
   }, []);
 
@@ -173,7 +194,7 @@ export default function SingleChartPane({
   useEffect(() => {
     riskRef.current = risk;
     scheduleDraw();
-  }, [risk?.tpPct, risk?.slPct, scheduleDraw]);
+  }, [risk, scheduleDraw]);
 
   useEffect(() => {
     if (!activeBotTab) return;
@@ -194,7 +215,7 @@ export default function SingleChartPane({
         list.splice(emaIdx + 1, 0, "volume");
       }
       setActiveIndicators(list);
-    } catch (e) { }
+    } catch { }
 
     setTimeout(() => {
       applyDefaultZoom();
@@ -233,7 +254,7 @@ export default function SingleChartPane({
   hiddenIndicatorsRef.current = hiddenIndicators;
   const [isLegendVisible, setIsLegendVisible] = useState(false);
   const [isBacktestCollapsed, setIsBacktestCollapsed] = useState(true);
-  const [indicatorsModalTab, setIndicatorsModalTab] = useState("system");
+  const [indicatorsModalTab] = useState("system");
 
   const getIndicatorTitle = (id) => {
     const titles = {
@@ -292,7 +313,7 @@ export default function SingleChartPane({
         from: Math.max(0, total - candleCount),
         to: total - 1 + rightOffset,
       });
-    } catch (e) { }
+    } catch { }
   };
 
   const getTfMultiplier = (rawTf) => {
@@ -410,8 +431,16 @@ export default function SingleChartPane({
       }
     }
 
-    if (activeTrade && (activeTrade.state === 'open' || activeTrade.state === 'waiting')) {
-      results.push({ ...activeTrade, state: 'Active Position' });
+    if (activeTrade && activeTrade.state === 'waiting') {
+      const curIdx = candles.length - 1;
+      results.push({
+        ...activeTrade,
+        entryTime: candles[curIdx].time, // Cạnh trái luôn thẳng hàng với cây nến hiện tại
+        state: 'waiting',
+        isWaiting: true,
+      });
+    } else if (activeTrade && activeTrade.state === 'open') {
+      results.push({ ...activeTrade, state: 'Active Position', isWaiting: false });
     }
 
     return results;
@@ -419,28 +448,165 @@ export default function SingleChartPane({
 
   const calculateSMCPositions = (candles, obs) => {
     if (!candles || candles.length < 25) return [];
-    const validObs = (obs || []).filter(ob => ob.high && ob.low);
+
+    // Chỉ lấy các khối OB còn hợp lệ (chưa bị đóng cửa xuyên thủng)
+    const validObs = (obs || []).filter(ob => {
+      if (!ob || !ob.high || !ob.low) return false;
+      const obSec = ob.time ? (ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time) : 0;
+      for (let i = candles.length - 1; i >= 0; i--) {
+        const cd = candles[i];
+        if (obSec > 0 && cd.time <= obSec) break;
+        if (ob.bias === 1 && cd.close < ob.low) return false;
+        if (ob.bias === -1 && cd.close > ob.high) return false;
+      }
+      return true;
+    });
+
     if (validObs.length === 0) return [];
 
-    const latestOb = validObs[validObs.length - 1];
-    const isBull = latestOb.bias === 1;
-    const entryPrice = isBull ? latestOb.high : latestOb.low;
-    const obHeight = Math.abs(latestOb.high - latestOb.low);
-    const slDist = Math.max(obHeight, entryPrice * 0.008);
-    const tpDist = slDist * 1.5;
-    const slTarget = isBull ? latestOb.low - obHeight * 0.15 : latestOb.high + obHeight * 0.15;
-    const tpTarget = isBull ? entryPrice + tpDist : entryPrice - tpDist;
+    const positions = [];
+    let waitingPos = null;
 
-    const entryCandle = candles[Math.max(0, candles.length - 20)];
-    return [{
-      entryTime: latestOb.time || entryCandle.time,
-      entryPrice: entryPrice,
-      tpTarget: tpTarget,
-      slTarget: slTarget,
-      entryType: isBull ? 'Long' : 'Short',
-      state: 'Active Position',
-      isSmcBot: true
-    }];
+    for (let idx = 0; idx < validObs.length; idx++) {
+      const ob = validObs[idx];
+      const isBull = ob.bias === 1;
+
+      // 1. ENTRY: Luôn đặt tại biên của OB (Long: biên trên ob.high, Short: biên dưới ob.low)
+      const entryPrice = isBull ? ob.high : ob.low;
+
+      // 2. STOP LOSS: Luôn đặt tại biên đối diện của OB (Long: biên dưới ob.low, Short: biên trên ob.high)
+      const slTarget = isBull ? ob.low : ob.high;
+
+      // 3. TAKE PROFIT: Tỷ lệ RR 1.5R dựa trên khoảng cách SL (chính bằng chiều cao khối OB)
+      const obHeight = Math.abs(ob.high - ob.low);
+      const tpTarget = isBull
+        ? (entryPrice + obHeight * 1.5)
+        : (entryPrice - obHeight * 1.5);
+
+      // 4. LOẠI BOX: OB Long (xanh dương) -> Box Long; OB Short (đỏ) -> Box Short
+      const entryType = isBull ? 'Long' : 'Short';
+
+      const obSec = ob.time ? (ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time) : 0;
+      let obIdx = candles.findIndex(c => c.time >= obSec);
+      if (obIdx === -1) obIdx = Math.max(0, candles.length - 20);
+
+      // Kiểm tra giá bứt phá thoát ra ngoài OB rồi mới vòng về chạm biên entry
+      let hasBrokenOut = false;
+      let hitEntryIdx = -1;
+
+      for (let i = obIdx + 1; i < candles.length; i++) {
+        const c = candles[i];
+        if (isBull) {
+          if (!hasBrokenOut) {
+            if (c.low > entryPrice) {
+              hasBrokenOut = true;
+            }
+          } else {
+            // Khi đã bứt phá, nến sau đó quay đầu chạm biên trên OB (entryPrice)
+            if (c.low <= entryPrice) {
+              if (c.close >= slTarget) {
+                hitEntryIdx = i;
+                break;
+              } else {
+                break; // Thủng biên dưới SL
+              }
+            }
+          }
+        } else {
+          if (!hasBrokenOut) {
+            if (c.high < entryPrice) {
+              hasBrokenOut = true;
+            }
+          } else {
+            // Khi đã bứt phá, nến sau đó quay đầu chạm biên dưới OB (entryPrice)
+            if (c.high >= entryPrice) {
+              if (c.close <= slTarget) {
+                hitEntryIdx = i;
+                break;
+              } else {
+                break; // Thủng biên trên SL
+              }
+            }
+          }
+        }
+      }
+
+      // TRƯỜNG HỢP 1: Giá CHƯA vòng về chạm Entry -> Box tịnh tiến dóng thẳng hàng theo cây nến hiện tại
+      if (hitEntryIdx === -1) {
+        if (idx === validObs.length - 1) {
+          const curIdx = candles.length - 1;
+          waitingPos = {
+            entryTime: candles[curIdx].time,
+            entryPrice,
+            tpTarget,
+            slTarget,
+            exitTime: null,
+            exitResult: null,
+            entryType,
+            state: 'waiting',
+            isSmcBot: true,
+            isWaiting: true,
+          };
+        }
+        continue;
+      }
+
+      // TRƯỜNG HỢP 2: Giá ĐÃ VÒNG VỀ CHẠM Entry -> Dừng tịnh tiến, FIX VỊ TRÍ bắt đầu tại nến khớp Entry
+      let exitTime = null;
+      let exitResult = null;
+      let state = 'Active Position';
+
+      for (let j = hitEntryIdx + 1; j < candles.length; j++) {
+        const c = candles[j];
+        if (isBull) {
+          if (c.high >= tpTarget) {
+            exitTime = c.time;
+            exitResult = 'TP';
+            state = 'Take Profit';
+            break;
+          }
+          if (c.low <= slTarget) {
+            exitTime = c.time;
+            exitResult = 'SL';
+            state = 'Stop Loss';
+            break;
+          }
+        } else {
+          if (c.low <= tpTarget) {
+            exitTime = c.time;
+            exitResult = 'TP';
+            state = 'Take Profit';
+            break;
+          }
+          if (c.high >= slTarget) {
+            exitTime = c.time;
+            exitResult = 'SL';
+            state = 'Stop Loss';
+            break;
+          }
+        }
+      }
+
+      // Mỗi OB chỉ tương ứng với 1 lệnh duy nhất. Khớp TP hay SL 1 lần là xong.
+      positions.push({
+        entryTime: candles[hitEntryIdx].time,
+        entryPrice,
+        tpTarget,
+        slTarget,
+        exitTime,
+        exitResult,
+        state,
+        entryType,
+        isSmcBot: true,
+        isWaiting: false,
+      });
+    }
+
+    if (waitingPos) {
+      positions.push(waitingPos);
+    }
+
+    return positions;
   };
 
   const drawObs = () => {
@@ -467,7 +633,21 @@ export default function SingleChartPane({
     o.style.width = maxRightX + 'px';
     o.style.overflow = 'hidden';
 
-    obs.forEach(ob => {
+    // Chỉ hiển thị các OB còn đủ điều kiện, chưa bị đâm thủng / lấp hết
+    const candles = candlesRef.current || [];
+    const validObs = obs.filter(ob => {
+      if (!ob || !ob.high || !ob.low) return false;
+      const obSec = ob.time ? (ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time) : 0;
+      for (let i = candles.length - 1; i >= 0; i--) {
+        const cd = candles[i];
+        if (obSec > 0 && cd.time <= obSec) break;
+        if (ob.bias === 1 && cd.close < ob.low) return false;
+        if (ob.bias === -1 && cd.close > ob.high) return false;
+      }
+      return true;
+    });
+
+    validObs.forEach(ob => {
       const y1 = s.priceToCoordinate(ob.high);
       const y2 = s.priceToCoordinate(ob.low);
       if (y1 === null || y2 === null) return;
@@ -483,7 +663,7 @@ export default function SingleChartPane({
           const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
           const xCoord = c.timeScale().timeToCoordinate(secTime);
           if (xCoord !== null) startX = Math.floor(xCoord);
-        } catch (e) { }
+        } catch { }
       }
 
       if (startX === null) startX = 0;
@@ -505,6 +685,7 @@ export default function SingleChartPane({
       o.appendChild(box);
     });
   };
+  drawObsRef.current = drawObs;
 
   const drawLiquidV5Boxes = () => {
     const oBoxes = liquidV5BoxesOverlayRef.current;
@@ -534,7 +715,12 @@ export default function SingleChartPane({
     const w = (oBoxes && oBoxes.clientWidth) || (oTop && oTop.clientWidth) || cont.clientWidth;
     if (w <= 0) return;
     const plotW = (c.timeScale && typeof c.timeScale().width === 'function') ? c.timeScale().width() : 0;
-    const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - 70);
+    const pScaleWidth = (c.priceScale && typeof c.priceScale('right').width === 'function') ? c.priceScale('right').width() : (w - plotW);
+    const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - (pScaleWidth > 0 ? pScaleWidth : 55));
+
+    if (pScaleWidth > 20 && pScaleWidth < 120 && Math.abs(pScaleWidth - priceScaleWidth) >= 2) {
+      setPriceScaleWidth(pScaleWidth);
+    }
 
     if (oBoxes) {
       oBoxes.style.width = maxRightX + 'px';
@@ -545,48 +731,7 @@ export default function SingleChartPane({
       oTop.style.overflow = 'hidden';
     }
 
-    if (oBoxes && isLiquidActive) {
-      const obs = activeObsRef.current || [];
-      obs.forEach(ob => {
-        const y1 = s.priceToCoordinate(ob.high);
-        const y2 = s.priceToCoordinate(ob.low);
-        if (y1 === null || y2 === null) return;
 
-        const topY = Math.min(y1, y2);
-        const botY = Math.max(y1, y2);
-        const h = Math.max(botY - topY, 4);
-        const isBull = ob.bias === 1;
-
-        let startX = null;
-        if (ob.time && ob.time > 0) {
-          try {
-            const secTime = ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time;
-            const xCoord = c.timeScale().timeToCoordinate(secTime);
-            if (xCoord !== null) startX = Math.floor(xCoord);
-          } catch (e) { }
-        }
-
-        if (startX === null) startX = 0;
-        if (startX < -2000) startX = -2000;
-        if (startX >= maxRightX) return;
-
-        const boxWidth = Math.max(0, maxRightX - startX);
-        if (boxWidth <= 0) return;
-
-        const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
-        const box = document.createElement('div');
-        box.style.position = 'absolute';
-        box.style.top = topY + 'px';
-        box.style.left = startX + 'px';
-        box.style.width = boxWidth + 'px';
-        box.style.height = h + 'px';
-        box.style.backgroundColor = bg;
-        box.style.border = 'none';
-        box.style.pointerEvents = 'none';
-
-        oBoxes.appendChild(box);
-      });
-    }
 
     const candles = candlesRef.current || [];
     let posList = [];
@@ -632,7 +777,8 @@ export default function SingleChartPane({
     };
 
     if (oTop) {
-      posList.forEach(pos => {
+      const renderBoxes = posList.length > 15 ? posList.slice(-15) : posList;
+      renderBoxes.forEach(pos => {
         if (!pos.entryTime || !pos.entryPrice || !pos.tpTarget || !pos.slTarget) return;
 
         const entryTimeSec = pos.entryTime > 100000000000 ? Math.floor(pos.entryTime / 1000) : pos.entryTime;
@@ -651,40 +797,44 @@ export default function SingleChartPane({
             const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
             const exitIdx = candles.findIndex(item => item.time >= exitTimeSec);
             if (exitIdx > entryIdx) {
-              endX = Math.floor((exitIdx - logicalRange.from) * barWidth);
+              endX = Math.floor((exitIdx + 1 - logicalRange.from) * barWidth);
             } else {
-              endX = Math.floor((entryIdx + 25 - logicalRange.from) * barWidth);
+              endX = Math.floor((entryIdx + 1 - logicalRange.from) * barWidth);
             }
           } else {
             const curIdx = candles.length - 1;
-            endX = Math.floor((Math.max(entryIdx + 25, curIdx + 15) - logicalRange.from) * barWidth);
+            const targetIdx = pos.isWaiting ? (entryIdx + 10) : Math.max(entryIdx + 10, curIdx + 1);
+            endX = Math.floor((targetIdx - logicalRange.from) * barWidth);
           }
         } else {
           try {
             const sc = c.timeScale().timeToCoordinate(candles[entryIdx].time);
             if (sc !== null) startX = Math.floor(sc);
-          } catch (e) { }
+          } catch { }
+
+          let barSpacing = 14;
+          if (candles.length >= 2) {
+            try {
+              const c1 = c.timeScale().timeToCoordinate(candles[candles.length - 1].time);
+              const c2 = c.timeScale().timeToCoordinate(candles[candles.length - 2].time);
+              if (c1 !== null && c2 !== null && c1 > c2) barSpacing = c1 - c2;
+            } catch { }
+          }
 
           if (pos.exitTime) {
             try {
               const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
               const scExit = c.timeScale().timeToCoordinate(exitTimeSec);
-              if (scExit !== null && startX !== null && scExit > startX) {
-                endX = Math.floor(scExit);
+              if (scExit !== null && startX !== null && scExit >= startX) {
+                endX = Math.floor(scExit + barSpacing);
               }
-            } catch (e) { }
-          }
-
-          if (startX !== null && endX === null) {
-            let barSpacing = 14;
-            if (candles.length >= 2) {
-              try {
-                const c1 = c.timeScale().timeToCoordinate(candles[candles.length - 1].time);
-                const c2 = c.timeScale().timeToCoordinate(candles[candles.length - 2].time);
-                if (c1 !== null && c2 !== null && c1 > c2) barSpacing = c1 - c2;
-              } catch (e) { }
-            }
-            endX = Math.floor(startX + 25 * barSpacing);
+            } catch { }
+          } else {
+            try {
+              const curIdx = candles.length - 1;
+              const count = pos.isWaiting ? 10 : Math.max(10, curIdx - entryIdx + 1);
+              endX = Math.floor(startX + count * barSpacing);
+            } catch { }
           }
         }
 
@@ -891,6 +1041,7 @@ export default function SingleChartPane({
       }
     }
   };
+  drawLiquidV5BoxesRef.current = drawLiquidV5Boxes;
 
   const updateIndicators = () => {
     const chart = chartRef.current;
@@ -923,7 +1074,7 @@ export default function SingleChartPane({
       if (seriesMap.has(key)) {
         try {
           chart.removeSeries(seriesMap.get(key));
-        } catch (e) { }
+        } catch { }
         seriesMap.delete(key);
       }
     };
@@ -934,9 +1085,9 @@ export default function SingleChartPane({
     if (emaSeriesRef.current) {
       if (currentActive.includes("ema200") && !isIndHidden("ema200")) {
         const emaData = calculateEMA(candles, 200);
-        try { emaSeriesRef.current.setData(emaData); } catch (e) { }
+        try { emaSeriesRef.current.setData(emaData); } catch { }
       } else {
-        try { emaSeriesRef.current.setData([]); } catch (e) { }
+        try { emaSeriesRef.current.setData([]); } catch { }
       }
     }
 
@@ -958,7 +1109,7 @@ export default function SingleChartPane({
         s20.setData(calculateEMA(candles, 20));
         s50.setData(calculateEMA(candles, 50));
         s200.setData(calculateEMA(candles, 200));
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_ribbon_20");
       removeSeriesByKey("ind_ribbon_50");
@@ -984,7 +1135,7 @@ export default function SingleChartPane({
         sUpper.setData(bb.upper);
         sBasis.setData(bb.basis);
         sLower.setData(bb.lower);
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_bb_upper");
       removeSeriesByKey("ind_bb_basis");
@@ -1000,7 +1151,7 @@ export default function SingleChartPane({
       });
       try {
         sSt.setData(st.map(item => ({ time: item.time, value: item.value })));
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_supertrend");
     }
@@ -1023,7 +1174,7 @@ export default function SingleChartPane({
       } else {
         chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.12 } });
       }
-    } catch (e) { }
+    } catch { }
 
     // RSI (14)
     if (hasRsi) {
@@ -1034,7 +1185,7 @@ export default function SingleChartPane({
       });
       try {
         sRsi.setData(calculateRSI(candles, 14));
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_rsi");
     }
@@ -1060,7 +1211,7 @@ export default function SingleChartPane({
         sHist.setData(macdRes.histogram);
         sMacd.setData(macdRes.macd);
         sSig.setData(macdRes.signal);
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_macd_hist");
       removeSeriesByKey("ind_macd_line");
@@ -1072,7 +1223,7 @@ export default function SingleChartPane({
     if (volumeSeriesRef.current) {
       try {
         volumeSeriesRef.current.applyOptions({ visible: hasVol });
-      } catch (e) { }
+      } catch { }
     }
     if (hasVol && candles && candles.length > 20) {
       const volData = candles.map(c => ({ time: c.time, value: c.volume || 0 }));
@@ -1087,7 +1238,7 @@ export default function SingleChartPane({
       });
       try {
         sVolMa.setData(volMa);
-      } catch (e) { }
+      } catch { }
     } else {
       removeSeriesByKey("ind_vol_ma");
     }
@@ -1113,7 +1264,7 @@ export default function SingleChartPane({
         try {
           const saved = JSON.parse(localStorage.getItem("tls1_coder_scripts") || "[]");
           script = saved.find(s => s.id === sId);
-        } catch (e) { }
+        } catch { }
       }
       if (script && script.code) {
         const res = runCoderCustomScript(script.code, candles);
@@ -1129,7 +1280,7 @@ export default function SingleChartPane({
             });
             try {
               pSeries.setData(plotItem.data);
-            } catch (e) { }
+            } catch { }
           });
         }
       }
@@ -1217,7 +1368,7 @@ export default function SingleChartPane({
       autoscaleInfoProvider: () => null,
       priceFormat: {
         type: 'custom',
-        formatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
+        formatter: formatHyperliquidPrice,
       },
     });
 
@@ -1226,7 +1377,7 @@ export default function SingleChartPane({
       borderVisible: false, wickUpColor: "#26a69a", wickDownColor: "#ef5350",
       priceFormat: {
         type: 'custom',
-        formatter: (price) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(price),
+        formatter: formatHyperliquidPrice,
       },
       autoscaleInfoProvider: (original) => {
         const res = original();
@@ -1249,7 +1400,7 @@ export default function SingleChartPane({
           if (lr && lr.to < (candles.length - 15)) {
             return res;
           }
-        } catch (e) { }
+        } catch { }
 
         const range = max - min;
         if (range <= 0) return res;
@@ -1309,7 +1460,7 @@ export default function SingleChartPane({
         }));
         vs.setData(vols);
         es.setData(calculateEMA(candlesRef.current, 200));
-      } catch (e) { }
+      } catch { }
     }
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
@@ -1341,13 +1492,14 @@ export default function SingleChartPane({
       }
     });
     resizeObserver.observe(containerEl);
+    const dynSeries = dynamicSeriesRef.current;
 
     return () => {
       containerEl.removeEventListener('wheel', handleUserInteraction);
       containerEl.removeEventListener('pointerdown', handleUserInteraction);
       containerEl.removeEventListener('touchstart', handleUserInteraction);
       resizeObserver.disconnect();
-      dynamicSeriesRef.current.clear();
+      if (dynSeries) dynSeries.clear();
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -1361,7 +1513,7 @@ export default function SingleChartPane({
     coderScriptsRef.current = coderScripts;
     hiddenIndicatorsRef.current = hiddenIndicators;
     if (!isVisible || !chartRef.current) return;
-    (updateIndicatorsRef.current || updateIndicators)();
+    updateIndicatorsRef.current?.();
     scheduleDraw();
   }, [activeIndicators, coderScripts, isVisible, hiddenIndicators, scheduleDraw]);
 
@@ -1445,12 +1597,12 @@ export default function SingleChartPane({
         setTimeout(() => {
           if (isMounted) {
             applyDefaultZoom();
-            (updateIndicatorsRef.current || updateIndicators)();
+            updateIndicatorsRef.current?.();
             scheduleDraw();
           }
         }, 15);
       } else {
-        (updateIndicatorsRef.current || updateIndicators)();
+        updateIndicatorsRef.current?.();
       }
     } else {
       // Giữ biểu đồ mượt mà không chớp đen trong 0.15s chờ API 2-Pha phản hồi
@@ -1500,7 +1652,7 @@ export default function SingleChartPane({
         if (chartRef.current && hasInitializedRef.current) {
           try {
             prevRange = chartRef.current.timeScale().getVisibleLogicalRange();
-          } catch (e) { }
+          } catch { }
         }
 
         candlesRef.current = unique;
@@ -1508,21 +1660,21 @@ export default function SingleChartPane({
         if (volumeSeriesRef.current) volumeSeriesRef.current.setData(uniqueVolume);
         if (emaSeriesRef.current) emaSeriesRef.current.setData(emaData);
         if (rd.ob_boxes) activeObsRef.current = rd.ob_boxes;
-        (updateIndicatorsRef.current || updateIndicators)();
+        updateIndicatorsRef.current?.();
 
         if (!hasInitializedRef.current) {
           hasInitializedRef.current = true;
           setTimeout(() => {
             if (!isMounted) return;
             applyDefaultZoom();
-            (updateIndicatorsRef.current || updateIndicators)();
+            updateIndicatorsRef.current?.();
             scheduleDraw();
           }, 30);
         } else {
           if (userInteractedRef.current && prevRange) {
             try {
               chartRef.current.timeScale().setVisibleLogicalRange(prevRange);
-            } catch (e) { }
+            } catch { }
           } else if (!userInteractedRef.current) {
             try {
               const lr = prevRange || chartRef.current.timeScale().getVisibleLogicalRange();
@@ -1531,7 +1683,7 @@ export default function SingleChartPane({
                 from: unique.length - 1 + 8 - span,
                 to: unique.length - 1 + 8,
               });
-            } catch (e) { }
+            } catch { }
           }
           setTimeout(() => {
             if (!isMounted) return;
@@ -1746,6 +1898,7 @@ export default function SingleChartPane({
           {/* Winrate Stats Table (top-right corner) */}
           <div 
             className={`chart-backtest-table-wrap ${isBacktestCollapsed ? 'collapsed' : ''}`}
+            style={{ right: `${priceScaleWidth + 4}px` }}
             onMouseDown={e => e.stopPropagation()}
             onMouseUp={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
@@ -1804,17 +1957,13 @@ export default function SingleChartPane({
                     <td className="col-metric">Winrate</td>
                     <td className="col-val" style={{ color: '#00e676', fontWeight: 700 }}>{backtestStats.winrate}</td>
                   </tr>
-                  <tr>
-                    <td className="col-metric">Total Profit</td>
-                    <td className="col-val" style={{ color: '#00e676', fontWeight: 700 }}>{backtestStats.totalProfit}</td>
-                  </tr>
                 </tbody>
               </table>
             )}
           </div>
 
           <div style={{
-            position: "absolute", bottom: "6px", right: "52px",
+            position: "absolute", bottom: "6px", right: `${priceScaleWidth + 4}px`,
             display: "flex", gap: "4px", zIndex: 10
           }}>
             <button
