@@ -18,6 +18,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[20/09/2026]** - Sửa Lỗi Lệnh Mục 'Chia' Chỉ Có 1 Đầu TP Hoặc 1 Đầu SL (OKX Yêu Cầu Gộp Cả TP & SL Vào 1 Dict Duy Nhất):
+  - **Mô tả hiện tượng:** Trên giao diện OKX mục "Chia", 2 lệnh M5 vừa khớp xuất hiện tình trạng què quặt: ETH chỉ có mỗi SL (`-- / 2.609,53`), còn BTC lại chỉ có mỗi TP (`81.863,50 / --`), không hiện đủ cả cặp TP/SL.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Format của OKX V5 `attachAlgoOrds`:** API sàn OKX quy định khi gài cặp TP/SL kèm theo lệnh Limit, mảng `attachAlgoOrds` phải chứa **đúng 1 dictionary duy nhất** gồm đồng thời cả `tpTriggerPx` và `slTriggerPx`. Nếu truyền 2 dictionary tách rời `[{...tp...}, {...sl...}]`, sàn OKX chỉ bóc tách và tạo 1 lệnh con duy nhất (hoặc TP hoặc SL) và bỏ rơi đầu còn lại!
+    2. **Chốt chặn an toàn bị lừa:** Trong hàm quét an toàn `apply_emergency_tpsl`, điều kiện kiểm tra chỉ là `if status["has_tp"] or status["has_sl"]: return`. Khi thấy ETH đã có SL, hoặc BTC đã có TP, bot tưởng vị thế đã được bảo hiểm nên quay xe không nạp thêm đầu còn thiếu!
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Chuẩn hóa 1 dict duy nhất chứa cả TP và SL:** Tại cả `bot_strategy.py` (sub1) và `bot_orders.py` (sub2), `attachAlgoOrds` được gộp chuẩn thành 1 dictionary duy nhất: `[{"attachAlgoClOrdId": ..., "tpTriggerPx": ..., "tpOrdPx": "-1", "tpTriggerPxType": "last", "slTriggerPx": ..., "slOrdPx": "-1", "slTriggerPxType": "last"}]`.
+    2. **Watchdog bắt buộc đủ cả 2 đầu (`has_tp AND has_sl`):** Điều kiện an toàn được siết chặt thành `is_fully_protected = status["has_tp"] and status["has_sl"]`. Nếu thiếu bất kỳ đầu nào (chỉ có TP hoặc chỉ có SL), sau 15 giây bot sẽ tự động dọn lệnh lẻ mồ côi và gọi `place_algo_tpsl_pair` nạp lại cặp TP/SL hoàn chỉnh gắn thẳng vào mục "Chia".
+  - **Kiểm chứng:** Toàn bộ các bot biên dịch không lỗi (`exit code 0`). Lệnh limit mới khi bắn lên OKX mang payload 1 dict duy nhất, đảm bảo kích hoạt đủ 100% cả TP và SL.
+
+
 - **[20/09/2026]** - Sửa Lỗi Hủy Sạch Limit Các Khung Khác Khi Khớp M5 & Gắn Trực Tiếp Cặp TP/SL Chuẩn Native Vào Mục 'Chia':
   - **Mô tả hiện tượng:**
     1. Khi bot khớp lệnh ở khung gần nhất (M5), toàn bộ các lệnh Limit treo ở các khung khác (M15, M30, H1, H2, H4) bất ngờ bị gỡ bỏ sạch sẽ khỏi sàn OKX dù đang chạy ở chế độ **Lưới Đa Khung**.

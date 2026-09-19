@@ -551,42 +551,44 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         # Mọi lệnh Limit khi bắn lên sàn đều được gắn cặp TP/SL Native độc lập qua attachAlgoOrds.
         # Khi khớp lệnh, sàn OKX tự kích hoạt TP/SL native tức thì.
         # Nếu trên sàn ĐÃ CÓ bất kỳ lệnh Algo TP hoặc SL nào:
-        # BẢO LƯU NGUYÊN VẸN 100%, TUYỆT ĐỐI KHÔNG gài đè, KHÔNG sinh thêm điểm thừa!
         had_active_attr = f"tpsl_active_{norm_side}"
         missing_attr = f"tpsl_missing_since_{norm_side}"
+        # Vị thế được coi là an toàn tuyệt đối khi có ĐẦY ĐỦ CẢ HAI ĐẦU (TP VÀ SL)
+        is_fully_protected = status["has_tp"] and status["has_sl"]
 
-        if status["has_tp"] or status["has_sl"]:
+        if is_fully_protected:
             if tracker:
                 if norm_side == "long":
-                    tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
-                    tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
+                    tracker.active_tp_px_long = status["tp_px"]
+                    tracker.active_sl_px_long = status["sl_px"]
                 else:
-                    tracker.active_tp_px_short = status["tp_px"] if status["has_tp"] else calc_tp
-                    tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
+                    tracker.active_tp_px_short = status["tp_px"]
+                    tracker.active_sl_px_short = status["sl_px"]
                 setattr(tracker, had_active_attr, True)
                 setattr(tracker, missing_attr, None)
             return
 
         # ⚡ CHỐT CHẶN AN TOÀN THỤ ĐỘNG (PASSIVE WATCHDOG / FALLBACK NATIVE RESTORE):
-        # Chỉ chạy khi vị thế HOÀN TOÀN TRẦN TRỤI (Không có bất kỳ TP hoặc SL nào trên sàn).
-        # Nếu vị thế trước đó đã từng có TP/SL mà hiện tại bị mất (do CEO chủ động bấm hủy trên sàn để kéo nắn giá):
-        # Đệm 15 giây chờ CEO thao tác thủ công. Sau 15 giây nếu vẫn trần trụi thì tự động nạp lại đúng chuẩn Native attachAlgoOrds!
+        # Kích hoạt khi vị thế bị THIẾU BẢO HIỂM (thiếu TP, thiếu SL, hoặc thiếu cả hai).
+        # Đệm 15 giây chờ CEO thao tác thủ công. Sau 15 giây nếu vẫn chưa đủ cả 2 đầu thì tự động nạp lại cặp Native chuẩn!
         now_ts = time.time()
-        was_previously_active = getattr(tracker, had_active_attr, False) if tracker else False
+        missing_since = getattr(tracker, missing_attr, None)
 
-        if was_previously_active:
-            missing_since = getattr(tracker, missing_attr, None)
-            if missing_since is None:
-                if tracker: setattr(tracker, missing_attr, now_ts)
-                print(f"⏳ [TP/SL SCAN BUFFER] {inst_id} {norm_side.upper()}: Phát hiện CEO vừa hủy TP/SL trên sàn. Đang đệm 15s chờ CEO thao tác thủ công...")
-                return
-            elif (now_ts - missing_since) < 15.0:
-                # Vẫn đang trong thời gian 15s đệm cho CEO thao tác
-                return
-            else:
-                # Đã hết 15s mà CEO chưa cài lại -> Kích hoạt cài lại bảo vệ tự động chuẩn Native attachAlgoOrds
-                print(f"🛡️ [AUTO-RESTORE NATIVE TP/SL] {inst_id} {norm_side.upper()}: Đã qua 15s sau khi hủy mà chưa có TP/SL mới → Nạp lại chuẩn Native attachAlgoOrds ({target_tf})!")
-                if tracker: setattr(tracker, missing_attr, None)
+        if missing_since is None:
+            if tracker: setattr(tracker, missing_attr, now_ts)
+            missing_part = "TP" if not status["has_tp"] and status["has_sl"] else ("SL" if not status["has_sl"] and status["has_tp"] else "TP/SL")
+            print(f"⏳ [TP/SL SCAN BUFFER] {inst_id} {norm_side.upper()}: Phát hiện thiếu {missing_part}. Đang đệm 15s chờ thao tác...")
+            return
+        elif (now_ts - missing_since) < 15.0:
+            # Vẫn đang trong thời gian 15s đệm cho CEO thao tác
+            return
+        else:
+            # Đã hết 15s mà chưa đủ cả 2 đầu -> Dọn sạch lệnh lẻ (nếu có) và nạp lại cặp TP/SL chuẩn Native vào mục Chia
+            print(f"🛡️ [AUTO-RESTORE NATIVE TP/SL] {inst_id} {norm_side.upper()}: Đã qua 15s thiếu bảo hiểm → Nạp trực tiếp cặp TP/SL chuẩn Native vào mục 'Chia' ({target_tf})!")
+            if tracker: setattr(tracker, missing_attr, None)
+            # Dọn lệnh lẻ mồ côi nếu có để nạp lại thành 1 cặp hoàn chỉnh
+            if status["has_tp"] or status["has_sl"]:
+                clean_algo_orders(client, inst_id, td_mode, side)
 
         if tracker:
             if norm_side == "long":

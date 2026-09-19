@@ -110,13 +110,10 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
             sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
             body_limit["attachAlgoOrds"] = [
                 {
-                    "attachAlgoClOrdId": f"{cl_prefix}TP{int(time.time() * 1000000)}"[:32],
+                    "attachAlgoClOrdId": f"{cl_prefix}TPSL{int(time.time() * 1000)}"[:32],
                     "tpTriggerPx": tp_px,
                     "tpOrdPx": "-1",
-                    "tpTriggerPxType": "last"
-                },
-                {
-                    "attachAlgoClOrdId": f"{cl_prefix}SL{int(time.time() * 1000000)}"[:32],
+                    "tpTriggerPxType": "last",
                     "slTriggerPx": sl_px,
                     "slOrdPx": "-1",
                     "slTriggerPxType": "last"

@@ -2932,13 +2932,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
                             attach_algo_long = [
                                 {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPL{tf}{int(time.time() * 1000000)}"[:32],
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
                                     "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
                                     "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last"
-                                },
-                                {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}SLL{tf}{int(time.time() * 1000000)}"[:32],
+                                    "tpTriggerPxType": "last",
                                     "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
                                     "slOrdPx": "-1",
                                     "slTriggerPxType": "last"
@@ -3194,13 +3191,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
                             attach_algo_short = [
                                 {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPS{tf}{int(time.time() * 1000000)}"[:32],
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
                                     "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
                                     "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last"
-                                },
-                                {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}SLS{tf}{int(time.time() * 1000000)}"[:32],
+                                    "tpTriggerPxType": "last",
                                     "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
                                     "slOrdPx": "-1",
                                     "slTriggerPxType": "last"
