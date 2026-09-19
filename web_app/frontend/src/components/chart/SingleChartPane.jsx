@@ -51,6 +51,7 @@ export default function SingleChartPane({
   coin,
   tf,
   risk,
+  enabledTfs = {},
   onChangeCoin,
   onChangeTf,
   isActive,
@@ -75,6 +76,10 @@ export default function SingleChartPane({
   const candlesRef = useRef([]);
   const activeBotTabRef = useRef(activeBotTab);
   const tfRef = useRef(tf);
+  const coinRef = useRef(coin);
+  coinRef.current = coin;
+  const enabledTfsRef = useRef(enabledTfs);
+  enabledTfsRef.current = enabledTfs;
   const riskRef = useRef(risk);
   riskRef.current = risk;
   const rafIdRef = useRef(null);
@@ -85,7 +90,10 @@ export default function SingleChartPane({
   const [isAutoFit, setIsAutoFit] = useState(true);
   const isAutoFitRef = useRef(isAutoFit);
   isAutoFitRef.current = isAutoFit;
-  const [isLogScale, setIsLogScale] = useState(false);
+  const [isLogScale, setIsLogScale] = useState(true);
+  const isLogScaleRef = useRef(isLogScale);
+  isLogScaleRef.current = isLogScale;
+  const prevLengthRef = useRef(0);
   const userInteractedRef = useRef(false);
   const hasInitializedRef = useRef(false);
   const [activeDrawingTool, setActiveDrawingTool] = useState(DRAWING_TOOLS.CURSOR);
@@ -188,8 +196,10 @@ export default function SingleChartPane({
   useEffect(() => {
     activeBotTabRef.current = activeBotTab;
     tfRef.current = tf;
+    coinRef.current = coin;
+    enabledTfsRef.current = enabledTfs;
     scheduleDraw();
-  }, [activeBotTab, tf, scheduleDraw]);
+  }, [activeBotTab, tf, coin, enabledTfs, scheduleDraw]);
 
   useEffect(() => {
     riskRef.current = risk;
@@ -305,9 +315,15 @@ export default function SingleChartPane({
     const candleCount = 55;
     const rightOffset = 8;
     try {
-      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+      chartRef.current.priceScale('right').applyOptions({
+        autoScale: true,
+        mode: isLogScaleRef.current ? 1 : 0
+      });
       if (candleSeriesRef.current) {
-        candleSeriesRef.current.priceScale().applyOptions({ autoScale: true });
+        candleSeriesRef.current.priceScale().applyOptions({
+          autoScale: true,
+          mode: isLogScaleRef.current ? 1 : 0
+        });
       }
       chartRef.current.timeScale().setVisibleLogicalRange({
         from: Math.max(0, total - candleCount),
@@ -338,7 +354,12 @@ export default function SingleChartPane({
   };
 
   const calculateEMA200Positions = (candles, currentTf) => {
-    if (!candles || candles.length < 205) return [];
+    // 1. Bộ đếm tích lũy chuẩn 60 nến (REQUIRED_ACCUMULATION_CANDLES = 60)
+    const REQUIRED_ACCUM = (riskRef.current && riskRef.current.accumCandles)
+      ? parseInt(riskRef.current.accumCandles, 10)
+      : 60;
+
+    if (!candles || candles.length < (200 + REQUIRED_ACCUM)) return [];
     const emaData = calculateEMA(candles, 200);
     if (!emaData || emaData.length === 0) return [];
 
@@ -378,18 +399,28 @@ export default function SingleChartPane({
       if (activeTrade) {
         if (activeTrade.state === 'waiting') {
           const isLong = activeTrade.entryType === 'Long';
-          const entryHit = isLong
-            ? candle.low <= activeTrade.entryPrice
-            : candle.high >= activeTrade.entryPrice;
+          // Khi lệnh đang chờ, giá Limit bám theo đường EMA200 động
+          const ep = isLong ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
+          const tp = isLong ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
+          const sl = isLong ? (ep * (1 - slPct)) : (ep * (1 + slPct));
+
+          // Kiểm tra khớp entry khi giá chạm vùng EMA200
+          const entryHit = isLong ? candle.low <= ep : candle.high >= ep;
 
           if (entryHit) {
             activeTrade.state = 'open';
             activeTrade.entryTime = candle.time;
+            activeTrade.entryPrice = ep;
+            activeTrade.tpTarget = tp;
+            activeTrade.slTarget = sl;
           } else {
-            const emaDrift = Math.abs(ema - activeTrade.entryEma) / activeTrade.entryEma;
-            if (emaDrift > 0.005) {
-              activeTrade = null;
-            }
+            // Cập nhật giá Limit bám theo đường EMA200
+            activeTrade.entryPrice = ep;
+            activeTrade.entryEma = ema;
+            activeTrade.tpTarget = tp;
+            activeTrade.slTarget = sl;
+
+            // Hủy nếu gãy trục xu hướng (nến đóng cửa xuyên qua phía bên kia)
             if (isLong && consecutiveBelow > 0) activeTrade = null;
             if (!isLong && consecutiveAbove > 0) activeTrade = null;
           }
@@ -412,8 +443,9 @@ export default function SingleChartPane({
         }
       }
 
-      if (!activeTrade && (consecutiveAbove >= 15 || consecutiveBelow >= 15)) {
-        const isBull = consecutiveAbove >= 15;
+      // Chỉ xuất hiện box khi nến tích lũy bám một phía trục EMA200 vượt qua điều kiện >= 60 nến
+      if (!activeTrade && (consecutiveAbove >= REQUIRED_ACCUM || consecutiveBelow >= REQUIRED_ACCUM)) {
+        const isBull = consecutiveAbove >= REQUIRED_ACCUM;
         const ep = isBull ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
         const tp = isBull ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
         const sl = isBull ? (ep * (1 - slPct)) : (ep * (1 + slPct));
@@ -435,7 +467,7 @@ export default function SingleChartPane({
       const curIdx = candles.length - 1;
       results.push({
         ...activeTrade,
-        entryTime: candles[curIdx].time, // Cạnh trái luôn thẳng hàng với cây nến hiện tại
+        entryTime: candles[curIdx].time, // Cạnh trái luôn thẳng hàng với cây nến hiện tại khi đang chờ khớp
         state: 'waiting',
         isWaiting: true,
       });
@@ -1355,6 +1387,7 @@ export default function SingleChartPane({
       rightPriceScale: {
         borderColor: '#2a2e39',
         autoScale: true,
+        mode: 1,
         scaleMargins: {
           top: 0.08,
           bottom: 0.25,
@@ -1571,6 +1604,15 @@ export default function SingleChartPane({
     hasInitializedRef.current = false;
     userInteractedRef.current = false;
     setIsAutoFit(true);
+    isAutoFitRef.current = true;
+    setIsLogScale(true);
+    isLogScaleRef.current = true;
+    try {
+      chartRef.current?.priceScale("right").applyOptions({ autoScale: true, mode: 1 });
+      if (candleSeriesRef.current) {
+        candleSeriesRef.current.priceScale().applyOptions({ autoScale: true, mode: 1 });
+      }
+    } catch { }
 
     let isMounted = true;
     const targetCoin = coin;
@@ -1664,6 +1706,7 @@ export default function SingleChartPane({
 
         if (!hasInitializedRef.current) {
           hasInitializedRef.current = true;
+          prevLengthRef.current = unique.length;
           setTimeout(() => {
             if (!isMounted) return;
             applyDefaultZoom();
@@ -1671,20 +1714,17 @@ export default function SingleChartPane({
             scheduleDraw();
           }, 30);
         } else {
-          if (userInteractedRef.current && prevRange) {
+          // Khi update thêm nến (sau 300 nến + tải Phase 2), nếu đang ở chế độ Auto (hoặc số lượng nến thay đổi lớn > 50 nến):
+          // Luôn gọi applyDefaultZoom() để nến hiện tại luôn nằm ở tầm nhìn 55 nến bên phải cùng, không bị nhảy mất nến!
+          const isHugeCandleJump = Math.abs(unique.length - (prevLengthRef.current || 0)) > 50;
+          if (isAutoFitRef.current || !userInteractedRef.current || isHugeCandleJump) {
+            applyDefaultZoom();
+          } else if (prevRange) {
             try {
               chartRef.current.timeScale().setVisibleLogicalRange(prevRange);
             } catch { }
-          } else if (!userInteractedRef.current) {
-            try {
-              const lr = prevRange || chartRef.current.timeScale().getVisibleLogicalRange();
-              const span = lr ? (lr.to - lr.from) : 55;
-              chartRef.current.timeScale().setVisibleLogicalRange({
-                from: unique.length - 1 + 8 - span,
-                to: unique.length - 1 + 8,
-              });
-            } catch { }
           }
+          prevLengthRef.current = unique.length;
           setTimeout(() => {
             if (!isMounted) return;
             scheduleDraw();
@@ -1972,6 +2012,7 @@ export default function SingleChartPane({
                 e.stopPropagation();
                 const next = !isAutoFit;
                 setIsAutoFit(next);
+                isAutoFitRef.current = next;
                 if (next) {
                   userInteractedRef.current = false;
                   applyDefaultZoom();
@@ -1992,7 +2033,11 @@ export default function SingleChartPane({
                 e.stopPropagation();
                 const next = !isLogScale;
                 setIsLogScale(next);
+                isLogScaleRef.current = next;
                 chartRef.current?.priceScale("right").applyOptions({ mode: next ? 1 : 0 });
+                if (candleSeriesRef.current) {
+                  candleSeriesRef.current.priceScale().applyOptions({ mode: next ? 1 : 0 });
+                }
               }}
               style={{
                 width: "20px", height: "20px",

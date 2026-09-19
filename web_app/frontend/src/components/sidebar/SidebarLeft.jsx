@@ -6,15 +6,33 @@ export default function SidebarLeft({
   accounts = [],
   effectiveAccId,
   botAccountMap = {},
+  onAssignAccount,
   handleAssignAccountToActiveBot,
   onOpenSettings,
-  isRiskCollapsed,
+  isRiskCollapsed = false,
   setIsRiskCollapsed,
+  onToggleRiskCollapse,
   risk,
   setRisk,
   isRunning = false,
   onToggleMultiplyVolume,
 }) {
+  const handleToggle = () => {
+    if (typeof onToggleRiskCollapse === "function") {
+      onToggleRiskCollapse();
+    } else if (typeof setIsRiskCollapsed === "function") {
+      setIsRiskCollapsed(!isRiskCollapsed);
+    }
+  };
+
+  const handleAccountSelect = (accId) => {
+    if (typeof onAssignAccount === "function") {
+      onAssignAccount(accId);
+    } else if (typeof handleAssignAccountToActiveBot === "function") {
+      handleAssignAccountToActiveBot(accId);
+    }
+  };
+
   const getBotLabel = () => {
     if (activeBotTab === "sub1") return "Bot EMA200";
     if (activeBotTab === "sub2") return "Bot SMC";
@@ -47,9 +65,18 @@ export default function SidebarLeft({
             }}
           >
             <button
-              onClick={() => setIsRiskCollapsed(!isRiskCollapsed)}
-              style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: "10px", padding: "0 2px" }}
-              title={isRiskCollapsed ? "Mở rộng cấu hình vốn" : "Thu gọn cấu hình vốn"}
+              type="button"
+              onClick={handleToggle}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#aaa",
+                cursor: "pointer",
+                fontSize: "12px",
+                padding: "2px 4px",
+                lineHeight: 1,
+              }}
+              title={isRiskCollapsed ? "Mở rộng cấu hình tài khoản" : "Thu gọn cấu hình tài khoản"}
             >
               {isRiskCollapsed ? "▼" : "▲"}
             </button>
@@ -71,7 +98,7 @@ export default function SidebarLeft({
                 height: "28px",
               }}
               value={effectiveAccId}
-              onChange={(e) => handleAssignAccountToActiveBot(e.target.value)}
+              onChange={(e) => handleAccountSelect(e.target.value)}
             >
               {accounts.length === 0 && <option value="">(Chưa có tài khoản)</option>}
               {accounts.map((acc) => {

@@ -17,6 +17,45 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[19/09/2026]** - Tự Động Khóa Chế Độ A (Auto Fit) & L (Log Scale), Giữ Nến Luôn Trong Tầm Nhìn Khi Đổi Coin/TF & Nạp 300+ Nến:
+  - **Mô tả:** Khi chuyển chart, chuyển coin hoặc khi dữ liệu nến cập nhật thêm (nạp tiếp từ 300 nến lên 1000+ nến), tầm nhìn biểu đồ đôi khi bị nhảy trôi về quá khứ khiến không nhìn thấy nến hiện tại. CEO yêu cầu tự động bật sẵn và cố định ở cả 2 chế độ **A (Auto Scale)** và **L (Log Scale)** sau mỗi lần chuyển chart hay chuyển TF.
+  - **Nguyên nhân:**
+    1. Chế độ `isLogScale` trước đó mặc định là `false` (phải click tay vào nút L mới bật).
+    2. Khi nạp tiếp nến ở Phase 2 (từ 300 lên 1400 nến), code cũ sử dụng lại `prevRange` (vốn ghi nhớ index nến 245..305 của tập nến 300 cũ), áp vào mảng 1400 nến khiến biểu đồ nhảy về quá khứ vài tháng trước và làm mất dấu nến hiện tại.
+  - **Đã thực hiện:**
+    1. **Mặc định luôn BẬT A & L:** Khởi tạo `isAutoFit = true` và `isLogScale = true` (chế độ Logarithmic Scale `mode: 1`). Cả 2 nút A và L luôn sáng màu xanh dương chủ động.
+    2. **Tự động áp dụng khi chuyển Coin/TF:** Mỗi khi chuyển coin hoặc chuyển TF, tự động reset `isAutoFit = true`, `isLogScale = true`, kích hoạt `{ autoScale: true, mode: 1 }` và gọi `applyDefaultZoom()`.
+    3. **Chống nhảy mất nến khi nạp 300+ nến:** Phát hiện khi số lượng nến nạp thêm tăng đột biến (> 50 nến) hoặc đang ở chế độ Auto, tự động gọi `applyDefaultZoom()` neo thẳng về nến hiện tại mới nhất (55 nến gần nhất bên phải), triệt tiêu hoàn toàn hiện tượng lệch trục hay trôi nến.
+  - **Kiểm chứng:** Đã kiểm tra thực tế bằng Browser Subagent (`chart_check_tf_1789824372957.png`): Cả 2 nút **A** và **L** ở góc dưới bên phải đều sáng xanh dương chuẩn mực; nến hiển thị trọn vẹn, rõ ràng ở mọi khung thời gian.
+
+- **[19/09/2026]** - Sửa Triệt Để Điểm Chạm EMA200: Lệnh Chờ Bám Theo Đường EMA Động, Khớp Chuẩn Xác 100% Khi Retest Trục:
+  - **Mô tả:** CEO phản ánh trên biểu đồ ETH-USDT khung H4, nến đã tích lũy trên EMA200 hơn 200 nến (thừa điều kiện 60 nến), và có cây nến râu nhúng chạm chuẩn xác vào đường EMA200 màu trắng (ngày 15-16/09) nhưng biểu đồ không xuất hiện box tín hiệu Long.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Bị chặn bởi bộ lọc TF:** Trong cấu hình bot sàn `sub1_global_config.json`, cặp ETH chỉ bật auto-trade `["H2", "H1", "M5", "M15", "M30"]` (không có H4). Bộ lọc `enabledTfs` trước đó đã chặn không cho vẽ box trên ETH H4. Trên biểu đồ kỹ thuật web (backtesting), thuật toán phân tích kỹ thuật phải vẽ tín hiệu độc lập theo đúng cấu trúc nến của khung thời gian đang xem khi thỏa mãn tích lũy >= 60 nến.
+    2. **Lỗi giá Entry tĩnh & Drift hủy lệnh sai:** Trong code cũ, khi tạo lệnh chờ (`waiting`), lệnh lưu cứng giá `entryPrice` của cây nến từ 1 tháng trước (lúc EMA mới ở 1850). Đồng thời có dòng `emaDrift > 0.005` (nếu EMA lệch 0.5% thì hủy lệnh). Do đó khi giá chạy sóng tăng dốc lên 2600 và EMA dốc lên 2350, lệnh chờ bị hủy liên tục và gán lệch giá tĩnh, khiến khi nến nhúng râu chạm đường EMA200 ở 2356 thì không kích hoạt khớp entry.
+  - **Đã thực hiện:**
+    1. **Cơ chế Lệnh Limit bám theo EMA Động (Dynamic Trailing Limit):** Trong suốt thời gian chờ (`waiting`), giá Entry Limit tự động bám sát theo đường EMA200 của từng cây nến (`ep = isLong ? ema * (1 + offset) : ema * (1 - offset)`).
+    2. Bỏ đoạn kiểm tra `emaDrift` gây hủy lệnh oan. Lệnh chỉ bị hủy khi giá thực sự gãy trục xu hướng (nến đóng cửa xuyên qua đường EMA200 sang phía bên kia).
+    3. Khi râu nến nhúng về chạm vùng EMA200 (`candle.low <= ep`), lệnh lập tức **KHỚP ENTRY** chuyển sang `open`, ghim vị trí bắt đầu tại nến chạm EMA200 đó, và kéo dài độ rộng tới khi chốt lời Take Profit (`candle.high >= tpTarget`).
+  - **Kiểm chứng:** Đã kiểm tra thực tế bằng Browser Subagent trên biểu đồ ETH-USDT 4H (`ema200_eth_usdt_4h_1789823824004.png`):
+    - Khớp chính xác 100% Box Long màu xanh tại điểm râu nến nhúng chạm đường EMA200 màu trắng (ngày 15-16/09).
+    - Box Long hoàn thành kéo dài và chốt lời TP tại cây nến xanh dựng đứng ngày 18/09.
+    - Box Long chờ ở nến live hiện tại tịnh tiến mượt mà theo giá live. Linter `npx oxlint` 0 lỗi.
+
+- **[19/09/2026]** - Sửa Lỗi Nút Thu Gọn / Mở Rộng Phần "TÀI KHOẢN (BOT EMA200)" Ở Sidebar Trái:
+  - **Mô tả:** Nút bấm tam giác thu gọn (▲/▼) ở góc phải tiêu đề "TÀI KHOẢN (BOT EMA200):" trên thanh Sidebar bên trái bị đơ, bấm vào không có tác dụng và không thu gọn/mở rộng được khu vực cài đặt vốn rủi ro.
+  - **Nguyên nhân:**
+    1. Lỗi lệch tên Prop giữa component cha và con: Tại `App.jsx`, prop được truyền xuống dưới tên `onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}`, trong khi component `SidebarLeft.jsx` lại destructure và gọi trực tiếp `setIsRiskCollapsed` (`setIsRiskCollapsed(!isRiskCollapsed)`). Khi click vào nút tam giác, code gặp `TypeError: setIsRiskCollapsed is not a function`.
+    2. Ngoài ra, hàm gán tài khoản trong dropdown `SidebarLeft.jsx` gọi `handleAssignAccountToActiveBot`, nhưng `App.jsx` truyền prop là `onAssignAccount`.
+  - **Đã thực hiện:**
+    1. Tại `SidebarLeft.jsx`: Viết hàm bọc `handleToggle` và `handleAccountSelect` hỗ trợ tương thích ngược đầy đủ cả hai tên prop (`onToggleRiskCollapse` / `setIsRiskCollapsed` và `onAssignAccount` / `handleAssignAccountToActiveBot`).
+    2. Tinh chỉnh CSS cho nút toggle: Bổ sung `cursor: 'pointer'`, `userSelect: 'none'`, hover opacity để trải nghiệm click nhạy bén và rõ ràng.
+    3. Tại `App.jsx`: Cung cấp đồng thời cả `setIsRiskCollapsed={setIsRiskCollapsed}` và `onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}` để đảm bảo tương thích 100%.
+  - **Kiểm chứng:** Đã kiểm tra thực tế bằng Browser Subagent trên giao diện `http://localhost:5173`:
+    - Bấm nút ▲: Vùng cài đặt vốn (Ký quỹ, Hệ số Ký Quỹ, Mức chốt lời, Mức cắt lỗ) lập tức thu gọn ẩn đi, nút chuyển thành ▼ (`account_collapsed_state_1789822930639.png`).
+    - Bấm nút ▼: Toàn bộ vùng cài đặt vốn lập tức mở rộng đầy đủ trở lại, nút chuyển về ▲ (`account_expanded_state_1789822944061.png`).
+    - Chạy linter `npx oxlint` sạch 100% không cảnh báo hay lỗi.
+
 - **[19/09/2026]** - Chuẩn Hóa Tuyệt Đối 100% Khối OB và Box Long/Short Bot SMC:
   - **Mô tả:** CEO chỉ rõ 3 lỗi logic trên biểu đồ Bot SMC:
     1. Box 1: Entry bị lệch ở giữa OB thay vì nằm ở biên OB.

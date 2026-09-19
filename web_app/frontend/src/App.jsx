@@ -1327,6 +1327,7 @@ function App() {
           onAssignAccount={handleAssignAccountToActiveBot}
           onOpenSettings={() => setShowSettings(true)}
           isRiskCollapsed={isRiskCollapsed}
+          setIsRiskCollapsed={setIsRiskCollapsed}
           onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}
           risk={risk}
           setRisk={setRisk}
@@ -1400,6 +1401,7 @@ function App() {
                         coin={cfg.coin}
                         tf={cfg.tf}
                         risk={risk}
+                        enabledTfs={enabledTfs}
                         onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
                         onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
                         isActive={activeChartIndex === idx}
