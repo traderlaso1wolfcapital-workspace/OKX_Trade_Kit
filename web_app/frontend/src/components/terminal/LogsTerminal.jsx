@@ -143,7 +143,6 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
           flex: 1,
           overflowX: "auto",
           overflowY: "auto",
-          padding: "8px 12px 36px 12px",
           WebkitOverflowScrolling: "touch",
         }}
       >

@@ -904,7 +904,15 @@ a#tv-attr-logo,
   height: 100%;
 }
 
+.log-block {
+  font-size: inherit;
+  font-family: inherit;
+}
+
 .log-line {
+  font-size: inherit;
+  font-family: inherit;
+  letter-spacing: inherit;
   line-height: 1.55;
   white-space: pre;
   border-bottom: 1px solid #141414;
@@ -1419,7 +1427,7 @@ a#tv-attr-logo,
 }
 
 /* ============= TABLET/IPAD LANDSCAPE ============= */
-@media (width >= 1001px) and (width <= 1200px) {
+@media screen and (min-width: 1001px) and (max-width: 1200px) {
   .sidebar-left {
     width: 280px !important;
     min-width: 280px !important;
@@ -1427,7 +1435,7 @@ a#tv-attr-logo,
 }
 
 /* ============= MOBILE RESPONSIVE ============= */
-@media (width <= 1000px) {
+@media screen and (max-width: 1024px), (width <= 1024px) {
   .app-container {
     flex-direction: column;
     height: 100dvh;
@@ -1557,13 +1565,16 @@ a#tv-attr-logo,
 
   /* Log font fit to mobile screen without horizontal overflow for 78-char table */
   .logs-terminal {
-    font-size: clamp(7px, 2.18vw, 8.8px);
-    letter-spacing: -0.28px;
-    padding: 6px 4px 32px 6px;
-    line-height: 1.45;
+    font-size: clamp(7px, 2.05vw, 8.2px) !important;
+    letter-spacing: -0.3px !important;
+    padding: 6px 4px 36px 4px !important;
+    line-height: 1.42 !important;
   }
+  .log-block,
   .log-line {
-    line-height: 1.45;
+    font-size: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: 1.42 !important;
   }
 
   /* Positions table scroll ngang và dọc trên mobile */
@@ -1642,7 +1653,7 @@ body.is-resizing-vertical {
 
 
 
-@media (width <= 1000px) {
+@media screen and (max-width: 1024px), (width <= 1024px) {
   .desktop-only {
     display: none !important;
   }
@@ -3289,5 +3300,11 @@ div[class*="tradingview-widget-copyright"],
   .chart-backtest-table-wrap {
     top: 0;
     right: 75px;
+  }
+
+  .logs-terminal {
+    font-size: clamp(6.6px, 1.95vw, 7.8px) !important;
+    letter-spacing: -0.32px !important;
+    padding: 6px 3px 36px 3px !important;
   }
 }

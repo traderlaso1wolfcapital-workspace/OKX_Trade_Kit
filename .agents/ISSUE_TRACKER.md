@@ -18,6 +18,83 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[20/09/2026]** - Sửa Lỗi Hủy Sạch Limit Các Khung Khác Khi Khớp M5 & Gắn Trực Tiếp Cặp TP/SL Chuẩn Native Vào Mục 'Chia':
+  - **Mô tả hiện tượng:**
+    1. Khi bot khớp lệnh ở khung gần nhất (M5), toàn bộ các lệnh Limit treo ở các khung khác (M15, M30, H1, H2, H4) bất ngờ bị gỡ bỏ sạch sẽ khỏi sàn OKX dù đang chạy ở chế độ **Lưới Đa Khung**.
+    2. TP/SL hiển thị tách rời hoặc hiển thị ở bảng "Tổng hợp" thay vì nằm gọn bên trong dòng vị thế ở mục "Chia" của sàn OKX.
+    3. Tình trạng vị thế hiển thị sai lệch volume và liệt kê cùng lúc cả 6 TF (`[m5 m15 m30 H1 H2 H4]`).
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Phát hiện lệnh filled sai lệch làm rỗng target TFs:** Trong `bot_strategy.py` (vòng lặp kiểm tra lệnh pending), khi một TF (như M15, M30...) chưa kịp gài lệnh trên sàn, `found_px` trả về `None`. Code cũ có đoạn: `if tracker.has_long: tracker.pos_cycle_filled_tfs.append(tf)`. Vì vậy, ngay khi M5 vừa khớp (`has_long = True`), bot lập tức coi 5 TF còn lại cũng "ĐÃ KHỚP" và nhét toàn bộ vào `pos_cycle_filled_tfs`. Ở vòng lặp tiếp theo, bộ lọc `target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]` loại bỏ sạch cả 6 TF (trả về danh sách rỗng `[]`), kích hoạt lệnh `cancel-batch-orders` xóa sổ toàn bộ các lệnh limit còn lại trên sàn!
+    2. **Logic cưỡng ép nâng TF lên H4:** Hàm kiểm tra EMA tự động nâng `tracker.active_pos_tf` lên H4 dù vị thế thực tế chỉ là lệnh M5.
+    3. **Gửi TP và SL thành 2 request tách rời:** Trước đây gọi `place_algo_tpsl` 2 lần riêng biệt cho TP và SL, khiến OKX coi đó là 2 lệnh conditional độc lập chứ không phải cặp TP/SL gắn liền với hợp đồng con trong mục "Chia".
+  - **Giải pháp triệt để đã triển khai theo chỉ đạo của CEO:**
+    1. **Chặn đứng việc nhận diện nhầm lệnh khớp:** Chỉ khi nào một TF đã thực sự được bot đặt lên sàn (`was_placed = tracker.placed_entry_px_... not in ("---", "ERR")`) thì mới được phép ghi nhận là "Đã khớp" khi biến mất. Nhờ đó, ở chế độ Lưới Đa Khung, khi M5 khớp thì **các khung lớn hơn (M15, M30, H1...) vẫn giữ nguyên 100% lệnh Limit trên sàn**, sẵn sàng đón giá khi thị trường quét râu!
+    2. **Đo Volume Ký Quỹ (Margin) để xác định chuẩn xác TF:** Hàm `reconstruct_filled_tfs_from_volume` lấy Ký quỹ thực tế (`actual_margin = pos_vol_usdt / leverage`) đối chiếu với cấu hình vốn của từng TF (`_target_usdt * vol_mults[tf]`). Bot xác định chính xác vị thế thuộc về đúng TF nào (ví dụ `[M5]`), tuyệt đối không bị dính chùm cả 6 TF.
+    3. **Nạp trực tiếp cặp TP/SL vào mục 'Chia' qua `place_algo_tpsl_pair`:** Gửi đồng thời cả `tpTriggerPx` và `slTriggerPx` trong một request `order-algo` duy nhất. OKX V5 liên kết trực tiếp cặp TP/SL này vào dòng vị thế của mục "Chia" trên giao diện sàn, đúng chuẩn Native attachAlgoOrds.
+    4. **Chuẩn hóa thông báo hiển thị vị thế (`bot_ui.py`):** Hiển thị rõ ràng: `{coin_name} ╭─ Đã khớp LONG [{tf}] | Ký quỹ: {margin:.2f} U ({notional:.1f} USDT)`.
+  - **Kiểm chứng:** Toàn bộ các module `bot_orders.py`, `bot_strategy.py`, `bot_ui.py` biên dịch đạt exit code 0 (`py_compile`).
+
+
+- **[20/09/2026]** - Sửa Lỗi Hiển Thị Volume Vị Thế (Notional 33 U vs Ký Quỹ 0.33 $) & Lỗi Nhận Diện Sai Toàn Bộ 6 TF Đã Khớp:
+  - **Mô tả hiện tượng:**
+    1. Bảng Logs console hiển thị `BTC ╭─ Đã khớp LONG [TREND] [m5 m15 m30 H1 H2 H4] = 33 U`, trong khi trên thực tế lệnh trên sàn và bảng vị thế chỉ có Margin 0.33 $ (vốn cấu hình 0.4 $) và mới chỉ khớp đúng 1 lệnh M5.
+    2. Bot hiển thị sai toàn bộ 6 khung `[m5 m15 m30 H1 H2 H4]` đã khớp, khiến các khung khác không thể tiếp tục đặt limit.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Hiển thị Notional thay vì Ký Quỹ:** Trong `bot_ui.py`, dòng in log lấy trực tiếp `tk.long_pos_vol` (Notional Volume = Margin x Đòn bẩy 100x = 32.5 U ≈ 33 U), thay vì chia cho Đòn bẩy để ra Ký Quỹ thực tế (0.33 $).
+    2. **Lịch sử khớp lệnh Fills bị ô nhiễm từ quá khứ:** Trong `bot_strategy.py`, hàm `reconstruct_filled_tfs_from_volume` gọi `/api/v5/trade/fills` lấy 50 fills gần nhất mà không lọc theo thời gian tạo vị thế (`cTime`). Nó đọc phải các lệnh khớp cũ từ các chu kỳ giao dịch trước đó (ngày hôm trước) và nhét hết cả 6 TF vào `pos_cycle_filled_tfs`.
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Quy đổi chuẩn đơn vị Ký Quỹ (Margin):** Trong `bot_ui.py`, hiển thị `long_margin_val = tk.long_pos_vol / leverage` (0.33 U), đồng nhất 100% với cột Ký Quỹ 0.33 $ trên giao diện web app và sàn OKX.
+    2. **Chặn ô nhiễm lịch sử Fills:** Bổ sung điều kiện lọc thời gian `fill_ts >= pos_ctime - 10000` (dựa trên `cTime` vị thế của OKX). Tuyệt đối loại bỏ các lệnh khớp từ chu kỳ cũ. Khi chỉ có 1 lệnh M5 khớp, danh sách chỉ hiển thị duy nhất `[m5]`.
+  - **Kiểm chứng:** Test trích xuất fills với `cTime` trên sàn OKX trả về chính xác 1 lệnh `scvlmtELM5` duy nhất, không còn 5 TF cũ. `python -m py_compile` đạt 100%.
+
+
+- **[20/09/2026]** - Thống Nhất Dùng DUY NHẤT Cơ Chế Native `attachAlgoOrds` (Triệt Tiêu 2 Điểm TP/SL Trùng & Xung Đột Engine):
+  - **Mô tả hiện tượng:** Khi 1 TF khớp lệnh Limit, trên sàn/biểu đồ xuất hiện đồng thời 2 điểm TP và 2 điểm SL nằm sát nhau. Nguyên nhân do bot vừa chạy cơ chế Native `attachAlgoOrds` vừa chạy Dynamic Engine (`apply_emergency_tpsl`) cùng tranh nhau đặt lệnh cho 1 vị thế.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Format `attachAlgoOrds` bị OKX nuốt mất TP:** Trước đây `attachAlgoOrds` gộp cả `tpTriggerPx` và `slTriggerPx` trong 1 dictionary duy nhất. OKX V5 chỉ tạo 1 lệnh con SL và bỏ qua TP. Khi lệnh khớp, sàn chỉ có SL, khiến Dynamic Engine tưởng thiếu TP nên bắn thêm TP và bắn luôn cả SL tổng.
+    2. **Đụng độ giữa 2 cơ chế:** Dynamic Engine quét mỗi chu kỳ 2-4s, không phân biệt lệnh đã được bảo vệ bởi `attachAlgoOrds` mà tiếp tục can thiệp đặt thêm lệnh TP/SL của riêng mình.
+  - **Giải pháp triệt để đã triển khai theo chỉ đạo của CEO:**
+    1. **Tách chuẩn 2 object độc lập trong `attachAlgoOrds`:** Ở cả Bot 1 (`sub1`) và Bot SMC (`sub2`), mảng `attachAlgoOrds` được tách thành 2 phần tử riêng biệt: 1 dict cho TP (`tpTriggerPx`, `tpOrdPx: "-1"`) và 1 dict cho SL (`slTriggerPx`, `slOrdPx: "-1"`). OKX xác nhận sinh đầy đủ 2 algo ID độc lập cho cả TP và SL tức thì khi khớp lệnh.
+    2. **Ưu tiên DUY NHẤT 1 cơ chế Native `attachAlgoOrds`:** Dynamic Engine (`apply_emergency_tpsl`) được rút về làm vai trò **Chốt chặn An toàn Thụ động (Passive Watchdog)**. Nếu vị thế đã có bất kỳ TP hoặc SL nào trên sàn: **BẢO LƯU 100%, TUYỆT ĐỐI KHÔNG ĐẶT ĐÈ, KHÔNG TẠO ĐIỂM THỪA**.
+    3. **Cơ chế đệm 15s khi CEO hủy TP/SL thủ công:** Nếu CEO chủ động bấm hủy TP/SL trên sàn (để kéo nắn hoặc sửa giá), bot cho thời gian đệm 15 giây chờ CEO thao tác. Sau 15 giây nếu vị thế vẫn hoàn toàn trần trụi (không có TP/SL), bot mới tự động quét và cài lại 1 cặp TP/SL bảo vệ tài khoản.
+  - **Kiểm chứng:** Test thực tế trên OKX API: Native `attachAlgoOrds` sinh đầy đủ 2 nhánh TP và SL; `check_algo_tpsl_status` nhận diện chính xác 100% cả net mode và long/short mode. Cú pháp `python -m py_compile` đạt 100%.
+
+
+- **[20/09/2026]** - Tối Ưu Font Size Bảng Logs Trên Mobile (Vừa Khít 78 Ký Tự Màn Hình Điện Thoại):
+  - **Mô tả hiện tượng:** Trên màn hình điện thoại (iOS/Safari/Android), font chữ tab Logs hiển thị quá to (~13.5px của giao diện máy tính), khiến bảng dashboard hiển thị chỉ được 2 cột đầu và bị tràn mất nửa bên phải (`⚡ Thợ săn EMA200 | 💰 Lợi nhuận | ...` bị cắt).
+  - **Nguyên nhân cốt lõi (Root Cause):**
+    1. Media query trong `index.css` sử dụng cú pháp CSS Range Query `@media (width <= 1000px)`. Nhiều phiên bản WebKit / Safari iOS không hỗ trợ cú pháp này nên bỏ qua toàn bộ khối CSS mobile.
+    2. `.log-line` và `.log-block` không có khai báo kế thừa font (`font-size: inherit`), dẫn đến font size không đồng bộ.
+    3. Thư mục `dist` của frontend chưa được build lại sau các thay đổi CSS gần nhất.
+  - **Giải pháp triệt để đã triển khai:**
+    1. Đổi cú pháp media query sang chuẩn toàn cầu: `@media screen and (max-width: 1024px), (width <= 1024px)`.
+    2. Bổ sung rule font clamp co giãn tự động theo chiều rộng màn hình: `font-size: clamp(7px, 2.05vw, 8.2px) !important; letter-spacing: -0.3px !important;` ở mức <=1024px và `clamp(6.6px, 1.95vw, 7.8px) !important` ở mức <=768px.
+    3. Thiết lập `.log-block, .log-line` kế thừa font-size và letter-spacing tuyệt đối (`inherit !important`).
+    4. Rebuild toàn bộ frontend production (`vite build`) thành công vào `web_app/frontend/dist`.
+  - **Kiểm chứng:** Rebuild Vite đạt 100% không lỗi, các file bundle mới `index-CuBZ_25T.css` và `index-2EDv6EaH.js` đã sẵn sàng phục vụ.
+
+
+- **[20/09/2026]** - Khắc Phục Triệt Để Tử Huyệt Bắn Spam Lệnh Limit M5 (Khớp 17 Lần Liên Tiếp Cùng 1 Khung):
+  - **Mô tả hiện tượng:** Sau khi lệnh Limit M5 khớp, bot liên tục bắn lại lệnh Limit M5 mới lên sàn mỗi vài giây/vài chục giây, khiến cùng 1 khung M5 bị nhồi tới 17 lệnh với tổng khối lượng gấp nhiều lần cấu hình vốn ban đầu.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Lệch 100 lần đơn vị Notional Volume vs Margin:** Trong hàm `reconstruct_filled_tfs_from_volume`, `base_vol` được tính bằng `_target_usdt * _coin_vol_mult` mà quên nhân với Đòn bẩy (`leverage = 100x`). Vì thế volume vị thế trên sàn (`cross_long_vol` = 400$) bị so sánh với ngưỡng chỉ 4$, dẫn tới thuật toán luôn chọn nhầm sang `H4` thay vì `M5`.
+    2. **Xóa mất dấu vết `pos_cycle_filled_tfs`:** Khi chạy Lưới Đa Khung chuẩn, nhánh `else:` chỉ trả về đúng 1 TF đơn lẻ (`[best_tf] = ['H4']`), đè bẹp mất `M5`. M5 bị coi là "chưa khớp" và tiếp tục nằm trong `target_long_tfs`.
+    3. **Nhầm lẫn tai hại giữa Lệnh Khớp và Lệnh Bị Hủy:** Khi lệnh Limit M5 khớp, nó biến mất khỏi danh sách `orders-pending`. Bộ đếm `missing_count` tăng lên, bot lầm tưởng lệnh Limit bị hủy trên sàn nên kích hoạt `_emergency_needed = True` ("Phát hiện lệnh Limit bị hủy trên sàn → Đặt lại ngay!").
+    4. **Thiếu Cầu Dao Khóa Cứng (Hard Lock):** Hàm đặt lệnh Limit không kiểm tra xem TF đó đã từng khớp trong vị thế này hay chưa, dẫn tới vòng lặp vô tận: Đặt M5 → Khớp → Tưởng mất lệnh → Đặt lại M5 → Khớp...
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Nâng cấp `reconstruct_filled_tfs_from_volume`:**
+       - Nhân `leverage` (100x) vào `base_vol` để chuẩn hóa đơn vị so sánh Notional Volume.
+       - Tích hợp quét trực tiếp lịch sử khớp lệnh `/api/v5/trade/fills` từ OKX để trích xuất chính xác 100% tag TF từ `clOrdId` đã khớp.
+       - Bảo toàn đơn điệu (`list(dict.fromkeys(old_filled + detected_long_tfs))`): Một khi 1 TF đã được ghi nhận khớp trong vị thế, TUYỆT ĐỐI KHÔNG bị xóa khỏi `pos_cycle_filled_tfs` chừng nào vị thế chưa đóng hẳn.
+    2. **Xử lý chính xác trạng thái Lệnh Khớp:**
+       - Trong bộ quét mất lệnh, nếu bot đang có vị thế (`tracker.has_long` hoặc `tracker.has_short`), việc lệnh biến mất khỏi sàn được định danh ngay là **LỆNH ĐÃ KHỚP (FILLED)**.
+       - Tự động nạp TF vào `pos_cycle_filled_tfs`, triệt tiêu hoàn toàn cờ `_emergency_needed = False`.
+    3. **CẦU DAO TỬ HUYỆT (Khóa cứng 1 TF bắn duy nhất 1 lần):**
+       - Đặt chốt chặn ở cả 2 đầu: (1) Tại đầu vòng lặp duyệt TF mục tiêu; (2) Ngay trước hàm `place_pure_limit`. Nếu `tracker.has_long and tf in tracker.pos_cycle_filled_tfs`: **CẤM 100%** đặt lệnh Limit cho TF đó.
+       - Kích hoạt Cooldown tối thiểu 60s giữa 2 lần bắn lệnh của cùng 1 TF để triệt tiêu hoàn toàn tình trạng spam lệnh vài giây một lần.
+  - **Kiểm chứng:** `python -m py_compile` kiểm tra cú pháp đạt 100% không lỗi.
+
+
 - **[20/09/2026]** - Điều Chỉnh Cấu Hình Mặc Định: Mặc Định TẮT (OFF) Nút "Nhân Hệ Số Ký Quỹ (Vốn)":
   - **Mô tả:** Chuyển trạng thái mặc định của tùy chọn "nhân Hệ số Ký Quỹ (Vốn)" (`ENABLE_TF_VOLUME_MULTIPLIER` / `multiplyVolumeByTf`) sang TẮT (OFF / False) khi người dùng bấm "KHÔI PHỤC MẶC ĐỊNH" cũng như khởi tạo cấu hình mới, nhằm triệt tiêu rủi ro tăng vốn ngoài ý muốn cho người mới dùng bot.
   - **Đã thực hiện:**

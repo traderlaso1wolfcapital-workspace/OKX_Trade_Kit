@@ -108,15 +108,20 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         if setup.take_profit and setup.stop_loss:
             tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
             sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
-            body_limit["attachAlgoOrds"] = [{
-                "attachAlgoClOrdId": f"{cl_prefix}AT{int(time.time() * 1000000)}"[:32],
-                "tpTriggerPx": tp_px,
-                "tpOrdPx": "-1",
-                "tpTriggerPxType": "last",
-                "slTriggerPx": sl_px,
-                "slOrdPx": "-1",
-                "slTriggerPxType": "last"
-            }]
+            body_limit["attachAlgoOrds"] = [
+                {
+                    "attachAlgoClOrdId": f"{cl_prefix}TP{int(time.time() * 1000000)}"[:32],
+                    "tpTriggerPx": tp_px,
+                    "tpOrdPx": "-1",
+                    "tpTriggerPxType": "last"
+                },
+                {
+                    "attachAlgoClOrdId": f"{cl_prefix}SL{int(time.time() * 1000000)}"[:32],
+                    "slTriggerPx": sl_px,
+                    "slOrdPx": "-1",
+                    "slTriggerPxType": "last"
+                }
+            ]
 
         resp = client.request("POST", "/api/v5/trade/order", body=body_limit)
         if resp and resp.get("code") == "0":

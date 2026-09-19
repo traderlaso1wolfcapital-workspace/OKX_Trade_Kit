@@ -1030,13 +1030,39 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     cross_short_amt += abs(pos_amt)
                     cross_short_vol += abs(pos_amt) * contract_val * avg_px
 
-        def reconstruct_filled_tfs_from_volume(side_str: str, pos_vol_usdt: Decimal) -> list[str]:
+        def reconstruct_filled_tfs_from_volume(side_str: str, pos_vol_usdt: Decimal, pos_ctime: int = 0) -> list[str]:
             """
-            BẮT BUỘC KHỞI ĐẦU: Quét tổng volume thực tế trên sàn, so sánh với Setting Base Volume trong JSON
-            để quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã được DCA trong khối volume đó.
+            Quét và quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã khớp cho vị thế hiện tại.
+            Kết hợp:
+            1. Lịch sử khớp lệnh fills thực tế từ sàn OKX (/api/v5/trade/fills) với clOrdId có tag TF (chỉ lấy fill thuộc chu kỳ vị thế hiện tại).
+            2. Quy đổi volume thực tế trên sàn dựa trên Base Volume * Leverage * TF Multipliers.
             """
-            _target_usdt = Decimal("100")
-            # Ưu tiên đọc trực tiếp từ file JSON cấu hình đã lưu trong AppData ổ C
+            # 1. Quét lịch sử khớp lệnh fills từ sàn OKX (chỉ lấy lệnh fill của vị thế hiện tại)
+            fills_detected = []
+            try:
+                fills = client.request("GET", "/api/v5/trade/fills", 
+                                       params={"instType": "SWAP", "instId": swap_id, "limit": "50"}).get("data", [])
+                prefix = f"{CL_ORD_PREFIX}EL" if side_str == "long" else f"{CL_ORD_PREFIX}ES"
+                for f in fills:
+                    fill_ts = int(f.get("ts", "0"))
+                    # BẮT BUỘC: Lệnh fill phải thuộc chu kỳ vị thế hiện tại (ts >= cTime - 10s)
+                    if pos_ctime > 0 and fill_ts < (pos_ctime - 10000):
+                        continue
+                    cl_id = f.get("clOrdId", "")
+                    if cl_id.startswith(prefix) or cl_id.startswith("scv25EL") or cl_id.startswith("scv25ES") or cl_id.startswith("scvlmtEL") or cl_id.startswith("scvlmtES"):
+                        for tf_cand in ["H4", "H2", "H1", "M30", "M15", "M5"]:
+                            if tf_cand in cl_id:
+                                if tf_cand not in fills_detected:
+                                    fills_detected.append(tf_cand)
+                                break
+            except Exception:
+                pass
+
+            if fills_detected:
+                # Có bằng chứng fill trực tiếp từ sàn cho chu kỳ này -> Dùng trực tiếp 100% chuẩn xác
+                return fills_detected
+
+            _target_usdt = Decimal("1")
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
                 if gcfg_path and os.path.exists(gcfg_path):
@@ -1055,75 +1081,29 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
                     break
 
-            base_vol = _target_usdt * _coin_vol_mult
+            # 🔒 Tính toán mức Ký Quỹ thực tế (Margin) của vị thế trên sàn
+            _leverage = Decimal(str(cfg.get("leverage", 100)))
+            actual_margin = pos_vol_usdt / _leverage if _leverage > 0 else pos_vol_usdt
+
+            is_tf_vol_mult = getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
                 "M5": Decimal("1.0"), "M15": Decimal("1.2"), "M30": Decimal("1.5"),
                 "H1": Decimal("2.0"), "H2": Decimal("3.0"), "H4": Decimal("5.0")
             })
 
-            _is_pyramid_reconstruct = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-            _is_neg_reconstruct = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
             _tfs_enabled = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
             valid_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in _tfs_enabled]
-            
-            if _is_pyramid_reconstruct:
-                # DCA Dương: Khớp từ TF lớn xuống TF nhỏ
-                tfs_order = list(reversed(valid_tfs))
-                cum_prev = Decimal("0")
-                filled_tfs = []
-                for tf in tfs_order:
-                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
-                    threshold = cum_prev + cur_vol * Decimal("0.70")
-                    if pos_vol_usdt >= threshold:
-                        filled_tfs.append(tf)
-                        cum_prev += cur_vol
-                    else:
-                        break
-                
-                # Nếu volume trên sàn nhỏ hơn ngưỡng của khung lớn nhất (ví dụ < 70% H4):
-                # Tuyệt đối KHÔNG gán bừa thành H4!
-                # Đối chiếu volume thực tế với các khung nhỏ hơn (tính từ M5 lên) để gán đúng TF:
-                if not filled_tfs:
-                    cum_small = Decimal("0")
-                    for tf in valid_tfs:  # M5 -> M15 -> M30 -> H1 -> H2
-                        cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
-                        threshold = cum_small + cur_vol * Decimal("0.70")
-                        if pos_vol_usdt >= threshold:
-                            filled_tfs.append(tf)
-                            cum_small += cur_vol
-                        else:
-                            break
-                    if not filled_tfs:
-                        filled_tfs = [valid_tfs[0]] if valid_tfs else ["M5"]
-            elif _is_neg_reconstruct:
-                # DCA Âm: Khớp từ TF nhỏ lên TF lớn
-                tfs_order = list(valid_tfs)
-                cum_prev = Decimal("0")
-                filled_tfs = []
-                for tf in tfs_order:
-                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
-                    threshold = cum_prev + cur_vol * Decimal("0.70")
-                    if pos_vol_usdt >= threshold:
-                        filled_tfs.append(tf)
-                        cum_prev += cur_vol
-                    else:
-                        break
-                if not filled_tfs:
-                    filled_tfs = [tfs_order[0]] if tfs_order else ["M5"]
-            else:
-                # ⚡ ĐƠN LỆNH / ĐỘC LẬP (TẮT CẢ 2 DCA): Không nhồi lệnh, chỉ 1 khung khớp gần nhất với volume
-                filled_tfs = []
-                best_tf = valid_tfs[0] if valid_tfs else "M5"
-                min_diff = None
-                for tf in valid_tfs:
-                    cur_vol = base_vol * vol_mults.get(tf, Decimal("1.0"))
-                    diff = abs(pos_vol_usdt - cur_vol)
-                    if min_diff is None or diff < min_diff:
-                        min_diff = diff
-                        best_tf = tf
-                filled_tfs = [best_tf]
+            if not valid_tfs:
+                valid_tfs = ["M5"]
 
-            return filled_tfs
+            if is_tf_vol_mult:
+                # Đo độ lệch margin thực tế với margin cấu hình của từng TF để tìm TF khớp nhất
+                best_tf = min(valid_tfs, key=lambda tf: abs(actual_margin - (_target_usdt * _coin_vol_mult * vol_mults.get(tf, Decimal("1.0")))))
+                return [best_tf]
+            else:
+                # Không nhân margin: TF mặc định là TF đang active hoặc M5
+                cur_tf = getattr(tracker, "active_pos_tf", "M5")
+                return [cur_tf if cur_tf in valid_tfs else valid_tfs[0]]
 
         if cross_long_amt > 0:
             tracker.active_avg_px_long = cross_long_vol / (cross_long_amt * contract_val)
@@ -1131,14 +1111,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             tracker.long_pos_vol = cross_long_vol
             tracker.last_long_pos_amt = cross_long_amt
 
-            # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
-            detected_long_tfs = reconstruct_filled_tfs_from_volume("long", cross_long_vol)
-            tracker.pos_cycle_filled_tfs = list(detected_long_tfs)
+            pos_l_ctime = int(active_long_pos[0].get("cTime", 0)) if active_long_pos and active_long_pos[0].get("cTime") else 0
+            detected_long_tfs = reconstruct_filled_tfs_from_volume("long", cross_long_vol, pos_ctime=pos_l_ctime)
+            tracker.pos_cycle_filled_tfs = detected_long_tfs
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
-            tracker.active_pos_tf = detected_long_tfs[-1]
+            tracker.active_pos_tf = detected_long_tfs[-1] if detected_long_tfs else "M5"
             
             import bots.sub1.bot_models as bm
-            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "LONG", float(tracker.active_avg_px_long), float(cross_long_amt), tf=detected_long_tfs[-1])
+            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "LONG", float(tracker.active_avg_px_long), float(cross_long_amt), tf=tracker.active_pos_tf)
 
         if cross_short_amt > 0:
             tracker.active_avg_px_short = cross_short_vol / (cross_short_amt * contract_val)
@@ -1146,14 +1126,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             tracker.short_pos_vol = cross_short_vol
             tracker.last_short_pos_amt = cross_short_amt
 
-            # BẮT BUỘC: Đồng bộ ngay danh sách TF đã DCA từ Volume thực tế trên sàn
-            detected_short_tfs = reconstruct_filled_tfs_from_volume("short", cross_short_vol)
-            tracker.pos_cycle_filled_tfs = list(detected_short_tfs)
+            pos_s_ctime = int(active_short_pos[0].get("cTime", 0)) if active_short_pos and active_short_pos[0].get("cTime") else 0
+            detected_short_tfs = reconstruct_filled_tfs_from_volume("short", cross_short_vol, pos_ctime=pos_s_ctime)
+            tracker.pos_cycle_filled_tfs = detected_short_tfs
             tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
-            tracker.active_pos_tf = detected_short_tfs[-1]
+            tracker.active_pos_tf = detected_short_tfs[-1] if detected_short_tfs else "M5"
             
             import bots.sub1.bot_models as bm
-            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "SHORT", float(tracker.active_avg_px_short), float(cross_short_amt), tf=detected_short_tfs[-1])
+            bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "SHORT", float(tracker.active_avg_px_short), float(cross_short_amt), tf=tracker.active_pos_tf)
     except Exception as e:
         hft_logger.error(f"Lỗi lấy position {coin_name}: {e}", exc_info=True)
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
@@ -1245,23 +1225,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ⚔️ QUẢN TRỊ VỊ THẾ & PHANH BẢO VỆ LIMIT CROSS
     # ==============================================================================
     
-    # ⚡ DYNAMIC HIGHEST ALIGNED TF LOGIC FOR MTF DCA
-    # BUG FIX: Chỉ nâng TF lên, không được hạ xuống (ví dụ: đã H4 không được điều chỉnh về M5)
-    _tf_order = ["H4", "H2", "H1", "M30", "M15", "M5"]
-    if tracker.has_long:
-        for tf in _tf_order:
-            if tracker.mtf_states.get(tf, {}).get("side") == "above":
-                # Chỉ cập nhật nếu TF mới >= TF hiện tại
-                if tf_weight(tf) >= tf_weight(getattr(tracker, "active_pos_tf", "M5")):
-                    tracker.active_pos_tf = tf
-                break
-    elif tracker.has_short:
-        for tf in _tf_order:
-            if tracker.mtf_states.get(tf, {}).get("side") == "under":
-                # Chỉ cập nhật nếu TF mới >= TF hiện tại
-                if tf_weight(tf) >= tf_weight(getattr(tracker, "active_pos_tf", "M5")):
-                    tracker.active_pos_tf = tf
-                break
+
 
     # ⚡ Force re-apply TP/SL ngay sau khi sync TF thay đổi
     if btc_sync_tf_changed:
@@ -2392,11 +2356,23 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.placed_entry_px_long_by_tf[tf] = found_px_l
                             tracker.missing_count["long"][tf] = 0
                         else:
-                            if tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR", ""):
+                            # 🔒 NẾU ĐANG CÓ VỊ THẾ LONG: Chỉ coi là ĐÃ KHỚP khi trước đó bot ĐÃ ĐẶT lệnh limit này trên sàn!
+                            was_placed_l = tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR", "")
+                            if tracker.has_long and was_placed_l:
+                                if tf not in tracker.pos_cycle_filled_tfs:
+                                    tracker.pos_cycle_filled_tfs.append(tf)
+                                    tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    print(f"🎯 [LỆNH KHỚP] {coin_name}: Lệnh Limit LONG {tf} đã khớp thành công trên sàn! Khóa cứng TF {tf}.")
+                                tracker.placed_entry_px_long_by_tf[tf] = "---"
+                                tracker.missing_count["long"][tf] = 0
+                                continue
+
+                            if was_placed_l:
                                 tracker.missing_count["long"][tf] = tracker.missing_count["long"].get(tf, 0) + 1
                                 if tracker.missing_count["long"][tf] >= 5:
                                     tracker.placed_entry_px_long_by_tf[tf] = "---"
-                                    _emergency_needed = True
+                                    if not tracker.has_long:
+                                        _emergency_needed = True
                             else:
                                 tracker.placed_entry_px_long_by_tf[tf] = "---"
                                 tracker.missing_count["long"][tf] = 0
@@ -2408,11 +2384,23 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.placed_entry_px_short_by_tf[tf] = found_px_s
                             tracker.missing_count["short"][tf] = 0
                         else:
-                            if tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR", ""):
+                            # 🔒 NẾU ĐANG CÓ VỊ THẾ SHORT: Chỉ coi là ĐÃ KHỚP khi trước đó bot ĐÃ ĐẶT lệnh limit này trên sàn!
+                            was_placed_s = tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR", "")
+                            if tracker.has_short and was_placed_s:
+                                if tf not in tracker.pos_cycle_filled_tfs:
+                                    tracker.pos_cycle_filled_tfs.append(tf)
+                                    tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    print(f"🎯 [LỆNH KHỚP] {coin_name}: Lệnh Limit SHORT {tf} đã khớp thành công trên sàn! Khóa cứng TF {tf}.")
+                                tracker.placed_entry_px_short_by_tf[tf] = "---"
+                                tracker.missing_count["short"][tf] = 0
+                                continue
+
+                            if was_placed_s:
                                 tracker.missing_count["short"][tf] = tracker.missing_count["short"].get(tf, 0) + 1
                                 if tracker.missing_count["short"][tf] >= 5:
                                     tracker.placed_entry_px_short_by_tf[tf] = "---"
-                                    _emergency_needed = True
+                                    if not tracker.has_short:
+                                        _emergency_needed = True
                             else:
                                 tracker.placed_entry_px_short_by_tf[tf] = "---"
                                 tracker.missing_count["short"][tf] = 0
@@ -2747,6 +2735,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh LONG ở các TF mục tiêu
             for tf in target_long_tfs:
+                # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN LIMIT VÔ TỘI VẠ):
+                # Khi đã có vị thế LONG: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs) -> CẤM TUYỆT ĐỐI!
+                if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                    continue
+
                 is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
                 _is_this_tf_hedge = is_hedge and (getattr(tracker, "hedge_tf", None) == tf or getattr(tracker, "xole_tf", None) == tf)
                 if _is_this_tf_hedge:
@@ -2863,6 +2856,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if not amend_ok and not matching_order:
                     # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
+                        # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT KHI ĐÃ CÓ VỊ THẾ):
+                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                            tracker.placed_entry_px_long_by_tf[tf] = "---"
+                            continue
+
                         try:
                             _lever = str(_get_leverage(tf))
                             _resp = client.request("POST", "/api/v5/account/set-leverage", body={
@@ -2902,10 +2900,26 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 print(f"⏳ [API LAG WARNING] Lệnh LONG {tf} biến mất khỏi API, đợi {missing_count}/3 chu kỳ...")
                                 continue
                             else:
-                                # Quá 3 chu kỳ, chắc chắn đã mất lệnh
+                                # Quá 3 chu kỳ: Nếu đang có vị thế thì đánh dấu đã khớp, cấm re-place
                                 tracker.missing_count_long[tf] = 0
+                                if tracker.has_long:
+                                    if tf not in tracker.pos_cycle_filled_tfs:
+                                        tracker.pos_cycle_filled_tfs.append(tf)
+                                        tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    tracker.placed_entry_px_long_by_tf[tf] = "---"
+                                    continue
                         else:
                             tracker.missing_count_long[tf] = 0
+                            
+                        # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT):
+                        # 1. Nếu TF này đã từng khớp trong vị thế này: CẤM TUYỆT ĐỐI
+                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                            tracker.placed_entry_px_long_by_tf[tf] = "---"
+                            continue
+                        # 2. Khóa Cooldown chống bắn liên tục (mỗi TF chỉ được bắn 1 lần trong tối thiểu 60s)
+                        last_placed_sec = getattr(tracker, "last_limit_order_sec_long", {}).get(tf, 0)
+                        if (now_sec - last_placed_sec) < 60:
+                            continue
                             
 
                         # ⚡ Gắn TP/SL tức thì cho mọi chế độ (Lưới Đa Khung, DCA Âm, DCA Dương) qua native attachAlgoOrds của OKX V5
@@ -2916,15 +2930,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
                             _calc_tp = round_to_tick(px_tf * (Decimal("1") + _tp_pct), spec["tickSz"])
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
-                            attach_algo_long = [{
-                                "attachAlgoClOrdId": f"{CL_ORD_PREFIX}ATL{tf}{int(time.time() * 1000000)}"[:32],
-                                "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                "tpOrdPx": "-1",
-                                "tpTriggerPxType": "last",
-                                "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                "slOrdPx": "-1",
-                                "slTriggerPxType": "last"
-                            }]
+                            attach_algo_long = [
+                                {
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPL{tf}{int(time.time() * 1000000)}"[:32],
+                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                    "tpOrdPx": "-1",
+                                    "tpTriggerPxType": "last"
+                                },
+                                {
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}SLL{tf}{int(time.time() * 1000000)}"[:32],
+                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                    "slOrdPx": "-1",
+                                    "slTriggerPxType": "last"
+                                }
+                            ]
                         except Exception:
                             attach_algo_long = None
 
@@ -2981,6 +3000,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             # 2. Đặt hoặc cập nhật lệnh SHORT ở các TF mục tiêu
             for tf in target_short_tfs:
+                # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN LIMIT VÔ TỘI VẠ):
+                # Khi đã có vị thế SHORT: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs) -> CẤM TUYỆT ĐỐI!
+                if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                    continue
+
                 is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
                 _is_this_tf_hedge = is_hedge and (getattr(tracker, "hedge_tf", None) == tf or getattr(tracker, "xole_tf", None) == tf)
                 if _is_this_tf_hedge:
@@ -3097,6 +3121,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if not amend_ok and not matching_order:
                     # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
+                        # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT KHI ĐÃ CÓ VỊ THẾ):
+                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                            tracker.placed_entry_px_short_by_tf[tf] = "---"
+                            continue
+
                         try:
                             _lever = str(_get_leverage(tf))
                             _resp = client.request("POST", "/api/v5/account/set-leverage", body={
@@ -3134,9 +3163,26 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 print(f"⏳ [API LAG WARNING] Lệnh SHORT {tf} biến mất khỏi API, đợi {missing_count}/3 chu kỳ...")
                                 continue
                             else:
+                                # Quá 3 chu kỳ: Nếu đang có vị thế thì đánh dấu đã khớp, cấm re-place
                                 tracker.missing_count_short[tf] = 0
+                                if tracker.has_short:
+                                    if tf not in tracker.pos_cycle_filled_tfs:
+                                        tracker.pos_cycle_filled_tfs.append(tf)
+                                        tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    tracker.placed_entry_px_short_by_tf[tf] = "---"
+                                    continue
                         else:
                             tracker.missing_count_short[tf] = 0
+                            
+                        # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT):
+                        # 1. Nếu TF này đã từng khớp trong vị thế này: CẤM TUYỆT ĐỐI
+                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                            tracker.placed_entry_px_short_by_tf[tf] = "---"
+                            continue
+                        # 2. Khóa Cooldown chống bắn liên tục (mỗi TF chỉ được bắn 1 lần trong tối thiểu 60s)
+                        last_placed_sec = getattr(tracker, "last_limit_order_sec_short", {}).get(tf, 0)
+                        if (now_sec - last_placed_sec) < 60:
+                            continue
                             
                         # ⚡ Gắn TP/SL tức thì cho mọi chế độ (Lưới Đa Khung, DCA Âm, DCA Dương) qua native attachAlgoOrds của OKX V5
                         attach_algo_short = None
@@ -3146,15 +3192,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
                             _calc_tp = round_to_tick(px_tf * (Decimal("1") - _tp_pct), spec["tickSz"])
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
-                            attach_algo_short = [{
-                                "attachAlgoClOrdId": f"{CL_ORD_PREFIX}ATS{tf}{int(time.time() * 1000000)}"[:32],
-                                "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                "tpOrdPx": "-1",
-                                "tpTriggerPxType": "last",
-                                "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                "slOrdPx": "-1",
-                                "slTriggerPxType": "last"
-                            }]
+                            attach_algo_short = [
+                                {
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPS{tf}{int(time.time() * 1000000)}"[:32],
+                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                    "tpOrdPx": "-1",
+                                    "tpTriggerPxType": "last"
+                                },
+                                {
+                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}SLS{tf}{int(time.time() * 1000000)}"[:32],
+                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                    "slOrdPx": "-1",
+                                    "slTriggerPxType": "last"
+                                }
+                            ]
                         except Exception:
                             attach_algo_short = None
 

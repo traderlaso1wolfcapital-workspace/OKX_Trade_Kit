@@ -379,8 +379,10 @@ def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, t
         return
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "conditional", "sz": size, "clOrdId": cl_id}
     tp_or_sl = "TP" if is_tp else "SL"
-    if is_tp: body["tpTriggerPx"], body["tpOrdPx"] = trigger_px, "-1"
-    else: body["slTriggerPx"], body["slOrdPx"] = trigger_px, "-1"
+    if is_tp:
+        body["tpTriggerPx"], body["tpOrdPx"], body["tpTriggerPxType"] = trigger_px, "-1", "last"
+    else:
+        body["slTriggerPx"], body["slOrdPx"], body["slTriggerPxType"] = trigger_px, "-1", "last"
     try:
         resp = client.request("POST", "/api/v5/trade/order-algo", body=body)
         if resp and resp.get("code") != "0":
@@ -407,11 +409,66 @@ def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, t
             print(f"⚠️ [EMERGENCY] Giá đã vượt qua {tp_or_sl} {trigger_px} trước khi gài lệnh. Đóng {pos_side.upper()} Market ngay lập tức!")
             close_position_market(client, inst_id, pos_side, size, f"{tp_or_sl} bị đâm thủng", td_mode)
 
+def place_algo_tpsl_pair(client, inst_id: str, side: str, pos_side: str, size: str, tp_px: str, sl_px: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
+    """
+    Cài đặt trực tiếp cặp TP/SL chuẩn Native vào vị thế trong mục 'Chia' trên OKX V5.
+    Gửi đồng thời cả tpTriggerPx và slTriggerPx trong 1 request duy nhất để sàn liên kết trực tiếp vào vị thế.
+    """
+    if dry_run:
+        if SHOW_DRY_RUN_LOGS:
+            print(f"🌑 [DRY-RUN] place_algo_tpsl_pair: {inst_id} {pos_side.upper()} TP@{tp_px} SL@{sl_px} sz={size} (shadow mode)")
+        return
+    body = {
+        "instId": inst_id,
+        "tdMode": td_mode,
+        "side": side,
+        "posSide": pos_side,
+        "ordType": "conditional",
+        "sz": size,
+        "clOrdId": cl_id,
+        "tpTriggerPx": tp_px,
+        "tpOrdPx": "-1",
+        "tpTriggerPxType": "last",
+        "slTriggerPx": sl_px,
+        "slOrdPx": "-1",
+        "slTriggerPxType": "last"
+    }
+    try:
+        resp = client.request("POST", "/api/v5/trade/order-algo", body=body)
+        if resp and resp.get("code") != "0":
+            raise Exception(str(resp.get('msg', 'Unknown')))
+        print(f"🔒 [NATIVE TP/SL] Đã gắn trực tiếp cặp TP/SL vào vị thế mục 'Chia' của {inst_id}: TP@{tp_px} | SL@{sl_px} (sz={size})")
+        return resp
+    except Exception as e:
+        err_str = str(e)
+        if "posSide" in err_str or "51000" in err_str:
+            fallback_pos_side = "net" if pos_side != "net" else ("long" if side == "sell" else "short")
+            body["posSide"] = fallback_pos_side
+            try:
+                resp = client.request("POST", "/api/v5/trade/order-algo", body=body)
+                if resp and resp.get("code") != "0":
+                    raise Exception(str(resp.get('msg', 'Unknown')))
+                print(f"🔒 [NATIVE TP/SL] Đã gắn trực tiếp cặp TP/SL vào vị thế mục 'Chia' của {inst_id} [fallback {fallback_pos_side}]: TP@{tp_px} | SL@{sl_px}")
+                return resp
+            except Exception as e2:
+                err_str = str(e2)
+        hft_logger.error(f"Lỗi place_algo_tpsl_pair: {err_str}", exc_info=True)
+        print(f"🚨 [ALGO TP/SL PAIR] Lỗi kết nối OKX: {err_str} | instId={inst_id} tp={tp_px} sl={sl_px}")
+
 def check_algo_tpsl_status(client, inst_id: str, pos_side: str, td_mode: str, size: Decimal) -> dict[str, Any]:
     status = {"has_tp": False, "has_sl": False, "tp_px": Decimal("0"), "sl_px": Decimal("0"), "size_matched": True}
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
-        expected_exit_side = "sell" if pos_side in ("long", "buy") else ("buy" if pos_side in ("short", "sell") else None)
+        # Xác định chiều thoát lệnh chính xác:
+        # Long (hoặc net với size > 0) -> Lệnh thoát là "sell"
+        # Short (hoặc net với size < 0) -> Lệnh thoát là "buy"
+        if pos_side in ("long", "buy") or (pos_side in ("net", "") and size > 0):
+            expected_exit_side = "sell"
+        elif pos_side in ("short", "sell") or (pos_side in ("net", "") and size < 0):
+            expected_exit_side = "buy"
+        else:
+            expected_exit_side = "sell" if pos_side == "net" else None
+
         for o in pending_algo:
             o_pos_side = o.get("posSide", "")
             o_td_mode = o.get("tdMode", "")
@@ -421,7 +478,7 @@ def check_algo_tpsl_status(client, inst_id: str, pos_side: str, td_mode: str, si
             pos_match = (o_pos_side == pos_side) or (o_pos_side in ("net", "") and expected_exit_side and o_side == expected_exit_side)
             if pos_match and (o_td_mode == td_mode or not o_td_mode):
                 order_sz = Decimal(o.get("sz", "0"))
-                if order_sz != size:
+                if order_sz != abs(size):
                     status["size_matched"] = False
                 if o.get("tpTriggerPx") and Decimal(o.get("tpTriggerPx", "0")) > 0: 
                     status["has_tp"] = True
@@ -451,92 +508,25 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         
         # Lấy hệ số theo TF của vị thế đang mở
         tracker = state_matrix.get(inst_id)
-        # Dùng TF lớn nhất đã thực sự khớp, không phải active_pos_tf (có thể đã sync từ BTC)
-        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+        
+        # ⚡ Xác định TF chuẩn của vị thế theo đúng chuẩn Native attachAlgoOrds
         if tracker:
             filled = getattr(tracker, "pos_cycle_filled_tfs", [])
             if filled:
-                if _is_pyramid or _is_neg_dca:
-                    max_filled_tf = max(filled, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                else:
-                    max_filled_tf = filled[0]
+                target_tf = filled[-1]
             else:
-                max_filled_tf = getattr(tracker, "active_pos_tf", "M5")
+                target_tf = getattr(tracker, "active_pos_tf", "M5")
         else:
-            max_filled_tf = "M5"
+            target_tf = "M5"
 
-        # --- UPGRADE TF LOGIC (Chỉ áp dụng cho DCA Âm, không áp dụng cho DCA Dương hoặc Đơn Lệnh) ---
-        if tracker and _is_neg_dca:
-            try:
-                tf_weights = {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}
-                next_tf_map = {"M5": "M15", "M15": "M30", "M30": "H1", "H1": "H2", "H2": "H4", "H4": "H4"}
-                current_weight = tf_weights.get(max_filled_tf, 0)
-                upgrade_tf = max_filled_tf
-                
-                is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
-                hedge_big = getattr(tracker, "hedge_big_tf", getattr(tracker, "xole_big_tf", None))
-                if is_hedge and hedge_big:
-                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(hedge_big, Decimal("1.0"))
-                else:
-                    temp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
-                base_sl_pct = globals_ref.SCALPING_SL_PCT * temp_tf_mult
-                
-                if side in ["long", "net"]:
-                    base_sl = avg_px * (Decimal("1") - base_sl_pct)
-                    placed_dict = getattr(tracker, "placed_entry_px_long_by_tf", {})
-                else:
-                    base_sl = avg_px * (Decimal("1") + base_sl_pct)
-                    placed_dict = getattr(tracker, "placed_entry_px_short_by_tf", {})
-                
-                filled_tfs = getattr(tracker, "pos_cycle_filled_tfs", [])
-                
-                for tf, px_str in placed_dict.items():
-                    if tf not in filled_tfs and px_str not in ("---", "ERR"):
-                        w = tf_weights.get(tf, 0)
-                        if w > current_weight:
-                            pending_px = Decimal(px_str)
-                            dist = abs(base_sl - pending_px) / pending_px
-                            if dist <= Decimal("0.006"):
-                                upgrade_tf = next_tf_map.get(max_filled_tf, max_filled_tf)
-                                break
-            except Exception:
-                pass
-        # ------------------------
+        # ⚡ Chuẩn công thức Native attachAlgoOrds: Cố định theo SCALPING_TP_PCT / SCALPING_SL_PCT * tf_mult
+        # Tuyệt đối KHÔNG qua Dynamic Engine (không upgrade TF map, không bóp streak_mult)
+        tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(target_tf, Decimal("1.0"))
+        target_tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * tf_mult
+        target_sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * tf_mult
 
-        tp_tf_mult = globals_ref.TF_MULTIPLIERS.get(max_filled_tf, Decimal("1.0"))
-        sl_tf_mult = globals_ref.TF_MULTIPLIERS.get(upgrade_tf, Decimal("1.0")) if 'upgrade_tf' in locals() else tp_tf_mult
-        
-        # ⚡ Tính hệ số giảm (Shrink) TP/SL dựa trên chuỗi thắng (win_streak)
-        streak_mult = Decimal("1.0")
-        is_hd_pos = (getattr(tracker, "is_hedge_pos", False) or getattr(tracker, "is_xole_pos", False)) and (getattr(tracker, "hedge_pos_side", "") == side or getattr(tracker, "xole_pos_side", "") == side) if tracker else False
-        
-        if is_hd_pos:
-            # Ưu tiên lấy hedge_tf làm chuẩn tra cứu streak
-            hd_tf = getattr(tracker, "hedge_tf", getattr(tracker, "xole_tf", max_filled_tf)) or max_filled_tf
-            win_streak = getattr(tracker, "hedge_win_streak", getattr(tracker, "xole_win_streak", 0))
-            if win_streak == 0 and tracker and hd_tf in tracker.mtf_states:
-                win_streak = tracker.mtf_states[hd_tf].get("win_streak", 0)
-        else:
-            win_streak = tracker.mtf_states[max_filled_tf].get("win_streak", 0) if (tracker and max_filled_tf in tracker.mtf_states) else 0
-            
-        streak = min(win_streak, 4)
-        if streak == 0: streak_mult = Decimal("1.0")
-        elif streak == 1: streak_mult = Decimal("0.8")
-        elif streak == 2: streak_mult = Decimal("0.6")
-        elif streak == 3: streak_mult = Decimal("0.4")
-        else: streak_mult = Decimal("0.3")
-        
-        if is_hd_pos:
-            target_tp_pct = getattr(tracker, "hedge_tp_pct", getattr(tracker, "xole_tp_pct", globals_ref.SCALPING_TP_PCT * tp_tf_mult)) * streak_mult
-            target_sl_pct = getattr(tracker, "hedge_sl_pct", getattr(tracker, "xole_sl_pct", globals_ref.SCALPING_SL_PCT * sl_tf_mult)) * streak_mult
-        else:
-            # Nhân hệ số TF và hệ số bóp TP/SL (streak_mult)
-            target_tp_pct = globals_ref.SCALPING_TP_PCT * tp_tf_mult * streak_mult
-            target_sl_pct = globals_ref.SCALPING_SL_PCT * sl_tf_mult * streak_mult
-        
         # ⚡ SAFETY CLAMP: Giới hạn TP/SL tối đa 5% cho forex (XAU, kim loại) — OKX từ chối nếu vượt ngưỡng
-        if max_filled_tf in ("H2", "H4") and target_tp_pct > Decimal("0.05"):
+        if target_tf in ("H2", "H4") and target_tp_pct > Decimal("0.05"):
             target_tp_pct = Decimal("0.05")
             target_sl_pct = Decimal("0.05")
         
@@ -545,55 +535,74 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
             calc_tp = round_to_tick(avg_px * (Decimal("1") + target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") - target_sl_pct), tick_sz)
             tp_side, sl_side = "sell", "sell"
+            tp_cl_id = f"{CL_ORD_PREFIX}TPL{target_tf}{int(time.time() * 1000000)}"[:32]
+            sl_cl_id = f"{CL_ORD_PREFIX}SLL{target_tf}{int(time.time() * 1000000)}"[:32]
         else:
             calc_tp = round_to_tick(avg_px * (Decimal("1") - target_tp_pct), tick_sz)
             calc_sl = round_to_tick(avg_px * (Decimal("1") + target_sl_pct), tick_sz)
             tp_side, sl_side = "buy", "buy"
+            tp_cl_id = f"{CL_ORD_PREFIX}TPS{target_tf}{int(time.time() * 1000000)}"[:32]
+            sl_cl_id = f"{CL_ORD_PREFIX}SLS{target_tf}{int(time.time() * 1000000)}"[:32]
             
         abs_size_dec = abs(size_dec)
         status = check_algo_tpsl_status(client, inst_id, side, td_mode, abs_size_dec)
         
-        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA):
-        # Mỗi lệnh con đã được gắn TP/SL riêng độc lập qua attachAlgoOrds (chế độ Split/Chia trên OKX).
-        # Nếu trên sàn ĐÃ CÓ bất kỳ lệnh Algo TP hoặc SL nào, BẢO LƯU NGUYÊN VẸN 100%, tuyệt đối không hủy/gài đè lệnh tổng!
-        is_grid_mode = (not _is_pyramid) and (not _is_neg_dca)
-        if is_grid_mode:
-            if status["has_tp"] or status["has_sl"]:
-                if tracker:
-                    if norm_side == "long":
-                        tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
-                        tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
-                    else:
-                        tracker.active_tp_px_short = status["tp_px"] if status["has_tp"] else calc_tp
-                        tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
-                return
+        # ⚡ ƯU TIÊN DUY NHẤT 1 CƠ CHẾ: NATIVE attachAlgoOrds CỦA OKX V5
+        # Mọi lệnh Limit khi bắn lên sàn đều được gắn cặp TP/SL Native độc lập qua attachAlgoOrds.
+        # Khi khớp lệnh, sàn OKX tự kích hoạt TP/SL native tức thì.
+        # Nếu trên sàn ĐÃ CÓ bất kỳ lệnh Algo TP hoặc SL nào:
+        # BẢO LƯU NGUYÊN VẸN 100%, TUYỆT ĐỐI KHÔNG gài đè, KHÔNG sinh thêm điểm thừa!
+        had_active_attr = f"tpsl_active_{norm_side}"
+        missing_attr = f"tpsl_missing_since_{norm_side}"
 
-        # ⚡ TÔN TRỌNG TP/SL CỦA CEO & TỰ ĐỘNG GỘP/NÂNG CẤP KHI CẮN DCA:
-        # Nếu trên sàn ĐÃ CÓ TP hoặc SL và khối lượng khớp với vị thế hiện tại:
-        # Tuyệt đối KHÔNG xóa và KHÔNG gài đè lại khi lệch giá. Giữ nguyên giá do CEO thiết lập.
-        # Chỉ hủy và gài lại khi khối lượng vị thế thay đổi (ví dụ vừa cắn DCA nhồi thêm lệnh).
-        if not status["size_matched"]:
-            clean_algo_orders(client, inst_id, td_mode, side)
-            status["has_tp"] = False
-            status["has_sl"] = False
-            print(f"🎯 [DCA TP/SL UPGRADE] {inst_id} {norm_side.upper()}: Khối lượng vị thế thay đổi ({abs_size_dec}) → Tự động gộp & nâng cấp TP/SL tổng theo TF Max {max_filled_tf} (Hệ số x{tp_tf_mult:.2f})!")
+        if status["has_tp"] or status["has_sl"]:
+            if tracker:
+                if norm_side == "long":
+                    tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
+                    tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
+                else:
+                    tracker.active_tp_px_short = status["tp_px"] if status["has_tp"] else calc_tp
+                    tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
+                setattr(tracker, had_active_attr, True)
+                setattr(tracker, missing_attr, None)
+            return
+
+        # ⚡ CHỐT CHẶN AN TOÀN THỤ ĐỘNG (PASSIVE WATCHDOG / FALLBACK NATIVE RESTORE):
+        # Chỉ chạy khi vị thế HOÀN TOÀN TRẦN TRỤI (Không có bất kỳ TP hoặc SL nào trên sàn).
+        # Nếu vị thế trước đó đã từng có TP/SL mà hiện tại bị mất (do CEO chủ động bấm hủy trên sàn để kéo nắn giá):
+        # Đệm 15 giây chờ CEO thao tác thủ công. Sau 15 giây nếu vẫn trần trụi thì tự động nạp lại đúng chuẩn Native attachAlgoOrds!
+        now_ts = time.time()
+        was_previously_active = getattr(tracker, had_active_attr, False) if tracker else False
+
+        if was_previously_active:
+            missing_since = getattr(tracker, missing_attr, None)
+            if missing_since is None:
+                if tracker: setattr(tracker, missing_attr, now_ts)
+                print(f"⏳ [TP/SL SCAN BUFFER] {inst_id} {norm_side.upper()}: Phát hiện CEO vừa hủy TP/SL trên sàn. Đang đệm 15s chờ CEO thao tác thủ công...")
+                return
+            elif (now_ts - missing_since) < 15.0:
+                # Vẫn đang trong thời gian 15s đệm cho CEO thao tác
+                return
+            else:
+                # Đã hết 15s mà CEO chưa cài lại -> Kích hoạt cài lại bảo vệ tự động chuẩn Native attachAlgoOrds
+                print(f"🛡️ [AUTO-RESTORE NATIVE TP/SL] {inst_id} {norm_side.upper()}: Đã qua 15s sau khi hủy mà chưa có TP/SL mới → Nạp lại chuẩn Native attachAlgoOrds ({target_tf})!")
+                if tracker: setattr(tracker, missing_attr, None)
 
         if tracker:
             if norm_side == "long":
-                tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
-                tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
+                tracker.active_tp_px_long = calc_tp
+                tracker.active_sl_px_long = calc_sl
             else:
-                tracker.active_tp_px_short = status["tp_px"] if status["has_tp"] else calc_tp
-                tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
+                tracker.active_tp_px_short = calc_tp
+                tracker.active_sl_px_short = calc_sl
 
-        if not status["has_tp"] or not status["has_sl"]:
-            abs_size_str = str(abs_size_dec)
-            if not status["has_tp"]:
-                tp_px_str = f"{calc_tp:.{dec_places}f}"
-                place_algo_tpsl(client, inst_id, tp_side, side, abs_size_str, tp_px_str, True, f"{CL_ORD_PREFIX}TP{int(time.time() * 1000000)}"[:32], td_mode)
-            if not status["has_sl"]:
-                sl_px_str = f"{calc_sl:.{dec_places}f}"
-                place_algo_tpsl(client, inst_id, sl_side, side, abs_size_str, sl_px_str, False, f"{CL_ORD_PREFIX}SL{int(time.time() * 1000000)}"[:32], td_mode)
+        abs_size_str = str(abs_size_dec)
+        tp_px_str = f"{calc_tp:.{dec_places}f}"
+        sl_px_str = f"{calc_sl:.{dec_places}f}"
+        pair_cl_id = f"{CL_ORD_PREFIX}TPSL{target_tf}{int(time.time() * 1000)}"[:32]
+        place_algo_tpsl_pair(client, inst_id, tp_side, side, abs_size_str, tp_px_str, sl_px_str, pair_cl_id, td_mode)
+        if tracker:
+            setattr(tracker, had_active_attr, True)
     except Exception as e:
         hft_logger.error(f"Lỗi apply_emergency_tpsl ({inst_id} {pos.get('posSide', '')}): {e}", exc_info=True)
 

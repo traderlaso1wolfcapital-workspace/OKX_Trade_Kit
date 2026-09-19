@@ -539,10 +539,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
             else:
                 filled_str = fmt_tf("M5").ljust(18)
-            long_vol = f"{tk.long_pos_vol:.0f} U" if getattr(tk, "long_pos_vol", 0) > 0 else ""
-            long_vol_str = f" = {long_vol.ljust(6)} " if long_vol else " "
+            long_margin_val = (tk.long_pos_vol / Decimal(str(leverage))) if getattr(tk, "long_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
             mode_tag = _get_mode_tag(tk, "long")
-            line_main = f"    {coin_name} ╭─ Đã khớp LONG {mode_tag} [{filled_str.strip()}]{long_vol_str.rstrip()}"
+            line_main = f"    {coin_name} ╭─ Đã khớp LONG {mode_tag} [{filled_str.strip()}] | Ký quỹ: {long_margin_val:.2f} U ({tk.long_pos_vol:.1f} USDT)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
@@ -569,10 +568,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
             else:
                 filled_str = fmt_tf("M5").ljust(18)
-            short_vol = f"{tk.short_pos_vol:.0f} U" if getattr(tk, "short_pos_vol", 0) > 0 else ""
-            short_vol_str = f" = {short_vol.ljust(6)} " if short_vol else " "
+            short_margin_val = (tk.short_pos_vol / Decimal(str(leverage))) if getattr(tk, "short_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
             mode_tag = _get_mode_tag(tk, "short")
-            line_main = f"    {coin_name} ╭─ Đã khớp SHORT {mode_tag} [{filled_str.strip()}]{short_vol_str.rstrip()}"
+            line_main = f"    {coin_name} ╭─ Đã khớp SHORT {mode_tag} [{filled_str.strip()}] | Ký quỹ: {short_margin_val:.2f} U ({tk.short_pos_vol:.1f} USDT)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
