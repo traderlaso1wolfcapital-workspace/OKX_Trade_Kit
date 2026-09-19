@@ -894,8 +894,8 @@ a#tv-attr-logo,
 .logs-terminal {
   background-color: #0d0d0d;
   color: #c8c8c8;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 12px;
+  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 13.5px;
   padding: 8px 14px 42px 14px;
   box-sizing: border-box;
   overflow: auto;
@@ -1555,8 +1555,16 @@ a#tv-attr-logo,
   /* Status compact */
   .status-text { font-size: 11px; }
 
-  /* Log font nho hon tren mobile */
-  .logs-terminal { font-size: 11px; }
+  /* Log font fit to mobile screen without horizontal overflow for 78-char table */
+  .logs-terminal {
+    font-size: clamp(7px, 2.18vw, 8.8px);
+    letter-spacing: -0.28px;
+    padding: 6px 4px 32px 6px;
+    line-height: 1.45;
+  }
+  .log-line {
+    line-height: 1.45;
+  }
 
   /* Positions table scroll ngang và dọc trên mobile */
   .positions-table-wrapper {

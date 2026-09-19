@@ -581,20 +581,41 @@ def _parse_env_file(fpath: str):
 
 def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
     data_dir = get_user_data_dir(uid)
-    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     
+    # Khi chỉ định rõ account_id: TUYỆT ĐỐI KHÔNG fallback sang strategy hay tài khoản khác!
+    if account_id and account_id.strip():
+        target_acc = account_id.strip()
+        candidate_paths = [
+            os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"),
+            os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
+            os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"),
+            os.path.join(data_dir, f".api_{target_acc}"),
+            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{target_acc}"),
+            os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"),
+        ]
+        # Chỉ kiểm tra .api_botEMA200 nếu chính account_id đó là "sub1" hoặc ".api_botEMA200"
+        if target_acc in ["sub1", ".api_botEMA200"]:
+            candidate_paths.extend([
+                os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"),
+                os.path.join(data_dir, ".api_botEMA200")
+            ])
+            
+        for p in candidate_paths:
+            if os.path.exists(p):
+                c = _parse_env_file(p)
+                if c["api_key"] and c["secret_key"] and c["passphrase"]:
+                    return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
+        return "", "", "", False
+
+    # Khi không truyền account_id (lấy mặc định của bot/strategy)
+    target_acc = strategy
     candidate_paths = [
-        os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"),
-        os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
-        os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"),
-        os.path.join(data_dir, f".api_{target_acc}"),
         os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"),
         os.path.join(data_dir, f".api_{strategy}"),
         os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{strategy}"),
-        os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"),
         os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"),
     ]
-    if strategy == "sub1" or target_acc == "sub1":
+    if strategy == "sub1":
         candidate_paths.append(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"))
         candidate_paths.append(os.path.join(data_dir, ".api_botEMA200"))
         
@@ -816,6 +837,34 @@ async def auto_resume_bots():
     except Exception as e:
         print(f"[SYSTEM] Lỗi quét thư mục auto_resume_bots: {e}")
 
+def _cancel_unfilled_limit_orders(uid: str, strategy: str, account_id: str = None, action_name: str = "BOT") -> int:
+    """Quét và hủy toàn bộ lệnh Limit chưa khớp trên OKX, bảo lưu 100% TP/SL."""
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
+    canceled_orders = 0
+    if api_key and secret_key and passphrase:
+        try:
+            resp = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                # Chỉ hủy các lệnh Limit mở vị thế chưa khớp, TUYỆT ĐỐI không hủy lệnh đóng vị thế (reduceOnly)
+                to_cancel = [
+                    {"instId": o["instId"], "ordId": o["ordId"]}
+                    for o in data
+                    if o.get("ordType") == "limit" and str(o.get("reduceOnly", "")).lower() != "true"
+                ]
+                if to_cancel:
+                    for i in range(0, len(to_cancel), 20):
+                        batch = to_cancel[i:i+20]
+                        _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", json.dumps(batch), api_key, secret_key, passphrase, is_demo)
+                    canceled_orders = len(to_cancel)
+                    print(f"🧹 [{action_name}] Đã hủy thành công {canceled_orders} lệnh Limit chưa khớp trên OKX cho {target_acc}. Bảo lưu 100% TP/SL!", flush=True)
+                else:
+                    print(f"ℹ️ [{action_name}] Không có lệnh Limit chờ nào cần hủy trên OKX cho {target_acc}.", flush=True)
+        except Exception as e:
+            print(f"⚠️ [{action_name}] Lỗi dọn dẹp lệnh Limit trên OKX: {e}", flush=True)
+    return canceled_orders
+
 @app.post("/api/bot/start")
 async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, account_id: str = None):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
@@ -836,6 +885,9 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
     acc_name = strategy
+
+    # 🧹 Dọn sạch toàn bộ lệnh Limit cũ chưa khớp trên OKX để bot đặt lại theo logic mới (bảo lưu 100% TP/SL)
+    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="START BOT")
 
     proc = get_nested(bot_processes, uid, strategy)
     pid = get_running_pid(uid, strategy)
@@ -875,9 +927,13 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
             try:
                 with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
                     f.write("1")
+                with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
+                    f.write("0")
+                set_nested(bot_start_times, uid, strategy, time.time())
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Lỗi ghi activate flag: {e}")
-            return {"status": "success", "message": "⚡ Bot đã được KÍCH HOẠT! Lệnh thật sẽ được đặt lên OKX."}
+            clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
+            return {"status": "success", "message": f"⚡ Bot đã được KÍCH HOẠT!{clean_info} Lệnh thật sẽ được đặt lên OKX theo nến hiện tại.", "canceled_count": canceled_orders}
 
     # Process chưa chạy — spawn mới (bắt đầu ở DRY_RUN, ngay sau đó activate)
     try:
@@ -920,29 +976,112 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
         try:
             with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
                 f.write("1")
+            with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
+                f.write("0")
         except: pass
 
-        return {"status": "success", "message": "Đã khởi động và kích hoạt Bot thành công!"}
+        clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
+        return {"status": "success", "message": f"Đã khởi động và kích hoạt Bot thành công!{clean_info}", "canceled_count": canceled_orders}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bot/reset_capital")
-def reset_capital(uid: str, strategy: str = "sub1"):
+def reset_capital(uid: str, strategy: str = "sub1", account_id: str = None):
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
     
-    flag_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
-    os.makedirs(flag_dir, exist_ok=True)
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    data_dir = get_user_data_dir(uid)
     
-    # acc_name corresponds to the strategy name (e.g. sub1)
-    acc_name = strategy
-    flag_path = os.path.join(flag_dir, f"reset_wallet_{acc_name}.flag")
-    
+    # 1. Lấy API credentials của tài khoản được chỉ định
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
+    if not api_key or not secret_key or not passphrase:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tài khoản [{target_acc}] chưa có API Key OKX! Vui lòng nhập và lưu API Key trước khi thực hiện Reset Vốn Gốc."
+        )
+        
+    # 2. Quét trực tiếp số dư thực tế từ sàn OKX qua API v5
     try:
-        with open(flag_path, "w") as f:
-            f.write("1")
-        return {"status": "success", "message": "Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot."}
+        resp = _okx_signed_request(
+            method="GET",
+            path="/api/v5/account/balance",
+            body_str="",
+            api_key=api_key,
+            secret_key=secret_key,
+            passphrase=passphrase,
+            is_demo=is_demo,
+            timeout=10
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Sàn OKX từ chối (HTTP {resp.status_code}): {resp.text}")
+            
+        res_json = resp.json()
+        if res_json.get("code") != "0":
+            err_msg = res_json.get("msg", "Lỗi không xác định từ sàn OKX")
+            raise HTTPException(status_code=400, detail=f"Sàn OKX báo lỗi ({res_json.get('code')}): {err_msg}")
+            
+        bal_data = res_json.get("data", [{}])[0]
+        total_eq_str = bal_data.get("totalEq", "0")
+        total_equity = float(total_eq_str) if total_eq_str else 0.0
+        
+        # Nếu totalEq chưa có giá trị, quét chi tiết số dư USDT
+        if total_equity <= 0:
+            for detail in bal_data.get("details", []):
+                if detail.get("ccy") == "USDT":
+                    total_equity = float(detail.get("eq", detail.get("cashBal", 0.0)))
+                    break
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi tạo cờ reset: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi truy vấn số dư OKX: {str(e)}")
+        
+    # 3. Cập nhật mốc VỐN GỐC mới vào toàn bộ các file dữ liệu tiến hóa
+    evo_files = [
+        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{target_acc}_evolution_data.json"),
+        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_evolution_data.json"),
+        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+    ]
+    for evo_file in evo_files:
+        try:
+            os.makedirs(os.path.dirname(evo_file), exist_ok=True)
+            evo_data = {}
+            if os.path.exists(evo_file):
+                try:
+                    with open(evo_file, "r", encoding="utf-8") as f:
+                        evo_data = json.load(f)
+                except Exception:
+                    evo_data = {}
+            evo_data["wallet_stats"] = {
+                "von_goc": round(total_equity, 2),
+                "von_hien_tai": round(total_equity, 2),
+                "loi_nhuan": 0.0,
+                "tang_truong": 0.0,
+                "last_reset_ts": time.time()
+            }
+            with open(evo_file, "w", encoding="utf-8") as f:
+                json.dump(evo_data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    # 4. Ghi cờ flag cho bot process ngầm nhận biết và đồng bộ ngay
+    flag_dir = os.path.join(data_dir, f"bots/{strategy}", "json_data")
+    os.makedirs(flag_dir, exist_ok=True)
+    for flag_name in [f"reset_wallet_{strategy}.flag", f"reset_wallet_{target_acc}.flag"]:
+        try:
+            with open(os.path.join(flag_dir, flag_name), "w") as f:
+                f.write("1")
+        except Exception:
+            pass
+
+    return {
+        "status": "success",
+        "total_equity": round(total_equity, 2),
+        "account": target_acc,
+        "message": f"✅ Đã Reset Vốn Gốc thành công!\nTổng vốn quét thực tế từ sàn OKX: {total_equity:,.2f} USDT"
+    }
 
 @app.post("/api/bot/reset_nen")
 def reset_nen(uid: str, strategy: str = "sub1"):
@@ -961,16 +1100,22 @@ def reset_nen(uid: str, strategy: str = "sub1"):
         raise HTTPException(status_code=500, detail=f"Lỗi tạo cờ reset nến: {e}")
 
 @app.post("/api/bot/stop")
-async def stop_bot(uid: str, strategy: str = "sub1"):
-    """Dừng bot (chuyển về Shadow mode). Process tiếp tục chạy ngầm, chỉ đặt lệnh ảo."""
+async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
+    """Dừng bot (chuyển về Shadow mode). Hủy toàn bộ limit chưa khớp trên sàn, bảo lưu 100% TP/SL."""
     acc_name = strategy
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
 
-    # Ghi stop flag → bot sẽ chuyển về DRY_RUN (không kill process)
+    # 1. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
+    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
+
+    # 2. Ghi stop flag → bot sẽ chuyển về DRY_RUN (không kill process)
     try:
         with open(os.path.join(flag_dir, f"stop_{acc_name}.flag"), "w") as f:
             f.write("stop")
+        with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
+            f.write("1")
     except Exception:
         pass
 
@@ -980,7 +1125,8 @@ async def stop_bot(uid: str, strategy: str = "sub1"):
         try: os.remove(activate_flag)
         except: pass
 
-    return {"message": f"Bot {strategy} đã chuyển về Shadow Mode (chạy ngầm).", "status": "SHADOW"}
+    msg = f"Bot {strategy} đã dừng! Toàn bộ lệnh Limit chưa khớp đã được hủy ({canceled_orders} lệnh). TP/SL của các vị thế đang chạy được giữ nguyên 100%."
+    return {"message": msg, "status": "SHADOW", "canceled_count": canceled_orders}
 
 @app.post("/api/bot/shadow/start")
 async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -1046,13 +1192,27 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
-        # Mặc định cấu hình nếu chưa tồn tại
+        # Mặc định cấu hình chuẩn xác cho người dùng mới (khớp 100% hình 1)
         default_cfg = {
             "ENABLED_TFS": {},
-            "ENABLED_COINS": ["BTC", "ETH", "XAU"],
+            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
             "POSITION_VOLUME_HIGH_CONFIDENCE": 1.0,
             "SCALPING_TP_PCT": 0.008,
-            "SCALPING_SL_PCT": 0.008
+            "SCALPING_SL_PCT": 0.008,
+            "ENABLE_TF_VOLUME_MULTIPLIER": True,
+            "ENABLE_STRATEGY_MAIN": True,
+            "ENABLE_PYRAMID_DCA": False,
+            "ENABLE_NEGATIVE_DCA": False,
+            "ENABLE_MULTITF_GRID": True,
+            "ENABLE_STRATEGY_HEDGE": False,
+            "ENABLE_DYNAMIC_EMA200_TP": False,
+            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ENTRY_OFFSET_PCT": 0.05,
+            "DCA_GAP_PCT": 0.20,
+            "CONFLUENCE_PCT": 0.23,
+            "ACCUM_CANDLES": 60,
+            "ETH_VOL_MULT": 1.30,
+            "ETH_VOLATILITY_FACTOR": 1.30
         }
         try:
             with open(config_path, "w", encoding="utf-8") as f:
@@ -1078,6 +1238,15 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
         if "SCALPING_SL_PCT" not in cfg:
             cfg["SCALPING_SL_PCT"] = 0.008
             dirty = True
+        if "ENABLE_TF_VOLUME_MULTIPLIER" not in cfg:
+            cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = True
+            dirty = True
+        if "ENABLE_MULTITF_GRID" not in cfg:
+            cfg["ENABLE_MULTITF_GRID"] = True
+            dirty = True
+        if "ALTCOIN_FOLLOW_BTC_EMA" not in cfg:
+            cfg["ALTCOIN_FOLLOW_BTC_EMA"] = True
+            dirty = True
         if dirty:
             try:
                 with open(config_path, "w", encoding="utf-8") as f:
@@ -1089,7 +1258,7 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
         raise HTTPException(status_code=500, detail=f"Failed to read config: {e}")
 
 @app.post("/api/bot/config")
-def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1"):
+def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1", account_id: str = None):
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
@@ -1115,11 +1284,19 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
     if update_data.strategy_config is not None:
         for k, v in update_data.strategy_config.items():
             cfg[k] = v
+            
+    if strategy == "sub1":
+        cfg["ENABLE_STRATEGY_MAIN"] = True
     
     try:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
-        return {"message": "Config updated successfully.", "config": cfg}
+
+        # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh để bắt đầu chu trình chạy bot mới (bảo lưu 100% TP/SL)
+        target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+        canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")
+
+        return {"message": "Config updated successfully.", "config": cfg, "canceled_count": canceled_orders}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
 
@@ -1166,6 +1343,13 @@ def create_bot_account(req: AccountCreate, uid: str):
     
     bot_dir = os.path.join(data_dir, f"bots/{acc_id}")
     os.makedirs(bot_dir, exist_ok=True)
+    
+    # Khởi tạo file .api rỗng tuyệt đối cho tài khoản mới - TUYỆT ĐỐI không kế thừa key cũ
+    try:
+        with open(os.path.join(bot_dir, f".api_{acc_id}"), "w", encoding="utf-8") as f:
+            f.write('OKX_API_KEY=""\nOKX_SECRET_KEY=""\nOKX_PASSPHRASE=""\nOKX_IS_DEMO="False"\n')
+    except Exception:
+        pass
     
     with open(acc_file, "w", encoding="utf-8") as f:
         json.dump(accounts, f, indent=4, ensure_ascii=False)

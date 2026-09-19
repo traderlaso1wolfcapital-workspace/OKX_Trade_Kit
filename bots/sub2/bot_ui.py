@@ -12,13 +12,19 @@ BEARISH = -1
 def update_wallet_metrics(client, env_paths: dict, system_config: dict):
     try:
         balance_data = client.request("GET", "/api/v5/account/balance", params={"ccy": "USDT"})
-        usdt_details = balance_data.get("data", [{}])[0].get("details", [])
+        bal_item = balance_data.get("data", [{}])[0]
+        total_eq = bal_item.get("totalEq")
+        current_equity = Decimal(str(total_eq)) if (total_eq and float(total_eq) > 0) else Decimal("0.00")
         
-        current_equity = Decimal("2000.00")  
-        for detail in usdt_details:
-            if detail.get("ccy") == "USDT":
-                current_equity = Decimal(str(detail.get("eq", "2000.00")))
-                break
+        if current_equity <= 0:
+            usdt_details = bal_item.get("details", [])
+            for detail in usdt_details:
+                if detail.get("ccy") == "USDT":
+                    eq_val = detail.get("eq") or detail.get("cashBal", "0.00")
+                    current_equity = Decimal(str(eq_val))
+                    break
+        if current_equity <= 0:
+            current_equity = Decimal("2000.00")
         
         data = {}
         if os.path.exists(env_paths["JSON_EVOLUTION_DATA_FILE"]):

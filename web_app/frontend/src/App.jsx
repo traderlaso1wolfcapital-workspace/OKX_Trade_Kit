@@ -104,6 +104,7 @@ function App() {
   const currentUid = localStorage.getItem("tls1_uid") || loginUid;
   const {
     botStatus,
+    setBotStatus,
     positions,
     setPositions,
     closedPositions,
@@ -115,6 +116,15 @@ function App() {
   const [isStartingBot, setIsStartingBot] = useState(false);
   const [isStoppingBot, setIsStoppingBot] = useState(false);
   const [overrideBotRunning, setOverrideBotRunning] = useState(null);
+
+  // Tự động giải phóng cờ ép trạng thái khi WebSocket hoặc Server đã xác nhận đồng bộ
+  useEffect(() => {
+    if (overrideBotRunning === true && botStatus === "RUNNING") {
+      setOverrideBotRunning(null);
+    } else if (overrideBotRunning === false && (botStatus === "SHADOW" || botStatus === "STOPPED")) {
+      setOverrideBotRunning(null);
+    }
+  }, [botStatus, overrideBotRunning]);
 
   // 6. Multi-chart Layout & Configuration
   const getLayoutDefaults = (layout) => {
@@ -268,7 +278,7 @@ function App() {
     return ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
   });
 
-  const [activePairs, setActivePairs] = useState([]);
+  const [activePairs, setActivePairs] = useState(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
   const [enabledTfs, setEnabledTfs] = useState({});
 
   const safePos = useMemo(() => {
@@ -373,10 +383,10 @@ function App() {
   };
 
   // 9. Risk & Strategy Settings State
-  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false });
+  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: true });
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const [strat, setStrat] = useState({
-    main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
+    main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
     dynamicPingpongTp: false, altcoinFollowBtc: true,
     sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
     trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
@@ -430,7 +440,7 @@ function App() {
     if (activeBotTab === "sub1") {
       setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
       setStrat({
-        main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
+        main: true, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
@@ -515,12 +525,13 @@ function App() {
             multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : r.multiplyVolumeByTf
           }));
         }
-        if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined) {
+        if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined || d.ENABLE_MULTITF_GRID !== undefined) {
           setStrat(s => ({
             ...s,
-            main: d.ENABLE_STRATEGY_MAIN !== undefined ? Boolean(d.ENABLE_STRATEGY_MAIN) : s.main,
+            main: activeBotTab === "sub1" ? true : (d.ENABLE_STRATEGY_MAIN !== undefined ? Boolean(d.ENABLE_STRATEGY_MAIN) : s.main),
             pyramidDca: d.ENABLE_PYRAMID_DCA !== undefined ? Boolean(d.ENABLE_PYRAMID_DCA) : s.pyramidDca,
             negativeDca: d.ENABLE_NEGATIVE_DCA !== undefined ? Boolean(d.ENABLE_NEGATIVE_DCA) : s.negativeDca,
+            multiTfGrid: d.ENABLE_MULTITF_GRID !== undefined ? Boolean(d.ENABLE_MULTITF_GRID) : (!d.ENABLE_PYRAMID_DCA && !d.ENABLE_NEGATIVE_DCA),
             hedge: d.ENABLE_STRATEGY_HEDGE !== undefined ? Boolean(d.ENABLE_STRATEGY_HEDGE) : s.hedge,
             xole: d.ENABLE_STRATEGY_XOLE !== undefined ? Boolean(d.ENABLE_STRATEGY_XOLE) : s.xole,
             dynamicEma200Tp: d.ENABLE_DYNAMIC_EMA200_TP !== undefined ? Boolean(d.ENABLE_DYNAMIC_EMA200_TP) : s.dynamicEma200Tp,
@@ -667,6 +678,7 @@ function App() {
 
   // Bot Start / Stop Handlers
   const handleStartBot = async () => {
+    if (isStartingBot || isStoppingBot) return;
     const currentAcc = effectiveAccId;
     if (!currentAcc) {
       alert("⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi chạy bot!");
@@ -701,15 +713,22 @@ function App() {
         console.error("Lỗi đồng bộ cấu hình trước khi Start:", e);
       }
 
-      const [r] = await Promise.all([
-        fetch(`/api/bot/start?uid=${currentUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" }),
-        new Promise(resolve => setTimeout(resolve, 800))
-      ]);
+      const r = await fetch(`/api/bot/start?uid=${currentUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
       if (r.ok) {
+        let cleanMsg = "";
+        try {
+          const resData = await r.json();
+          if (resData?.canceled_count > 0) {
+            cleanMsg = ` (Đã dọn dẹp ${resData.canceled_count} lệnh Limit cũ trên sàn, bảo lưu 100% TP/SL)`;
+          }
+        } catch { }
         setOverrideBotRunning(true);
-        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}`);
+        if (setBotStatus) setBotStatus("RUNNING");
+        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}${cleanMsg}`);
         refreshBotData();
-        setTimeout(() => setOverrideBotRunning(null), 3000);
+        // Giữ hiệu ứng loading tối thiểu 600ms mượt mà, sau đó khi tắt loading thì giao diện chuyển thẳng sang nút DỪNG BOT
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setIsStartingBot(false);
       } else {
         let errMsg = "Không rõ nguyên nhân";
         try {
@@ -720,29 +739,33 @@ function App() {
         }
         alert(`❌ Lỗi khởi động bot: ${errMsg || r.statusText}`);
         setOverrideBotRunning(null);
+        setIsStartingBot(false);
       }
     } catch (e) {
       alert(`❌ Lỗi kết nối khi khởi động bot: ${e?.message || e}`);
       setOverrideBotRunning(null);
-    } finally {
       setIsStartingBot(false);
     }
   };
 
   const handleStopBot = async () => {
+    if (isStoppingBot || isStartingBot) return;
     try {
       setIsStoppingBot(true);
       const targetStrat = activeBotTab || "sub1";
       const targetUid = currentUid || "default";
-      const [r] = await Promise.all([
-        fetch(`/api/bot/stop?strategy=${targetStrat}&uid=${targetUid}`, { method: "POST" }),
-        new Promise(resolve => setTimeout(resolve, 800))
-      ]);
+      const targetAcc = selectedAccount || effectiveAccId || "";
+      const r = await fetch(`/api/bot/stop?strategy=${targetStrat}&uid=${targetUid}&account_id=${targetAcc}`, { method: "POST" });
       if (r.ok) {
+        const resData = await r.json().catch(() => ({}));
         setOverrideBotRunning(false);
-        addSystemLog(`🛑 [BOT] Đã gửi lệnh dừng bot.`);
+        if (setBotStatus) setBotStatus("SHADOW");
+        const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";
+        addSystemLog(`🛑 [BOT] Đã dừng bot thành công${cancelCount}.`);
         refreshBotData();
-        setTimeout(() => setOverrideBotRunning(null), 3000);
+        // Giữ hiệu ứng loading tối thiểu 600ms mượt mà, sau đó khi tắt loading thì giao diện chuyển thẳng sang nút CHẠY BOT
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setIsStoppingBot(false);
       } else {
         let errMsg = "Không rõ nguyên nhân";
         try {
@@ -753,11 +776,11 @@ function App() {
         }
         alert(`❌ Lỗi dừng bot: ${errMsg || r.statusText}`);
         setOverrideBotRunning(null);
+        setIsStoppingBot(false);
       }
     } catch (e) {
       alert(`❌ Lỗi kết nối khi dừng bot: ${e?.message || e}`);
       setOverrideBotRunning(null);
-    } finally {
       setIsStoppingBot(false);
     }
   };
@@ -856,7 +879,7 @@ function App() {
       // Defaults for Bot EMA200
       setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80 });
       setStrat({
-        main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
+        main: true, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false,
         sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
@@ -888,10 +911,17 @@ function App() {
   const handleResetCapital = async () => {
     if (!window.confirm("Bạn có chắc chắn muốn Reset Vốn Gốc (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?")) return;
     try {
-      const resp = await fetch(`/api/bot/reset_capital?uid=${currentUid}&strategy=${activeBotTab}`, { method: "POST" });
+      const targetAcc = selectedAccount || effectiveAccId || "";
+      const resp = await fetch(`/api/bot/reset_capital?uid=${currentUid}&strategy=${activeBotTab}&account_id=${targetAcc}`, { method: "POST" });
       const data = await resp.json();
-      if (resp.ok) alert("✅ Đã gửi lệnh Reset Vốn Gốc (Audit) đến Bot thành công!");
-      else alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+      if (resp.ok) {
+        const msg = data.message || `✅ Đã Reset Vốn Gốc thành công! Tổng vốn quét từ OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`;
+        alert(msg);
+        addSystemLog(`♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc thành công! Tổng vốn quét từ sàn OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`);
+        refreshBotData();
+      } else {
+        alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+      }
     } catch (e) {
       alert("❌ Lỗi kết nối: " + e.message);
     }
@@ -947,10 +977,12 @@ function App() {
   const handleSaveStratConfig = async () => {
     setIsSavingConfig(true);
     try {
+      const targetAcc = selectedAccount || effectiveAccId || "";
       const strategyConfig = {
-        ENABLE_STRATEGY_MAIN: Boolean(strat.main),
+        ENABLE_STRATEGY_MAIN: activeBotTab === "sub1" ? true : Boolean(strat.main),
         ENABLE_PYRAMID_DCA: Boolean(strat.pyramidDca),
         ENABLE_NEGATIVE_DCA: Boolean(strat.negativeDca),
+        ENABLE_MULTITF_GRID: Boolean(strat.multiTfGrid ?? (!strat.pyramidDca && !strat.negativeDca)),
         ENABLE_STRATEGY_HEDGE: Boolean(strat.hedge),
         ENABLE_STRATEGY_XOLE: Boolean(strat.xole),
         ENABLE_DYNAMIC_EMA200_TP: Boolean(strat.dynamicEma200Tp),
@@ -967,10 +999,11 @@ function App() {
         DCA_GAP_PCT: parseFloat(entryCfg.dcaGapPct) || 0.20,
         CONFLUENCE_PCT: parseFloat(entryCfg.confluencePct) || 0.23,
         ACCUM_CANDLES: parseInt(entryCfg.accumCandles) || 60,
+        ETH_VOL_MULT: parseFloat(entryCfg.ethVolMult) || 1.30,
         ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf),
       };
 
-      const res = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+      const res = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}&account_id=${targetAcc}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -981,7 +1014,13 @@ function App() {
         })
       });
 
-      if (!res.ok) {
+      let cancelMsg = "";
+      if (res.ok) {
+        const d = await res.json().catch(() => ({}));
+        if (d?.canceled_count > 0) {
+          cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX, bảo lưu 100% TP/SL)`;
+        }
+      } else {
         const err = await res.json();
         alert(`❌ Lỗi lưu cấu hình: ${err.detail || "Không rõ nguyên nhân"}`);
         setIsSavingConfig(false);
@@ -989,9 +1028,10 @@ function App() {
       }
 
       const curBotName = activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation";
-      alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!`);
-      const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Độc lập";
-      addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình ${curBotName}: Chế độ = ${dcaMode}`);
+      alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!${cancelMsg}`);
+      const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Lưới Đa Khung";
+      addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình ${curBotName}: Chế độ = ${dcaMode}${cancelMsg}`);
+      refreshBotData();
     } catch (e) {
       alert(`❌ Lỗi kết nối khi lưu cấu hình: ${e.message}`);
     } finally {
@@ -1000,32 +1040,90 @@ function App() {
     }
   };
 
-  const handleResetDefaultStrat = () => {
-    if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH của app không?")) {
+  const handleResetDefaultStrat = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH chuẩn (XAU, BTC, ETH - Ký quỹ 1$ - Lưới Đa Khung - Đồng pha BTC) không?")) return;
+
+    setIsSavingConfig(true);
+    try {
+      const targetAcc = selectedAccount || effectiveAccId || "";
       if (activeBotTab === "sub1") {
-        setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80 });
-        setStrat({
-          main: false, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
+        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80, multiplyVolumeByTf: true };
+        const defaultStrat = {
+          main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false,
           sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
           trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
-        });
-        setEntryCfg(prev => ({
-          ...prev,
+        };
+        const defaultEntryCfg = {
           entryOffset: "0.05",
           dcaGapPct: "0.20",
           confluencePct: "0.23",
           accumCandles: 60,
           altcoinFollowBtc: true,
-        }));
-        setEnabledTfs({});
-        const curUid = localStorage.getItem("tls1_uid") || "guest";
+          ethVolMult: "1.30",
+        };
+        const defaultCoins = ["XAU", "BTC", "ETH"];
+        const defaultPairs = ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"];
+
+        setRisk(defaultRisk);
+        setStrat(defaultStrat);
+        setEntryCfg(defaultEntryCfg);
+        setActivePairs(defaultPairs);
+        setWatchlistCoins(defaultPairs);
+        const curUid = localStorage.getItem("tls1_uid") || currentUid || "guest";
         try {
-          setWatchlistCoins(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
-          localStorage.setItem(`tls1_watchlist_coins_${curUid}`, JSON.stringify(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]));
+          localStorage.setItem(`tls1_watchlist_coins_${curUid}`, JSON.stringify(defaultPairs));
         } catch { }
+
+        const strategyConfig = {
+          ENABLE_STRATEGY_MAIN: true,
+          ENABLE_PYRAMID_DCA: false,
+          ENABLE_NEGATIVE_DCA: false,
+          ENABLE_MULTITF_GRID: true,
+          ENABLE_STRATEGY_HEDGE: false,
+          ENABLE_STRATEGY_XOLE: false,
+          ENABLE_DYNAMIC_EMA200_TP: false,
+          ENABLE_DYNAMIC_PINGPONG_TP: false,
+          ENABLE_SIDEWAY_SAFE_EXIT: false,
+          ENABLE_SQUEEZE_ESCAPE_EXIT: false,
+          ENABLE_SAFEGUARD_ENTRY_EXIT: false,
+          ENABLE_TRAILING_SL: false,
+          ENABLE_MAX_ROI_EXIT: false,
+          ENABLE_SIDEWAY_VAP_EXIT: false,
+          ENABLE_H4_FLIP_CLOSE: false,
+          ALTCOIN_FOLLOW_BTC_EMA: true,
+          ENTRY_OFFSET_PCT: 0.05,
+          DCA_GAP_PCT: 0.20,
+          CONFLUENCE_PCT: 0.23,
+          ACCUM_CANDLES: 60,
+          ETH_VOL_MULT: 1.30,
+          ENABLE_TF_VOLUME_MULTIPLIER: true,
+        };
+
+        const res = await fetch(`/api/bot/config?strategy=sub1&uid=${currentUid}&account_id=${targetAcc}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            enabled_coins: defaultCoins,
+            position_volume: 1,
+            scalping_tp_pct: 0.008,
+            scalping_sl_pct: 0.008,
+            strategy_config: strategyConfig
+          })
+        });
+
+        let cancelMsg = "";
+        if (res.ok) {
+          const d = await res.json().catch(() => ({}));
+          if (d?.canceled_count > 0) {
+            cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX, bảo lưu 100% TP/SL)`;
+          }
+        }
+        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho Bot EMA200 thành công!${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định Bot EMA200: Ký quỹ 1$, Lưới Đa Khung, Đồng pha BTC, XAU/BTC/ETH${cancelMsg}`);
+        refreshBotData();
       } else if (activeBotTab === "sub2") {
-        setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
+        setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT", multiplyVolumeByTf: true });
         setStrat({
           main: true, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -1033,11 +1131,33 @@ function App() {
           trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
           timeframeBase: "1H",
         });
+        const res = await fetch(`/api/bot/config?strategy=sub2&uid=${currentUid}&account_id=${targetAcc}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            position_volume: 1,
+            scalping_tp_pct: 0.015,
+            scalping_sl_pct: 0.015,
+            strategy_config: { ENABLE_STRATEGY_MAIN: true }
+          })
+        });
+        let cancelMsg = "";
+        if (res.ok) {
+          const d = await res.json().catch(() => ({}));
+          if (d?.canceled_count > 0) cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX)`;
+        }
+        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho Bot SMC thành công!${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định Bot SMC${cancelMsg}`);
+        refreshBotData();
       } else {
         setRisk({ posVol: 1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
         setStrat({ main: true, timeframeBase: "1H" });
       }
-      alert("Đã khôi phục cài đặt về mặc định của nhà sản xuất!");
+    } catch (e) {
+      alert(`❌ Lỗi khôi phục mặc định: ${e.message}`);
+    } finally {
+      setIsSavingConfig(false);
+      setShowSettings(false);
     }
   };
 
@@ -1232,9 +1352,7 @@ function App() {
         const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) { 
           const d = await r.json(); 
-          setBotStatus(d.status); 
-          setUptime(d.uptime);
-          if (d.active_accounts) setActiveBotAccounts(d.active_accounts);
+          if (d?.status && setBotStatus) setBotStatus(d.status); 
         }
       } catch { }
     };
@@ -1244,15 +1362,16 @@ function App() {
         if (r.ok) {
           const d = await r.json();
           if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
-          if (d.ENABLED_COINS) setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
-          if (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) {
-            setRisk(r => ({
-              ...r,
-              posVol: Number(d.POSITION_VOLUME_HIGH_CONFIDENCE),
-              tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
-              slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct
-            }));
+          if (d.ENABLED_COINS && Array.isArray(d.ENABLED_COINS) && d.ENABLED_COINS.length > 0) {
+            setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
           }
+          setRisk(r => ({
+            ...r,
+            posVol: (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : r.posVol,
+            tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
+            slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct,
+            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? true),
+          }));
         }
       } catch { }
     };
@@ -1566,7 +1685,13 @@ function App() {
         selectedAccount={selectedAccount}
         onAssignAccount={handleAssignAccountToActiveBot}
         botAccountMap={botAccountMap}
-        onCreateAccount={() => { setNewAccountInput(""); setShowAddAccountModal(true); }}
+        onCreateAccount={() => {
+          setApiKey("");
+          setSecretKey("");
+          setPassphrase("");
+          setNewAccountInput("");
+          setShowAddAccountModal(true);
+        }}
         onDeleteAccount={() => setShowDeleteAccountModal(true)}
         apiKey={apiKey}
         setApiKey={setApiKey}

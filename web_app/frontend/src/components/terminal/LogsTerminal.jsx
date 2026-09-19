@@ -134,50 +134,6 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
-      {/* Thanh công cụ mini cho Logs */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "4px 12px",
-          background: "#181818",
-          borderBottom: "1px solid #282828",
-          fontSize: "12px",
-          color: "#aaa",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span>{normalizedLogs.length} chu kỳ gần nhất</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "4px", cursor: "pointer", fontSize: "11px" }}>
-            <input
-              type="checkbox"
-              checked={autoScroll}
-              onChange={(e) => setAutoScroll(e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
-            Ghim log mới nhất
-          </label>
-          <button
-            onClick={handleCopy}
-            className="styled-btn"
-            style={{ padding: "2px 8px", fontSize: "11px", height: "22px", background: "#252526", color: "#ddd", border: "1px solid #3e3e42", borderRadius: "3px", cursor: "pointer" }}
-            title="Sao chép toàn bộ Logs"
-          >
-            📋 Sao chép
-          </button>
-          <button
-            onClick={handleClear}
-            className="styled-btn"
-            style={{ padding: "2px 8px", fontSize: "11px", height: "22px", background: "#252526", color: "#ddd", border: "1px solid #3e3e42", borderRadius: "3px", cursor: "pointer" }}
-            title="Xóa màn hình Logs"
-          >
-            🗑️ Xóa
-          </button>
-        </div>
-      </div>
 
       {/* Vùng hiển thị Logs Terminal */}
       <div

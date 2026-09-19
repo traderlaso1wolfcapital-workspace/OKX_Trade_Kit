@@ -14,6 +14,7 @@ from typing import Any
 ENABLE_STRATEGY_MAIN = True       # ❶ CHIẾN THUẬT ĐA KHUNG (MAIN)
 ENABLE_PYRAMID_DCA = False        # 🔄 CHẾ ĐỘ DCA DƯƠNG (PYRAMIDING) - MẶC ĐỊNH TẮT
 ENABLE_NEGATIVE_DCA = False       # 🔄 CHẾ ĐỘ DCA ÂM - MẶC ĐỊNH TẮT
+ENABLE_MULTITF_GRID = True        # 🌐 CHẾ ĐỘ LƯỚI ĐA KHUNG ĐỘC LẬP (SPLIT GRID OKX) - MẶC ĐỊNH BẬT KHI TẮT 2 DCA
 ENABLE_STRATEGY_HEDGE = False     # ❷ CHIẾN THUẬT ĐẢO CHIỀU (HEDGE) - MẶC ĐỊNH TẮT
 ENABLE_STRATEGY_XOLE = False      # Alias tương thích ngược
 
@@ -35,7 +36,7 @@ LIMIT_CANDLES = "900"
 POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 1$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
-ENABLE_TF_VOLUME_MULTIPLIER = False                # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF.
+ENABLE_TF_VOLUME_MULTIPLIER = True                 # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: BẬT)
 
 
 # ==============================================================================
@@ -140,7 +141,7 @@ COIN_PORTFOLIO = [
     {"coin": "HYPE", "swap": "HYPE-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.8"), "asset_class": "crypto"},
     {"coin": "ZEC", "swap": "ZEC-USDT-SWAP", "leverage": 50, "vol_mult": Decimal("1.5"), "asset_class": "crypto"},
 ]
-ENABLED_COINS = ["XAU", "CL", "BTC", "ETH"]
+ENABLED_COINS = ["XAU", "BTC", "ETH"]
 
 import sys
 globals_ref = sys.modules[__name__]

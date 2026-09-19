@@ -18,6 +18,106 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[20/09/2026]** - Chuẩn Hóa Cấu Hình Mặc Định (Khớp 100% Hình 1), Tự Động Quét Hủy Lệnh Chờ OKX Khi Lưu/Reset Cấu Hình & Tối Ưu Hiển Thị Bảng Logs:
+  - **Mô tả:**
+    1. Thiết lập cấu hình mặc định cho người dùng mới và khôi phục mặc định chuẩn xác theo ảnh CEO cung cấp: Cặp giao dịch: `XAU, BTC, ETH` (các coin khác tắt); Ký quỹ `1$`, Bật `nhân Hệ số Ký Quỹ (Vốn)`; TP/SL `0.8%`; Công tắc chiến thuật: Chỉ Bật `Lưới Đa Khung` và `Đồng pha BTC & Lọc Vĩ mô` (tất cả các công tắc khác tắt); Điểm vào lệnh: Đón trước cản `0.05%`, Khoảng cách DCA `0.2%`, Nến xu hướng `60`, Hệ số nhạy ETH `1.30`.
+    2. Cả 2 nút "LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)" và "KHÔI PHỤC MẶC ĐỊNH" đều phải tự động quét trên sàn OKX và hủy toàn bộ các lệnh limit chờ vào lệnh (bảo lưu 100% TP/SL của lệnh đang chạy) để khởi động chu trình mới.
+    3. Ẩn hoàn toàn hàng công cụ mini ("1 chu kỳ gần nhất - Ghim log mới nhất - Sao chép - Xóa") trong bảng logs để tối đa hóa diện tích.
+    4. Căn chỉnh size chữ bảng logs trên mobile: Đọc trọn vẹn 78 ký tự bảng SYS Dashboard (4 cột `Thợ săn EMA200 | Lợi nhuận | Tài khoản | Hiệu suất`) mà không bị mất cột hay cuộn ngang.
+    5. Tăng size chữ bảng logs trên PC/Desktop lên 13.5px để nhìn to rõ, dễ đọc.
+  - **Đã thực hiện:**
+    1. **Mặc định chuẩn Backend & Core (`bot_config.py`, `backend/main.py`, `sub1_global_config.json`):**
+       - `ENABLE_TF_VOLUME_MULTIPLIER = True`, `ENABLED_COINS = ["XAU", "BTC", "ETH"]`.
+       - Mặc định khởi tạo user mới đầy đủ 100% các thông số chuẩn của Hình 1.
+       - Tự động hủy lệnh limit chờ trong `update_bot_config` (`_cancel_unfilled_limit_orders`).
+    2. **Frontend Web App (`App.jsx`, `SystemSettingsModal.jsx`):**
+       - Khởi tạo mặc định `risk.multiplyVolumeByTf: true`, `activePairs: ["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]`.
+       - Trong `handleSaveStratConfig` và `handleResetDefaultStrat`: Truyền `account_id`, lưu config và nhận diện số lệnh limit đã hủy trên OKX (`canceled_count`).
+    3. **Tối ưu Bảng Logs (`LogsTerminal.jsx`, `index.css`):**
+       - Ẩn hoàn toàn hàng mini toolbar trong `LogsTerminal.jsx`.
+       - Desktop: Tăng `.logs-terminal` lên `13.5px` (font Consolas, Liberation Mono, line-height 1.55).
+       - Mobile: Áp dụng `clamp(7px, 2.18vw, 8.8px)` và `letter-spacing: -0.28px` cho 78 ký tự bảng dashboard vừa vặn hoàn hảo trên màn hình điện thoại mà không bị tràn viền.
+  - **Kiểm chứng:** Build Vite frontend thành công 100%, Python `py_compile` thành công 100%.
+
+- **[20/09/2026]** - Sửa Triệt Để Hiện Tượng Nháy Nút & Khóa Trạng Thái Loading Đến Khi Hoàn Thành Chuyển Đổi Nút CHẠY / DỪNG BOT:
+  - **Mô tả:** Khi bot đang chạy và người dùng click vào nút "■ DỪNG BOT", nút loading khoảng 1 giây rồi lại hiện trở lại nút "■ DỪNG BOT", một lúc sau mới chuyển sang nút "▶ CHẠY BOT", khiến người dùng hoang mang lầm tưởng là chưa click hoặc click trượt. Tương tự, khi click "▶ CHẠY BOT", nút phải duy trì loading cho tới khi bot xác nhận đang chạy và chuyển thẳng sang "■ DỪNG BOT".
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Frontend nhả loading quá sớm khi backend chưa cập nhật flag:** Khi click "DỪNG BOT", `handleStopBot` trong `App.jsx` đặt `isStoppingBot = true`, sau khi request POST `/api/bot/stop` trả về thì `finally` lập tức gán `isStoppingBot = false`.
+    2. **Độ trễ cập nhật file cờ `dry_run` tại backend:** Trước đây, endpoint `/api/bot/stop` chỉ tạo file `stop_sub1.flag` và xóa `activate_sub1.flag` mà chưa cập nhật ngay giá trị `dry_run_sub1.flag = 1`. Do tiểu trình bot chạy theo chu kỳ 2 giây mới đọc flag và ghi ra file `dry_run`, nên trong 1-3 giây đó hàm `get_bot_status` và WebSocket vẫn trả về `"status": "RUNNING"`.
+    3. Vì `isStoppingBot` đã tắt mà `botStatus` vẫn còn là `RUNNING` (đồng thời `overrideBotRunning` bị timeout 3s hoặc bị WebSocket ghi đè), React render lại nút "■ DỪNG BOT". Mãi sau đó khi bot ghi xong cờ, WebSocket gửi `SHADOW` thì nút mới đổi sang "▶ CHẠY BOT".
+    4. Ngoài ra, trong `App.jsx`, hook `useBotWebSocket` có trả về `setBotStatus` nhưng chưa được destructure, khiến `fetchStatus` bị lỗi `ReferenceError` ngầm.
+  - **Đã thực hiện:**
+    1. **Backend (`web_app/backend/main.py`):**
+       - Trong endpoint `@app.post("/api/bot/stop")`: Ghi ngay lập tức `dry_run_{acc_name}.flag = "1"`. Bất kỳ yêu cầu kiểm tra trạng thái nào từ WebSocket hay REST API sau thời điểm dừng đều trả về `"SHADOW"` ngay tức khắc.
+       - Trong endpoint `@app.post("/api/bot/start")`: Ghi ngay lập tức `dry_run_{acc_name}.flag = "0"` và cập nhật `bot_start_times`.
+    2. **Frontend Web App (`App.jsx`):**
+       - Destructure `setBotStatus` từ `useBotWebSocket`.
+       - Thêm `useEffect` đồng bộ: Khi WebSocket hoặc Server phản hồi trạng thái thực tế khớp với trạng thái mong muốn (`RUNNING` khi start, `SHADOW`/`STOPPED` khi stop), tự động giải phóng cờ `overrideBotRunning`.
+       - Trong `handleStartBot` & `handleStopBot`: Giữ nguyên trạng thái `isStartingBot` / `isStoppingBot` (loading spinner kèm khóa disable chống double click). Cập nhật ngay tức thì `setOverrideBotRunning` và `setBotStatus`. Chỉ khi trạng thái mới đã được thiết lập xong và sau hiệu ứng chuyển cảnh mượt mà 600ms mới tắt loading, đảm bảo nút nhảy thẳng 1 lần duy nhất từ `ĐANG DỪNG BOT...` ⭢ `▶ CHẠY BOT` (hoặc từ `ĐANG KHỞI ĐỘNG BOT...` ⭢ `■ DỪNG BOT`), triệt tiêu 100% hiện tượng nháy nút.
+  - **Kiểm chứng:** Build Vite frontend thành công 100%, Python `py_compile` thành công 100%.
+
+- **[20/09/2026]** - Bổ Sung Công Tắc Riêng "Lưới Đa Khung" (Multi-TF Split Grid) Dưới DCA Dương & DCA Âm:
+  - **Mô tả:** Thay vì để người dùng phải tự hiểu cơ chế "TẮT cả 2 nút DCA Dương và DCA Âm = Chạy chế độ Lưới Đa Khung", CEO yêu cầu tạo thêm một nút công tắc ON/OFF riêng biệt đặt tên là **"Lưới Đa Khung"** nằm ngay bên dưới 2 nút DCA Dương và DCA Âm trong phần Công Tắc Chiến Thuật.
+  - **Cơ chế Loại Trừ Lẫn Nhau (Mutual Exclusion 3 Chế Độ):**
+    1. Bật **Lưới Đa Khung** ⭢ Tự động tắt cả DCA Dương và DCA Âm.
+    2. Bật **DCA Dương** ⭢ Tự động tắt Lưới Đa Khung và DCA Âm.
+    3. Bật **DCA Âm** ⭢ Tự động tắt Lưới Đa Khung và DCA Dương.
+    4. Tắt Lưới Đa Khung ⭢ Tự động chuyển về bật DCA Dương hoặc người dùng có thể tự chọn chế độ mong muốn.
+  - **Đã thực hiện:**
+    1. **Frontend Web App (`SystemSettingsModal.jsx` & `App.jsx`):**
+       - Thêm ToggleSwitch "Lưới Đa Khung" với nhãn trực quan và biểu tượng `[?]` giải thích cặn kẽ cơ chế đính kèm `attachAlgoOrds` theo tab "Chia" của OKX.
+       - Tích hợp logic switch loại trừ liên hoàn 3 chiều giữa `pyramidDca`, `negativeDca`, `multiTfGrid`.
+       - Đồng bộ lưu biến `ENABLE_MULTITF_GRID` trong payload lưu cấu hình và reset cấu hình mặc định.
+       - Cập nhật hiển thị tên chế độ `Lưới Đa Khung` trên log terminal và thông báo.
+    2. **Desktop GUI (`desktop_app/gui_main.py`):**
+       - Khởi tạo checkbox `self.chk_multi_tf_grid` ("Lưới Đa Khung (Độc Lập / Chia)") ngay dưới `self.chk_negative_dca`.
+       - Liên kết sự kiện loại trừ 3 chiều `on_pyramid_toggled`, `on_negative_dca_toggled`, `on_grid_toggled`.
+       - Đồng bộ đọc và ghi biến `ENABLE_MULTITF_GRID` vào file cấu hình `sub1_global_config.json`.
+    3. **Bot Backend Engine (`bot_config.py`, `bot_strategy.py`, `bot_orders.py`):**
+       - Bổ sung biến toàn cục `ENABLE_MULTITF_GRID = True` trong `bot_config.py`.
+       - Tích hợp nạp và hot-reload `ENABLE_MULTITF_GRID` trong `bot_strategy.py`.
+       - Tương thích ngược: Nếu cấu hình cũ chưa có key thì fallback tự suy luận từ `not ENABLE_PYRAMID_DCA and not ENABLE_NEGATIVE_DCA`.
+       - Khớp hoàn toàn với cơ chế đính kèm `attachAlgoOrds` độc lập theo tab "Chia" của sàn OKX.
+  - **Kiểm chứng:** Build Vite frontend thành công 100%, Python `py_compile` thành công 100%.
+
+- **[20/09/2026]** - Sửa Lỗi Bot EMA200 Không Đặt Limit Đa Khung Cho BTC/ETH (Bị Chặn Bởi `ENABLE_STRATEGY_MAIN: False`):
+  - **Mô tả:** Người dùng cấu hình bật toàn bộ khung thời gian trade (`M5, M15, M30, H1, H2, H4`), bật "Đồng pha BTC & Lọc Vĩ mô", tắt cả 2 nút DCA Dương và DCA Âm (chạy chế độ Lưới Đa Khung Độc Lập). Bảng nến BTC hiển thị M5 (`▲ 638-0`), M15 (`▲ 230-0`), M30 (`▲ 80-0`), H4 (`▲ 311-0`) đều trên 60 nến tăng đạt chuẩn, nhưng bot không hề rải lệnh Limit Long ở các khung này, kéo theo ETH cũng bị đứng yên và chỉ thông báo: `chờ LONG [TREND] tại H4`.
+  - **Nguyên nhân cốt lõi:**
+    1. **Bị tắt Chiến Thuật Chính ngầm:** Trong giao diện Web (`App.jsx`), state `strat.main` của Bot EMA200 mặc định gán là `false`. Khi người dùng mở modal Cài Đặt (vốn không có nút bật `strat.main` cho Bot EMA200 vì bản thân nó là bot chính) và bấm "LƯU CẤU HÌNH CHIẾN THUẬT", Web đã gửi `ENABLE_STRATEGY_MAIN: false` ghi đè vào file cấu hình `sub1_global_config.json`.
+    2. Tại dòng 2610 của `bot_strategy.py`, có dòng điều kiện:
+       `if not getattr(globals_ref, "ENABLE_STRATEGY_MAIN", True): target_long_tfs = []; target_short_tfs = []`
+       Khi `ENABLE_STRATEGY_MAIN == False`, toàn bộ danh sách khung thời gian mục tiêu bị xóa trắng `[]`, khiến bot hủy toàn bộ lệnh Limit của BTC trên sàn!
+    3. Vì tính năng "Đồng pha BTC" đang BẬT, khi BTC bị xóa trắng không có lệnh Limit nào, logic đồng pha của Altcoin (dòng 2682) cũng cưỡng chế xóa sạch `target_long_tfs = []` của ETH để bảo vệ an toàn.
+    4. Về thông báo `chờ LONG [TREND] tại H4`: Trong chế độ Lưới Đa Khung Độc Lập, hàm hiển thị lấy khung neo xu hướng lớn nhất có tín hiệu làm chủ (`best_tf = "H4"`), nhưng do không có lệnh limit nào được đặt (bị xóa ở bước 2) nên Terminal rơi vào nhánh hiển thị chờ H4 thay vì in ra danh sách các lệnh Limit rải ở từng khung.
+  - **Đã thực hiện:**
+    1. **Khóa cứng `ENABLE_STRATEGY_MAIN = True` cho Bot EMA200:**
+       - Trong [`App.jsx`](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Sửa `main: true` cho `sub1`, và trong hàm `handleSaveStratConfig` luôn ép `ENABLE_STRATEGY_MAIN: true` cho `sub1`.
+       - Trong [`web_app/backend/main.py`](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Tại `update_bot_config`, nếu `strategy == "sub1"` thì luôn giữ `cfg["ENABLE_STRATEGY_MAIN"] = True`.
+       - Cập nhật toàn bộ các file `sub1_global_config.json` của user (bao gồm user `523019992975987626`) sang `"ENABLE_STRATEGY_MAIN": True`.
+  - **Kiểm chứng:** Build Vite frontend thành công, python py_compile 100% không lỗi.
+
+
+- **[20/09/2026]** - Để Trống Toàn Bộ 3 Dòng API Key Khi Tạo Tài Khoản Mới & Quét Trực Tiếp Số Dư Thực Tế Từ OKX Khi Bấm "Reset Vốn Gốc":
+  - **Mô tả:**
+    1. Khi tạo tài khoản cấu hình API key mới, toàn bộ 3 dòng nhập API Key, Secret Key, Passphrase phải để trống (`""`), tuyệt đối không được sao chép hoặc kế thừa lại API Key của tài khoản cũ.
+    2. Khi người dùng ấn nút "Reset Vốn Gốc (Audit)", bot và hệ thống phải quét trực tiếp số dư thực tế (`totalEq` / USDT equity) từ sàn OKX thông qua API key của tài khoản đó, cập nhật mốc vốn gốc mới và hiển thị chính xác tổng vốn quét được cho người dùng.
+  - **Nguyên nhân cốt lõi:**
+    1. **Tài khoản mới bị điền đè API Key cũ:** Hàm backend `_get_okx_creds` khi nhận `account_id` mới chưa có file `.api_{account_id}` đã tự động fallback sang đọc file `.api_{strategy}` hoặc `.api_botEMA200`. Do đó khi frontend gọi `fetchCreds`, backend trả về key của tài khoản cũ và điền đè vào form.
+    2. **Reset Vốn Gốc trước đó:** Nút bấm chỉ ghi cờ flag `reset_wallet_{strategy}.flag` cho bot chạy ngầm, không trực tiếp quét live balance qua OKX API ngay lập tức, không truyền `account_id` riêng biệt, và không phản hồi tổng vốn thực tế cho người dùng.
+  - **Đã thực hiện:**
+    1. **Để trống 3 dòng API Key:**
+       - Sửa `_get_okx_creds` trong `web_app/backend/main.py`: Khi có `account_id` được chỉ định, chỉ kiểm tra đúng file của `account_id` đó, tuyệt đối không fallback sang bot/tài khoản khác. Nếu chưa có key thì trả về chuỗi rỗng `""`.
+       - Trong `create_bot_account`, tự động khởi tạo file `.api_{acc_id}` rỗng hoàn toàn.
+       - Trong `App.jsx`, `onCreateAccount` và `confirmCreateAccount` chủ động gán `setApiKey("")`, `setSecretKey("")`, `setPassphrase("")`.
+       - Trong `desktop_app/gui_main.py`, `create_new_account` và `load_current_settings` luôn xóa trắng 3 ô input trước khi nạp dữ liệu.
+    2. **Quét trực tiếp tổng vốn OKX khi Reset Vốn Gốc:**
+       - Nâng cấp endpoint `POST /api/bot/reset_capital` trong backend và hàm `reset_wallet` trong Desktop app: Sử dụng API Key của tài khoản đích, gửi request ký HMAC bảo mật đến OKX endpoint `/api/v5/account/balance`.
+       - Quét trực tiếp `totalEq` (tổng tài sản ròng theo USD/USDT) hoặc USDT `eq` / `cashBal`.
+       - Tự động ghi mốc vốn gốc mới vào toàn bộ các file `du_lieu_tien_hoa.json` / `evolution_data.json` của tài khoản và chiến lược.
+       - Hiển thị thông báo Alert và ghi log Terminal rõ ràng số vốn thực tế quét được từ sàn OKX (Ví dụ: `✅ Đã Reset Vốn Gốc thành công! Tổng vốn quét từ sàn OKX: 1,500.00 USDT`).
+  - **Kiểm chứng:** Code python biên dịch 100% không lỗi (`python -m py_compile`), frontend Vite build thành công sạch sẽ.
+
+
 - **[19/09/2026]** - Tạo Công Cụ Tự Động Kéo Code `zzPull_From_GitHub.py` (Ưu Tiên Tuyệt Đối Máy CEO):
   - **Mô tả:** Tạo file script tự động kéo code [zzPull_From_GitHub.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPull_From_GitHub.py) để mỗi khi CEO kéo cập nhật từ GitHub về (do Thọ dev hoặc đối tác push lên), code tự động hợp nhất và bảo vệ 100% các bản vá trên máy CEO nếu có xung đột (conflict).
   - **Quy trình hoạt động tự động của script:**
@@ -140,6 +240,34 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     2. Khôi phục `const [indicatorsModalTab] = useState("system");` tại [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx#L229).
     3. Đã vào trực tiếp trình duyệt thông qua Browser Agent kiểm thử toàn diện cả 3 tab: `Bot EMA200`, `Bot SMC`, `Bot Liquidation`. Toàn bộ giao diện nến, volume, bảng vị thế, thanh cài đặt hiển thị mượt mà 100%, không còn màn hình đỏ crash.
     4. Build production `npm run build` thành công.
+
+- **[20/09/2026]** - Nâng Cấp Chuẩn API OKX `attachAlgoOrds` Cho Chế Độ "Lưới Đa Khung" (Tắt Cả 2 DCA):
+  - **Mô tả:** Tận dụng tính năng "Chia" (Split Position) mới của sàn OKX. Khi người dùng tắt cả 2 nút DCA Dương và DCA Âm (chế độ Lưới Đa Khung Độc Lập), mỗi lệnh Limit của từng khung thời gian (M5, M15, M30, H1, H2, H4) sẽ được đính kèm cặp TP/SL riêng độc lập cho đúng khung đó ngay khi đặt lệnh Limit. Khi giá khớp lệnh khung nào, sàn OKX ghi nhận vào tab "Chia", và khi chạm TP/SL của khung đó thì chỉ đóng đúng khối lượng của khung đó, hoàn toàn không làm ảnh hưởng đến các lệnh hoặc vị thế của các khung khác.
+  - **Đã thực hiện:**
+    1. **Bot Orders (`bots/sub1/bot_orders.py`):**
+       - Nâng cấp hàm `place_pure_limit` nhận tham số `attach_algo_ords`. Gửi kèm cấu trúc `attachAlgoOrds` gồm `tpTriggerPx`, `tpOrdPx: -1`, `slTriggerPx`, `slOrdPx: -1`, `triggerPxType: last` khi gọi POST `/api/v5/trade/order`.
+       - Bổ sung cơ chế fallback an toàn: Nếu OKX từ chối cấu trúc algo (do biên độ giá hoặc tài khoản), tự động gỡ `attachAlgoOrds` và đặt Limit trơn để không bỏ lỡ điểm vào lệnh.
+       - Cập nhật `apply_emergency_tpsl`: Trong chế độ Lưới Đa Khung (`not ENABLE_PYRAMID_DCA and not ENABLE_NEGATIVE_DCA`), bảo lưu 100% các lệnh Algo TP/SL con độc lập của từng sub-position, tuyệt đối không gọi `clean_algo_orders` để xóa đè lệnh tổng.
+    2. **Bot Strategy (`bots/sub1/bot_strategy.py`):**
+       - Tính toán động `calc_tp` và `calc_sl` cho từng TF theo hệ số `TF_MULTIPLIERS` của khung đó (cả LONG và SHORT).
+       - Truyền `attach_algo_ords` trực tiếp vào lệnh đặt Limit của từng TF.
+       - Ghi nhận phiên bản `z310` ở cuối file.
+
+- **[20/09/2026]** - Tự Động Hủy Toàn Bộ Lệnh Limit Chờ & Bảo Lưu 100% TP/SL Khi Bấm "CHẠY BOT" và "DỪNG BOT":
+  - **Mô tả:** Khi người dùng bấm "CHẠY BOT" hoặc "DỪNG BOT" (trên cả Web App và Desktop GUI), toàn bộ các lệnh Limit chưa khớp đang chờ trên sàn OKX phải được tự động dọn sạch hoàn toàn để bot đặt lại Limit theo đúng logic nến thời gian thực hiện tại, đồng thời tuyệt đối giữ nguyên 100% các lệnh TP/SL của các vị thế đang chạy.
+  - **Đã thực hiện:**
+    1. **Backend Web App (`main.py`):**
+       - Tạo hàm helper dùng chung `_cancel_unfilled_limit_orders(uid, strategy, account_id, action_name)`.
+       - Tích hợp vào endpoint `@app.post("/api/bot/start")`: Trước khi kích hoạt/spawn bot, quét và dọn sạch các lệnh limit cũ chưa khớp trên OKX (`ordType == 'limit'` và `reduceOnly != 'true'`), trả về `canceled_count`.
+       - Tích hợp vào endpoint `@app.post("/api/bot/stop")`: Quét và hủy toàn bộ lệnh limit chờ mở vị thế khi dừng bot.
+       - Bảo toàn 100% các lệnh TP/SL điều kiện (`orders-algo-pending`) và các lệnh đóng vị thế (`reduceOnly`).
+    2. **Frontend Web App (`App.jsx`):**
+       - Cập nhật `handleStartBot`: Đọc số lượng lệnh limit đã dọn (`canceled_count`) từ API response và in thông báo rõ ràng lên terminal hệ thống.
+    3. **Desktop App (`gui_main.py`):**
+       - Viết hàm `_cancel_unfilled_limits(self, action_name)` quét và hủy batch toàn bộ các lệnh limit chờ mở vị thế trên OKX.
+       - Gọi trong luồng ngầm ở cả `start_bot(self)` (Khởi động bot) và `stop_bot(self)` (Dừng bot).
+    4. **Bot Core Cleanup (`bots/sub1/bot_orders.py` & `bots/sub2/bot_orders.py`):**
+       - Bổ sung bộ lọc loại trừ `reduceOnly` và gỡ bỏ lệnh xóa algo TP/SL trong `sub2`. Đảm bảo vị thế đang chạy luôn an toàn vốn tuyệt đối.
 
 - **[19/09/2026]** - Sửa Triệt Để Các Lỗi Chấm Đỏ / Diagnostics Trong Dự Án (Backend & Frontend):
   - **Mô tả:** IDE xuất hiện nhiều chấm đỏ và số báo lỗi 9 tại `main.py`, cũng như chấm đỏ cảnh báo trên các thư mục `backend` và `frontend/src`.

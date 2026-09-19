@@ -1792,6 +1792,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if not os.path.exists(env_path):
                 with open(env_path, "w", encoding="utf-8") as f:
                     f.write("OKX_API_KEY=\"\"\nOKX_SECRET_KEY=\"\"\nOKX_PASSPHRASE=\"\"\n")
+                if hasattr(self, 'input_api_key') and self.input_api_key:
+                    self.input_api_key.setText("")
+                if hasattr(self, 'input_secret_key') and self.input_secret_key:
+                    self.input_secret_key.setText("")
+                if hasattr(self, 'input_passphrase') and self.input_passphrase:
+                    self.input_passphrase.setText("")
                 self.reload_accounts()
                 idx = self.account_dropdown.findData(env_name)
                 if idx >= 0:
@@ -3252,6 +3258,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_main = ToggleSwitch()
         self.chk_pyramid = ToggleSwitch(width=40, height=20)
         self.chk_negative_dca = ToggleSwitch()
+        self.chk_multi_tf_grid = ToggleSwitch()
         self.chk_xole = ToggleSwitch()
         self.chk_dynamic_ema200_tp = ToggleSwitch()
         self.chk_dynamic_pingpong_tp = ToggleSwitch()
@@ -3259,18 +3266,26 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         add_checkbox(l_toggles, 0, 0, "DCA Dương", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.")
         add_checkbox(l_toggles, 1, 0, "DCA Âm", self.chk_negative_dca, "BẬT: Cho phép trung bình giá DCA khi âm.")
+        add_checkbox(l_toggles, 2, 0, "Lưới Đa Khung", self.chk_multi_tf_grid, "BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng.")
         add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều.")
         add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
-        add_checkbox(l_toggles, 2, 0, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.", colspan=2)
+        add_checkbox(l_toggles, 2, 1, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.")
         
         def on_pyramid_toggled(checked):
-            if checked and self.chk_negative_dca.isChecked():
-                self.chk_negative_dca.setChecked(False)
+            if checked:
+                if self.chk_negative_dca.isChecked(): self.chk_negative_dca.setChecked(False)
+                if self.chk_multi_tf_grid.isChecked(): self.chk_multi_tf_grid.setChecked(False)
         def on_negative_dca_toggled(checked):
-            if checked and self.chk_pyramid.isChecked():
-                self.chk_pyramid.setChecked(False)
+            if checked:
+                if self.chk_pyramid.isChecked(): self.chk_pyramid.setChecked(False)
+                if self.chk_multi_tf_grid.isChecked(): self.chk_multi_tf_grid.setChecked(False)
+        def on_grid_toggled(checked):
+            if checked:
+                if self.chk_pyramid.isChecked(): self.chk_pyramid.setChecked(False)
+                if self.chk_negative_dca.isChecked(): self.chk_negative_dca.setChecked(False)
         self.chk_pyramid.toggled.connect(on_pyramid_toggled)
         self.chk_negative_dca.toggled.connect(on_negative_dca_toggled)
+        self.chk_multi_tf_grid.toggled.connect(on_grid_toggled)
         layout.addWidget(grp_toggles)
 
         # 2. PHÒNG THỦ VỊ THẾ TỰ ĐỘNG HOÁ AI
@@ -3763,6 +3778,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if self.strategy_id in ["trinhsat", "quansu"]:
             return
         self._is_loading_settings = True
+        if hasattr(self, 'input_api_key') and self.input_api_key:
+            self.input_api_key.setText("")
+        if hasattr(self, 'input_secret_key') and self.input_secret_key:
+            self.input_secret_key.setText("")
+        if hasattr(self, 'input_passphrase') and self.input_passphrase:
+            self.input_passphrase.setText("")
         env_file = self.get_selected_env()
         acc_name = self.get_acc_name()
 
@@ -3848,6 +3869,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 if hasattr(self, 'chk_main'): self.chk_main.setChecked(bool(cfg.get("ENABLE_STRATEGY_MAIN", getattr(bot_config, "ENABLE_STRATEGY_MAIN", True))))
                 if hasattr(self, 'chk_pyramid'): self.chk_pyramid.setChecked(bool(cfg.get("ENABLE_PYRAMID_DCA", getattr(bot_config, "ENABLE_PYRAMID_DCA", False))))
                 if hasattr(self, 'chk_negative_dca'): self.chk_negative_dca.setChecked(bool(cfg.get("ENABLE_NEGATIVE_DCA", getattr(bot_config, "ENABLE_NEGATIVE_DCA", False))))
+                if hasattr(self, 'chk_multi_tf_grid'): self.chk_multi_tf_grid.setChecked(bool(cfg.get("ENABLE_MULTITF_GRID", getattr(bot_config, "ENABLE_MULTITF_GRID", True))))
                 if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", getattr(bot_config, "ENABLE_STRATEGY_HEDGE", getattr(bot_config, "ENABLE_STRATEGY_XOLE", True))))))
                 if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_EMA200_TP", getattr(bot_config, "ENABLE_DYNAMIC_EMA200_TP", False))))
                 if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(bool(cfg.get("ENABLE_DYNAMIC_PINGPONG_TP", getattr(bot_config, "ENABLE_DYNAMIC_PINGPONG_TP", False))))
@@ -4241,6 +4263,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_PYRAMID_DCA": self.chk_pyramid.isChecked(),
                 "ENABLE_NEGATIVE_DCA": self.chk_negative_dca.isChecked() if hasattr(self, 'chk_negative_dca') else False,
+                "ENABLE_MULTITF_GRID": self.chk_multi_tf_grid.isChecked() if hasattr(self, 'chk_multi_tf_grid') else True,
                 "ENABLE_STRATEGY_HEDGE": self.chk_xole.isChecked(),
                 "ENABLE_STRATEGY_XOLE": self.chk_xole.isChecked(),
                 "ENABLE_DYNAMIC_EMA200_TP": self.chk_dynamic_ema200_tp.isChecked(),
@@ -4383,14 +4406,92 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.worker.finished_signal.connect(self.on_bot_finished)
         self.worker.start()
         
+        # Dọn sạch toàn bộ lệnh Limit cũ chưa khớp trên OKX để bot đặt lại theo logic hiện tại (bảo toàn 100% TP/SL)
+        try:
+            threading.Thread(target=self._cancel_unfilled_limits, args=("KHỞI ĐỘNG BOT",), daemon=True).start()
+        except Exception:
+            pass
+
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
         self.account_dropdown.setEnabled(False)
         self.status_led.setText("● ĐANG CHẠY")
         self.status_led.setStyleSheet("color: #00FF00; padding-left:10px;")
 
+    def _cancel_unfilled_limits(self, action_name: str = "DỪNG BOT"):
+        """Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX, bảo lưu 100% TP/SL."""
+        try:
+            api_key = self.input_api_key.text().strip() if hasattr(self, 'input_api_key') else ""
+            secret_key = self.input_secret_key.text().strip() if hasattr(self, 'input_secret_key') else ""
+            passphrase = self.input_passphrase.text().strip() if hasattr(self, 'input_passphrase') else ""
+
+            if not api_key:
+                env_file = self.get_selected_env()
+                if env_file:
+                    env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
+                    if os.path.exists(env_path):
+                        with open(env_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                if "=" in line:
+                                    k, v = line.strip().split("=", 1)
+                                    v = v.strip("\"'")
+                                    if k == "OKX_API_KEY": api_key = v
+                                    elif k == "OKX_SECRET_KEY": secret_key = v
+                                    elif k == "OKX_PASSPHRASE": passphrase = v
+
+            if not (api_key and secret_key and passphrase):
+                return
+
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            path = "/api/v5/trade/orders-pending?instType=SWAP"
+            message = ts + "GET" + path
+            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+            signature = base64.b64encode(mac.digest()).decode('utf-8')
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": ts,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+            }
+            resp = requests.get("https://www.okx.com" + path, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                orders = resp.json().get("data", [])
+                to_cancel = [
+                    {"instId": o["instId"], "ordId": o["ordId"]}
+                    for o in orders
+                    if o.get("ordType") == "limit" and str(o.get("reduceOnly", "")).lower() != "true"
+                ]
+                if to_cancel:
+                    for i in range(0, len(to_cancel), 20):
+                        batch = to_cancel[i:i+20]
+                        body_str = json.dumps(batch)
+                        ts_post = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                        msg_post = ts_post + "POST" + "/api/v5/trade/cancel-batch-orders" + body_str
+                        mac_post = hmac.new(bytes(secret_key, encoding='utf8'), bytes(msg_post, encoding='utf-8'), digestmod=hashlib.sha256)
+                        sig_post = base64.b64encode(mac_post.digest()).decode('utf-8')
+                        h_post = {
+                            "OK-ACCESS-KEY": api_key,
+                            "OK-ACCESS-SIGN": sig_post,
+                            "OK-ACCESS-TIMESTAMP": ts_post,
+                            "OK-ACCESS-PASSPHRASE": passphrase,
+                            "Content-Type": "application/json"
+                        }
+                        requests.post("https://www.okx.com/api/v5/trade/cancel-batch-orders", headers=h_post, data=body_str, timeout=10)
+                        time.sleep(0.1)
+                    self.append_log(f"\n🧹 [{action_name}]: Đã dọn {len(to_cancel)} lệnh Limit cũ chưa khớp trên OKX. Bảo lưu 100% TP/SL!")
+                else:
+                    self.append_log(f"\nℹ️ [{action_name}]: Không có lệnh Limit chờ cũ nào trên sàn. Toàn bộ TP/SL giữ nguyên an toàn.")
+        except Exception as e:
+            self.append_log(f"\n⚠️ [{action_name} LỖI DỌN LIMIT]: {e}")
+
     def stop_bot(self):
         self.play_sound("litupsubway-key-collect-sfx-522219.mp3", 0.7)
+        # Hủy toàn bộ lệnh Limit chưa khớp trên OKX (bảo toàn 100% TP/SL)
+        try:
+            threading.Thread(target=self._cancel_unfilled_limits, args=("DỪNG BOT",), daemon=True).start()
+        except Exception:
+            pass
+
         if self.worker:
             self.btn_stop.setEnabled(False)
             self.worker.stop()
@@ -4400,7 +4501,86 @@ class BotInstanceWidget(QtWidgets.QWidget):
         flag_dir = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", "json_data")
         os.makedirs(flag_dir, exist_ok=True)
         flag = os.path.join(flag_dir, f"reset_wallet_{self.strategy_id}.flag")
-        with open(flag, "w") as f: f.write("1")
+        try:
+            with open(flag, "w") as f: f.write("1")
+        except: pass
+
+        # Quét trực tiếp số dư thực tế từ sàn OKX
+        api_key = self.input_api_key.text().strip() if hasattr(self, 'input_api_key') else ""
+        secret_key = self.input_secret_key.text().strip() if hasattr(self, 'input_secret_key') else ""
+        passphrase = self.input_passphrase.text().strip() if hasattr(self, 'input_passphrase') else ""
+
+        if not api_key:
+            env_file = self.get_selected_env()
+            if env_file:
+                env_path = os.path.join(USER_DATA_DIR, f"bots/{self.strategy_id}", env_file)
+                if os.path.exists(env_path):
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if "=" in line:
+                                k, v = line.strip().split("=", 1)
+                                v = v.strip("\"'")
+                                if k == "OKX_API_KEY": api_key = v
+                                elif k == "OKX_SECRET_KEY": secret_key = v
+                                elif k == "OKX_PASSPHRASE": passphrase = v
+
+        if not api_key or not secret_key or not passphrase:
+            self.append_log("\n⚠️ [HỆ THỐNG]: Chưa cấu hình API Key OKX cho tài khoản này. Vui lòng nhập và lưu API Key trước khi Reset Vốn Gốc!")
+            QtWidgets.QMessageBox.warning(self, "Cảnh báo", "Tài khoản này chưa có API Key OKX!\nVui lòng nhập và lưu API Key trước khi Reset Vốn Gốc.")
+            return
+
+        try:
+            ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+            path = "/api/v5/account/balance"
+            message = ts + "GET" + path
+            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
+            signature = base64.b64encode(mac.digest()).decode('utf-8')
+            headers = {
+                "OK-ACCESS-KEY": api_key,
+                "OK-ACCESS-SIGN": signature,
+                "OK-ACCESS-TIMESTAMP": ts,
+                "OK-ACCESS-PASSPHRASE": passphrase,
+            }
+            resp = requests.get("https://www.okx.com" + path, headers=headers, timeout=10)
+            res_data = resp.json()
+            if res_data.get("code") == "0":
+                bal_item = res_data.get("data", [{}])[0]
+                tot_eq = float(bal_item.get("totalEq", 0.0))
+                if tot_eq <= 0:
+                    for d in bal_item.get("details", []):
+                        if d.get("ccy") == "USDT":
+                            tot_eq = float(d.get("eq", d.get("cashBal", 0.0)))
+                            break
+
+                acc_name = self.get_acc_name()
+                evo_path = os.path.join(flag_dir, f"{acc_name}_du_lieu_tien_hoa.json")
+                evo_data = {}
+                if os.path.exists(evo_path):
+                    try:
+                        with open(evo_path, "r", encoding="utf-8") as f:
+                            evo_data = json.load(f)
+                    except: pass
+                evo_data["wallet_stats"] = {
+                    "von_goc": round(tot_eq, 2),
+                    "von_hien_tai": round(tot_eq, 2),
+                    "loi_nhuan": 0.0,
+                    "tang_truong": 0.0,
+                    "last_reset_ts": time.time()
+                }
+                try:
+                    with open(evo_path, "w", encoding="utf-8") as f:
+                        json.dump(evo_data, f, indent=2, ensure_ascii=False)
+                except: pass
+
+                self.append_log(f"\n♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc thành công! Tổng vốn quét từ sàn OKX: {tot_eq:,.2f} USDT")
+                QtWidgets.QMessageBox.information(self, "Thông báo", f"Đã Reset Vốn Gốc (Audit) thành công!\n\nTổng vốn quét thực tế từ sàn OKX: {tot_eq:,.2f} USDT")
+                return
+            else:
+                err_msg = res_data.get("msg", "Lỗi sàn OKX")
+                self.append_log(f"\n⚠️ [HỆ THỐNG]: Sàn OKX báo lỗi ({res_data.get('code')}): {err_msg}")
+        except Exception as e:
+            self.append_log(f"\n⚠️ [HỆ THỐNG]: Lỗi kết nối quét số dư OKX: {e}")
+
         self.append_log("\n♻️ [HỆ THỐNG]: Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
         QtWidgets.QMessageBox.information(self, "Thông báo", "Đã gửi lệnh Reset Vốn Gốc (Audit) thành công cho tài khoản!")
 

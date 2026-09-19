@@ -382,14 +382,25 @@ export default function SystemSettingsModal({
                       <div className="tactics-toggles-layout">
                         <div className="tactics-left-col">
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
-                            <ToggleSwitch checked={strat.pyramidDca ?? false} onChange={v => setStrat(s => ({ ...s, pyramidDca: v, negativeDca: v ? false : s.negativeDca }))} />
+                            <ToggleSwitch checked={strat.pyramidDca ?? false} onChange={v => setStrat(s => ({ ...s, pyramidDca: v, negativeDca: false, multiTfGrid: v ? false : s.multiTfGrid }))} />
                             <span className="toggle-name">DCA Dương</span>
-                            <button className="btn-help" onClick={() => alert("BẬT (Pyramid DCA): Nhồi vị thế có lãi theo bậc thang xu hướng. Bắt buộc mở lệnh đầu tiên tại khung lớn nhất được tích chọn (ví dụ H4). Chỉ khi lệnh khung lớn đã khớp và vị thế đang CÓ LÃI, bot mới mở khóa đặt tiếp Limit ở các khung nhỏ hơn liền kề (H4 -> H2 -> H1 -> M30 -> M15 -> M5). Tuyệt đối không nhồi khi vị thế đang âm.\n\nTẮT: Không áp dụng cơ chế nhồi dương.")} title="BẬT: Nhồi thêm vị thế khi đang có lãi theo bậc thang xu hướng từ khung lớn xuống nhỏ.">[?]</button>
+                            <button className="btn-help" onClick={() => alert("BẬT (Pyramid DCA): Nhồi vị thế có lãi theo bậc thang xu hướng. Bắt buộc mở lệnh đầu tiên tại khung lớn nhất được tích chọn (ví dụ H4). Chỉ khi lệnh khung lớn đã khớp và vị thế đang CÓ LÃI, bot mới mở khóa đặt tiếp Limit ở các khung nhỏ hơn liền kề (H4 -> H2 -> H1 -> M30 -> M15 -> M5). Tuyệt đối không nhồi khi vị thế đang âm.\n\n* Khi bật DCA Dương, bot sẽ tự động tắt DCA Âm và Lưới Đa Khung.")} title="BẬT: Nhồi thêm vị thế khi đang có lãi theo bậc thang xu hướng từ khung lớn xuống nhỏ.">[?]</button>
+                          </div>
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
+                            <ToggleSwitch checked={strat.negativeDca ?? false} onChange={v => setStrat(s => ({ ...s, negativeDca: v, pyramidDca: false, multiTfGrid: v ? false : s.multiTfGrid }))} />
+                            <span className="toggle-name">DCA Âm</span>
+                            <button className="btn-help" onClick={() => alert("BẬT (Negative DCA): Trung bình giá khi vị thế gồng lỗ. Khi giá tiếp tục lùi về cản EMA200 của các khung lớn hơn, bot sẽ khớp thêm lệnh Limit để kéo giá vào lệnh bình quân (Average Entry). Đồng thời kích hoạt cơ chế Nâng cấp TF (Upgrade TF) để nới rộng biên độ TP/SL theo hệ số của khung lớn hơn vừa khớp.\n\n* Khi bật DCA Âm, bot sẽ tự động tắt DCA Dương và Lưới Đa Khung.")} title="BẬT: Trung bình giá khi gồng lỗ và tự động nâng cấp biên độ TP/SL theo khung lớn.">[?]</button>
                           </div>
                           <div className="toggle-row">
-                            <ToggleSwitch checked={strat.negativeDca ?? false} onChange={v => setStrat(s => ({ ...s, negativeDca: v, pyramidDca: v ? false : s.pyramidDca }))} />
-                            <span className="toggle-name">DCA Âm</span>
-                            <button className="btn-help" onClick={() => alert("BẬT (Negative DCA): Trung bình giá khi vị thế gồng lỗ. Khi giá tiếp tục lùi về cản EMA200 của các khung lớn hơn, bot sẽ khớp thêm lệnh Limit để kéo giá vào lệnh bình quân (Average Entry). Đồng thời kích hoạt cơ chế Nâng cấp TF (Upgrade TF) để nới rộng biên độ TP/SL theo hệ số của khung lớn hơn vừa khớp.\n\nTẮT: Không trung bình giá khi đang âm.")} title="BẬT: Trung bình giá khi gồng lỗ và tự động nâng cấp biên độ TP/SL theo khung lớn.">[?]</button>
+                            <ToggleSwitch checked={strat.multiTfGrid ?? (!strat.pyramidDca && !strat.negativeDca)} onChange={v => {
+                              if (v) {
+                                setStrat(s => ({ ...s, multiTfGrid: true, pyramidDca: false, negativeDca: false }));
+                              } else {
+                                setStrat(s => ({ ...s, multiTfGrid: false }));
+                              }
+                            }} />
+                            <span className="toggle-name">Lưới Đa Khung</span>
+                            <button className="btn-help" onClick={() => alert("BẬT (Multi-TF Split Grid): Đặt đồng thời các lệnh Limit độc lập cho tất cả các khung thời gian được tích chọn (M5, M15, M30, H1, H2, H4). Mỗi lệnh được gán TP/SL riêng độc lập theo chế độ 'Chia' (Split Position) của OKX. Khớp lệnh ở khung nào thì chỉ đóng đúng khối lượng của khung đó khi chạm TP/SL, hoàn toàn không gộp vị thế.\n\n* Khi bật Lưới Đa Khung, bot sẽ tự động tắt DCA Dương và DCA Âm.")} title="BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng biệt.">[?]</button>
                           </div>
                         </div>
                         <div className="tactics-right-col">

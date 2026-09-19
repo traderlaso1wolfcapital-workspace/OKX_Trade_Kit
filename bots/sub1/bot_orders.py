@@ -240,14 +240,19 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict], dry_run: bool =
         print("🧹 [STARTUP CLEANUP]: Bắt đầu dọn dẹp lệnh Limit rác trên OKX (Bảo lưu TP/SL)...")
         for item in portfolio:
             inst_id = item["swap"]
-            # 1. Quét và Hủy Limit chờ cũ (tránh lệnh treo sai giá từ phiên trước)
+            # 1. Quét và Hủy Limit chờ cũ (tránh lệnh treo sai giá từ phiên trước, bảo toàn reduceOnly & TP/SL)
             try:
                 pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id}).get("data", [])
                 if pending_regular:
-                    body_cancel = [{"ordId": o["ordId"], "instId": inst_id} for o in pending_regular]
-                    for i in range(0, len(body_cancel), 20):
-                        client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel[i:i+20])
-                        time.sleep(0.1)
+                    body_cancel = [
+                        {"ordId": o["ordId"], "instId": inst_id}
+                        for o in pending_regular
+                        if o.get("ordType") == "limit" and str(o.get("reduceOnly", "")).lower() != "true"
+                    ]
+                    if body_cancel:
+                        for i in range(0, len(body_cancel), 20):
+                            client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel[i:i+20])
+                            time.sleep(0.1)
             except Exception as e:
                 hft_logger.error(f"Lỗi cleanup startup Limit ({inst_id}): {e}")
         
@@ -298,19 +303,23 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
         hft_logger.error(f"Lỗi place_market_entry: {err_str}", exc_info=True)
         print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
-def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
+def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False, attach_algo_ords: list = None):
     # 🔒 DRY-RUN: Ghi log ảo thay vì đặt lệnh thật lên OKX
     if dry_run:
         if SHOW_DRY_RUN_LOGS:
             clean_sz = _clean_num_str(size)
             clean_px = _clean_num_str(price)
-            print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz} (shadow mode, bỏ qua)")
+            algo_info = f" [TP/SL: {attach_algo_ords[0]['tpTriggerPx']}/{attach_algo_ords[0]['slTriggerPx']}]" if attach_algo_ords else ""
+            print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz}{algo_info} (shadow mode, bỏ qua)")
         return None
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
+    if attach_algo_ords:
+        body["attachAlgoOrds"] = attach_algo_ords
     try:
         resp = client.request("POST", "/api/v5/trade/order", body=body)
         if resp and resp.get("code") != "0":
             raise Exception(str(resp.get('msg', 'Unknown')))
+        return resp
     except Exception as e:
         err_str = str(e)
         
@@ -325,6 +334,18 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
                 return resp
             except Exception as e2:
                 err_str = str(e2)
+
+        # Fallback nếu OKX từ chối attachAlgoOrds (ví dụ lỗi 51046, 51047, 51048, 51049 hoặc liên quan TP/SL)
+        if attach_algo_ords and any(k in err_str for k in ["attachAlgoOrds", "51046", "51047", "51048", "51049", "tpTriggerPx", "slTriggerPx"]):
+            print(f"⚠️ [ATTACH ALGO WARNING] OKX từ chối attachAlgoOrds ({err_str}), fallback đặt Limit trơn...")
+            body_no_algo = dict(body)
+            body_no_algo.pop("attachAlgoOrds", None)
+            try:
+                resp = client.request("POST", "/api/v5/trade/order", body=body_no_algo)
+                if resp and resp.get("code") == "0":
+                    return resp
+            except Exception:
+                pass
 
         if "51006" in err_str or "Order price is not within the price limit" in err_str:
             print(f"⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!")
@@ -530,6 +551,21 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
         abs_size_dec = abs(size_dec)
         status = check_algo_tpsl_status(client, inst_id, side, td_mode, abs_size_dec)
         
+        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA):
+        # Mỗi lệnh con đã được gắn TP/SL riêng độc lập qua attachAlgoOrds (chế độ Split/Chia trên OKX).
+        # Nếu trên sàn ĐÃ CÓ bất kỳ lệnh Algo TP hoặc SL nào, BẢO LƯU NGUYÊN VẸN 100%, tuyệt đối không hủy/gài đè lệnh tổng!
+        is_grid_mode = (not _is_pyramid) and (not _is_neg_dca)
+        if is_grid_mode:
+            if status["has_tp"] or status["has_sl"]:
+                if tracker:
+                    if norm_side == "long":
+                        tracker.active_tp_px_long = status["tp_px"] if status["has_tp"] else calc_tp
+                        tracker.active_sl_px_long = status["sl_px"] if status["has_sl"] else calc_sl
+                    else:
+                        tracker.active_tp_px_short = status["tp_px"] if status["has_tp"] else calc_tp
+                        tracker.active_sl_px_short = status["sl_px"] if status["has_sl"] else calc_sl
+                return
+
         # ⚡ TÔN TRỌNG TP/SL CỦA CEO:
         # Nếu trên sàn ĐÃ CÓ TP hoặc SL và khối lượng khớp với vị thế hiện tại:
         # Tuyệt đối KHÔNG xóa và KHÔNG gài đè lại khi lệch giá. Giữ nguyên giá do CEO thiết lập.

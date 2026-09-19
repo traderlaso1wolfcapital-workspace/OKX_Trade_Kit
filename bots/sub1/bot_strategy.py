@@ -96,6 +96,7 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
             "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
             "ENABLE_NEGATIVE_DCA": bool(existing_cfg.get("ENABLE_NEGATIVE_DCA", getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False))),
+            "ENABLE_MULTITF_GRID": bool(existing_cfg.get("ENABLE_MULTITF_GRID", getattr(globals_ref, "ENABLE_MULTITF_GRID", True))),
             "ENABLE_STRATEGY_HEDGE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
             "ENABLE_STRATEGY_XOLE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
             "ENABLE_DYNAMIC_EMA200_TP": bool(getattr(globals_ref, "ENABLE_DYNAMIC_EMA200_TP", False)),
@@ -163,6 +164,7 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
                 if "ENABLE_PYRAMID_DCA" in cfg: set_val("ENABLE_PYRAMID_DCA", bool(cfg["ENABLE_PYRAMID_DCA"]))
                 if "ENABLE_NEGATIVE_DCA" in cfg: set_val("ENABLE_NEGATIVE_DCA", bool(cfg["ENABLE_NEGATIVE_DCA"]))
+                if "ENABLE_MULTITF_GRID" in cfg: set_val("ENABLE_MULTITF_GRID", bool(cfg["ENABLE_MULTITF_GRID"]))
                 if "ENABLE_STRATEGY_HEDGE" in cfg or "ENABLE_STRATEGY_XOLE" in cfg:
                     _h_val = bool(cfg.get("ENABLE_STRATEGY_HEDGE", cfg.get("ENABLE_STRATEGY_XOLE", True)))
                     set_val("ENABLE_STRATEGY_HEDGE", _h_val)
@@ -2884,8 +2886,30 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             tracker.missing_count_long[tf] = 0
                             
 
+                        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA): Gắn TP/SL riêng độc lập cho từng TF qua attachAlgoOrds (chế độ Split/Chia trên OKX)
+                        attach_algo_long = None
+                        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+                        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+                        if not _is_pyramid and not _is_neg_dca:
+                            try:
+                                _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                                _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
+                                _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
+                                _calc_tp = round_to_tick(px_tf * (Decimal("1") + _tp_pct), spec["tickSz"])
+                                _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
+                                attach_algo_long = [{
+                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                    "tpOrdPx": "-1",
+                                    "tpTriggerPxType": "last",
+                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                    "slOrdPx": "-1",
+                                    "slTriggerPxType": "last"
+                                }]
+                            except Exception:
+                                attach_algo_long = None
+
                         place_pure_limit(client, swap_id, "buy", "net" if pMode == "net_mode" else "long", str(sz_for_tf), px_str,
-                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
+                                         f"{CL_ORD_PREFIX}EL{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run, attach_algo_ords=attach_algo_long)
                         tracker.placed_entry_px_long_by_tf[tf] = px_str
                         if not hasattr(tracker, "last_limit_order_sec_long"): tracker.last_limit_order_sec_long = {}
                         tracker.last_limit_order_sec_long[tf] = time.time()
@@ -3094,8 +3118,30 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         else:
                             tracker.missing_count_short[tf] = 0
                             
+                        # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (TẮT CẢ 2 DCA): Gắn TP/SL riêng độc lập cho từng TF qua attachAlgoOrds (chế độ Split/Chia trên OKX)
+                        attach_algo_short = None
+                        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+                        _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+                        if not _is_pyramid and not _is_neg_dca:
+                            try:
+                                _tp_tf_mult = getattr(globals_ref, "TF_MULTIPLIERS", {}).get(tf, Decimal("1.0"))
+                                _tp_pct = getattr(globals_ref, "SCALPING_TP_PCT", Decimal("0.015")) * _tp_tf_mult
+                                _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
+                                _calc_tp = round_to_tick(px_tf * (Decimal("1") - _tp_pct), spec["tickSz"])
+                                _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
+                                attach_algo_short = [{
+                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                    "tpOrdPx": "-1",
+                                    "tpTriggerPxType": "last",
+                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                    "slOrdPx": "-1",
+                                    "slTriggerPxType": "last"
+                                }]
+                            except Exception:
+                                attach_algo_short = None
+
                         place_pure_limit(client, swap_id, "sell", "net" if pMode == "net_mode" else "short", str(sz_for_tf), px_str,
-                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run)
+                                         f"{CL_ORD_PREFIX}ES{tf}{int(time.time() * 1000000)}"[:32], tf_mode, dry_run=dry_run, attach_algo_ords=attach_algo_short)
                         tracker.placed_entry_px_short_by_tf[tf] = px_str
                         if not hasattr(tracker, "last_limit_order_sec_short"): tracker.last_limit_order_sec_short = {}
                         tracker.last_limit_order_sec_short[tf] = time.time()
@@ -3136,3 +3182,4 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 # z308 | Fix duplicate marker generation on bot startup syncing to prevent position merge in UI
 
 # z309 | Update default margin to 1$ and logic volume fallbacks to 1
+# z310 | Upgraded Grid Mode (OFF both DCAs) with native OKX attachAlgoOrds: each TF limit has independent TP/SL sub-position matching OKX Split Position tab
