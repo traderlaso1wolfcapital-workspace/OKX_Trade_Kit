@@ -5,6 +5,7 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 - Bất cứ khi nào Agent bắt đầu một phiên làm việc mới liên quan đến việc sửa lỗi hoặc cập nhật tính năng, Agent **PHẢI** đọc file này trước tiên để xem có lỗi nào đang tồn tại hay không.
 - Sau khi fix xong một lỗi, Agent **PHẢI** tự động xóa (hoặc đánh dấu hoàn thành) lỗi đó khỏi danh sách này.
 - Bất kỳ lỗi mới nào phát sinh chưa được giải quyết phải được ghi chú vào đây.
+- 🛡️ **QUY TẮC ĐỒNG BỘ GIT (ƯU TIÊN TUYỆT ĐỐI MÁY CEO):** Khi CEO pull mã nguồn từ GitHub (do thọ dev hoặc đối tác push lên), nếu phát sinh xung đột (conflict), AI BẮT BUỘC phải ưu tiên giữ lại 100% bản vá tại máy tính Local của CEO (`ours`), tuyệt đối không để code remote ghi đè làm mất các thuật toán và bản vá cốt lõi đã nghiệm thu.
 
 ---
 
