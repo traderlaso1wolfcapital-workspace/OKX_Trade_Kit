@@ -103,7 +103,7 @@ body {
 
 /* ============= GROUP BOX ============= */
 .group-box {
-  border: 2px solid #444;
+  border: 1.5px solid #444;
   border-radius: 4px;
   padding: 16px 10px 10px;
   margin-bottom: 14px;
@@ -1635,6 +1635,8 @@ a#tv-attr-logo,
     width: 100%;
     box-sizing: border-box;
     margin-bottom: 0;
+    border: 1.5px solid #444 !important;
+    border-radius: 4px !important;
   }
 
   .sidebar-content .group-box:first-of-type {
