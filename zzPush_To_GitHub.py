@@ -2,6 +2,7 @@ import json
 import re
 import os
 import subprocess
+from datetime import datetime
 
 # ⚠️ CỜ BẬT/TẮT CHỨC NĂNG BUILD ACTION .EXE (Theo lệnh CEO)
 # Khi đặt False: Chỉ đẩy code lên GitHub, không tăng Version, không tạo Tag -> Không kích hoạt Action Build .exe
