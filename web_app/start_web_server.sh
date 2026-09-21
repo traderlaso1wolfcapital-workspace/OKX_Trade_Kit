@@ -10,9 +10,9 @@ pm2 delete tls1-bot-backend 2>/dev/null
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 PROJECT_ROOT="$(dirname "$DIR")"
 
-echo "Đang cài đặt các thư viện cần thiết (FastAPI, uvicorn)..."
+echo "Đang cài đặt các thư viện cần thiết từ requirements.txt..."
 cd "$DIR/backend"
-pip3 install fastapi uvicorn psutil --break-system-packages 2>/dev/null || pip3 install fastapi uvicorn psutil 2>/dev/null
+pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt 2>/dev/null
 
 echo "Đang Build Frontend tối ưu hóa..."
 cd "$DIR/frontend"
