@@ -76,6 +76,8 @@ if res.returncode == 0 and res_tag.returncode == 0:
     else:
         print("✅ HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ĐÃ KHÓA BUILD ACTION .EXE).")
     print(f"Phiên bản: v{new_v}")
+    print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 else:
     print("❌ THẤT BẠI: Quá trình đẩy code lên GitHub gặp lỗi (Exit code != 0).")
+    print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 print("=========================================")

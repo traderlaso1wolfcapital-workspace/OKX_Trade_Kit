@@ -57,8 +57,8 @@ body {
 
 /* ============= SIDEBAR TRÁI ============= */
 .sidebar-left {
-  width: 285px;
-  min-width: 285px;
+  width: 350px;
+  min-width: 350px;
   background-color: #252526;
   border-right: 1px solid #333333;
   display: flex;

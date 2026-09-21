@@ -1,6 +1,7 @@
 import os
-import subprocess
 import sys
+import subprocess
+from datetime import datetime
 
 print("=========================================")
 print("  TỰ ĐỘNG ĐỒNG BỘ (PULL) CODE TỪ GITHUB")
@@ -83,4 +84,5 @@ log_res = run_cmd([git, "log", "-1", "--oneline"])
 print("=========================================")
 print("🚀 ĐỒNG BỘ HOÀN TẤT! CODE TRÊN MÁY CEO AN TOÀN TUYỆT ĐỐI.")
 print(f"Commit hiện tại: {log_res.stdout.strip()}")
+print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 print("=========================================")

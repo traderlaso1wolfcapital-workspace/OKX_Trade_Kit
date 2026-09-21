@@ -18,6 +18,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[22/09/2026]** - Tinh Gọn Hàng Ký Quỹ & Dropdown Chế Độ Vốn Chuẩn Phong Cách Gốc:
+  - **Mô tả thay đổi:** Giữ nguyên 100% phong cách gốc của hàng Ký quỹ (font chữ, cỡ chữ, màu sắc nút USDT / % VỐN, đường viền 2px của khung Tài khoản) và ghép nút xổ xuống `[Cố định ▾] / [nhân Hệ số ▾]` đồng bộ:
+    - Nút `USDT` và `% VỐN`: Giữ nguyên vẹn font `10px bold`, `border-radius: 4px`, màu xanh `#26a69a` khi chọn.
+    - Nút xổ xuống: Đồng bộ cùng size `10px bold`, `border-radius: 4px`, viền `1px solid #444` và nền `#222` cố định. Khi bật chế độ nhân hệ số, chỉ có màu chữ chuyển sang xanh `#26a69a` thanh lịch.
+    - Khung Tài khoản: Giữ nguyên đường viền `2px solid #444` chuẩn nét nguyên bản.
+    - **Dãn thanh Sidebar & Chống tràn viền triệt để:** Dãn chiều rộng Sidebar lên `350px`, tinh chỉnh khoảng cách gap (4px) và đồng bộ kích thước các ô nhập `NumberSpinBox` thành `78px` chuẩn mực. Đảm bảo khi chuyển sang mode `nhân Hệ số ▼` (dài hơn chữ `Cố định ▼`), ô nhập số `0.4 $` vẫn nằm gọn gàng bên trong khung viền với khoảng dư an toàn hơn 30px, không bao giờ bị tràn mép.
+  - **Kiểm chứng:** Build production Vite thành công (`✓ built in 290ms`, exit code 0).
+
+
+- **[22/09/2026]** - Bổ Sung Thông Tin Thời Gian Hoàn Tất Sau Khi Đẩy Code Lên GitHub (`zzPush_To_GitHub.py` & `zzPull_From_GitHub.py`):
+  - **Mô tả thay đổi:** Thêm dòng in mốc thời gian hoàn tất (`dd/mm/YYYY HH:MM:SS`) ngay dưới phiên bản sau khi đẩy code (hoặc đồng bộ code) xong lên GitHub.
+  - **Đã xử lý:** 
+    1. Import `datetime` và bổ sung `print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")` trong `zzPush_To_GitHub.py` (cả trường hợp thành công và thất bại).
+    2. Tương tự bổ sung thông tin thời gian hoàn tất vào `zzPull_From_GitHub.py`.
+  - **Kiểm chứng:** Đã biên dịch `python -m py_compile` cả 2 file thành công 100%.
+
 - **[22/09/2026]** - Tinh Chỉnh Cách Điệu Quang Học (Optical Balance) Cho Hàng Nút DỪNG BOT / CHẠY BOT (Trên 10px, Dưới 8px):
   - **Mô tả thay đổi:** Để tạo sự cách điệu và nhịp thở quang học (optical weight) tự nhiên hơn so với việc chia đôi cứng nhắc, khoảng cách phía trên được nới thêm **+2px** so với phía dưới.
   - **Đã xử lý:** 
