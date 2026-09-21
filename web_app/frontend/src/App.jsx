@@ -1410,7 +1410,11 @@ function App() {
   const fetchPositions = useCallback(async () => {
     try {
       const acc = effectiveAccId;
-      if (!acc) return;
+      if (!acc) {
+        setPositions([]);
+        setClosedPositions([]);
+        return;
+      }
       const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
       if (r.ok) setPositions(await r.json());
 
