@@ -517,8 +517,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: 10px; /* Cách đỉnh 10px (hơn đáy đúng 2px tạo độ thoáng cách điệu quang học) */
+  margin-bottom: 8px; /* Cách đáy 8px gọn gàng */
   padding: 0;
   flex-shrink: 0;
   box-sizing: border-box;

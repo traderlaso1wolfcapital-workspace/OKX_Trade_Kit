@@ -18,12 +18,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[22/09/2026]** - Cân Đối Khoảng Cách Trên Dưới Của Hàng Nút DỪNG BOT / CHẠY BOT (Đều 8px):
-  - **Mô tả thay đổi:** Trước đây khoảng cách phía trên nút DỪNG BOT tới viền ngăn cách là ~18px (do `padding-top: 10px` của `.bot-panel-card` cộng dồn với `margin-top: 8px` của `.bot-action-bar`), trong khi khoảng cách phía dưới tới viền khung biểu đồ chỉ khoảng 8-10px, khiến phần trên bị xa và lệch.
+- **[22/09/2026]** - Tinh Chỉnh Cách Điệu Quang Học (Optical Balance) Cho Hàng Nút DỪNG BOT / CHẠY BOT (Trên 10px, Dưới 8px):
+  - **Mô tả thay đổi:** Để tạo sự cách điệu và nhịp thở quang học (optical weight) tự nhiên hơn so với việc chia đôi cứng nhắc, khoảng cách phía trên được nới thêm **+2px** so với phía dưới.
   - **Đã xử lý:** 
-    1. Đưa `padding-top: 0` cho `.bot-panel-card` trên cả Desktop và Mobile.
-    2. Đặt `margin: 8px 0` đối xứng hoàn hảo cho `.bot-action-bar`.
-    3. Giúp khoảng cách từ nút đến viền trên và viền dưới bằng nhau tuyệt đối (đúng **8px** cả 2 phía), tạo thế cân đối, hài hòa.
+    1. Thiết lập `margin-top: 10px; margin-bottom: 8px;` cho `.bot-action-bar`.
+    2. Khoảng cách đỉnh là **10px**, khoảng cách đáy là **8px** (+2px ở trên) tạo cảm giác nút bám vững chãi lên khung biểu đồ bên dưới mà vẫn có khoảng thở thanh thoát với thanh tiêu đề trên.
+  - **Kiểm chứng:** Test browser và chụp ảnh nghiệm thu layout. Build production Vite thành công (`✓ built in 271ms`, exit code 0).
   - **Kiểm chứng:** Test browser, đo khoảng cách và chụp ảnh nghiệm thu. Build production Vite thành công (`✓ built in 293ms`, exit code 0).
 
 - **[22/09/2026]** - Chuẩn Hóa Icon Vuông / Tam Giác Trắng Thuần Vector Cho Nút CHẠY BOT / DỪNG BOT:
