@@ -465,7 +465,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     else:
         tracker._disabled_cleaned = False
     
-    # ⚡ EARLY EXIT CHO COIN KHÔNG CÓ TF NÀO ĐƯỢC CHỌN TRONG TF TRADE:
+    # ⚡ DỌN SẠCH LỆNH CHO COIN KHÔNG CÓ TF NÀO ĐƯỢC CHỌN TRONG TF TRADE:
+    # (Không return ở đây để coin vẫn được fetch nến, đếm nến và cập nhật giá live hiển thị trên Dashboard)
     current_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", [])
     if not current_enabled_tfs:
         if not tracker.has_long and not tracker.has_short:
@@ -476,7 +477,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 tracker.placed_entry_px_long_by_tf, tracker.placed_entry_px_short_by_tf = {}, {}
                 tracker._no_tf_cleaned = True
                 print(f"🧹 [TF TRADE CLEANUP] {coin_name}: Không có TF nào được chọn, đã dọn sạch toàn bộ lệnh limit.")
-            return
         else:
             tracker._no_tf_cleaned = False
     else:
@@ -1735,8 +1735,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             import json
             saved_data = {}
             if os.path.exists(mtf_file):
-                with open(mtf_file, "r", encoding="utf-8") as f:
-                    saved_data = json.load(f)
+                try:
+                    with open(mtf_file, "r", encoding="utf-8") as f:
+                        saved_data = json.load(f)
+                except Exception:
+                    saved_data = {}
             
             # Gộp mtf_states và các thuộc tính vị thế mở rộng
             _is_hd_save = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
@@ -1772,6 +1775,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             os.replace(temp_mtf_file, mtf_file)
         except:
             pass
+
+    # ⚡ Nếu coin chưa được chọn TF trade nào và chưa có vị thế mở:
+    # Bỏ qua hoàn toàn việc tính toán rải lệnh limit (vì đã hoàn thành 100% đếm nến & cập nhật giá live cho Dashboard)
+    if not current_enabled_tfs and not tracker.has_long and not tracker.has_short:
+        return
 
     # ==============================================================================
     # ⛔️ PHÁT HIỆN TÍN HIỆU ĐA CHIỀU (ADJACENT-PAIR CONFLUENCE)

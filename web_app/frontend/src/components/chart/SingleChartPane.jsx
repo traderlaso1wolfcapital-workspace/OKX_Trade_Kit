@@ -1935,7 +1935,7 @@ export default function SingleChartPane({
             )}
           </div>
 
-          {/* Winrate Stats Table (top-right corner) */}
+          {/* Winrate Stats Table (top-right corner of chart, thu nhỏ 15%) */}
           <div 
             className={`chart-backtest-table-wrap ${isBacktestCollapsed ? 'collapsed' : ''}`}
             style={{ right: `${priceScaleWidth + 4}px` }}
@@ -1962,8 +1962,8 @@ export default function SingleChartPane({
                 title={isBacktestCollapsed ? "Mở rộng" : "Thu gọn"}
               >
                 <svg
-                  width="11"
-                  height="11"
+                  width="10"
+                  height="10"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"

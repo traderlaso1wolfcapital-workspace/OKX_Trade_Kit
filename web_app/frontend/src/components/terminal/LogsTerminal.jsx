@@ -11,6 +11,46 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
   const wsRef = useRef(null);
   const lastLogTimeRef = useRef(0);
   const logBlockIdRef = useRef(0);
+  const [fitStyles, setFitStyles] = useState({});
+
+  // 📱 Tự động co dãn (Auto-Fit) kích thước chữ vừa khít 2 viền màn hình trên Mobile / iPhone Safari
+  useEffect(() => {
+    const el = terminalRef.current;
+    if (!el) return;
+
+    const updateFit = () => {
+      const containerWidth = el.clientWidth;
+      if (!containerWidth) return;
+
+      if (containerWidth < 768) {
+        // Trừ padding 2 bên (khoảng 8px)
+        const usableWidth = Math.max(containerWidth - 8, 200);
+        // Bảng dashboard chuẩn có độ rộng 78 ký tự ('=' * 78)
+        // Hệ số chiều rộng 1 ký tự monospace (SF Mono / Menlo / Consolas) xấp xỉ 0.6 * fontSize
+        // Usable width / 48.5 giúp 78 ký tự co dãn vừa khít 2 viền trái-phải và 87 ký tự không tràn
+        const calculatedSize = usableWidth / 48.5;
+        const fontSize = Math.max(6.8, Math.min(11.5, calculatedSize));
+        const letterSpacing = usableWidth < 380 ? -0.34 : (usableWidth < 440 ? -0.26 : -0.2);
+
+        setFitStyles({
+          fontSize: `${fontSize.toFixed(2)}px`,
+          letterSpacing: `${letterSpacing}px`,
+        });
+      } else {
+        setFitStyles({});
+      }
+    };
+
+    updateFit();
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(el);
+    window.addEventListener("resize", updateFit);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFit);
+    };
+  }, []);
 
   // Self-managed WS mode (khi App.jsx không truyền logs)
   useEffect(() => {
@@ -144,6 +184,8 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
           overflowX: "auto",
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
+          WebkitTextSizeAdjust: "none",
+          ...fitStyles,
         }}
       >
         {normalizedLogs.length === 0 ? (
@@ -152,9 +194,29 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
           </div>
         ) : (
           normalizedLogs.map((block) => (
-            <div key={block.id} className="log-block" style={{ marginBottom: "22px", minWidth: "fit-content" }}>
+            <div
+              key={block.id}
+              className="log-block"
+              style={{
+                marginBottom: "22px",
+                minWidth: "fit-content",
+                fontSize: "inherit",
+                letterSpacing: "inherit",
+                WebkitTextSizeAdjust: "none",
+              }}
+            >
               {(block.lines || []).map((l, i) => (
-                <div key={i} className="log-line" style={{ whiteSpace: "pre", minWidth: "fit-content" }}>
+                <div
+                  key={i}
+                  className="log-line"
+                  style={{
+                    whiteSpace: "pre",
+                    minWidth: "fit-content",
+                    fontSize: "inherit",
+                    letterSpacing: "inherit",
+                    WebkitTextSizeAdjust: "none",
+                  }}
+                >
                   {l}
                 </div>
               ))}

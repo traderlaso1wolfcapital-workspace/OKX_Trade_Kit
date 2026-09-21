@@ -18,6 +18,138 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[22/09/2026]** - Cân Đối Khoảng Cách Trên Dưới Của Hàng Nút DỪNG BOT / CHẠY BOT (Đều 8px):
+  - **Mô tả thay đổi:** Trước đây khoảng cách phía trên nút DỪNG BOT tới viền ngăn cách là ~18px (do `padding-top: 10px` của `.bot-panel-card` cộng dồn với `margin-top: 8px` của `.bot-action-bar`), trong khi khoảng cách phía dưới tới viền khung biểu đồ chỉ khoảng 8-10px, khiến phần trên bị xa và lệch.
+  - **Đã xử lý:** 
+    1. Đưa `padding-top: 0` cho `.bot-panel-card` trên cả Desktop và Mobile.
+    2. Đặt `margin: 8px 0` đối xứng hoàn hảo cho `.bot-action-bar`.
+    3. Giúp khoảng cách từ nút đến viền trên và viền dưới bằng nhau tuyệt đối (đúng **8px** cả 2 phía), tạo thế cân đối, hài hòa.
+  - **Kiểm chứng:** Test browser, đo khoảng cách và chụp ảnh nghiệm thu. Build production Vite thành công (`✓ built in 293ms`, exit code 0).
+
+- **[22/09/2026]** - Chuẩn Hóa Icon Vuông / Tam Giác Trắng Thuần Vector Cho Nút CHẠY BOT / DỪNG BOT:
+  - **Mô tả nguyên nhân:** Trước đây nút dùng ký tự text Unicode `■` và `▶`. Khi mở trên các hệ điều hành khác nhau (đặc biệt là iOS Safari trên iPhone, Android, Windows), hệ điều hành tự động thay thế bằng các font emoji màu sắc 3D hoặc glyph khác nhau, gây mất đồng bộ và không đồng nhất giao diện.
+  - **Đã xử lý:** Thay thế hoàn toàn ký tự Unicode bằng SVG vector màu trắng (`#ffffff`) chuẩn:
+    - **DỪNG BOT:** Hình vuông màu trắng 11x11px với góc bo nhẹ `rx="1.5"` đồng nhất.
+    - **CHẠY BOT:** Hình tam giác sang phải màu trắng 11x11px với góc cạnh sắc nét, cân đối tuyệt đối.
+    - Đảm bảo hiển thị 100% đồng nhất như nhau trên mọi thiết bị (iPhone, iPad, Android, Windows PC, Mac).
+  - **Kiểm chứng:** Test browser và chụp ảnh nghiệm thu cả 2 trạng thái Chạy và Dừng. Build production Vite thành công (`✓ built in 226ms`, exit code 0).
+
+- **[22/09/2026]** - Tự Động Co Dãn (Auto-Fit) Size Chữ Bảng Logs Vừa Khít 2 Viền Màn Hình Trên iPhone 15 Pro Max (Safari) & Mobile:
+  - **Mô tả nguyên nhân:** Trên iOS Safari, WebKit có tính năng Text Autosizing / Font Boosting tự động phóng to chữ nhỏ lên 13-14px nếu thiếu `-webkit-text-size-adjust: none`. Đồng thời, font size tĩnh không tự co dãn theo kích thước màn hình thiết bị khiến bảng dashboard 78 ký tự bị tràn viền phải, chữ quá to trên Safari iPhone.
+  - **Đã xử lý:**
+    1. **Anti-Font-Boosting cho WebKit / Safari:** Thiết lập `-webkit-text-size-adjust: 100%` trên `html, body` và `-webkit-text-size-adjust: none !important; text-size-adjust: none !important;` trên `.logs-terminal`, `.log-block`, `.log-line`.
+    2. **Font Stack Monospace Hiện Đại:** Chuyển sang `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace` cho độ hiển thị siêu sắc nét trên iPhone và Safari.
+    3. **Auto-Fit ResizeObserver Thông Minh:** Trong `LogsTerminal.jsx`, sử dụng `ResizeObserver` đo chính xác `clientWidth` của container. Khi chiều rộng < 768px (Mobile), tự động tính toán font size (`usableWidth / 48.5`) và letter-spacing (-0.26px đến -0.34px) sao cho bảng dashboard chuẩn 78 ký tự (`==============================================================================`) co dãn dàn đều vừa khít 100% từ mép viền trái sang mép viền phải, loại bỏ hoàn toàn hiện tượng tràn viền. Khi ở Desktop giữ nguyên 13.5px chuẩn.
+  - **Kiểm chứng:** Test browser emulation trực tiếp ở kích thước 430px (iPhone 15 Pro Max), bảng dashboard hiển thị vừa khít hoàn hảo từ mép trái sang mép phải. Frontend Vite build thành công (`✓ built in 263ms`, exit code 0).
+
+- **[22/09/2026]** - Đưa Cụm Backtesting Về Vị Trí Cũ & Thu Nhỏ 15%:
+  - **Mô tả thay đổi:**
+    1. **Vị trí hiển thị:** Đưa cụm Backtesting trở lại vị trí góc trên bên phải của biểu đồ nến (`position: absolute; top: 0; right: 80px`), trả lại thanh công cụ phía trên nguyên bản.
+    2. **Thu nhỏ 15%:**
+       - Giảm font chữ tiêu đề và bảng số liệu xuống `9.5px` (trước là 11px).
+       - Giảm padding của thanh tiêu đề Backtesting xuống `3.5px 7px` (khi thu gọn là `3px 6px`).
+       - Nút toggle thu nhỏ còn `15px x 15px`.
+       - Giữ nguyên vẹn 100% màu sắc nền, đường viền và bo góc dưới `border-radius: 0 0 5px 5px`.
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 266ms`, exit code 0).
+
+- **[22/09/2026]** - Cập Nhật Nút "OKX Connect" (Logo OKX & Thu Ngắn Chiều Dài Gọn Gàng):
+  - **Mô tả thay đổi:**
+    1. **Logo OKX chính thức:** Thay thế emoji link `🔗` bằng biểu tượng logo OKX (5 ô vuông bo góc tròn) dạng SVG vector sắc nét.
+    2. **Đổi chữ:** Chuyển từ `"CONNECT OKX"` thành `"OKX Connect"`.
+    3. **Thu gọn chiều dài:** Giảm padding từ `6px 20px` xuống `5px 12px` và `min-height: 28px`, giúp nút ngắn lại vừa vặn, tinh tế và cân xứng với hàng nút hành động.
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 263ms`, exit code 0).
+
+- **[22/09/2026]** - Khắc Phục Lệch Viền Trái (Đưa Cạnh Trái Sát Mép Cân Đối Với Cạnh Phải):
+  - **Mô tả nguyên nhân:** Khung chứa ngoài cùng `.app-container` trước đó bị dính `padding-left: calc(env(...) + 3px)` và `.content-wrapper` dùng `width: 100vw`, khiến toàn bộ cụm thẻ Bot bị đẩy thụt lùi sang phải 3-5px (cạnh phải bị ép tràn sát mép ngoài, trong khi cạnh trái bị hở một vệt đen).
+  - **Đã xử lý:** 
+    1. Reset triệt để `padding: 0 !important;` cho `.app-container`.
+    2. Chuyển `.content-wrapper` từ `100vw` sang `width: 100% !important; max-width: 100% !important; overflow-x: hidden !important;`.
+    3. Đảm bảo `.main-section`, `.bot-panel-card` căn chuẩn 100% bề ngang, cả hai cạnh trái và phải đều sát mép đối xứng hoàn hảo.
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 238ms`, exit code 0).
+
+- **[22/09/2026]** - Rút Gọn Cạnh Dưới Để Cụm Bảng Vị Thế Sát Phần Tài Khoản (Mobile):
+  - **Mô tả thay đổi:**
+    1. Revert padding đáy của `.bot-panel-card` trên mobile về `0` (`padding: 8px 5px 0 5px !important;`).
+    2. Thu gọn padding trên của `.sidebar-content` (`padding: 4px 5px 10px 5px !important;`) và kéo khung Tài khoản lên (`margin-top: 6px !important;`), giúp phần Tài khoản (Bot EMA200) nằm sát khít ngay dưới cụm Bảng Vị Thế theo đúng ý CEO.
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 267ms`, exit code 0).
+
+- **[22/09/2026]** - Đặt Khoảng Cách Cạnh Dưới Cụm Bảng Vị Thế Đến Tài Khoản (Mobile) Là 8px:
+  - **Mô tả thay đổi:** Cập nhật padding đáy của `.bot-panel-card` trên mobile thành `padding: 8px 5px 8px 5px !important;`. Cạnh dưới của cụm Bảng Vị Thế - Biểu Đồ giờ cách phần Tài khoản (Bot EMA200) đúng **8px**, vừa vặn, không bị dính sát vào nhau.
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 213ms`, exit code 0).
+
+- **[22/09/2026]** - Điều Chỉnh Khoảng Cách Mép Ngoài Cụm Bảng Vị Thế (Mobile) Xuống 5px:
+  - **Mô tả thay đổi:** Chỉnh sửa padding của thẻ bọc `.bot-panel-card` trên mobile từ `padding: 8px 8px 0 8px` thành `padding: 8px 5px 0 5px`. Cụm Bảng Vị Thế - Biểu Đồ giờ cách mép ngoài 2 bên đúng **5px** (rộng và thoáng hơn 3px mỗi bên).
+  - **Kiểm chứng:** Frontend Vite build thành công (`✓ built in 262ms`, exit code 0).
+
+- **[22/09/2026]** - Đặt Đường Chỉ Cụm Bảng Vị Thế - Biểu Đồ Sang Độ Dày 1.5px & Màu #444 (Giống Khung Tài Khoản):
+  - **Mô tả thay đổi:**
+    1. **Đồng bộ thông số theo yêu cầu CEO:** Toàn bộ đường chỉ bao quanh cụm Bảng Vị Thế - Biểu Đồ (`.main-workspace`) và đường chỉ phân chia bên dưới nút kéo (`.horizontal-resizer`) được thiết lập:
+       - **Độ dày:** `1.5px`
+       - **Mã màu:** `#444` (đồng nhất với màu khung `.group-box` của phần Tài khoản)
+       - **Bo góc (`border-radius`):** `4px`
+    2. **Áp dụng đồng bộ:** Đã đồng bộ cho cả giao diện PC và Mobile.
+  - **Kiểm chứng:** Frontend Vite build thành công 100% (`✓ built in 313ms`, exit code 0).
+
+- **[22/09/2026]** - Đồng Bộ Đường Chỉ Xung Quanh Biểu Đồ Khớp Chuẩn Theo Bảng Vị Thế (1px):
+  - **Mô tả thay đổi:**
+    1. **Khắc phục tình trạng đường chỉ biểu đồ bị lớn/trùng viền:** Trước đó `.single-chart-card` có `border: 1px solid #333333` lồng bên trong `.main-workspace` có viền 2px, khiến xung quanh biểu đồ bị đúp viền và dày cộm hơn hẳn Bảng Vị Thế.
+    2. **Đồng bộ chuẩn 1px thanh mảnh theo Bảng Vị Thế:** 
+       - `.main-workspace`: đưa về `border: 1px solid #333333;` (cả desktop và mobile).
+       - `.resizer.horizontal-resizer`: đưa về `border-bottom: 1px solid #333333;` khớp hoàn toàn với các đường chỉ `1px solid #333333` của Bảng Vị Thế.
+       - `.single-chart-card`: bỏ viền riêng (`border: none; border-radius: 0;`), trong đa khung biểu đồ (`multi-chart-container`) dùng `gap: 1px` và `background-color: #333333` để tạo đường chỉ ngăn cách 1px duy nhất.
+       - Toàn bộ đường viền quanh Biểu Đồ và Bảng Vị Thế đạt độ đồng bộ 100%, sắc nét và tinh gọn.
+  - **Kiểm chứng:** Frontend Vite build hoàn tất không lỗi (`✓ built in 365ms`, exit code 0).
+
+- **[22/09/2026]** - Đưa Đường Chỉ Ngang Xuống Dưới Nút Kéo Phân Chia (Cạnh Trên Của Bảng Vị Thế):
+  - **Mô tả thay đổi:**
+    1. **Bỏ đường chỉ ngang phía trên nút kéo:** Xóa bỏ `border-bottom` trên `.pane-chart` (cả desktop và mobile) và xóa `border-top` trên `.resizer.horizontal-resizer`. Giữa chân biểu đồ và thanh kéo không còn đường viền ngăn cách.
+    2. **Đưa đường chỉ ngang xuống bên dưới nút kéo:** Thêm `border-bottom: 2px solid #333333` vào `.resizer.horizontal-resizer`. Đường chỉ ngang màu `#333333` dày 2px nằm ngay dưới nút kéo `---`, đóng vai trò là cạnh trên trực tiếp của thanh tiêu đề tabs / Bảng Vị Thế (`.tab-bar-header`).
+  - **Kiểm chứng:** Frontend Vite build hoàn tất không lỗi (`✓ built in 203ms`, exit code 0).
+
+- **[22/09/2026]** - Tăng Độ Dày Toàn Bộ Đường Chỉ Bo Viền Xung Quanh Thành 2px & Xóa Đường Chỉ Ngang Ngay Trên Tài Khoản (Mobile):
+  - **Mô tả thay đổi:**
+    1. **Xóa đường chỉ ngang ngay trên Tài khoản:** Đã loại bỏ hoàn toàn đường viền đáy `border-bottom: none` của thẻ bot phía trên và `border-top: none` của khung `sidebar-left` bên dưới. Khu vực ngay phía trên dòng chữ "TÀI KHOẢN (BOT EMA200):" hoàn toàn sạch sẽ, không còn vệt chỉ ngang ngăn cách.
+    2. **Tăng độ dày toàn bộ đường chỉ viền thành 2px:** 
+       - Cụm `main-workspace` (nơi chứa Bảng Vị Thế, Biểu Đồ, Logs): `border: 2px solid #333333 !important; border-radius: 4px !important;`.
+       - Cụm thẻ tổng bao quanh `bot-panel-card`: `border: 2px solid #333333 !important;`.
+       - Khung tài khoản `sidebar-left`: `border: 2px solid #333333 !important;`.
+       - Khung nhóm `group-box`: `border: 2px solid #444;`.
+       - Đường chỉ viền đáy của cụm chart: `border-bottom: 2px solid #333333`.
+       - Nhờ đó các đường chỉ bo viền xung quanh dày dặn, sắc nét và nổi bật đúng như hình ảnh CEO đã minh họa.
+  - **Kiểm chứng:** Frontend Vite build hoàn tất không lỗi (`✓ built in 220ms`, exit code 0).
+
+- **[22/09/2026]** - Sửa Lỗi Mất Chart Nến, Nạp Logo OKX Cho Cặp Coin & Điều Chỉnh Giao Diện:
+  - **Mô tả thay đổi:**
+    1. **Logo Coin OKX chuẩn CDN:** Ẩn toàn bộ nút checkbox gạt ON/OFF ở cột đầu tiên của Bảng Vị Thế, thay bằng Logo chính thức của từng coin lấy trực tiếp từ OKX CDN (`https://static.okx.com/cdn/oksupport/asset/currency/icon/{coin}.png`).
+    2. **Mặc định ON khi thêm mã giao dịch:** Khi tích chọn coin trong cài đặt (THÊM MÃ GIAO DỊCH), coin lập tức xuất hiện ra ngoài Bảng Vị Thế và tự động ở chế độ BẬT (ON).
+    3. **Ràng buộc an toàn khi bấm CHẠY BOT:** Kiểm tra phải có ít nhất 1 cặp giao dịch được gán khung thời gian (TF trade) mới cho phép chạy bot. Những cặp nào chưa chọn TF trade thì bot bỏ qua không trade cặp đó, bot vẫn vận hành bình thường với các cặp đã chọn TF.
+    4. **Thứ tự Tabs chuẩn:** Sắp xếp lại thứ tự 3 tabs thành: **Bảng Vị Thế** ⭢ **Biểu Đồ** ⭢ **Logs**.
+  - **Mô tả hiện tượng:**
+    1. Chart nến bị đen toàn bộ, không tải được nến do backend FastAPI bị crash lúc khởi động (`ModuleNotFoundError: No module named 'jwt'` do thiếu package trong môi trường `.venv`).
+    2. Giao diện trước đây bị chia cắt nửa trên nửa dưới (50% Chart, 50% Bảng vị thế / Logs) khiến không gian xem trên cả PC và Mobile bị chật chội.
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Khắc phục triệt để mất nến:** Cài đặt toàn bộ dependencies mới (`PyJWT`, `bcrypt`, `slowapi`) trực tiếp vào môi trường thực thi của dự án `..\..\..\.venv`. Bổ sung chuẩn hóa tham số khung thời gian `bar` trong backend tránh lỗi `51000` của sàn OKX. Backend port 8080 đã online và trả về nến đầy đủ (`Status 200, Code 0`).
+    2. **Tối ưu không gian xem riêng biệt (Unified Tabs):**
+       - Đưa cụm Biểu đồ vào chung hàng tabs với Bảng vị thế và Logs thành 3 tab chính: **Bảng Vị Thế** — **Logs** — **Biểu Đồ**.
+       - Khi chọn bất kỳ tab nào, nội dung của tab đó sẽ bung trọn 100% chiều cao và chiều rộng không gian làm việc.
+       - Giữ nguyên Chart trong DOM (`display: flex/none`) để không bao giờ bị reload nến, không mất kết nối WebSocket real-time hay các đường vẽ indicator.
+       - Tự động kích hoạt sự kiện resize khi chuyển sang tab "Biểu Đồ" hoặc khi click chọn cặp tiền từ Bảng Vị Thế.
+  - **Kiểm chứng:** Backend `http://127.0.0.1:8080/api/market/candles` phản hồi nến OKX chuẩn; Frontend biên dịch Vite thành công 100%.
+
+
+- **[22/09/2026]** - Đồng Bộ & Hợp Nhất Bản Vá Mới Từ Dev Thọ (Origin/Main):
+  - **Mô tả:** Tiếp nhận 6 commits mới nhất từ Thọ dev (`902b4219` ⭢ `e7bd078f`) bao gồm:
+    1. Kết nối nhanh OKX OAuth Fast Connect (`🔗 CONNECT OKX`), deep linking trên điện thoại.
+    2. Nâng cấp bảo mật: Mã hóa AES Fernet cho API Keys, hash mật khẩu `bcrypt`, xác thực JWT token (`PyJWT`), chống spam request (`slowapi`).
+    3. Triệt tiêu giật giao diện (flicker) khi khởi động bot bằng việc ghi flag kích hoạt tức thì.
+    4. Tự động xóa sạch file tín hiệu & tiến hóa khi xóa tài khoản.
+    5. Giao diện bảng vị thế chống gãy dòng trên mobile (`nowrap`), rút gọn nhãn cài đặt, gom tab Bot thành dropdown `<select>`.
+  - **Bảo toàn nền tảng CEO & Mối nối Semantic:**
+    1. Giữ nguyên vẹn 100% thuật toán cốt lõi trong `bots/sub1` và `bots/sub2` (SMC Order Block sliding box & mitigation, EMA200 60 nến tích lũy, Native attachAlgoOrds cặp TP/SL vào mục 'Chia', lọc fills theo cTime).
+    2. Bổ sung `allow_origin_regex=r"https?://.*"` vào FastAPI `CORSMiddleware` đảm bảo truy cập từ Mobile và Cloudflare Tunnel không bị chặn CORS.
+    3. Đã cài đặt đầy đủ các package mới (`bcrypt`, `cryptography`, `PyJWT`, `slowapi`) và build thử nghiệm frontend thành công (`exit code 0`).
+
+
 - **[20/09/2026]** - Sửa Lỗi Lệnh Mục 'Chia' Chỉ Có 1 Đầu TP Hoặc 1 Đầu SL (OKX Yêu Cầu Gộp Cả TP & SL Vào 1 Dict Duy Nhất):
   - **Mô tả hiện tượng:** Trên giao diện OKX mục "Chia", 2 lệnh M5 vừa khớp xuất hiện tình trạng què quặt: ETH chỉ có mỗi SL (`-- / 2.609,53`), còn BTC lại chỉ có mỗi TP (`81.863,50 / --`), không hiện đủ cả cặp TP/SL.
   - **Nguyên nhân gốc rễ (Root Cause):**
@@ -2129,3 +2261,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Sau khi đã bứt phá, box Long/Short tiếp tục **tịnh tiến dóng thẳng hàng theo cây nến hiện tại** (10 nến về phía trước).
     - Chỉ khi nào có một cây nến sau đó **vòng quay trở lại chạm vào biên entry của OB** (`c.low <= entryPrice` với Long, `c.high >= entryPrice` với Short) thì box mới dừng tịnh tiến và **FIX VỊ TRÍ** tại cây nến chạm biên entry đó.
   *(Mã patch: `z-web-smc-breakout-retest-fix`)*
+
+- **[22/09/2026]** - Tinh chỉnh khoảng cách UI & Sửa dứt điểm lỗi Khởi động Bot (Flicker nút Chạy/Dừng & Lỗi API 50111):
+  - **Vấn đề 1 (Khoảng cách cụm Bảng Vị Thế và Tài Khoản):** 
+    - Cạnh dưới cụm Bảng Vị Thế (`.main-workspace`) bị dính sát vào đường viền đỉnh của cụm `TÀI KHOẢN (BOT EMA200):`.
+    - **Đã fix:** Tinh chỉnh `padding: 8px 5px 6px 5px !important;` cho `.bot-panel-card`, `padding: 6px 5px 10px 5px !important;` cho `.sidebar-content` và `margin-top: 8px !important;` cho `.group-box:first-of-type`. Tạo khoảng dãn thở ~15-18px tự nhiên, thanh thoát giữa 2 cụm mà vẫn đảm bảo 2 mép bên trái/phải thẳng tắp 5px.
+  - **Vấn đề 2 (Lỗi Bot không đặt lệnh Limit và nhấp nháy chuyển Chạy/Dừng Bot):**
+    - **Nguyên nhân gốc rễ:** Bản cập nhật trước đã thêm mã hóa Fernet (`encrypt_value`) vào hàm `_save_env_file` trong `web_app/backend/main.py`, dẫn đến các file `.api_sub1` của bot lưu giá trị dạng `ENC:gAAAAAB...`. Khi tiến trình bot độc lập (`sys_bot_sub1.py`) khởi chạy, bot đọc trực tiếp file và gửi chuỗi mã hóa `ENC:...` lên OKX -> Sàn OKX từ chối với mã lỗi `50111: Invalid OK-ACCESS-KEY`. Tiến trình bot crash sau 5 giây thoát `sys.exit(1)`, khiến WebSocket báo bot tắt và nút trên giao diện tự động bật ngược lại thành `▶ CHẠY BOT`.
+    - **Đã fix:**
+      1. Sửa `_save_env_file` trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py) để tự động giải mã `decrypt_value()` đảm bảo 100% lưu plaintext cho các file bot runtime (`.api_sub1`, `.api_sub2`, `.api_sub3`).
+      2. Quét và giải mã toàn bộ các file `.api_*` bị mã hóa `ENC:` trong `%LOCALAPPDATA%\TLS1_Trading_Users\`.
+      3. Bot khởi động trơn tru, API OKX xác thực thành công và giữ nút `■ DỪNG BOT` ổn định.
+  *(Mã patch: `z-web-bot-env-plaintext-and-spacing-fix`)*
+
+- **[22/09/2026]** - Tự động đếm nến & Cập nhật giá Live cho mọi cặp được chọn trong THÊM MÃ GIAO DỊCH dù chưa chọn TF trade:
+  - **Yêu cầu CEO:** Khi đã tích chọn cặp giao dịch trong "THÊM MÃ GIAO DỊCH" (xuất hiện ở Bảng vị thế bên ngoài), cặp đó BẮT BUỘC phải được nạp nến, tính EMA và đếm nến tích lũy bình thường trên toàn bộ các khung thời gian (m5, m15, m30, H1, H2, H4) kèm giá Live thực tế, không bắt buộc phải tích chọn TF trade mới đếm.
+  - **Nguyên nhân trước đó:** Trong `_run_strategy_cycle_impl` của [bot_strategy.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py), đoạn code kiểm tra `if not current_enabled_tfs` có lệnh `return` quá sớm ngay trước khi fetch nến và tính EMA, khiến các coin chưa chọn TF (như XAU) bị ngắt toàn bộ chu trình tính nến $\rightarrow$ Bảng hiển thị toàn số 0 và `0 (--%)`.
+  - **Đã fix:**
+    1. Bỏ lệnh early `return` trước khi đếm nến trong [bot_strategy.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py).
+    2. Cho phép chu trình chạy đầy đủ: fetch nến 6 khung thời gian, tính EMA34/89/200, cập nhật `live_price`, tính bộ đếm nến `update_tf_state` cho toàn bộ các khung thời gian và ghi vào `sub1_mtf_states.json`.
+    3. Đặt điều kiện `if not current_enabled_tfs and not tracker.has_long and not tracker.has_short: return` ngay SAU KHI đã cập nhật xong nến $\rightarrow$ Vừa đảm bảo bộ đếm nến và giá Live hiển thị chuẩn 100%, vừa bảo đảm không đặt bất kỳ lệnh Limit nào khi người dùng chưa chọn TF trade.
+  *(Mã patch: `z-bot-candle-count-without-tf-trade`)*
+

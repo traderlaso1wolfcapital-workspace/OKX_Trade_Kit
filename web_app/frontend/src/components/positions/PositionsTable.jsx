@@ -112,13 +112,19 @@ export default function PositionsTable({
                   <td style={{ textAlign: "left", padding: "4px 6px" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px", margin: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <input
-                          type="checkbox"
-                          className="coin-toggle"
-                          checked={isChecked}
-                          onChange={() => togglePair && togglePair(coin.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                        <img
+                          src={`https://static.okx.com/cdn/oksupport/asset/currency/icon/${(coin.label || coin.value || "").replace("-USDT", "").replace("-SWAP", "").trim().toLowerCase()}.png`}
+                          alt={coin.label}
+                          style={{
+                            width: "18px",
+                            height: "18px",
+                            borderRadius: "50%",
+                            objectFit: "contain",
+                            flexShrink: 0
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                         <span
                           style={{ color: "#fff", fontSize: "13px", fontWeight: "400", cursor: "pointer" }}
@@ -128,7 +134,7 @@ export default function PositionsTable({
                           {coin.label.replace("-SWAP", "")}
                         </span>
                       </div>
-                      <span style={{ color: "#666", fontSize: "11px", marginLeft: "22px" }}>Chờ tín hiệu...</span>
+                      <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px" }}>Chờ tín hiệu...</span>
                     </div>
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", color: "#555", fontSize: "13px" }}>--</td>
@@ -204,16 +210,24 @@ export default function PositionsTable({
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         {!isChild ? (
-                          <input
-                            type="checkbox"
-                            className="coin-toggle"
-                            checked={isChecked}
-                            onChange={() => togglePair && togglePair(coin.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            title={isChecked ? "Đang BẬT trade (Click để TẮT)" : "Đang TẮT trade (Click để BẬT)"}
+                          <img
+                            src={`https://static.okx.com/cdn/oksupport/asset/currency/icon/${(coin.label || coin.value || "").replace("-USDT", "").replace("-SWAP", "").trim().toLowerCase()}.png`}
+                            alt={coin.label}
+                            style={{
+                              width: "18px",
+                              height: "18px",
+                              borderRadius: "50%",
+                              objectFit: "contain",
+                              flexShrink: 0
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
                           />
                         ) : (
-                          <div style={{ width: "17px", height: "13px", flexShrink: 0 }}></div>
+                          <span style={{ color: "#555", fontSize: "11px", fontFamily: "monospace", width: "18px", textAlign: "center", flexShrink: 0 }}>
+                            └─
+                          </span>
                         )}
                         <span
                           style={{

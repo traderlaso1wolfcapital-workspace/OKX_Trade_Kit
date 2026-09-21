@@ -7,3 +7,4 @@ PyJWT
 cryptography
 slowapi
 bcrypt
+python-dotenv

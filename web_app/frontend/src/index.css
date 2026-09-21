@@ -5,6 +5,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
@@ -28,13 +33,13 @@ body {
   height: 100vh;
   width: 100%;
   background-color: #1e1e1e;
-  padding: env(safe-area-inset-top) calc(env(safe-area-inset-right) + 3px) env(safe-area-inset-bottom) calc(env(safe-area-inset-left) + 3px);
+  padding: 0;
 }
 
 .content-wrapper {
   display: flex;
   flex: 1;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
   flex-direction: row;
@@ -98,7 +103,7 @@ body {
 
 /* ============= GROUP BOX ============= */
 .group-box {
-  border: 1px solid #444;
+  border: 2px solid #444;
   border-radius: 4px;
   padding: 16px 10px 10px;
   margin-bottom: 14px;
@@ -493,10 +498,10 @@ body {
 /* ============= THẺ LIỀN KHỐI CỤM BOT (1:1 ẢNH 2) ============= */
 .bot-panel-card {
   background-color: #222222;
-  border: 1px solid #333333;
+  border: 2px solid #333333;
   border-radius: 0 4px 4px 4px;
   margin: 0 10px 10px 10px;
-  padding: 10px 12px 10px 12px;
+  padding: 0 12px 10px 12px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -513,8 +518,10 @@ body {
   align-items: center;
   gap: 12px;
   margin-top: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  padding: 0;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .btn-action-start {
@@ -580,17 +587,17 @@ body {
   color: #ffffff;
   border: none;
   border-radius: 4px;
-  padding: 6px 20px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 12.5px;
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-height: 30px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
   width: fit-content;
 }
 
@@ -695,11 +702,11 @@ a#tv-attr-logo,
 .main-workspace {
   display: flex;
   flex: 1;
-  height: calc(100% - 31px);
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   width: 100%;
-  border: 1px solid #333333;
+  border: 1.5px solid #444;
   border-radius: 4px;
   background-color: #0c0c0c;
   position: relative;
@@ -719,12 +726,12 @@ a#tv-attr-logo,
 
 .main-workspace.vertical .pane-chart {
   height: var(--chart-ratio, 50%);
-  border-bottom: 1px solid #333333;
+  border-bottom: none;
 }
 
 .main-workspace.horizontal .pane-chart {
   width: var(--chart-ratio, 50%);
-  border-right: 1px solid #333333;
+  border-right: 1.5px solid #444;
 }
 
 .resizer {
@@ -734,19 +741,23 @@ a#tv-attr-logo,
 }
 
 .resizer.horizontal-resizer {
-  height: 4px;
+  height: 9px;
   cursor: row-resize;
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #111111;
+  border-top: none;
+  border-bottom: 1.5px solid #444;
+  box-sizing: border-box;
 }
 
 .resizer.horizontal-resizer::after {
   content: "";
-  width: 60px;
-  height: 4px;
-  background-color: #777; /* Bright grey so it stands out */
-  border-radius: 4px;
+  width: 48px;
+  height: 3px;
+  background-color: #666666; /* Bright grey grab handle so it stands out */
+  border-radius: 2px;
 }
 
 .resizer.horizontal-resizer:hover, .resizer.horizontal-resizer:active {
@@ -845,20 +856,33 @@ a#tv-attr-logo,
   position: relative;
 }
 
-/* ============= PANE TABS (Logs + Positions) ============= */
+/* ============= PANE TABS (Positions + Logs + Charts) ============= */
 .pane-tabs {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background-color: #222;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .main-workspace.vertical .pane-tabs {
-  height: calc(100% - var(--chart-ratio, 50%) - 10px); /* 10px is resizer height */
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
-.main-workspace.horizontal .pane-tabs {
-  width: calc(100% - var(--chart-ratio, 50%) - 10px);
+.chart-tab-pane {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background-color: #0c0c0c;
 }
 
 .tab-bar-header {
@@ -904,6 +928,32 @@ a#tv-attr-logo,
   border-bottom: 2px solid #F90;
 }
 
+.btn-tab-split {
+  background: transparent;
+  border: none;
+  border-left: 1px solid #333333;
+  color: #a0a0a0;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 0 12px;
+  height: 100%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-tab-split:hover {
+  background-color: #2a2a2a;
+  color: #ff9900;
+}
+
+.btn-tab-split.active {
+  background-color: #2e2416;
+  color: #ff9900;
+}
+
 /* Status Badge */
 .status-badge {
   font-size: 11px;
@@ -923,29 +973,36 @@ a#tv-attr-logo,
 .logs-terminal {
   background-color: #0d0d0d;
   color: #c8c8c8;
-  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: var(--terminal-font-size, 13.5px);
+  letter-spacing: var(--terminal-letter-spacing, normal);
   padding: 8px 14px 42px 14px;
   box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
   height: 100%;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 .log-block {
   font-size: inherit;
   font-family: inherit;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 .log-line {
   font-size: inherit;
   font-family: inherit;
   letter-spacing: inherit;
-  line-height: 1.55;
+  line-height: 1.48;
   white-space: pre;
   border-bottom: 1px solid #141414;
   padding: 1px 0;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 /* ============= POSITIONS TABLE ============= */
@@ -1469,24 +1526,53 @@ a#tv-attr-logo,
     flex-direction: column;
     height: 100dvh;
     overflow: hidden;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .content-wrapper {
     flex-direction: column !important;
     flex: 1;
+    width: 100% !important;
+    max-width: 100% !important;
     overflow-y: auto;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Main section (Tabs bot + Chart workspace) luôn hiện trước (order: 1) */
   .main-section {
     width: 100% !important;
+    max-width: 100% !important;
     order: 1;
     display: flex;
     flex-direction: column;
     flex: 1 !important;
     height: auto !important;
     min-height: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Trên mobile: cụm Bot tabs bar và thẻ Bot panel card có đường chỉ dọc 2 bên viền mép màu #333333 */
+  .bot-tabs-bar {
+    width: 100% !important;
+    margin: 4px 0 0 0 !important;
+    padding: 0 5px !important;
+    box-sizing: border-box;
+  }
+
+  .bot-panel-card {
+    margin: 0 !important;
+    padding: 0 5px 6px 5px !important; /* Cạnh 2 bên cách mép 5px, cạnh dưới dãn nhẹ 6px, đỉnh khớp 8px với đáy */
+    border-left: 2px solid #333333 !important;
+    border-right: 2px solid #333333 !important;
+    border-bottom: none !important; /* Xoá đường chỉ ngang ngăn cách ngay trên Tài khoản */
+    border-radius: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
   .main-workspace {
@@ -1494,33 +1580,41 @@ a#tv-attr-logo,
     flex-direction: column !important;
     flex: 1 !important;
     height: 0 !important; /* Let flex control height */
+    border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 giống khung Tài khoản */
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
   }
 
   .main-workspace .pane-chart {
     width: 100% !important;
     height: var(--chart-ratio, 50%) !important;
+    border-left: none;
     border-right: none;
-    border-bottom: 1px solid #333333;
+    border-bottom: none !important;
     flex-shrink: 0;
   }
 
   .main-workspace .pane-tabs {
     width: 100% !important;
     flex: 1 !important;
-    height: calc(100% - var(--chart-ratio, 50%) - 10px) !important;
-    min-height: 200px;
+    height: 100% !important;
+    min-height: 0 !important;
     flex-shrink: 0;
+    border: none !important;
   }
 
-  /* Sidebar controls xuống dưới (order: 2) */
+  /* Sidebar controls xuống dưới (order: 2) có đường chỉ dọc 2 bên viền mép màu #333333 dày 2px */
   .sidebar-left {
     width: 100% !important;
     min-width: unset;
-    border-right: none;
-    border-top: 1px solid #333;
+    border-left: 2px solid #333333 !important;
+    border-right: 2px solid #333333 !important;
+    border-top: none !important; /* Xoá đường chỉ ngang ngăn cách ngay trên Tài khoản */
+    border-bottom: 2px solid #333333 !important;
     height: auto;
     order: 2;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
   
   .sidebar-header {
@@ -1528,7 +1622,7 @@ a#tv-attr-logo,
   }
 
   .sidebar-content {
-    padding: 10px;
+    padding: 6px 5px 10px 5px !important; /* Dãn nhẹ đỉnh để tạo khoảng trống với đáy Bảng Vị Thế */
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -1541,6 +1635,10 @@ a#tv-attr-logo,
     width: 100%;
     box-sizing: border-box;
     margin-bottom: 0;
+  }
+
+  .sidebar-content .group-box:first-of-type {
+    margin-top: 8px !important; /* Dãn khoảng cách thông thoáng, thanh lịch với đáy Bảng Vị Thế */
   }
 
   .sidebar-footer {
@@ -1594,16 +1692,21 @@ a#tv-attr-logo,
 
   /* Log font fit to mobile screen without horizontal overflow for 78-char table */
   .logs-terminal {
-    font-size: clamp(7px, 2.05vw, 8.2px) !important;
-    letter-spacing: -0.3px !important;
+    font-size: var(--terminal-font-size, clamp(7.2px, 2.08vw, 8.8px)) !important;
+    letter-spacing: var(--terminal-letter-spacing, -0.28px) !important;
     padding: 6px 4px 36px 4px !important;
-    line-height: 1.42 !important;
+    line-height: 1.4 !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
   }
   .log-block,
   .log-line {
     font-size: inherit !important;
+    font-family: inherit !important;
     letter-spacing: inherit !important;
-    line-height: 1.42 !important;
+    line-height: 1.4 !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
   }
 
   /* Positions table scroll ngang và dọc trên mobile */
@@ -1965,8 +2068,8 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   height: 100%;
   min-height: 0;
   display: grid;
-  gap: 3px;
-  background-color: #12141a;
+  gap: 1px;
+  background-color: #444;
   overflow: hidden;
   position: relative;
 }
@@ -2011,8 +2114,8 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   min-width: 0;
   background-color: #0c0c0c;
   overflow: visible;
-  border: 1px solid #333333;
-  border-radius: 2px;
+  border: none;
+  border-radius: 0;
   box-sizing: border-box;
   transition: border-color 0.15s ease;
   z-index: 1;
@@ -2023,7 +2126,7 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
 }
 
 .single-chart-card.active {
-  border-color: #333333;
+  border-color: transparent;
 }
 
 .single-chart-header {
@@ -3228,7 +3331,7 @@ div[class*="tradingview-widget-copyright"],
   background: rgba(242, 54, 70, 0.15);
 }
 
-/* ================= TLS1 BACKTESTING TABLE (TOP-RIGHT OF CHART) ================= */
+/* ================= TLS1 BACKTESTING TABLE (TOP-RIGHT OF CHART, 15% SMALLER) ================= */
 .chart-backtest-table-wrap {
   position: absolute;
   top: 0;
@@ -3240,7 +3343,7 @@ div[class*="tradingview-widget-copyright"],
   border: 1px solid rgba(42, 53, 74, 0.95);
   border-top: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 5px 5px;
   overflow: hidden;
   transition: all 0.2s ease;
 }
@@ -3249,8 +3352,8 @@ div[class*="tradingview-widget-copyright"],
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 5px 10px;
+  gap: 6px;
+  padding: 3.5px 7px;
   background: rgba(22, 28, 44, 0.85);
   border-bottom: 1px solid rgba(42, 53, 74, 0.8);
   cursor: pointer;
@@ -3263,23 +3366,23 @@ div[class*="tradingview-widget-copyright"],
 
 .chart-backtest-table-wrap.collapsed .chart-backtest-header {
   border-bottom: none;
-  padding: 4px 8px;
+  padding: 3px 6px;
 }
 
 .chart-backtest-title {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   color: #ffffff;
   white-space: nowrap;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .chart-backtest-toggle-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 3px;
@@ -3302,8 +3405,8 @@ div[class*="tradingview-widget-copyright"],
 }
 
 .chart-backtest-table td {
-  padding: 3px 12px;
-  font-size: 11px;
+  padding: 2.5px 8px;
+  font-size: 9.5px;
   border: 1px solid rgba(42, 53, 74, 0.7);
   white-space: nowrap;
   line-height: 1.35;
@@ -3313,27 +3416,21 @@ div[class*="tradingview-widget-copyright"],
   text-align: left;
   font-weight: 500;
   color: #a0aec0;
-  padding-left: 10px;
-  padding-right: 10px;
+  padding-left: 8px;
+  padding-right: 6px;
 }
 
 .chart-backtest-table td.col-val {
   text-align: right;
   font-weight: 700;
   color: #ffffff;
-  padding-left: 12px;
-  padding-right: 10px;
+  padding-left: 10px;
+  padding-right: 8px;
 }
 
 @media (max-width: 768px) {
   .chart-backtest-table-wrap {
     top: 0;
     right: 75px;
-  }
-
-  .logs-terminal {
-    font-size: clamp(6.6px, 1.95vw, 7.8px) !important;
-    letter-spacing: -0.32px !important;
-    padding: 6px 3px 36px 3px !important;
   }
 }
