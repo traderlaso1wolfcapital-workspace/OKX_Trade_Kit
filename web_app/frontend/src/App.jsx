@@ -680,7 +680,7 @@ function App() {
   const handleFastConnect = () => {
     // Tích hợp OKX Fast Connect API (OAuth 2.0)
     // Cần thay thế CLIENT_ID và REDIRECT_URI bằng thông tin cấu hình thực tế
-    const clientId = "YOUR_CLIENT_ID"; 
+    const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb"; 
     const redirectUri = encodeURIComponent(window.location.origin + "/okx-callback");
     const okxOAuthUrl = `https://www.okx.com/oauth2/v1/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
     
