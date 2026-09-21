@@ -4,7 +4,7 @@ echo "Đang dọn dẹp các tiến trình cũ..."
 pkill -f "python3 main.py" 2>/dev/null
 pkill -f "vite" 2>/dev/null
 pkill -f "cloudflared tunnel run" 2>/dev/null
-pm2 delete tls1-bot-backend 2>/dev/null
+pm2 delete all 2>/dev/null
 
 # Lấy thư mục gốc của script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -12,7 +12,7 @@ PROJECT_ROOT="$(dirname "$DIR")"
 
 echo "Đang cài đặt các thư viện cần thiết từ requirements.txt..."
 cd "$DIR/backend"
-pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt 2>/dev/null
+pip3 install -r requirements.txt --break-system-packages || pip3 install -r requirements.txt
 
 echo "Đang Build Frontend tối ưu hóa..."
 cd "$DIR/frontend"

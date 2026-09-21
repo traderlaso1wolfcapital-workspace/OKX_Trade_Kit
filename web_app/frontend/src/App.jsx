@@ -676,20 +676,81 @@ function App() {
     }
   };
 
+  // OKX Fast Connect Callback Interceptor
+  useEffect(() => {
+    const handleCallback = async () => {
+      if (window.location.pathname === "/okx-callback") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
+        if (code && currentUid) {
+          try {
+            const acc = effectiveAccId;
+            const strat = activeBotTab || "sub1";
+            
+            addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
+            const res = await fetch("/api/auth/okx/callback", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                code,
+                account_id: acc,
+                uid: currentUid,
+                strategy: strat
+              })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === "success") {
+              alert("✅ Kết nối OKX Fast Connect thành công!");
+              addSystemLog("✅ [FAST CONNECT] Lấy API Key thành công và đã lưu vào cấu hình.");
+              // Reload credentials
+              const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${currentUid}`);
+              if (credRes.ok) {
+                const credData = await credRes.json();
+                setApiKey(credData.api_key || "");
+                setSecretKey(credData.secret_key || "");
+                setPassphrase(credData.passphrase || "");
+              }
+            } else {
+              alert("❌ Lỗi kết nối OKX: " + (data.message || "Lỗi máy chủ"));
+              addSystemLog("❌ [FAST CONNECT] Lỗi: " + (data.message || "Lỗi máy chủ"));
+            }
+          } catch (err) {
+            alert("❌ Lỗi kết nối server: " + err.message);
+          } finally {
+            // Clean up URL
+            window.history.replaceState({}, document.title, "/");
+          }
+        } else if (!currentUid) {
+          // If no user is logged in, just clear url or redirect
+          window.history.replaceState({}, document.title, "/");
+        }
+      }
+    };
+    
+    if (isAuthenticated) {
+      handleCallback();
+    }
+  }, [isAuthenticated, currentUid, effectiveAccId, activeBotTab]);
+
   // Fast Connect Handler
   const handleFastConnect = () => {
     // Tích hợp OKX Fast Connect API (OAuth 2.0)
     // Cần thay thế CLIENT_ID và REDIRECT_URI bằng thông tin cấu hình thực tế
     const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb"; 
     const redirectUri = encodeURIComponent(window.location.origin + "/okx-callback");
-    const okxOAuthUrl = `https://www.okx.com/oauth2/v1/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
+    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
     
     // Mở trang authorize của OKX
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      window.location.href = okxOAuthUrl;
+      // Sử dụng thẻ <a> để kích hoạt Universal Link (vào thẳng app OKX) thay vì window.location.href
+      const link = document.createElement("a");
+      link.href = okxOAuthUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } else {
       window.open(okxOAuthUrl, "_blank");
     }

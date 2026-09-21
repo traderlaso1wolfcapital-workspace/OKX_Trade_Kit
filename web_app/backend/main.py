@@ -1,5 +1,9 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+# Tải biến môi trường từ file .env nếu có
+load_dotenv()
 import json
 import time
 import asyncio
@@ -200,6 +204,12 @@ class CloseTicketRequest(BaseModel):
     upl: Optional[str] = None
     exitPx: Optional[str] = None
 
+class OAuthCallbackRequest(BaseModel):
+    code: str
+    account_id: str
+    uid: str
+    strategy: str = "sub1"
+
 def check_or_set_account_password(uid: str, password: Optional[str], is_admin: bool):
     clean = uid.lower()
     auth_dir = get_user_base_dir(clean)
@@ -314,6 +324,61 @@ def login_with_password(request: Request, req: LoginRequest):
                 
     except Exception as e:
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
+
+@app.post("/api/auth/okx/callback")
+@limiter.limit("5/minute")
+def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
+    uid = req.uid.strip() if req.uid else ""
+    client_id = os.environ.get("OKX_OAUTH_CLIENT_ID", "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb")
+    client_secret = os.environ.get("OKX_OAUTH_CLIENT_SECRET", "")
+    
+    if not client_secret:
+        return {"status": "error", "message": "Server chưa được cấu hình OKX_OAUTH_CLIENT_SECRET. Hãy thiết lập biến môi trường này cho máy chủ."}
+        
+    try:
+        url = "https://www.okx.com/oauth2/v1/token"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json"
+        }
+        
+        # Origin có thể dùng để check redirect_uri
+        origin = request.headers.get("origin")
+        if not origin:
+            # Fallback nếu gọi từ localhost test
+            origin = "http://localhost:5173" if request.client.host == "127.0.0.1" else f"{request.url.scheme}://{request.url.netloc}"
+            
+        payload = {
+            "grant_type": "authorization_code",
+            "code": req.code,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": f"{origin}/okx-callback"
+        }
+        
+        resp = requests.post(url, data=payload, headers=headers, timeout=10)
+        data = resp.json()
+        
+        if "access_token" in data or "apiKey" in data or "api_key" in data:
+            # Tùy thuộc vào loại app (Trading/Broker), credentials có thể nằm sẵn trong payload
+            api_key = data.get("apiKey") or data.get("api_key")
+            secret_key = data.get("secretKey") or data.get("secret_key")
+            passphrase = data.get("passphrase")
+            
+            if api_key and secret_key and passphrase:
+                acc = req.account_id if req.account_id else req.strategy
+                base_dir = get_user_data_dir(uid)
+                fpath = os.path.join(base_dir, f"bots/{req.strategy}", f".api_{acc}")
+                _save_env_file(fpath, api_key, secret_key, passphrase, is_demo=False)
+                
+                return {"status": "success", "message": "Kết nối OKX Fast Connect thành công!"}
+            else:
+                return {"status": "error", "message": "Không tìm thấy API Key trong phản hồi OKX. Đảm bảo App OKX là loại Trading/Broker.", "raw": data}
+        else:
+            return {"status": "error", "message": f"OKX trả về lỗi: {data.get('error_description') or data.get('msg') or data}", "raw": data}
+            
+    except Exception as e:
+        return {"status": "error", "message": f"Lỗi server khi gọi OKX: {str(e)}"}
 
 async def log_reader_task(stream, uid, strategy):
     """Đọc stdout/stderr của tiến trình bot và đẩy vào ring buffer (deque)"""
@@ -1039,6 +1104,15 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
                 try: os.remove(fp)
                 except: pass
 
+        # Viết flag Kích hoạt & Tắt Shadow mode ngay lập tức trước khi chạy process
+        # để UI không bị giật (flicker) trạng thái "Dừng" trong 2 giây đầu.
+        try:
+            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
+                f.write("1")
+            with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
+                f.write("0")
+        except: pass
+
         custom_env = os.environ.copy()
         custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
         custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
@@ -1059,15 +1133,6 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
         bot_log_queues[uid][strategy] = deque(maxlen=400)
         loop = asyncio.get_event_loop()
         loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
-
-        # Chờ 2 giây cho bot khởi động rồi gửi activate ngay
-        await asyncio.sleep(2.0)
-        try:
-            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
-                f.write("1")
-            with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
-                f.write("0")
-        except: pass
 
         clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
         return {"status": "success", "message": f"Đã khởi động và kích hoạt Bot thành công!{clean_info}", "canceled_count": canceled_orders}
@@ -1463,11 +1528,27 @@ def delete_bot_account(account_id: str, uid: str):
         except Exception:
             pass
             
-    # Xoá file .api nếu có
-    env_path = os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}")
-    if os.path.exists(env_path):
-        try: os.remove(env_path)
-        except Exception: pass
+    # Xoá file .api và file dữ liệu tín hiệu của tài khoản này
+    paths_to_remove = [
+        os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}"),
+        os.path.join(data_dir, f"accounts/{account_id}", f".api_{account_id}"),
+        os.path.join(data_dir, f".api_{account_id}"),
+        os.path.join(OKX_TRADE_KIT_DIR, f".api_{account_id}")
+    ]
+    
+    for strategy in ["sub1", "sub2", "sub3"]:
+        paths_to_remove.extend([
+            os.path.join(data_dir, f"bots/{strategy}", f".api_{account_id}"),
+            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
+            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json"),
+            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
+            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json")
+        ])
+    
+    for p in paths_to_remove:
+        if os.path.exists(p):
+            try: os.remove(p)
+            except Exception: pass
         
     # Lọc bỏ account
     accounts = [a for a in accounts if a.get("id") != account_id]

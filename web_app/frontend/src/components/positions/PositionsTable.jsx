@@ -91,7 +91,7 @@ export default function PositionsTable({
             <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ký quỹ</th>
             <th style={{ textAlign: "center", minWidth: "130px" }}>PNL thả nổi</th>
             <th style={{ textAlign: "center" }}>TF trade</th>
-            <th style={{ textAlign: "center" }}>Cắt lệnh</th>
+            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Cắt lệnh</th>
           </tr>
         </thead>
         <tbody>
@@ -349,7 +349,7 @@ export default function PositionsTable({
                       </div>
                     )}
                   </td>
-                  <td style={{ textAlign: "center", padding: "4px 6px" }}>
+                  <td style={{ textAlign: "center", padding: "4px 6px", whiteSpace: "nowrap" }}>
                     <button
                       onClick={() => handleClosePosition(coin, pos)}
                       style={{
