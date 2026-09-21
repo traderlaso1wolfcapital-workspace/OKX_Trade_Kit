@@ -685,7 +685,14 @@ function App() {
     const okxOAuthUrl = `https://www.okx.com/oauth2/v1/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
     
     // Mở trang authorize của OKX
-    window.open(okxOAuthUrl, "_blank");
+    // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
+    // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = okxOAuthUrl;
+    } else {
+      window.open(okxOAuthUrl, "_blank");
+    }
   };
 
   // Bot Start / Stop Handlers
