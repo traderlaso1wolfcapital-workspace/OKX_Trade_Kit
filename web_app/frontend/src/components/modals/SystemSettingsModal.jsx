@@ -60,10 +60,10 @@ export default function SystemSettingsModal({
         {/* Tab Bar (InnerTabs) */}
         <div className="settings-tab-bar">
           <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
-            🔑 Cấu Hình API Key
+            🔑 API Key
           </button>
           <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
-            ⚙️ Cấu Hình Chiến Thuật
+            ⚙️ Chiến Thuật
           </button>
         </div>
 
@@ -217,7 +217,7 @@ export default function SystemSettingsModal({
                   disabled={isSavingConfig}
                   onClick={onSaveApiKey}
                 >
-                  {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "LƯU CẤU HÌNH API KEY"}
+                  {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "Lưu API Key"}
                 </button>
               </div>
             </div>
@@ -711,7 +711,7 @@ export default function SystemSettingsModal({
                   disabled={isSavingConfig}
                   onClick={onSaveStratConfig}
                 >
-                  {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "LƯU CẤU HÌNH CHIẾN THUẬT (AUTO-RELOAD)"}
+                  {isSavingConfig ? <><span className="spinner"></span> ĐANG LƯU...</> : "Lưu Chiến Thuật"}
                 </button>
               </div>
             </div>

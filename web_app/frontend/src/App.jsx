@@ -676,6 +676,18 @@ function App() {
     }
   };
 
+  // Fast Connect Handler
+  const handleFastConnect = () => {
+    // Tích hợp OKX Fast Connect API (OAuth 2.0)
+    // Cần thay thế CLIENT_ID và REDIRECT_URI bằng thông tin cấu hình thực tế
+    const clientId = "YOUR_CLIENT_ID"; 
+    const redirectUri = encodeURIComponent(window.location.origin + "/okx-callback");
+    const okxOAuthUrl = `https://www.okx.com/oauth2/v1/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
+    
+    // Mở trang authorize của OKX
+    window.open(okxOAuthUrl, "_blank");
+  };
+
   // Bot Start / Stop Handlers
   const handleStartBot = async () => {
     if (isStartingBot || isStoppingBot) return;
@@ -1201,6 +1213,9 @@ function App() {
         setIsAuthenticated(true);
         localStorage.setItem("tls1_auth", "true");
         localStorage.setItem("tls1_uid", loginUid);
+        if (data.token) {
+          localStorage.setItem("tls1_token", data.token);
+        }
         setAuthStep("uid");
         setAdminPassword("");
         setAdminConfirmPassword("");
@@ -1467,12 +1482,12 @@ function App() {
           {/* BOT PANEL CARD */}
           <div className="bot-panel-card">
             {/* ACTION BAR: START / STOP BOT */}
-            <div className="bot-action-bar" style={{ display: 'flex', justifyContent: 'center' }}>
+            <div className="bot-action-bar" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px', boxSizing: 'border-box' }}>
               {isStartingBot ? (
                 <button
                   disabled
                   className="btn-action-start btn-action-loading"
-                  style={{ width: "fit-content", alignSelf: "center" }}
+                  style={{ width: "fit-content" }}
                 >
                   <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
                   ĐANG KHỞI ĐỘNG BOT...
@@ -1481,7 +1496,7 @@ function App() {
                 <button
                   disabled
                   className="btn-action-stop btn-action-loading"
-                  style={{ width: "fit-content", alignSelf: "center" }}
+                  style={{ width: "fit-content" }}
                 >
                   <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
                   ĐANG DỪNG BOT...
@@ -1490,7 +1505,7 @@ function App() {
                 <button
                   onClick={handleStopBot}
                   className="btn-action-stop"
-                  style={{ width: "fit-content", alignSelf: "center" }}
+                  style={{ width: "fit-content" }}
                 >
                   ■ DỪNG BOT
                 </button>
@@ -1498,11 +1513,17 @@ function App() {
                 <button
                   onClick={handleStartBot}
                   className="btn-action-start"
-                  style={{ width: "fit-content", alignSelf: "center" }}
+                  style={{ width: "fit-content" }}
                 >
                   ▶ CHẠY BOT
                 </button>
               )}
+              <button
+                onClick={handleFastConnect}
+                className="btn-connect-okx"
+              >
+                🔗 CONNECT OKX
+              </button>
             </div>
 
             {/* CHARTS & WORKSPACE CONTAINER */}

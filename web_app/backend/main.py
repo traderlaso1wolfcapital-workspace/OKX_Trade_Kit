@@ -9,8 +9,16 @@ import hashlib
 import base64
 import requests
 import csv
+import jwt
+import bcrypt
+from cryptography.fernet import Fernet
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from collections import deque
 from typing import Optional, List, Dict, Union, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
@@ -21,16 +29,79 @@ from pydantic import BaseModel
 
 app = FastAPI(title="TLS1 Trading Web Backend", version="1.0.0")
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+LOCAL_APP_DATA = os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local"))
+MASTER_KEY_FILE = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users", ".master_key")
+
+def _get_or_create_master_key():
+    os.makedirs(os.path.dirname(MASTER_KEY_FILE), exist_ok=True)
+    if not os.path.exists(MASTER_KEY_FILE):
+        key = Fernet.generate_key()
+        with open(MASTER_KEY_FILE, "wb") as f:
+            f.write(key)
+        return key
+    with open(MASTER_KEY_FILE, "rb") as f:
+        return f.read().strip()
+
+MASTER_KEY = _get_or_create_master_key()
+fernet = Fernet(MASTER_KEY)
+JWT_SECRET = MASTER_KEY.decode('utf-8')
+JWT_ALGORITHM = "HS256"
+security = HTTPBearer()
+
+def create_jwt_token(uid: str, is_admin: bool = False):
+    payload = {
+        "uid": uid,
+        "is_admin": is_admin,
+        "exp": datetime.now(timezone.utc) + timedelta(days=7)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def encrypt_value(val: str) -> str:
+    if not val: return val
+    if val.startswith("ENC:"): return val
+    return "ENC:" + fernet.encrypt(val.encode('utf-8')).decode('utf-8')
+
+def decrypt_value(val: str) -> str:
+    if not val: return val
+    if val.startswith("ENC:"):
+        try:
+            return fernet.decrypt(val[4:].encode('utf-8')).decode('utf-8')
+        except Exception:
+            return ""
+    return val
+
 def is_admin_uid(uid: str) -> bool:
     if not uid: return False
     clean = str(uid).strip().lower()
     return clean == "admtls12021"
 
+def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+uid_cache = {}
+
 @app.get("/api/auth/verify")
-def verify_uid(uid: str):
+def verify_uid(uid: str, jwt_data: dict = Depends(verify_jwt)):
+    if jwt_data["uid"] != uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
     clean = str(uid).strip().lower() if uid else ""
     if is_admin_uid(clean):
         return {"status": "success", "message": "Admin login successful", "uid": uid}
+        
+    now = time.time()
+    if clean in uid_cache and now - uid_cache[clean]["time"] < 300: # 5 minutes
+        return uid_cache[clean]["result"]
+
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
         resp = requests.get(url, timeout=10)
@@ -45,7 +116,9 @@ def verify_uid(uid: str):
                 if row[0].strip() == uid:
                     user_status = row[5].strip().upper()
                     if user_status == "ACTIVE":
-                        return {"status": "success", "uid": uid}
+                        result = {"status": "success", "uid": uid}
+                        uid_cache[clean] = {"time": now, "result": result}
+                        return result
                     else:
                         return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
         return {"status": "error", "message": "UID không tồn tại hoặc chưa đăng ký!"}
@@ -56,7 +129,7 @@ def verify_uid(uid: str):
 # CORS Setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,8 +144,6 @@ sys.path.append(OKX_TRADE_KIT_DIR)
 
 
 # AppData path của TLS1_Trading
-LOCAL_APP_DATA = os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local"))
-
 def get_user_base_dir(uid: str) -> str:
     safe_uid = "".join(c for c in uid if c.isalnum() or c in ('_', '-'))
     if not safe_uid: safe_uid = "default"
@@ -147,7 +218,7 @@ def check_or_set_account_password(uid: str, password: Optional[str], is_admin: b
         if len(pwd) < 4:
             return {"status": "error", "message": "Mật khẩu phải có tối thiểu 4 ký tự!"}
         
-        pwd_hash = hashlib.sha256(pwd.encode("utf-8")).hexdigest()
+        pwd_hash = bcrypt.hashpw(pwd.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         os.makedirs(auth_dir, exist_ok=True)
         auth_data = {
             "uid": clean,
@@ -175,15 +246,30 @@ def check_or_set_account_password(uid: str, password: Optional[str], is_admin: b
             return {"status": "error", "message": f"Lỗi đọc file xác thực: {str(e)}"}
         
         saved_hash = auth_data.get("password_hash", "")
-        input_hash = hashlib.sha256(password.strip().encode("utf-8")).hexdigest()
         
-        if input_hash != saved_hash:
+        if len(saved_hash) == 64 and not saved_hash.startswith("$2b$"):
+            # Old SHA256 hash backward compatibility
+            input_hash = hashlib.sha256(password.strip().encode("utf-8")).hexdigest()
+            is_valid = (input_hash == saved_hash)
+            if is_valid:
+                new_hash = bcrypt.hashpw(password.strip().encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                auth_data["password_hash"] = new_hash
+                with open(auth_file, "w", encoding="utf-8") as f:
+                    json.dump(auth_data, f, indent=2)
+        else:
+            try:
+                is_valid = bcrypt.checkpw(password.strip().encode("utf-8"), saved_hash.encode("utf-8"))
+            except Exception:
+                is_valid = False
+        
+        if not is_valid:
             return {"status": "error", "message": "Mật khẩu không chính xác! Vui lòng thử lại."}
         
         return {"status": "success", "message": "Đăng nhập thành công!", "uid": uid}
 
 @app.post("/api/auth/login")
-def login_with_password(req: LoginRequest):
+@limiter.limit("5/minute")
+def login_with_password(request: Request, req: LoginRequest):
     uid = req.uid.strip() if req.uid else ""
     clean = uid.lower()
     if clean == "admtls12021":
@@ -193,7 +279,7 @@ def login_with_password(req: LoginRequest):
                 "message": "Vui lòng nhập mật khẩu cho Admin [admtls12021]:"
             }
         if req.password == "admtls12021@":
-            return {"status": "success", "message": "Đăng nhập Admin thành công!", "uid": uid}
+            return {"status": "success", "message": "Đăng nhập Admin thành công!", "uid": uid, "token": create_jwt_token(uid, is_admin=True)}
         return {"status": "error", "message": "Mật khẩu Admin không chính xác! Vui lòng thử lại."}
 
     try:
@@ -221,7 +307,10 @@ def login_with_password(req: LoginRequest):
             return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
             
         # Xác thực hoặc thiết lập mật khẩu bảo vệ tài khoản User
-        return check_or_set_account_password(uid, req.password, is_admin=False)
+        res = check_or_set_account_password(uid, req.password, is_admin=False)
+        if res.get("status") == "success":
+            res["token"] = create_jwt_token(uid, is_admin=False)
+        return res
                 
     except Exception as e:
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
@@ -571,9 +660,9 @@ def _parse_env_file(fpath: str):
                     if "=" in line:
                         k, v = line.strip().split("=", 1)
                         v = v.strip("\"'")
-                        if k == "OKX_API_KEY": creds["api_key"] = v
-                        elif k == "OKX_SECRET_KEY": creds["secret_key"] = v
-                        elif k == "OKX_PASSPHRASE": creds["passphrase"] = v
+                        if k == "OKX_API_KEY": creds["api_key"] = decrypt_value(v)
+                        elif k == "OKX_SECRET_KEY": creds["secret_key"] = decrypt_value(v)
+                        elif k == "OKX_PASSPHRASE": creds["passphrase"] = decrypt_value(v)
                         elif k == "OKX_IS_DEMO": creds["is_demo"] = (v.lower() == "true")
         except Exception:
             pass
@@ -663,9 +752,9 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
         except Exception:
             pass
     keys = {
-        "OKX_API_KEY": api_key,
-        "OKX_SECRET_KEY": secret_key,
-        "OKX_PASSPHRASE": passphrase,
+        "OKX_API_KEY": encrypt_value(api_key),
+        "OKX_SECRET_KEY": encrypt_value(secret_key),
+        "OKX_PASSPHRASE": encrypt_value(passphrase),
         "OKX_IS_DEMO": "True" if is_demo else "False",
     }
     new_lines = []
@@ -2299,3 +2388,4 @@ if __name__ == "__main__":
 
 # z7720 | Nâng cấp deque 400 dòng lưu trữ logs, sửa lỗi logs thiếu thông tin, và bổ sung WebSocket /ws/bot_data streaming trạng thái/vị thế/số dư thời gian thực.
 # z7721 | Update default margin/volume settings to 1.0
+# z7722 | Implemented bcrypt for password hashing and automatic migration from SHA256

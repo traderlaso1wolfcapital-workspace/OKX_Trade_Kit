@@ -88,7 +88,7 @@ export default function PositionsTable({
         <thead>
           <tr style={{ background: "#252526" }}>
             <th style={{ textAlign: "left" }}>Cặp vị thế</th>
-            <th style={{ textAlign: "center" }}>Ký quỹ</th>
+            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ký quỹ</th>
             <th style={{ textAlign: "center", minWidth: "130px" }}>PNL thả nổi</th>
             <th style={{ textAlign: "center" }}>TF trade</th>
             <th style={{ textAlign: "center" }}>Cắt lệnh</th>

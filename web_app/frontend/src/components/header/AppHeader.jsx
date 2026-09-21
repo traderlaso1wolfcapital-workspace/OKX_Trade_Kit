@@ -10,19 +10,24 @@ export default function AppHeader({
   return (
     <header className="bot-tabs-bar">
       <div className="bot-tabs-group">
-        {[
-          ["sub1", "Bot EMA200"],
-          ["sub2", "Bot SMC"],
-          ["sub3", "Bot Liquidation"],
-        ].map(([sub, label]) => (
-          <button
-            key={sub}
-            className={`bot-tab ${activeBotTab === sub ? "active" : ""}`}
-            onClick={() => onSelectBotTab(sub)}
-          >
-            {label}
-          </button>
-        ))}
+        <select
+          className="bot-tab-select"
+          value={activeBotTab}
+          onChange={(e) => onSelectBotTab(e.target.value)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: "4px",
+            backgroundColor: "#222",
+            color: "#fff",
+            border: "1px solid #444",
+            outline: "none",
+            fontSize: "14px"
+          }}
+        >
+          <option value="sub1">Bot EMA200</option>
+          <option value="sub2">Bot SMC</option>
+          <option value="sub3">Bot Liquidation</option>
+        </select>
       </div>
 
       {/* Slot indicator & Nút Join Cộng đồng */}

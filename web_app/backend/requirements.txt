@@ -3,3 +3,7 @@ uvicorn
 python-socketio
 websockets
 psutil
+PyJWT
+cryptography
+slowapi
+bcrypt
