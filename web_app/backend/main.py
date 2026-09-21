@@ -1992,7 +1992,13 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
         return []
 
 @app.get("/api/bot/closed_positions")
-def get_closed_positions(uid: str, strategy: str = "sub1"):
+def get_closed_positions(uid: str, strategy: str = "sub1", account_id: str = None):
+    # Nếu chưa nhập API Key, trả về rỗng (tránh hiển thị tín hiệu từ trade_markers cũ sau khi xoá API)
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
+    if not (api_key and secret_key and passphrase) and uid != ADMIN_UID:
+        return []
+
     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
     if not os.path.exists(positions_path):
         return []
@@ -2470,3 +2476,4 @@ if __name__ == "__main__":
 # z7720 | Nâng cấp deque 400 dòng lưu trữ logs, sửa lỗi logs thiếu thông tin, và bổ sung WebSocket /ws/bot_data streaming trạng thái/vị thế/số dư thời gian thực.
 # z7721 | Update default margin/volume settings to 1.0
 # z7722 | Implemented bcrypt for password hashing and automatic migration from SHA256
+# z7723 | Update OKX OAuth Fast API endpoint and hide closed_positions if API is deleted

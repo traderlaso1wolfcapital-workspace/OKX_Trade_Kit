@@ -735,22 +735,21 @@ function App() {
   // Fast Connect Handler
   const handleFastConnect = () => {
     // Tích hợp OKX Fast Connect API (OAuth 2.0)
-    // Cần thay thế CLIENT_ID và REDIRECT_URI bằng thông tin cấu hình thực tế
     const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb"; 
     const redirectUri = encodeURIComponent(window.location.origin + "/okx-callback");
-    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=all`;
+    // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
+    const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    sessionStorage.setItem("okx_oauth_state", state);
+    // URL đúng theo tài liệu OKX: /oauth/authorize (KHÔNG có /account/)
+    // scope=trade cho phép đọc + giao dịch
+    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=trade&state=${state}`;
     
-    // Mở trang authorize của OKX
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      // Sử dụng thẻ <a> để kích hoạt Universal Link (vào thẳng app OKX) thay vì window.location.href
-      const link = document.createElement("a");
-      link.href = okxOAuthUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // window.location.href kích hoạt Universal Link trên iOS/Android, mở thẳng app OKX
+      window.location.href = okxOAuthUrl;
     } else {
       window.open(okxOAuthUrl, "_blank");
     }
@@ -1418,7 +1417,7 @@ function App() {
       const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
       if (r.ok) setPositions(await r.json());
 
-      const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+      const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}&account_id=${acc}`);
       if (r2.ok) {
         setClosedPositions(await r2.json());
       }
