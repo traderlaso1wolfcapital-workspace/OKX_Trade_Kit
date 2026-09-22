@@ -18,6 +18,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[22/09/2026]** - Tăng Độ Dài Các Ô Nhập Số Liệu (Spinbox) Trên Mobile Lên 120px Để Nhập Được Nhiều Số Liệu Hơn:
+  - **Mô tả yêu cầu:** Trên giao diện Mobile, các ô nhập số liệu (Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5, và các ô trong Cài Đặt) có độ rộng cũ (78px - 95px) bị ngắn, phần ruột input chỉ còn ~38px khiến khi nhập các số lớn hoặc nhiều chữ số thập phân bị che khuất, chật chội. Cần kéo dài ô nhập trên mobile để hiển thị và nhập được nhiều số liệu hơn.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Trong khối media query `@media screen and (max-width: 1024px), (width <= 1024px)`, bổ sung quy tắc `.risk-row .spinbox-container, .entry-setup-row .spinbox-container { width: 120px !important; }`.
+      - Mở rộng chiều ngang thực tế của ô nhập từ 78px lên 120px (+54% chiều rộng tổng thể, không gian ruột input tăng gấp hơn 2 lần từ ~38px lên ~80px), cho phép nhập thoải mái 8-10 ký tự mà không bị co cụm hay cuộn chữ.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 292ms`). Trên các thiết bị di động (từ màn 360px đến tablet), các ô spinbox hiển thị rộng rãi, cân xứng hoàn hảo với các dòng thiết lập và không bị tràn khung.
+
 - **[22/09/2026]** - Loại Bỏ Viền Trong Hẹp Chữ Ở Các Ô Nhập Số Liệu Trong Settings Modal (Quản Lý Vốn, Điểm Vào Lệnh):
   - **Mô tả yêu cầu:** Các ô nhập số liệu spinbox trong cửa sổ Cài Đặt (mục Quản Lý Vốn, Điểm Vào Lệnh Entry Setup...) bị đường viền bao quanh phần số bên trong (như `0.4 $`, `0.8 %`), gây chật hẹp và không đồng bộ với các ô spinbox đã loại bỏ viền trong ở ngoài khung Tài khoản. Cần loại bỏ triệt để viền trong này.
   - **Đã xử lý:**

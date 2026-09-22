@@ -1700,6 +1700,12 @@ a#tv-attr-logo,
   }
 
 
+  /* Tăng độ dài các ô nhập số liệu (spinbox) trên mobile để nhập được nhiều số liệu hơn */
+  .risk-row .spinbox-container,
+  .entry-setup-row .spinbox-container {
+    width: 120px !important;
+  }
+
   /* Select lon hon tren mobile de de bam */
   .styled-select {
     font-size: 14px;
