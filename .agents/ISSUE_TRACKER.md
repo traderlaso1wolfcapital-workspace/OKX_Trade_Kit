@@ -18,11 +18,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[22/09/2026]** - Lỗi Nút Connect OKX (Fast API) Dẫn Tới Trang Quản Lý Tài Khoản Chung:
-  - **Mô tả lỗi:** URL kết nối OKX OAuth bị sai (`/account/oauth/authorize`), khiến người dùng bị chuyển tới trang quản lý tài khoản chung thay vì trang cấp quyền ứng dụng Fast API.
+- **[22/09/2026]** - Lỗi Nút Connect OKX (Fast API) Dẫn Tới Trang Hồ Sơ Tài Khoản Thay Vì Trang Cấp Quyền:
+  - **Mô tả lỗi:** Khi bấm nút "OKX Connect", người dùng bị chuyển tới trang hồ sơ tài khoản (`/account/users`) thay vì trang cấp quyền ứng dụng OAuth. Nguyên nhân gốc: tham số `scope=fast_api` không phải scope hợp lệ của OKX OAuth (OKX chỉ chấp nhận `read_only` và `trade`), khiến OKX không hiển thị trang consent mà redirect thẳng về trang hồ sơ.
   - **Đã xử lý:** 
-    - Xóa `/account` khỏi URL OAuth trong file `App.jsx` (`https://www.okx.com/oauth/authorize...`).
-  - **Kiểm chứng:** URL nay đã chuẩn xác theo tài liệu API của OKX.
+    - Sửa scope từ `fast_api` thành `read_only trade` trong URL OAuth tại `App.jsx`.
+    - URL sử dụng `/account/oauth/authorize` (đường dẫn chính xác theo tài liệu OKX Broker).
+  - **Kiểm chứng:** Scope đã đúng theo tài liệu OKX Broker API (`read_only`, `trade`).
 
 - **[22/09/2026]** - Lỗi Bot Vẫn Nhận Tín Hiệu & Hiện Lên Sau Khi Gỡ Bỏ API Key:
   - **Mô tả lỗi:** Khi người dùng xóa/gỡ bỏ API Key trong cài đặt, tiến trình (process) bot đang chạy ngầm không bị tắt. Điều này dẫn đến việc bot vẫn tiếp tục lắng nghe tín hiệu webhook từ TradingView và gửi dữ liệu về giao diện thông qua websocket.
