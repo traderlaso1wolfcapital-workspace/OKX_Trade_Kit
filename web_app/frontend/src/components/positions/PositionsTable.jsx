@@ -137,8 +137,12 @@ export default function PositionsTable({
                       <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px" }}>Chờ tín hiệu...</span>
                     </div>
                   </td>
-                  <td style={{ padding: "4px 6px", textAlign: "center", color: "#555", fontSize: "13px" }}>--</td>
-                  <td style={{ padding: "4px 6px", textAlign: "center", color: "#555", fontSize: "13px" }}>--</td>
+                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
+                  </td>
+                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
+                  </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                       {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
@@ -148,6 +152,7 @@ export default function PositionsTable({
                         return (
                           <span
                             key={tf}
+                            className={`tf-badge ${isOn ? "on" : "off"}`}
                             onClick={() => handleTfToggle && handleTfToggle(coin.value, tf)}
                             style={{
                               cursor: "pointer",
@@ -173,7 +178,7 @@ export default function PositionsTable({
                     </div>
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                    <span style={{ color: "#555", fontSize: "13px" }}>--</span>
+                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
                   </td>
                 </tr>
               );
@@ -338,6 +343,7 @@ export default function PositionsTable({
                           return (
                             <span
                               key={tf}
+                              className={`tf-badge ${isOn ? "on" : "off"}`}
                               onClick={() => handleTfToggle && handleTfToggle(coin.value, tf)}
                               style={{
                                 cursor: "pointer",

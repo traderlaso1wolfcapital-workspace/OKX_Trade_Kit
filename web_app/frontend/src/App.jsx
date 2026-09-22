@@ -44,6 +44,19 @@ function App() {
   });
   const [fadeClass, setFadeClass] = useState("tab-fade");
 
+  // Theme Mode: "default" (Bản Gốc) vs "glass_pro" (Kính mờ #181920 Pro)
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem("tls1_theme_mode") || "default";
+  });
+
+  const toggleTheme = () => {
+    setThemeMode((prev) => {
+      const next = prev === "glass_pro" ? "default" : "glass_pro";
+      localStorage.setItem("tls1_theme_mode", next);
+      return next;
+    });
+  };
+
   // 4. Accounts & Mapping
   const [accounts, setAccounts] = useState(() => {
     try {
@@ -1541,7 +1554,7 @@ function App() {
   const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${themeMode === "glass_pro" ? "theme-glass-pro" : ""}`}>
       {lockMessage && (
         <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "14px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
           {lockMessage}
@@ -1574,6 +1587,8 @@ function App() {
             onSelectBotTab={setActiveBotTab}
             slotCount={slotCount}
             maxSlots={100}
+            themeMode={themeMode}
+            onToggleTheme={toggleTheme}
           />
 
           {/* BOT PANEL CARD */}

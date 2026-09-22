@@ -53,6 +53,7 @@ export default function SidebarLeft({
           </span>
 
           <div
+            className="group-box-actions"
             style={{
               position: "absolute",
               top: "-10px",
@@ -60,12 +61,12 @@ export default function SidebarLeft({
               display: "flex",
               alignItems: "center",
               gap: "5px",
-              backgroundColor: "#252526",
               padding: "0 4px",
             }}
           >
             <button
               type="button"
+              className="btn-group-box-collapse"
               onClick={handleToggle}
               style={{
                 background: "transparent",
@@ -88,9 +89,6 @@ export default function SidebarLeft({
               style={{
                 flex: 1,
                 minWidth: 0,
-                background: "#2a2a2a",
-                border: "1px solid #444",
-                color: "#fff",
                 padding: "4px 8px",
                 borderRadius: "4px",
                 fontSize: "12px",
@@ -139,6 +137,7 @@ export default function SidebarLeft({
                   <div style={{ display: "flex", gap: "2px" }}>
                     <button
                       type="button"
+                      className={`risk-unit-btn ${risk.volUnit === "USDT" ? "active" : ""}`}
                       onClick={() => setRisk((r) => {
                         const currentVal = r.posVol;
                         const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
@@ -159,6 +158,7 @@ export default function SidebarLeft({
                     </button>
                     <button
                       type="button"
+                      className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
                       onClick={() => setRisk((r) => {
                         const currentVal = r.posVol;
                         const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
@@ -191,6 +191,7 @@ export default function SidebarLeft({
                     }
                   >
                     <div
+                      className={`risk-mult-badge ${risk.multiplyVolumeByTf ? "active" : ""}`}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -207,10 +208,10 @@ export default function SidebarLeft({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      <span style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
+                      <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
                         {risk.multiplyVolumeByTf ? "nhân Hệ số" : "Cố định"}
                       </span>
-                      <span style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
+                      <span className="risk-mult-arrow" style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
                     </div>
 
                     <select

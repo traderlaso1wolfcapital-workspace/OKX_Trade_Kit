@@ -18,6 +18,185 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[22/09/2026]** - Loại Bỏ Viền Trong Hẹp Chữ Ở Các Ô Nhập Số Liệu Trong Settings Modal (Quản Lý Vốn, Điểm Vào Lệnh):
+  - **Mô tả yêu cầu:** Các ô nhập số liệu spinbox trong cửa sổ Cài Đặt (mục Quản Lý Vốn, Điểm Vào Lệnh Entry Setup...) bị đường viền bao quanh phần số bên trong (như `0.4 $`, `0.8 %`), gây chật hẹp và không đồng bộ với các ô spinbox đã loại bỏ viền trong ở ngoài khung Tài khoản. Cần loại bỏ triệt để viền trong này.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật selector `.theme-glass-pro .settings-modal input[type="number"]:not(.spinbox-input)` và `input:not(.spinbox-input):focus` để quy tắc viền của modal không áp đè lên ruột spinbox.
+      - Thêm bộ quy tắc reset riêng cho `.settings-modal .spinbox-input` và `.theme-glass-pro .settings-modal .spinbox-input` với `background: transparent !important`, `border: none !important`, `box-shadow: none !important`, `outline: none !important`, `padding: 0 !important` (cả trạng thái thường lẫn `:focus`).
+  - **Kiểm chứng:** Build Vite production thành công (`built in 361ms`). Mọi ô spinbox trong Settings Modal (Quản lý vốn, Điểm vào lệnh...) đều hoàn toàn sạch bóng viền trong, hiển thị chữ số thoáng đãng, sắc nét đồng nhất 100% với bên ngoài.
+
+- **[22/09/2026]** - Đồng Bộ Màu Ký Tự Placeholder '--' Ở Cột Ký Quỹ & PNL Thả Nổi Nhạt Mờ Giống Cột Cắt Lệnh:
+  - **Mô tả yêu cầu:** Ký tự placeholder `--` ở 2 cột Ký quỹ và PNL thả nổi bị hiển thị sáng/đậm hơn, không đồng bộ với ký tự `--` màu nhạt, mờ tinh tế bên cột Cắt lệnh. Cần làm cho ký tự `--` ở cả hai cột này có màu nhạt, mờ giống hệt như bên phần Cắt lệnh.
+  - **Đã xử lý:**
+    - Trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+      - Bọc ký tự `--` ở cả hai cột Ký quỹ và PNL thả nổi trong `<span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>`, đồng bộ cấu trúc HTML và inline style 1:1 với cột Cắt lệnh.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Củng cố CSS specificity cho `.theme-glass-pro .empty-dash, .theme-glass-pro .positions-table td .empty-dash, .theme-glass-pro .positions-table td.empty-dash` với `color: #3b3f54 !important`, `opacity: 0.55 !important`, `letter-spacing: 1px !important` để ghi đè triệt để màu trắng `#ffffff` của thẻ `td`.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 314ms`). Cả 3 cột Ký quỹ, PNL thả nổi và Cắt lệnh hiện tại hiển thị ký tự `--` đồng nhất 100% về tông màu nhạt, độ mờ và kích thước ở cả Bản Gốc lẫn Bản Kính Mờ.
+
+- **[22/09/2026]** - Đồng Bộ Hiệu Ứng Phát Sáng Aura & Chuyển Động Hover Từ Nút OKX Connect Sang Nút Chạy/Dừng Bot:
+  - **Mô tả yêu cầu:** Đưa hiệu ứng hover của nút OKX Connect (phát ra aura ánh sáng tỏa rộng và chuyển động nhấc nhẹ `translateY(-1px)`, nhấn xuống `translateY(1px)`) sang nút CHẠY BOT và DỪNG BOT. Đảm bảo thay đổi thuần CSS giao diện, tuyệt đối không ảnh hưởng tới mã nguồn, state hoặc logic trade của Bot.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `.btn-action-start`: Thêm hào quang xanh Emerald `box-shadow: 0 0 10px rgba(46, 125, 50, 0.35)`, khi hover tăng cường aura rực rỡ `box-shadow: 0 0 16px rgba(76, 175, 80, 0.75)` kèm chuyển động nổi nhẹ `transform: translateY(-1px)`, khi active nhấn `transform: translateY(1px)`.
+      - Cập nhật `.btn-action-stop`: Thêm hào quang đỏ Crimson `box-shadow: 0 0 10px rgba(198, 40, 40, 0.35)`, khi hover tỏa aura rực rỡ `box-shadow: 0 0 16px rgba(244, 67, 54, 0.75)` kèm chuyển động nổi `transform: translateY(-1px)`, khi active nhấn `transform: translateY(1px)`.
+      - Khử hoàn toàn viền cứng `border-color: #ffaa00` cũ, bảo toàn trọn vẹn 100% logic JavaScript trong `App.jsx` và hệ thống bot backend.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 256ms`). Dùng browser subagent kiểm tra hover trực tiếp trên nút CHẠY BOT xác nhận nút tỏa aura xanh sáng bóng, chuyển động nổi êm ái y hệt nút OKX Connect.
+
+- **[22/09/2026]** - Đổi Màu Nền Nút Thu Gọn Về Tab Chung (⮃) Từ Nâu Đất Sang Gam Dark Slate Đồng Bộ Ở Cả 2 Bản:
+  - **Mô tả yêu cầu:** Nút chia/thu gọn tab (`btn-tab-split` với biểu tượng `⮃`) khi ở trạng thái kích hoạt (`.active`) có màu nền nâu đất bẩn (`#2e2416`), lệch tông với tổng thể giao diện. Cần đổi sang màu khác sạch sẽ, hiện đại và đồng bộ ở cả Bản Gốc lẫn Bản Kính Mờ.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Ở Bản Gốc: Thay thế màu nâu đất `#2e2416` trên `.btn-tab-split.active` bằng gam Dark Slate `#252836` (hover `#2d3142`), giữ biểu tượng ánh vàng `#ff9900`.
+      - Ở Bản Kính Mờ: Bổ sung quy tắc `.theme-glass-pro .btn-tab-split.active` với nền `#202332` (trùng khớp 100% với màu nền của tab đang chọn `Bảng Vị Thế (0)`) và biểu tượng màu Amber Gold `#f59e0b`.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 269ms`). Dùng browser subagent chụp ảnh macro zoom cận cảnh nút ở cả 2 bản, xác nhận màu nâu đất đã được loại bỏ hoàn toàn, thay bằng màu Dark Slate tinh tế, tiệp khối và đồng bộ 100%.
+
+- **[22/09/2026]** - Tăng Độ Đậm & Tương Phản Sắc Nét Cho Tông Màu Vàng (Amber Gold #f59e0b):
+  - **Mô tả yêu cầu:** Màu chữ vàng trên Bảng Vị Thế (`Bảng Vị Thế (0)`, các chip TF `30`, `H1`, `H2`, `H4`), tiêu đề `TÀI KHOẢN (BOT EMA200):` và các nút active trước đó dùng mã `#ffb74d` bị hơi nhạt/bợt so với nền tối. Cần cho đậm và sắc sảo hơn chút xíu.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Nâng cấp đồng bộ toàn bộ các điểm màu vàng từ `#ffb74d` sang tông Amber Gold đậm đà `#f59e0b` (trùng khớp 100% với viền active).
+    - Áp dụng xuyên suốt từ tiêu đề thương hiệu, active tab indicator, tiêu đề khung tài khoản, các chip TF đang bật đến hộp thoại Cài Đặt.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 219ms`). Dùng browser subagent chụp ảnh nghiệm thu xác nhận chữ vàng hiển thị nổi bật, tương phản cao, ấm áp và rõ nét vượt trội trên nền tối Obsidian.
+
+- **[22/09/2026]** - Cân Đối Khoảng Cách Trên Tiêu Đề Tài Khoản Ở Cả 2 Theme (Bản Gốc & Bản Kính Mờ):
+  - **Mô tả yêu cầu:** Khoảng cách giữa Bảng Vị Thế và tiêu đề `TÀI KHOẢN (BOT EMA200):` ở Bản Gốc bị quá sát (gần như chạm vào đáy), trong khi ở Bản Kính Mờ lại bị cách quá xa (hổng 40px). Cần cân đối lại khoảng cách của cả hai bên cho hài hoà, vừa vặn.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Ở Bản Gốc (`@media screen and (max-width: 1024px)`): Điều chỉnh `.sidebar-content .group-box:first-of-type` từ `margin-top: 8px` lên `margin-top: 18px !important`. Với `top: -10px` của tiêu đề, khoảng hở thông thoáng từ đáy Bảng Vị Thế đến chữ đạt chuẩn 8px (không còn bị quá sát hay dính mép).
+      - Ở Bản Kính Mờ (`.theme-glass-pro`): Bỏ `margin-bottom: 16px` thừa trên `.main-workspace` (`margin-bottom: 0 !important`), và đặt `.sidebar-content .group-box:first-of-type` về `margin-top: 18px !important` đồng bộ 1:1 với Bản Gốc.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 297ms`). Browser subagent chụp ảnh đối chiếu ở cả Bản Gốc và Bản Kính Mờ: khoảng cách trên cả hai bản hoàn toàn đồng nhất, đạt khoảng thở 8px thanh lịch, cân đối và liền lạc.
+
+- **[22/09/2026]** - Loại Bỏ Viền Trong Hẹp Chữ Ở Các Ô Nhập Giá Trị Spinbox (0.4$, 0.8%):
+  - **Mô tả yêu cầu:** Các ô nhập số (`0.4 $`, `0.8 %`) có đường viền hộp bao quanh bên trong phần số, làm chữ bị gò bó, chật hẹp và thừa viền kép. Cần loại bỏ viền trong để chữ và ký hiệu (`$`, `%`) đứng tự nhiên, thoáng đãng trong khung spinbox.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Thêm quy tắc `.theme-glass-pro .spinbox-input { background: transparent !important; border: none !important; box-shadow: none !important; outline: none !important; padding: 0 !important; }`.
+      - Cập nhật selector input chung sang `.theme-glass-pro input:not(.spinbox-input)` để không áp đặt viền thừa vào ruột spinbox.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 289ms`). Dùng browser subagent chụp ảnh kiểm tra xác nhận ruột ô nhập `0.4 $` và `0.8 %` hoàn toàn không còn viền trong thừa thãi, hiển thị thoáng đãng, sắc nét và thẩm mỹ.
+
+- **[22/09/2026]** - Đồng Bộ Vùng Nền Xám Phía Trên & Màu Nền Tiêu Đề Tài Khoản Hoà Trộn 1:1 Vào Nền Canvas:
+  - **Mô tả yêu cầu:**
+    1. Vùng khoảng cách giữa Bảng Vị Thế và Khung Tài Khoản vẫn còn hiện mảng màu xám cũ (`#1e1e1e` của `.content-wrapper`).
+    2. Nền của tiêu đề `TÀI KHOẢN (BOT EMA200):` có vệt chữ nhật màu sáng hơn (`#12131b`), chưa hoà trộn 1:1 vào màu nền xung quanh.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Thiết lập đồng bộ `background-color: #0b0c11 !important` cho toàn bộ `.theme-glass-pro`, `.theme-glass-pro.app-container`, `.theme-glass-pro .content-wrapper`, `.theme-glass-pro .main-section` và `.theme-glass-pro .sidebar-left`. Loại bỏ hoàn toàn mảng xám `#1e1e1e` lộ ra ở các khe dãn cách.
+      - Chuyển `background-color` của `.theme-glass-pro .group-box-title` và `.theme-glass-pro .group-box-actions` về `#0b0c11 !important` (trùng 1:1 với màu nền canvas xung quanh). Tiêu đề và nút thu gọn `▲` giờ đây hoà trộn hoàn toàn tự nhiên vào viền trên, không còn vệt hộp chữ nhật lệch màu.
+  - **Kiểm chứng:** Build Vite production thành công (`built in 268ms`). Browser subagent chụp ảnh ở cả 2 chế độ (Mobile stacked 834px và Desktop 1280px) xác nhận vùng xám đã biến mất 100%, tiêu đề tiệp nền 1:1 hoàn hảo.
+
+- **[22/09/2026]** - Đem Ngôn Ngữ Thiết Kế Cài Đặt Ra Giao Diện Ngoài Bản Kính Mờ & Fix Triệt Để Lỗi Đè Mất Chữ:
+  - **Mô tả yêu cầu:**
+    1. Đem trọn vẹn ngôn ngữ thiết kế của hộp thoại Cài Đặt (Dark Slate Obsidian `#12131b` / `#161824`, viền dark slate `#363b50` bo góc 6px, điểm xuyết Amber Gold `#ffb74d`) ra ngoài toàn bộ các khối giao diện chính của theme Kính Mờ.
+    2. Sửa lỗi tiêu đề `TÀI KHOẢN (BOT EMA200):` bị đè mất nửa trên chữ do dính sát vào cạnh đáy khối Bảng Vị Thế.
+    3. Xóa bỏ hoàn toàn màu nền xám cũ (`#2a2a2a`, `#444`) ở dropdown tài khoản (`adb`) và các nút/ô phụ trợ bên ngoài, thay thế bằng `#161824` và viền `#363b50` đồng bộ 100%.
+  - **Đã xử lý:**
+    - Trong [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Xóa bỏ các style inline `background: "#2a2a2a"`, `border: "1px solid #444"` trên `<select className="styled-select">` để nhận style chuẩn từ CSS theo theme.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật toàn bộ viền khối chính (`.sidebar-left`, `.group-box`, `.bot-panel-card`, `.main-workspace`, `.modal-content`) từ màu xanh xám nhạt (`#555d7d`) sang màu Dark Slate Obsidian `#363b50` đồng bộ với Cài Đặt, bo góc 6px tinh tế.
+      - Đặt `margin-top: 24px !important` cho `.group-box` cả trên desktop lẫn mobile layout (`@media screen and (max-width: 1024px)`), tạo khoảng thở rộng rãi 24px giữa 2 khối, giải quyết triệt để 100% lỗi đè mất chữ tiêu đề `TÀI KHOẢN (BOT EMA200):`.
+      - Nút thu gọn `▲` (`.btn-group-box-collapse`), dropdown tài khoản (`.styled-select`), nút `⚙ Cài Đặt`, các spinbox và nút Ký quỹ (`USDT`, `% VỐN`, `nhân Hệ số`) đều được đưa về nền `#161824`, viền `#363b50`, khi active/hover ánh sắc vàng hổ phách `#ffb74d` viền `#f59e0b`.
+    - Bảo toàn nguyên vẹn 100% giao diện và đường chỉ cạnh đáy Bảng Vị Thế ở "Bản Gốc".
+  - **Kiểm chứng:** Build Vite production thành công (`✓ built in 226ms`, exit code 0). Dùng browser subagent chụp ảnh nghiệm thu ở 2 độ phân giải (834px và 1280px) xác nhận tiêu đề tài khoản hiển thị đầy đủ, không bị che mất chữ, màu sắc ngoài và trong đồng bộ hoàn hảo. Đồng thời test chuyển đổi sang "Bản Gốc" xác nhận Bản Gốc giữ nguyên trạng thái hoàn mỹ.
+
+- **[22/09/2026]** - Khôi Phục Nguyên Trạng Cạnh Đáy Bảng Vị Thế Ở Bản Gốc (Bảo Toàn 100% Nền Tảng Gốc):
+  - **Mô tả yêu cầu:** Ở Bản Gốc (Original Theme), cạnh đáy của Bảng Vị Thế cũng bị mất viền ngang (do thuộc tính `border-bottom: none` và `border-radius: 4px 4px 0 0` ở mobile layout). Khôi phục nguyên vẹn 100% đường chỉ đáy của Bảng Vị Thế ở Bản Gốc mà không làm ảnh hưởng đến bất kỳ thành phần nào khác.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Tại `@media screen and (max-width: 1024px)`, khôi phục `.main-workspace { border: 1.5px solid #444 !important; border-radius: 4px !important; }` và `.group-box { border-radius: 4px !important; }`.
+    - Cạnh đáy của Bảng Vị Thế ở Bản Gốc hiện thị trọn vẹn đường chỉ ngang 1.5px màu `#444` từ mép trái sang mép phải, bo 4 góc tròn đều hoàn hảo, tách bạch độc lập với Khung Tài Khoản bên dưới bằng khoảng dãn cách 8px.
+  - **Kiểm chứng:** Build Vite production thành công. Đã dùng browser subagent resize viewport về dạng stacked (850px) và chụp ảnh nghiệm thu xác nhận cạnh đáy Bảng Vị Thế ở Bản Gốc hiển thị đầy đủ, sắc nét 100%.
+
+- **[22/09/2026]** - Tách Bạch Tuyệt Đối Đường Viền Tránh Chồng Chéo, Đồng Bộ Giao Diện Cài Đặt (System Settings) Theo Theme Kính Mờ & Làm Mờ Ký Tự Placeholder:
+  - **Mô tả yêu cầu:**
+    1. Đường chỉ cạnh dưới của Bảng Vị Thế bị mất/đứt đoạn: Cần làm liền lạc 100% không đứt khúc.
+    2. Nút thu gọn `▲` cấu hình tài khoản có mảng nền xám cũ: Chuyển sang nền dark glass của theme Kính Mờ.
+    3. Nền các ô chọn đơn vị ký quỹ ($ / % / nhân Hệ số) và spinbox đang dùng màu xám cũ: Đổi sang gam dark glass đồng bộ.
+    4. Viền bao quanh Bảng Vị Thế và Tài Khoản: Cho sáng hơn chút (`#555d7d`) để nổi bật tách bạch khối.
+    5. Các đường viền bị chồng chéo lên nhau (viền kép do lồng container trong mobile layout): Bỏ viền thừa ở container ngoài, tách bạch 2 khối độc lập có khoảng cách rõ ràng.
+    6. Ký tự `--` khi chưa có tín hiệu: Cho mờ nhạt hơn (`#3b3f54`), tinh tế không gây rối mắt.
+    7. Đồng bộ toàn diện modal Cài Đặt (SystemSettingsModal) theo giao diện Kính Mờ (Dark Slate & Amber Gold).
+  - **Đã xử lý:**
+    1. **Khử triệt để lỗi viền chồng chéo & đứt đoạn cạnh đáy:**
+       - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Ở chế độ mobile/stacked, loại bỏ hoàn toàn viền kép ngoài của `.bot-panel-card` và `.sidebar-left` (`border: none !important; padding: 0 !important;`).
+       - `.main-workspace` giữ trọn vẹn viền đáy 1px liền lạc (`border: 1px solid #555d7d !important;`). Cạnh đáy Bảng Vị Thế phẳng tiệp, không bị cắt khúc.
+       - `.group-box` có viền độc lập tách rời với khoảng cách dãn cách thông thoáng 14px.
+    2. **Đồng bộ nút thu gọn `▲` & ô chọn $ %:**
+       - Container `.group-box-actions` và `.group-box-title` chuyển sang nền `#12131b` tiệp màu kính mờ, nút `▲` trong suốt và hover vàng hổ phách `#ffb74d`.
+       - `.spinbox-container`, `.risk-unit-btn`, `.risk-mult-badge`, `.styled-select` chuyển sang nền dark glass `#12131c` viền `#363b52`.
+    3. **Làm mờ ký tự `--` & Chờ tín hiệu:**
+       - Gắn class `.empty-dash` cho các ô placeholder `--` trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx), chỉnh màu mờ thanh thoát `#3b3f54` (opacity 0.55).
+    4. **Đồng bộ giao diện Cài Đặt (SystemSettingsModal):**
+       - Modal Header, Tab Bar (`API Key` / `Chiến Thuật`), Group boxes, Inputs, Dropdowns, Spinboxes, Coin select chips, Toggle switch và các nút Audit/Reset/Lưu đều khoác lên lớp áo Kính Mờ 2 gam màu chuẩn mực.
+  - **Kiểm chứng:** Build Vite production thành công (`✓ built in 283ms`, exit code 0). Browser subagent chụp ảnh nghiệm thu xác nhận cả màn hình chính và hộp thoại Cài Đặt hiển thị sắc nét, tách bạch, không lỗi chồng chéo.
+
+- **[22/09/2026]** - Chuẩn Hoá Theme Kính Mờ: Đúng 2 Gam Màu (Dark Slate & Amber Gold), Đồng Bộ Viền 1px Sắc Nét & Xoá Bỏ Hoàn Toàn Chỉ Thừa Đè Lên Nhau:
+  - **Mô tả yêu cầu:**
+    1. Chỉ sử dụng đúng 1-2 gam màu xuyên suốt giao diện và chỉ thay đổi các sắc độ đậm nhạt của chúng để đạt tính thẩm mỹ tối đa. Xoá bỏ hoàn toàn các mảng xám bùn `#222`, `#444` và màu xanh lệch tông cũ.
+    2. Các đường viền bao quanh phải sắc nét, rõ ràng, tách bạch hơn.
+    3. Đồng bộ chuẩn 1px cho mọi đường viền, không có chỉ thừa đè lên nhau (loại bỏ double borders giữa các khối liền kề và trong bảng vị thế).
+  - **Đã xử lý:**
+    1. **Bảng màu 2 Gam Nhất Quán:**
+       - **Gam 1 (Dark Slate Obsidian - 90% UI):** Nền canvas `#0b0c11`, thân card & workspace `#12131b`, header & group-box `#161823`, ô input & spinbox & inactive chip `#1d1f2c`, hover row `#1a1c27`.
+       - **Gam 2 (Amber Gold - 10% Accent):** Tiêu đề thương hiệu, active tab indicator, focus ring, và toàn bộ các nút/chip ở trạng thái BẬT (`.tf-badge.on`, `.risk-unit-btn.active`, `.risk-mult-badge.active`) đều chuyển sang tông vàng hổ phách `#ffb74d` viền `#f59e0b`.
+    2. **Đồng Bộ Viền 1px Sắc Nét & Không Chỉ Thừa:**
+       - Chuẩn hoá toàn bộ viền bao quanh (Sidebar, GroupBox, Workspace, Header, Table Grid, Resizer) về duy nhất `1px solid #33374b`.
+       - Khử triệt để hiện tượng đè viền kép (double borders) trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): cell `th:last-child` và `td:last-child` bỏ `border-right`, hàng cuối `tr:last-child td` bỏ `border-bottom`, resizer và tab header được đồng bộ 1px phẳng tiệp.
+    3. Cập nhật [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx), [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx), và [AppHeader.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx) gắn class đồng bộ.
+  - **Kiểm chứng:** Vite build production thành công (`✓ built in 289ms`, exit code 0). Browser subagent chụp ảnh nghiệm thu xác nhận đường viền sắc nét, màu sắc hài hoà 2 gam màu chuẩn mực.
+
+- **[22/09/2026]** - Tinh Chỉnh Bản Kính Mờ: Trả Về Màu Xám Hài Hoà Bản Gốc & Loại Bỏ Hoàn Toàn Đường Chỉ Viền Rối Mắt:
+  - **Mô tả yêu cầu:** Bản kính mờ trước đó thêm quá nhiều đường chỉ bo viền (viền vàng bao quanh tiêu đề nhóm, viền hover, viền tab) gây rối mắt; màu sắc các khối chưa hài hoà. Cần loại bỏ hết các đường viền chỉ thừa, giữ trọn vẹn tông màu xám thanh lịch của bản gốc và thể hiện hiệu ứng kính mờ qua lớp nền mờ ảo bán trong suốt nhẹ nhàng.
+  - **Đã xử lý:**
+    1. Cập nhật [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+       - Bỏ hoàn toàn đường viền hộp bao quanh chữ `TÀI KHOẢN (BOT EMA200):`, trả về dạng notch phẳng tiệp nền với màu xám `#888888` nguyên bản.
+       - Giữ nguyên viền chuẩn `1.5px solid #444444; border-radius: 4px;` đồng bộ giữa Khung Tài Khoản và Bảng Vị Thế, bỏ toàn bộ viền kép và hiệu ứng hover màu mè.
+       - Lớp kính mờ được tạo bởi nền bán trong suốt `rgba(22, 22, 26, 0.75)` kèm `backdrop-filter: blur(12px)` trên nền xám tối `#111114`.
+       - Giữ nguyên bảng màu xám `#222222` và viền `#444444` của các ô input số, spinbox, và tab.
+    2. Cập nhật nút chuyển đổi theme trên Header [AppHeader.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx): Sử dụng tông xám bạc `[ ✓ Kính Mờ ]` nhã nhặn, không gây chói mắt.
+  - **Kiểm chứng:** Test browser thực tế và chụp ảnh nghiệm thu layout hoàn chỉnh. Build production Vite thành công (`✓ built in 427ms`, exit code 0).
+    3. Thêm nút chuyển đổi 1 chạm `[ ● Bản Gốc ]` ⇋ `[ ✓ Kính Mờ #181920 ]` ngay trên thanh Header [AppHeader.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx) và lưu trạng thái vào `localStorage`. CEO chỉ cần bấm 1 click là chuyển qua lại tức thì để so sánh trên cùng một luồng dữ liệu live.
+  - **Kiểm chứng:** Test browser và chụp ảnh so sánh trực tiếp cả 2 phiên bản. Build production Vite thành công (`✓ built in 303ms`, exit code 0).
+
+- **[22/09/2026]** - Tinh Chỉnh Cụm Chọn Bot: Bỏ Chữ Chiến Lược, Căn Giữa Tên Bot & Thay Bằng Pattern Vẽ Tay Vector Nhận Dạng Chiến Lược:
+  - **Mô tả yêu cầu:** Bỏ phần tag chữ "CHIẾN LƯỢC", căn giữa tên các bot trong nút và dropdown. Thay thế chấm đèn LED tròn bằng các hình vẽ pattern vector đặc trưng riêng cho từng chiến lược (tuyệt đối không dùng emoji/icon OS).
+  - **Đã xử lý:**
+    1. Cập nhật [AppHeader.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx):
+       - **Bot EMA200:** Hình vẽ vector đường sóng EMA200 uốn lượn qua 2 thanh nến xanh tăng - đỏ giảm.
+       - **Bot SMC:** Hình vẽ vector khối hộp Order Block nét đứt và đường giá bứt phá hồi quy chạm mép hộp (Mitigation entry).
+       - **Bot Liquidation:** Hình vẽ vector nến quét râu dài xuyên qua cản thanh khoản và đảo chiều rút chân.
+       - Căn giữa tên bot và phần mô tả thuật toán, loại bỏ dòng chữ "CHIẾN LƯỢC" để nút thanh thoát, tập trung trọn vẹn vào tên Bot và Pattern nhận diện.
+  - **Kiểm chứng:** Test browser thực tế và chụp ảnh nghiệm thu layout cả khi đóng và mở menu. Build production Vite thành công (`✓ built in 294ms`, exit code 0).
+
+- **[22/09/2026]** - Hoàn Thiện Thuật Toán A (AutoFit) Thích Ứng Mọi Hoàn Cảnh & Cố Định Tầm Nhìn ~60 Cây Nến:
+  - **Mô tả yêu cầu:** 
+    1. Khi giá nến và EMA200 áp sát nhau (khoảng cách giữa giá và EMA200 quá nhỏ), nếu vẫn ép theo biên độ 1/4 thì đồ thị bị zoom phóng đại cục bộ khiến nến bị che khuất hết. Cần tự động nhận diện thời điểm này để đưa cả cụm Giá & EMA200 ra **CHÍNH GIỮA (50%)** và zoom nhỏ lại để hiển thị trọn vẹn toàn bộ các cây nến dao động trên màn hình.
+    2. Khi giá và EMA200 cách xa nhau (trend rõ ràng): Giữ nguyên cơ chế cân đều 2 mép 1/4 trên - dưới, nhưng luôn có ngưỡng bảo vệ để không bao giờ bị cắt râu nến ở đỉnh/đáy.
+    3. Thêm điều kiện cố định số lượng nến hiển thị trên màn hình: Luôn luôn duy trì tầm nhìn chuẩn ~60 cây nến (kèm 8 nến đệm bên phải) khi bật AutoFit [A].
+  - **Đã xử lý:** 
+    1. Cập nhật `applyDefaultZoom`: Đặt `candleCount = 60` (chuẩn 60 nến) và `rightOffset = 8` trong [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx#L313-L334).
+    2. Cập nhật `autoscaleInfoProvider`: 
+       - Kiểm tra `peSpread = pTop - pBottom`. Nếu `peSpread < 0.40 * cSpan` (giá và EMA200 gần nhau quá):
+         - Đưa tâm dao động (`center = sqrt(Price * EMA)` ở Log mode, `(Price + EMA)/2` ở Linear mode) ra **CHÍNH GIỮA (50%)**.
+         - Tính toán biên độ đối xứng bao trọn cả cây nến cao nhất (`cMax`) và thấp nhất (`cMin`) cộng thêm 12% khoảng thở.
+       - Khi `peSpread >= 0.40 * cSpan` (cách xa nhau): Duy trì chuẩn 1/4 trên và 1/4 dưới, đồng thời bảo toàn trần sàn cho nến ngoại lai.
+  - **Kiểm chứng:** Build production Vite thành công (`✓ built in 274ms`, exit code 0).
+
+- **[22/09/2026]** - Dịch Chuyển Cụm Nút A & L Về Góc Dưới Phải (Dưới Cột Thước Đo Giá):
+  - **Mô tả yêu cầu:** Cụm 2 nút A (AutoFit) và L (Log Scale) trước đó nằm ở bên trái cột thước đo giá (`right: ${priceScaleWidth + 4}px`), đè lên vùng nến của đồ thị. Kéo dịch 2 nút về góc dưới cùng bên phải (`right: 6px, bottom: 6px, gap: 3px`), nằm gọn gàng bên dưới cột thước đo giá như 2 ô vuông chỉ định, giải phóng hoàn toàn không gian đồ thị nến.
+  - **Đã xử lý:** Cập nhật vị trí container nút trong [SingleChartPane.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/chart/SingleChartPane.jsx#L2034-L2037) thành `right: "6px", bottom: "6px", gap: "3px"`.
+  - **Kiểm chứng:** Build Vite production thành công (`✓ built in 352ms`, exit code 0).
+
+- **[22/09/2026]** - Cơ Chế Định Vị Đồ Thị A & L Mới: Đường Chỉ Giá & EMA200 Luôn Cách Đều 2 Cạnh Trên Dưới ~1/4:
+  - **Mô tả yêu cầu:** Trước đó chế độ A (AutoFit) tự động đưa đường giá nến vào khoảng giữa đồ thị (38% - 62%). Yêu cầu đổi cơ chế mặc định A & L: đường chỉ giá của nến hiện tại và đường EMA200 luôn luôn cách đều 2 cạnh trên và dưới của đồ thị một khoảng ~ 1/4 (25%).
+  - **Đã xử lý:** 
+    1. Thiết lập thuật toán tính toán biên độ tự động trong `autoscaleInfoProvider` của `SingleChartPane.jsx`:
+       - Xác định $pTop = \max(\text{currentPrice}, \text{currentEma200})$ và $pBottom = \min(\text{currentPrice}, \text{currentEma200})$.
+       - Khi ở chế độ **L (Log Scale)**: Tính theo tỷ lệ log lũy thừa với căn bậc hai `sqrt(pTop / pBottom)` để khoảng cách trực quan từ 2 đường tới 2 cạnh trên và dưới đồ thị luôn giữ chuẩn xác ~1/4 (25%), vùng ở giữa chiếm 50%.
+       - Khi ở chế độ **Linear**: Tính theo delta khoảng cách `newMax = pTop + 0.5 * delta`, `newMin = pBottom - 0.5 * delta` đảm bảo mỗi lề chiếm 25% (1/4).
+       - Có ngưỡng bảo vệ biên độ tối thiểu khi giá nến tiệm cận hoặc cắt ngang EMA200, chống giật rung.
+    2. Cập nhật `scaleMargins` đối xứng ({ top: 0.04, bottom: 0.04 }) và đồng bộ liên tục giá trị `latestEma200Ref` theo thời gian thực (realtime WebSocket tick).
+  - **Kiểm chứng:** Build production Vite thành công (`✓ built in 373ms`, exit code 0).
+
 - **[22/09/2026]** - Đồng Bộ Tuyệt Đối Đường Viền Cụm Tài Khoản (Bot EMA200) Với Bảng Vị Thế (1.5px solid #444):
   - **Mô tả thay đổi:** Khung `Bảng Vị Thế` (.main-workspace) sử dụng đường viền `border: 1.5px solid #444; border-radius: 4px;`. Trước đó khung `Tài khoản (Bot EMA200)` (.group-box) vẫn đang dùng `2px solid #444` khiến nét viền dày hơn một chút.
   - **Đã xử lý:** 

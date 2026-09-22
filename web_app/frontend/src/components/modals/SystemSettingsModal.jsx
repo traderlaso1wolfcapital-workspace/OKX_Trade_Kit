@@ -259,6 +259,7 @@ export default function SystemSettingsModal({
                         <div style={{ display: "flex", gap: "2px" }}>
                           <button
                             type="button"
+                            className={`risk-unit-btn ${risk.volUnit === "USDT" ? "active" : ""}`}
                             onClick={() => setRisk(r => {
                               const currentVal = r.posVol;
                               const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
@@ -268,6 +269,7 @@ export default function SystemSettingsModal({
                           >USDT</button>
                           <button
                             type="button"
+                            className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
                             onClick={() => setRisk(r => {
                               const currentVal = r.posVol;
                               const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
@@ -289,6 +291,7 @@ export default function SystemSettingsModal({
                           }
                         >
                           <div
+                            className={`risk-mult-badge ${risk.multiplyVolumeByTf ? "active" : ""}`}
                             style={{
                               display: "inline-flex",
                               alignItems: "center",
@@ -305,10 +308,10 @@ export default function SystemSettingsModal({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            <span style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
+                            <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
                               {risk.multiplyVolumeByTf ? "nhân Hệ số" : "Cố định"}
                             </span>
-                            <span style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
+                            <span className="risk-mult-arrow" style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
                           </div>
 
                           <select
