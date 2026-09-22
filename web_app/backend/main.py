@@ -344,18 +344,12 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
             "Accept": "application/json"
         }
         
-        # Origin có thể dùng để check redirect_uri
-        origin = request.headers.get("origin")
-        if not origin:
-            # Fallback nếu gọi từ localhost test
-            origin = "http://localhost:5173" if request.client.host == "127.0.0.1" else f"{request.url.scheme}://{request.url.netloc}"
-            
         payload = {
             "grant_type": "authorization_code",
             "code": req.code,
             "client_id": client_id,
             "client_secret": client_secret,
-            "redirect_uri": f"{origin}/okx-callback"
+            "redirect_uri": "https://autotrader.fun/okx-callback"
         }
         
         resp = requests.post(url, data=payload, headers=headers, timeout=10)

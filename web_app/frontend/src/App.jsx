@@ -7,8 +7,8 @@ import SingleChartPane from "./components/chart/SingleChartPane";
 import PositionsTable from "./components/positions/PositionsTable";
 import LogsTerminal from "./components/terminal/LogsTerminal";
 import HistoryTable from "./components/history/HistoryTable";
-import LoginModal from "./components/modals/LoginModal";
 import SystemSettingsModal from "./components/modals/SystemSettingsModal";
+import ConnectModal from "./components/modals/ConnectModal";
 import { AddAccountModal, DeleteAccountModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
 import "./App.css";
@@ -17,13 +17,12 @@ function App() {
   // 1. Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem("tls1_auth") === "true");
   const [loginUid, setLoginUid] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authStep, setAuthStep] = useState("uid");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
   const [loginPassphrase, setLoginPassphrase] = useState("");
   const [lockMessage, setLockMessage] = useState("");
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const audioRef = useRef(null);
 
   // 2. Hardware ID & Bot Slot
@@ -575,7 +574,7 @@ function App() {
           }));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isAuthenticated, activeBotTab, currentUid]);
 
   // Load admin closed positions for backtest stats
@@ -586,7 +585,7 @@ function App() {
       .then(data => {
         if (Array.isArray(data)) setAdminClosedPositions(data);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isAuthenticated, activeBotTab]);
 
   // Load accounts list
@@ -600,13 +599,13 @@ function App() {
           localStorage.setItem("tls1_accounts", JSON.stringify(data));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [isAuthenticated, currentUid]);
 
   // Start shadow bot in background
   useEffect(() => {
     if (!isAuthenticated || !currentUid) return;
-    fetch(`/api/bot/shadow/start?uid=${currentUid}&strategy=${activeBotTab}`, { method: 'POST' }).catch(() => {});
+    fetch(`/api/bot/shadow/start?uid=${currentUid}&strategy=${activeBotTab}`, { method: 'POST' }).catch(() => { });
   }, [isAuthenticated, activeBotTab, currentUid]);
 
   // 10. WebSocket Logs Terminal stream (with full multi-bot buffer, no line clipping!)
@@ -703,9 +702,35 @@ function App() {
         const code = urlParams.get("code");
         if (code && currentUid) {
           try {
-            const acc = effectiveAccId;
+            let acc = effectiveAccId;
             const strat = activeBotTab || "sub1";
-            
+
+            if (!acc) {
+              acc = `sub_${Date.now()}`;
+              const cleanName = "Tài khoản 1";
+              const newAcc = { id: acc, name: cleanName };
+
+              setAccounts(prev => {
+                const next = [...prev, newAcc];
+                localStorage.setItem("tls1_accounts", JSON.stringify(next));
+                return next;
+              });
+              setSelectedAccount(acc);
+              setBotAccountMap(prev => {
+                const next = { ...prev, [strat]: acc };
+                localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+                return next;
+              });
+
+              try {
+                await fetch(`/api/bot/accounts?uid=${currentUid}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: acc, name: cleanName })
+                });
+              } catch (e) { }
+            }
+
             addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
             const res = await fetch("/api/auth/okx/callback", {
               method: "POST",
@@ -745,7 +770,7 @@ function App() {
         }
       }
     };
-    
+
     if (isAuthenticated) {
       handleCallback();
     }
@@ -754,15 +779,15 @@ function App() {
   // Fast Connect Handler
   const handleFastConnect = () => {
     // Tích hợp OKX Fast Connect API (OAuth 2.0)
-    const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb"; 
-    const redirectUri = encodeURIComponent(window.location.origin + "/okx-callback");
+    const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
+    const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
     // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
     const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     sessionStorage.setItem("okx_oauth_state", state);
     // URL sử dụng /account/oauth/authorize (theo tài liệu OKX Broker)
     // scope=read_only+trade theo tài liệu OKX (fast_api không phải scope hợp lệ → redirect về hồ sơ)
     const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
-    
+
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -774,7 +799,68 @@ function App() {
     }
   };
 
+  const handleConnectApiKey = async (uid, inputApiKey, inputSecretKey, inputPassphrase) => {
+    try {
+      let accId = effectiveAccId;
+      if (!accId) {
+        accId = `sub_${Date.now()}`;
+        const cleanName = "Tài khoản 1";
+        const newAcc = { id: accId, name: cleanName };
+
+        setAccounts(prev => {
+          const next = [...prev, newAcc];
+          localStorage.setItem("tls1_accounts", JSON.stringify(next));
+          return next;
+        });
+        setSelectedAccount(accId);
+        setBotAccountMap(prev => {
+          const next = { ...prev, [activeBotTab]: accId };
+          localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+          return next;
+        });
+
+        try {
+          await fetch(`/api/bot/accounts?uid=${uid}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: accId, name: cleanName })
+          });
+        } catch (e) { }
+      }
+
+      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${uid}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: inputApiKey, secret_key: inputSecretKey, passphrase: inputPassphrase })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`❌ Lỗi: ${err.detail || "Không thể kết nối API Key"}`);
+        return;
+      }
+      setIsAuthenticated(true);
+      localStorage.setItem("tls1_auth", "true");
+      localStorage.setItem("tls1_uid", uid);
+      setLoginUid(uid);
+      setApiKey(inputApiKey);
+      setSecretKey(inputSecretKey);
+      setPassphrase(inputPassphrase);
+      alert("✅ Kết nối API Key thành công!");
+      setShowConnectModal(false);
+    } catch (e) {
+      alert(`Lỗi kết nối: ${e.message}`);
+    }
+  };
+
   // Bot Start / Stop Handlers
+  const handleStartBotClick = () => {
+    if (!isAuthenticated || !apiKey || !secretKey || !passphrase) {
+      setShowConnectModal(true);
+    } else {
+      handleStartBot();
+    }
+  };
+
   const handleStartBot = async () => {
     if (isStartingBot || isStoppingBot) return;
     const currentAcc = effectiveAccId;
@@ -1271,68 +1357,6 @@ function App() {
     window.location.reload();
   };
 
-  // Login handler
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (audioRef.current) audioRef.current.play().catch(() => {});
-    if (authStep === "create_password") {
-      if (!adminPassword || adminPassword.length < 4) {
-        setLoginError("Mật khẩu phải có tối thiểu 4 ký tự!");
-        return;
-      }
-      if (adminPassword !== adminConfirmPassword) {
-        setLoginError("Mật khẩu xác nhận không khớp! Vui lòng kiểm tra lại.");
-        return;
-      }
-    }
-
-    setIsLoggingIn(true);
-    setLoginError("");
-    try {
-      const pwdToSend = (authStep === "require_password" || authStep === "create_password") ? adminPassword : "";
-      const payload = {
-        uid: loginUid,
-        password: pwdToSend,
-        passphrase: authStep === "require_passphrase" ? loginPassphrase : ""
-      };
-      const res = await fetch(`/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.status === "success") {
-        setIsAuthenticated(true);
-        localStorage.setItem("tls1_auth", "true");
-        localStorage.setItem("tls1_uid", loginUid);
-        if (data.token) {
-          localStorage.setItem("tls1_token", data.token);
-        }
-        setAuthStep("uid");
-        setAdminPassword("");
-        setAdminConfirmPassword("");
-        setLoginPassphrase("");
-        setLoginError("");
-      } else if (data.status === "require_create_password") {
-        setAuthStep("create_password");
-        setAdminPassword("");
-        setAdminConfirmPassword("");
-        setLoginError("");
-      } else if (data.status === "require_password") {
-        setAuthStep("require_password");
-        setAdminPassword("");
-        setLoginError("");
-      } else if (data.status === "locked" || data.status === "pending") {
-        setLoginError(data.message || "Tài khoản đang bị khoá hoặc chờ duyệt.");
-      } else {
-        setLoginError(data.message || "Đăng nhập thất bại");
-      }
-    } catch {
-      setLoginError("Không thể kết nối đến máy chủ xác thực. Hãy kiểm tra kết nối mạng.");
-    }
-    setIsLoggingIn(false);
-  };
-
 
   // Poll trạng thái lock/pending mỗi 30s — giống Desktop App
   useEffect(() => {
@@ -1461,9 +1485,9 @@ function App() {
     const fetchStatus = async () => {
       try {
         const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-        if (r.ok) { 
-          const d = await r.json(); 
-          if (d?.status && setBotStatus) setBotStatus(d.status); 
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.status && setBotStatus) setBotStatus(d.status);
         }
       } catch { }
     };
@@ -1514,28 +1538,7 @@ function App() {
   }, [isAuthenticated, activeBotTab, selectedAccount, botAccountMap, loginUid, effectiveAccId, fetchPositions]);
 
 
-  if (!isAuthenticated) {
-    return (
-      <LoginModal
-        isAuthenticated={isAuthenticated}
-        audioRef={audioRef}
-        authStep={authStep}
-        setAuthStep={setAuthStep}
-        loginUid={loginUid}
-        setLoginUid={setLoginUid}
-        adminPassword={adminPassword}
-        setAdminPassword={setAdminPassword}
-        adminConfirmPassword={adminConfirmPassword}
-        setAdminConfirmPassword={setAdminConfirmPassword}
-        loginPassphrase={loginPassphrase}
-        setLoginPassphrase={setLoginPassphrase}
-        loginError={loginError}
-        setLoginError={setLoginError}
-        isLoggingIn={isLoggingIn}
-        handleLogin={handleLogin}
-      />
-    );
-  }
+  // Render main UI directly instead of blocking with LoginModal
 
   const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
 
@@ -1546,6 +1549,13 @@ function App() {
           {lockMessage}
         </div>
       )}
+
+      <ConnectModal
+        isOpen={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        handleFastConnect={handleFastConnect}
+        onSaveApiKey={handleConnectApiKey}
+      />
 
       <div className={`content-wrapper ${fadeClass}`}>
         {/* SIDEBAR LEFT */}
@@ -1610,7 +1620,7 @@ function App() {
                 </button>
               ) : (
                 <button
-                  onClick={handleStartBot}
+                  onClick={handleStartBotClick}
                   className="btn-action-start"
                   style={{ width: "fit-content" }}
                 >
@@ -1621,7 +1631,7 @@ function App() {
                 </button>
               )}
               <button
-                onClick={handleFastConnect}
+                onClick={() => setShowConnectModal(true)}
                 className="btn-connect-okx"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
@@ -1754,7 +1764,7 @@ function App() {
                     </section>
 
                     {/* Resizer thanh kéo giữa Biểu Đồ và Bảng Vị Thế */}
-                    <div 
+                    <div
                       className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
                       onMouseDown={startResizing}
                       onTouchStart={startResizing}
