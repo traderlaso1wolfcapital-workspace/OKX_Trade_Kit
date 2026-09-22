@@ -5,6 +5,11 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
@@ -28,13 +33,13 @@ body {
   height: 100vh;
   width: 100%;
   background-color: #1e1e1e;
-  padding: env(safe-area-inset-top) calc(env(safe-area-inset-right) + 3px) env(safe-area-inset-bottom) calc(env(safe-area-inset-left) + 3px);
+  padding: 0;
 }
 
 .content-wrapper {
   display: flex;
   flex: 1;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   overflow: hidden;
   flex-direction: row;
@@ -52,8 +57,8 @@ body {
 
 /* ============= SIDEBAR TRÁI ============= */
 .sidebar-left {
-  width: 285px;
-  min-width: 285px;
+  width: 350px;
+  min-width: 350px;
   background-color: #252526;
   border-right: 1px solid #333333;
   display: flex;
@@ -98,7 +103,7 @@ body {
 
 /* ============= GROUP BOX ============= */
 .group-box {
-  border: 1px solid #444;
+  border: 1.5px solid #444;
   border-radius: 4px;
   padding: 16px 10px 10px;
   margin-bottom: 14px;
@@ -493,10 +498,10 @@ body {
 /* ============= THẺ LIỀN KHỐI CỤM BOT (1:1 ẢNH 2) ============= */
 .bot-panel-card {
   background-color: #222222;
-  border: 1px solid #333333;
+  border: 2px solid #333333;
   border-radius: 0 4px 4px 4px;
   margin: 0 10px 10px 10px;
-  padding: 10px 12px 10px 12px;
+  padding: 0 12px 10px 12px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -512,9 +517,11 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
-  margin-bottom: 10px;
+  margin-top: 10px; /* Cách đỉnh 10px (hơn đáy đúng 2px tạo độ thoáng cách điệu quang học) */
+  margin-bottom: 8px; /* Cách đáy 8px gọn gàng */
+  padding: 0;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .btn-action-start {
@@ -527,16 +534,23 @@ body {
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   min-height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 0 10px rgba(46, 125, 50, 0.35);
+  width: fit-content;
 }
 
 .btn-action-start:hover:not(:disabled) {
   background-color: #388E3C;
-  border-color: #ffaa00;
+  box-shadow: 0 0 16px rgba(76, 175, 80, 0.75);
+  transform: translateY(-1px);
+}
+
+.btn-action-start:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn-action-start:disabled {
@@ -544,6 +558,8 @@ body {
   color: #888888;
   border-color: #444444;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-action-stop {
@@ -556,16 +572,23 @@ body {
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   min-height: 30px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-shadow: 0 0 10px rgba(198, 40, 40, 0.35);
+  width: fit-content;
 }
 
 .btn-action-stop:hover:not(:disabled) {
   background-color: #D32F2F;
-  border-color: #ffaa00;
+  box-shadow: 0 0 16px rgba(244, 67, 54, 0.75);
+  transform: translateY(-1px);
+}
+
+.btn-action-stop:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn-action-stop:disabled {
@@ -573,6 +596,8 @@ body {
   color: #888888;
   border-color: #444444;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-connect-okx {
@@ -580,17 +605,17 @@ body {
   color: #ffffff;
   border: none;
   border-radius: 4px;
-  padding: 6px 20px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 12.5px;
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-height: 30px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
   width: fit-content;
 }
 
@@ -695,11 +720,11 @@ a#tv-attr-logo,
 .main-workspace {
   display: flex;
   flex: 1;
-  height: calc(100% - 31px);
+  height: 100%;
   min-height: 0;
   overflow: hidden;
   width: 100%;
-  border: 1px solid #333333;
+  border: 1.5px solid #444;
   border-radius: 4px;
   background-color: #0c0c0c;
   position: relative;
@@ -719,12 +744,12 @@ a#tv-attr-logo,
 
 .main-workspace.vertical .pane-chart {
   height: var(--chart-ratio, 50%);
-  border-bottom: 1px solid #333333;
+  border-bottom: none;
 }
 
 .main-workspace.horizontal .pane-chart {
   width: var(--chart-ratio, 50%);
-  border-right: 1px solid #333333;
+  border-right: 1.5px solid #444;
 }
 
 .resizer {
@@ -734,19 +759,23 @@ a#tv-attr-logo,
 }
 
 .resizer.horizontal-resizer {
-  height: 4px;
+  height: 9px;
   cursor: row-resize;
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #111111;
+  border-top: none;
+  border-bottom: 1.5px solid #444;
+  box-sizing: border-box;
 }
 
 .resizer.horizontal-resizer::after {
   content: "";
-  width: 60px;
-  height: 4px;
-  background-color: #777; /* Bright grey so it stands out */
-  border-radius: 4px;
+  width: 48px;
+  height: 3px;
+  background-color: #666666; /* Bright grey grab handle so it stands out */
+  border-radius: 2px;
 }
 
 .resizer.horizontal-resizer:hover, .resizer.horizontal-resizer:active {
@@ -845,20 +874,33 @@ a#tv-attr-logo,
   position: relative;
 }
 
-/* ============= PANE TABS (Logs + Positions) ============= */
+/* ============= PANE TABS (Positions + Logs + Charts) ============= */
 .pane-tabs {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background-color: #222;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .main-workspace.vertical .pane-tabs {
-  height: calc(100% - var(--chart-ratio, 50%) - 10px); /* 10px is resizer height */
+  width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
-.main-workspace.horizontal .pane-tabs {
-  width: calc(100% - var(--chart-ratio, 50%) - 10px);
+.chart-tab-pane {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background-color: #0c0c0c;
 }
 
 .tab-bar-header {
@@ -904,6 +946,36 @@ a#tv-attr-logo,
   border-bottom: 2px solid #F90;
 }
 
+.btn-tab-split {
+  background: transparent;
+  border: none;
+  border-left: 1px solid #333333;
+  color: #a0a0a0;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 0 12px;
+  height: 100%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-tab-split:hover {
+  background-color: #2a2a2a;
+  color: #ff9900;
+}
+
+.btn-tab-split.active {
+  background-color: #252836;
+  color: #ff9900;
+}
+
+.btn-tab-split.active:hover {
+  background-color: #2d3142;
+}
+
 /* Status Badge */
 .status-badge {
   font-size: 11px;
@@ -923,29 +995,36 @@ a#tv-attr-logo,
 .logs-terminal {
   background-color: #0d0d0d;
   color: #c8c8c8;
-  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: var(--terminal-font-size, 13.5px);
+  letter-spacing: var(--terminal-letter-spacing, normal);
   padding: 8px 14px 42px 14px;
   box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
   height: 100%;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 .log-block {
   font-size: inherit;
   font-family: inherit;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 .log-line {
   font-size: inherit;
   font-family: inherit;
   letter-spacing: inherit;
-  line-height: 1.55;
+  line-height: 1.48;
   white-space: pre;
   border-bottom: 1px solid #141414;
   padding: 1px 0;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
 }
 
 /* ============= POSITIONS TABLE ============= */
@@ -1469,24 +1548,53 @@ a#tv-attr-logo,
     flex-direction: column;
     height: 100dvh;
     overflow: hidden;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .content-wrapper {
     flex-direction: column !important;
     flex: 1;
+    width: 100% !important;
+    max-width: 100% !important;
     overflow-y: auto;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Main section (Tabs bot + Chart workspace) luôn hiện trước (order: 1) */
   .main-section {
     width: 100% !important;
+    max-width: 100% !important;
     order: 1;
     display: flex;
     flex-direction: column;
     flex: 1 !important;
     height: auto !important;
     min-height: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Trên mobile: cụm Bot tabs bar và thẻ Bot panel card có đường chỉ dọc 2 bên viền mép màu #333333 */
+  .bot-tabs-bar {
+    width: 100% !important;
+    margin: 4px 0 0 0 !important;
+    padding: 0 5px !important;
+    box-sizing: border-box;
+  }
+
+  .bot-panel-card {
+    margin: 0 !important;
+    padding: 0 5px 0 5px !important; /* Xoá padding đáy thừa để khớp liền khối với Tài khoản */
+    border-left: 2px solid #333333 !important;
+    border-right: 2px solid #333333 !important;
+    border-bottom: none !important; /* Xoá đường chỉ ngang ngăn cách ngay trên Tài khoản */
+    border-radius: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
   .main-workspace {
@@ -1494,33 +1602,41 @@ a#tv-attr-logo,
     flex-direction: column !important;
     flex: 1 !important;
     height: 0 !important; /* Let flex control height */
+    border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 trọn vẹn 4 cạnh */
+    border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
+    box-sizing: border-box !important;
   }
 
   .main-workspace .pane-chart {
     width: 100% !important;
     height: var(--chart-ratio, 50%) !important;
+    border-left: none;
     border-right: none;
-    border-bottom: 1px solid #333333;
+    border-bottom: none !important;
     flex-shrink: 0;
   }
 
   .main-workspace .pane-tabs {
     width: 100% !important;
     flex: 1 !important;
-    height: calc(100% - var(--chart-ratio, 50%) - 10px) !important;
-    min-height: 200px;
+    height: 100% !important;
+    min-height: 0 !important;
     flex-shrink: 0;
+    border: none !important;
   }
 
-  /* Sidebar controls xuống dưới (order: 2) */
+  /* Sidebar controls xuống dưới (order: 2) có đường chỉ dọc 2 bên viền mép màu #333333 dày 2px */
   .sidebar-left {
     width: 100% !important;
     min-width: unset;
-    border-right: none;
-    border-top: 1px solid #333;
+    border-left: 2px solid #333333 !important;
+    border-right: 2px solid #333333 !important;
+    border-top: none !important;
+    border-bottom: 2px solid #333333 !important;
     height: auto;
     order: 2;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
   
   .sidebar-header {
@@ -1528,7 +1644,7 @@ a#tv-attr-logo,
   }
 
   .sidebar-content {
-    padding: 10px;
+    padding: 0 5px 10px 5px !important;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -1540,7 +1656,14 @@ a#tv-attr-logo,
   .sidebar-content .group-box {
     width: 100%;
     box-sizing: border-box;
+    margin-top: 0 !important;
     margin-bottom: 0;
+    border: 1.5px solid #444 !important;
+    border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
+  }
+
+  .sidebar-content .group-box:first-of-type {
+    margin-top: 18px !important; /* Cân đối khoảng cách vừa vặn 8px từ đáy Bảng Vị Thế đến chữ tiêu đề */
   }
 
   .sidebar-footer {
@@ -1577,6 +1700,12 @@ a#tv-attr-logo,
   }
 
 
+  /* Tăng độ dài các ô nhập số liệu (spinbox) trên mobile để nhập được nhiều số liệu hơn */
+  .risk-row .spinbox-container,
+  .entry-setup-row .spinbox-container {
+    width: 120px !important;
+  }
+
   /* Select lon hon tren mobile de de bam */
   .styled-select {
     font-size: 14px;
@@ -1594,16 +1723,21 @@ a#tv-attr-logo,
 
   /* Log font fit to mobile screen without horizontal overflow for 78-char table */
   .logs-terminal {
-    font-size: clamp(7px, 2.05vw, 8.2px) !important;
-    letter-spacing: -0.3px !important;
+    font-size: var(--terminal-font-size, clamp(7.2px, 2.08vw, 8.8px)) !important;
+    letter-spacing: var(--terminal-letter-spacing, -0.28px) !important;
     padding: 6px 4px 36px 4px !important;
-    line-height: 1.42 !important;
+    line-height: 1.4 !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
   }
   .log-block,
   .log-line {
     font-size: inherit !important;
+    font-family: inherit !important;
     letter-spacing: inherit !important;
-    line-height: 1.42 !important;
+    line-height: 1.4 !important;
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
   }
 
   /* Positions table scroll ngang và dọc trên mobile */
@@ -1965,8 +2099,8 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   height: 100%;
   min-height: 0;
   display: grid;
-  gap: 3px;
-  background-color: #12141a;
+  gap: 1px;
+  background-color: #444;
   overflow: hidden;
   position: relative;
 }
@@ -2011,8 +2145,8 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   min-width: 0;
   background-color: #0c0c0c;
   overflow: visible;
-  border: 1px solid #333333;
-  border-radius: 2px;
+  border: none;
+  border-radius: 0;
   box-sizing: border-box;
   transition: border-color 0.15s ease;
   z-index: 1;
@@ -2023,7 +2157,7 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
 }
 
 .single-chart-card.active {
-  border-color: #333333;
+  border-color: transparent;
 }
 
 .single-chart-header {
@@ -3228,7 +3362,7 @@ div[class*="tradingview-widget-copyright"],
   background: rgba(242, 54, 70, 0.15);
 }
 
-/* ================= TLS1 BACKTESTING TABLE (TOP-RIGHT OF CHART) ================= */
+/* ================= TLS1 BACKTESTING TABLE (TOP-RIGHT OF CHART, 15% SMALLER) ================= */
 .chart-backtest-table-wrap {
   position: absolute;
   top: 0;
@@ -3240,7 +3374,7 @@ div[class*="tradingview-widget-copyright"],
   border: 1px solid rgba(42, 53, 74, 0.95);
   border-top: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 5px 5px;
   overflow: hidden;
   transition: all 0.2s ease;
 }
@@ -3249,8 +3383,8 @@ div[class*="tradingview-widget-copyright"],
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 5px 10px;
+  gap: 6px;
+  padding: 3.5px 7px;
   background: rgba(22, 28, 44, 0.85);
   border-bottom: 1px solid rgba(42, 53, 74, 0.8);
   cursor: pointer;
@@ -3263,23 +3397,23 @@ div[class*="tradingview-widget-copyright"],
 
 .chart-backtest-table-wrap.collapsed .chart-backtest-header {
   border-bottom: none;
-  padding: 4px 8px;
+  padding: 3px 6px;
 }
 
 .chart-backtest-title {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 700;
   color: #ffffff;
   white-space: nowrap;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .chart-backtest-toggle-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 3px;
@@ -3302,8 +3436,8 @@ div[class*="tradingview-widget-copyright"],
 }
 
 .chart-backtest-table td {
-  padding: 3px 12px;
-  font-size: 11px;
+  padding: 2.5px 8px;
+  font-size: 9.5px;
   border: 1px solid rgba(42, 53, 74, 0.7);
   white-space: nowrap;
   line-height: 1.35;
@@ -3313,16 +3447,16 @@ div[class*="tradingview-widget-copyright"],
   text-align: left;
   font-weight: 500;
   color: #a0aec0;
-  padding-left: 10px;
-  padding-right: 10px;
+  padding-left: 8px;
+  padding-right: 6px;
 }
 
 .chart-backtest-table td.col-val {
   text-align: right;
   font-weight: 700;
   color: #ffffff;
-  padding-left: 12px;
-  padding-right: 10px;
+  padding-left: 10px;
+  padding-right: 8px;
 }
 
 @media (max-width: 768px) {
@@ -3330,10 +3464,657 @@ div[class*="tradingview-widget-copyright"],
     top: 0;
     right: 75px;
   }
+}
 
-  .logs-terminal {
-    font-size: clamp(6.6px, 1.95vw, 7.8px) !important;
-    letter-spacing: -0.32px !important;
-    padding: 6px 3px 36px 3px !important;
+/* =========================================================
+   THEME GLASS PRO (#181920) - THIẾT KẾ ĐỒNG BỘ 100% VỚI CÀI ĐẶT
+   Gam 1: Dark Slate Obsidian (#0b0c11 -> #12131b -> #161823 -> #161824 -> #202332)
+   Gam 2: Amber Gold Accent (#ffb74d / #f59e0b)
+   Quy tắc viền:
+   - Viền bao quanh các khối chính: Dark slate sắc nét (#363b50), bo góc 6px
+   - Viền phân cách cột / dòng / header: Slate trầm (#2e3347)
+   - Tất cả nút, dropdown, spinbox, badge: Đồng bộ nền #161824, viền #363b50
+   - Khung Tài khoản cách bảng vị thế 24px, không bị đè mất chữ
+   ========================================================= */
+.theme-glass-pro,
+.theme-glass-pro.app-container,
+.theme-glass-pro .content-wrapper,
+.theme-glass-pro .main-section {
+  background-color: #0b0c11 !important;
+}
+
+/* 1. KHUNG VỎ BÊN NGOÀI & SIDEBAR */
+.theme-glass-pro .sidebar-left,
+.theme-glass-pro .desktop-sidebar {
+  background-color: #0b0c11 !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-right: 1px solid #363b50 !important;
+  border-left: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+.theme-glass-pro .sidebar-header {
+  background-color: #161823 !important;
+  border-bottom: 1px solid #2e3347 !important;
+}
+
+.theme-glass-pro .app-title {
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .app-subtitle {
+  color: #70768c !important;
+}
+
+/* 2. KHUNG TÀI KHOẢN (BOT EMA200) - ĐỒNG BỘ GIAO DIỆN CÀI ĐẶT */
+.theme-glass-pro .group-box {
+  background: rgba(20, 22, 33, 0.75) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  margin-top: 24px !important;
+}
+
+.theme-glass-pro .group-box-title {
+  background-color: #0b0c11 !important;
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+  font-size: 12.5px !important;
+  border: none !important;
+  border-radius: 3px !important;
+  padding: 1px 7px !important;
+}
+
+.theme-glass-pro .group-box-actions {
+  background-color: #0b0c11 !important;
+  border-radius: 3px !important;
+  padding: 0 4px !important;
+}
+
+.theme-glass-pro .btn-group-box-collapse {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 3px !important;
+  color: #878da2 !important;
+  transition: all 0.15s ease !important;
+}
+
+.theme-glass-pro .btn-group-box-collapse:hover {
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .sidebar-left label,
+.theme-glass-pro .group-box label {
+  color: #c5c9d6 !important;
+}
+
+/* 3. CARD BOT PANEL & WORKSPACE (BIỂU ĐỒ + BẢNG VỊ THẾ) */
+.theme-glass-pro .bot-panel-card {
+  background: #12131b !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 6px !important;
+}
+
+.theme-glass-pro .main-workspace {
+  background: #12131b !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.theme-glass-pro .pane-chart {
+  background-color: #12131b !important;
+  border: none !important;
+}
+
+.theme-glass-pro .pane-tabs {
+  background-color: #12131b !important;
+  border: none !important;
+}
+
+/* RESIZER THANH KÉO (GIỮA BIỂU ĐỒ VÀ BẢNG VỊ THẾ) */
+.theme-glass-pro .resizer.horizontal-resizer {
+  height: 8px !important;
+  background-color: #161823 !important;
+  border-top: 1px solid #2e3347 !important;
+  border-bottom: 1px solid #2e3347 !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.theme-glass-pro .resizer.horizontal-resizer::after {
+  background-color: #484e66 !important;
+  border-radius: 2px !important;
+}
+
+.theme-glass-pro .resizer.horizontal-resizer:hover,
+.theme-glass-pro .resizer.horizontal-resizer:active {
+  background-color: #1f2231 !important;
+}
+
+.theme-glass-pro .resizer.horizontal-resizer:hover::after,
+.theme-glass-pro .resizer.horizontal-resizer:active::after {
+  background-color: #f59e0b !important;
+}
+
+/* 4. KHỐI NÚT CHÍNH (BẢNG VỊ THẾ / LOGS / BIỂU ĐỒ) */
+.theme-glass-pro .tab-bar-header {
+  height: 32px !important;
+  background-color: #161823 !important;
+  border-top: none !important;
+  border-bottom: 1px solid #2e3347 !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.theme-glass-pro .tab-btn {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #2e3347 !important;
+  color: #878da2 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  transition: all 0.15s ease !important;
+}
+
+.theme-glass-pro .tab-btn:hover {
+  background-color: #1d1f2c !important;
+  color: #ffffff !important;
+}
+
+.theme-glass-pro .tab-btn.active {
+  background-color: #202332 !important;
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #f59e0b !important;
+}
+
+.theme-glass-pro .btn-tab-split {
+  border-left: 1px solid #2e3347 !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  color: #878da2 !important;
+}
+
+.theme-glass-pro .btn-tab-split:hover {
+  background-color: #1a1d2b !important;
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .btn-tab-split.active {
+  background-color: #202332 !important;
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .btn-tab-split.active:hover {
+  background-color: #282c3f !important;
+  color: #f59e0b !important;
+}
+
+/* 5. BẢNG VỊ THẾ - CẠNH ĐÁY LIỀN LẠC 100%, VIỀN ĐỒNG NHẤT */
+.theme-glass-pro .positions-table-wrapper {
+  background-color: #12131b !important;
+  border: none !important;
+}
+
+.theme-glass-pro .positions-table {
+  background-color: #12131b !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+  border: none !important;
+  width: 100% !important;
+}
+
+.theme-glass-pro .positions-table th {
+  background-color: #161823 !important;
+  color: #878da2 !important;
+  border-top: none !important;
+  border-bottom: 1px solid #2e3347 !important;
+  border-right: 1px solid #2e3347 !important;
+  border-left: none !important;
+  font-size: 13px !important;
+}
+
+.theme-glass-pro .positions-table th:last-child {
+  border-right: none !important;
+}
+
+.theme-glass-pro .positions-table td {
+  background-color: #12131b !important;
+  border-top: none !important;
+  border-bottom: 1px solid #2e3347 !important;
+  border-right: 1px solid #2e3347 !important;
+  border-left: none !important;
+  color: #ffffff !important;
+}
+
+.theme-glass-pro .positions-table td:last-child {
+  border-right: none !important;
+}
+
+.theme-glass-pro .positions-table tr:hover td {
+  background-color: #181a26 !important;
+}
+
+/* KÝ TỰ -- VÀ CHỜ TÍN HIỆU MỜ NHẠT, KHÔNG GÂY RỐI MẮT */
+.theme-glass-pro .empty-dash,
+.theme-glass-pro .positions-table td .empty-dash,
+.theme-glass-pro .positions-table td.empty-dash {
+  color: #3b3f54 !important;
+  font-size: 12px !important;
+  opacity: 0.55 !important;
+  letter-spacing: 1px !important;
+}
+
+.theme-glass-pro .waiting-signal-text {
+  color: #4b5168 !important;
+  opacity: 0.7 !important;
+}
+
+/* 6. CÁC Ô CHỌN $ %, SPINBOX VÀ SELECT - DÙNG GAM DARK OBSIDIAN #161824 ĐỒNG BỘ */
+.theme-glass-pro .spinbox-container {
+  background-color: #161824 !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .spinbox-container:focus-within {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+}
+
+.theme-glass-pro .spinbox-input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+}
+
+.theme-glass-pro .spinbox-stepper {
+  background: transparent !important;
+  border-left: 1px solid #363b50 !important;
+}
+
+.theme-glass-pro .spinbox-btn {
+  color: #7a8096 !important;
+}
+
+.theme-glass-pro .spinbox-btn:hover {
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .spinbox-suffix {
+  color: #a0a6be !important;
+}
+
+.theme-glass-pro .styled-input.num,
+.theme-glass-pro .custom-select,
+.theme-glass-pro .styled-select,
+.theme-glass-pro input:not(.spinbox-input),
+.theme-glass-pro select {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .styled-input.num:focus,
+.theme-glass-pro .custom-select:focus,
+.theme-glass-pro .styled-select:focus,
+.theme-glass-pro input:not(.spinbox-input):focus,
+.theme-glass-pro select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+}
+
+.theme-glass-pro .styled-select option,
+.theme-glass-pro select option {
+  background-color: #161824 !important;
+  color: #ffffff !important;
+}
+
+/* 7. NÚT CHỌN ĐƠN VỊ KÝ QUỸ (USDT / % VỐN) VÀ HỆ SỐ */
+.theme-glass-pro .risk-unit-btn {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #878da2 !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .risk-unit-btn:hover {
+  border-color: #f59e0b !important;
+  color: #ffffff !important;
+}
+
+.theme-glass-pro .risk-unit-btn.active {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border: 1px solid #f59e0b !important;
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+}
+
+.theme-glass-pro .risk-mult-badge {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .risk-mult-badge:hover {
+  border-color: #f59e0b !important;
+}
+
+.theme-glass-pro .risk-mult-badge .risk-mult-text,
+.theme-glass-pro .risk-mult-badge .risk-mult-arrow {
+  color: #878da2 !important;
+}
+
+.theme-glass-pro .risk-mult-badge.active .risk-mult-text,
+.theme-glass-pro .risk-mult-badge.active .risk-mult-arrow {
+  color: #f59e0b !important;
+}
+
+/* 8. NÚT TF & CHIPS BÊN TRONG BẢNG */
+.theme-glass-pro .tf-badge.off {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #70768c !important;
+  border-radius: 3px !important;
+}
+
+.theme-glass-pro .tf-badge.on {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border: 1px solid #f59e0b !important;
+  color: #f59e0b !important;
+  border-radius: 3px !important;
+}
+
+.theme-glass-pro .tf-badge:hover {
+  border-color: #f59e0b !important;
+}
+
+.theme-glass-pro .btn-chart-settings {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #d1d5e4 !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .btn-chart-settings:hover {
+  background: #1e2133 !important;
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+}
+
+/* 9. NÚT TF KHUNG THỜI GIAN TRÊN BIỂU ĐỒ */
+.theme-glass-pro .tf-btn {
+  background: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #878da2 !important;
+  border-radius: 3px !important;
+}
+
+.theme-glass-pro .tf-btn.active {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+}
+
+/* 10. BẢNG BACKTESTING TRÊN BIỂU ĐỒ */
+.theme-glass-pro .single-chart-card {
+  background-color: #12131b !important;
+  border: 1px solid #363b50 !important;
+}
+
+.theme-glass-pro .single-chart-header {
+  background-color: #161823 !important;
+  border-bottom: 1px solid #2e3347 !important;
+}
+
+.theme-glass-pro .chart-backtest-header {
+  background: #161823 !important;
+  border-color: #363b50 !important;
+}
+
+.theme-glass-pro .chart-backtest-table {
+  background: rgba(20, 22, 33, 0.95) !important;
+  border-color: #363b50 !important;
+}
+
+.theme-glass-pro .chart-backtest-table td {
+  border-color: #2e3347 !important;
+}
+
+/* 11. MOBILE RESPONSIVE CHO THEME KÍNH MỜ - TÁCH BẠCH TUYỆT ĐỐI, BỎ HOÀN TOÀN VIỀN KÉP */
+@media screen and (max-width: 1024px) {
+  .theme-glass-pro .bot-panel-card {
+    border: none !important;
+    padding: 0 4px !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .theme-glass-pro .sidebar-left {
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .theme-glass-pro .sidebar-content {
+    padding: 0 4px 16px 4px !important;
+  }
+
+  .theme-glass-pro .main-workspace {
+    border: 1px solid #363b50 !important;
+    border-radius: 6px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .theme-glass-pro .sidebar-content .group-box:first-of-type {
+    margin-top: 18px !important;
+    border: 1px solid #363b50 !important;
+    border-radius: 6px !important;
   }
 }
+
+/* =========================================================
+   12. GIAO DIỆN CÀI ĐẶT (SYSTEM SETTINGS MODAL) - THEME KÍNH MỜ
+   ========================================================= */
+.theme-glass-pro .modal-overlay {
+  background-color: rgba(5, 6, 9, 0.75) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+.theme-glass-pro .modal-content,
+.theme-glass-pro .modal-content.settings-modal {
+  background-color: #12131b !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85) !important;
+}
+
+.theme-glass-pro .modal-header {
+  background-color: #161823 !important;
+  border-bottom: 1px solid #2e3347 !important;
+}
+
+.theme-glass-pro .modal-header h3 {
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .close-btn {
+  color: #878da2 !important;
+}
+
+.theme-glass-pro .close-btn:hover {
+  color: #f59e0b !important;
+}
+
+/* Tab Bar inside Settings */
+.theme-glass-pro .settings-tab-bar {
+  background-color: #161823 !important;
+  border-bottom: 1px solid #2e3347 !important;
+}
+
+.theme-glass-pro .settings-tab-btn {
+  background-color: #12131b !important;
+  color: #878da2 !important;
+  border: 1px solid #363b50 !important;
+  border-bottom: none !important;
+}
+
+.theme-glass-pro .settings-tab-btn:hover:not(.active) {
+  background-color: #1d1f2c !important;
+  color: #ffffff !important;
+}
+
+.theme-glass-pro .settings-tab-btn.active {
+  background-color: #202332 !important;
+  color: #f59e0b !important;
+  border: 1px solid #363b50 !important;
+  border-top: 2px solid #f59e0b !important;
+  border-bottom: 1px solid #202332 !important;
+}
+
+/* Modal Body & Scroll */
+.theme-glass-pro .settings-body,
+.theme-glass-pro .settings-tab-content,
+.theme-glass-pro .settings-tab-scroll {
+  background-color: #12131b !important;
+}
+
+.theme-glass-pro .settings-tab-scroll::-webkit-scrollbar-track,
+.theme-glass-pro .settings-body::-webkit-scrollbar-track {
+  background: #12131b !important;
+}
+
+.theme-glass-pro .settings-tab-scroll::-webkit-scrollbar-thumb,
+.theme-glass-pro .settings-body::-webkit-scrollbar-thumb {
+  background: #363b50 !important;
+  border-radius: 3px !important;
+}
+
+/* Settings Group Boxes */
+.theme-glass-pro .settings-group {
+  background-color: rgba(20, 22, 33, 0.6) !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 6px !important;
+}
+
+.theme-glass-pro .settings-group-title {
+  background-color: #12131b !important;
+  color: #f59e0b !important;
+}
+
+/* Inputs & Selects in Settings */
+.theme-glass-pro .settings-modal .styled-input,
+.theme-glass-pro .settings-modal .styled-select,
+.theme-glass-pro .settings-modal input[type="text"]:not(.spinbox-input),
+.theme-glass-pro .settings-modal input[type="password"],
+.theme-glass-pro .settings-modal input[type="number"]:not(.spinbox-input),
+.theme-glass-pro .settings-modal select {
+  background-color: #161824 !important;
+  border: 1px solid #363b50 !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .settings-modal .styled-input:focus,
+.theme-glass-pro .settings-modal .styled-select:focus,
+.theme-glass-pro .settings-modal input:not(.spinbox-input):focus,
+.theme-glass-pro .settings-modal select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+}
+
+/* Loại bỏ hoàn toàn viền trong của ô spinbox trong Settings Modal (Quản lý vốn, Điểm vào lệnh...) */
+.settings-modal .spinbox-input,
+.theme-glass-pro .settings-modal .spinbox-input,
+.theme-glass-pro .spinbox-container .spinbox-input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+}
+
+.settings-modal .spinbox-input:focus,
+.theme-glass-pro .settings-modal .spinbox-input:focus,
+.theme-glass-pro .spinbox-container .spinbox-input:focus {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.theme-glass-pro .settings-form-row label,
+.theme-glass-pro .settings-tab-content label {
+  color: #c5c9d6 !important;
+}
+
+/* Watchlist Coin Select Cards */
+.theme-glass-pro .coin-select-card {
+  background-color: #161824 !important;
+  border: 1px solid #363b50 !important;
+  border-radius: 4px !important;
+}
+
+.theme-glass-pro .coin-select-card:hover {
+  border-color: #f59e0b !important;
+  background-color: #1e2133 !important;
+}
+
+.theme-glass-pro .coin-select-card.selected {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border-color: #f59e0b !important;
+}
+
+.theme-glass-pro .coin-select-card.selected .coin-select-symbol {
+  color: #f59e0b !important;
+  font-weight: 700 !important;
+}
+
+/* Toggle Switch */
+.theme-glass-pro .toggle-slider {
+  background-color: #1a1c29 !important;
+  border: 1px solid #363b50 !important;
+}
+
+.theme-glass-pro .toggle-switch input:checked + .toggle-slider {
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+/* Audit & Action Buttons */
+.theme-glass-pro .btn-audit {
+  background-color: #181a27 !important;
+  border: 1px solid #363b50 !important;
+  color: #d1d5e4 !important;
+}
+
+.theme-glass-pro .btn-audit:hover {
+  background-color: #222536 !important;
+  border-color: #f59e0b !important;
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .btn-reset-strat {
+  background-color: #181a27 !important;
+  border: 1px solid #f59e0b !important;
+  color: #f59e0b !important;
+}
+
+.theme-glass-pro .btn-reset-strat:hover {
+  background-color: #262118 !important;
+}
+

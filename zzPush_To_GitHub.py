@@ -2,6 +2,7 @@ import json
 import re
 import os
 import subprocess
+from datetime import datetime
 
 # ⚠️ CỜ BẬT/TẮT CHỨC NĂNG BUILD ACTION .EXE (Theo lệnh CEO)
 # Khi đặt False: Chỉ đẩy code lên GitHub, không tăng Version, không tạo Tag -> Không kích hoạt Action Build .exe
@@ -75,6 +76,8 @@ if res.returncode == 0 and res_tag.returncode == 0:
     else:
         print("✅ HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ĐÃ KHÓA BUILD ACTION .EXE).")
     print(f"Phiên bản: v{new_v}")
+    print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 else:
     print("❌ THẤT BẠI: Quá trình đẩy code lên GitHub gặp lỗi (Exit code != 0).")
+    print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 print("=========================================")

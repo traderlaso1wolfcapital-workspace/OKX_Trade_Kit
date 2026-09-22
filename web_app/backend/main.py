@@ -1,9 +1,10 @@
 import os
 import sys
-from dotenv import load_dotenv
-
-# Tải biến môi trường từ file .env nếu có
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 import json
 import time
 import asyncio
@@ -134,6 +135,7 @@ def verify_uid(uid: str, jwt_data: dict = Depends(verify_jwt)):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -612,6 +614,12 @@ def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
     """Proxy OKX candle API với cơ chế 2 Pha Tức Thì (0.15s Pha 1 + Nền Pha 2 lấp đầy 2500 nến)."""
     try:
         limit = int(limit)
+        # Chuẩn hóa bar timeframe cho OKX (phút viết thường: 1m, 5m; giờ/ngày viết hoa: 1H, 4H, 1D)
+        b_low = str(bar).strip().lower()
+        if b_low in ["1m", "3m", "5m", "15m", "30m"]:
+            bar = b_low
+        elif b_low in ["1h", "2h", "4h", "6h", "12h", "1d", "1w"]:
+            bar = b_low.upper()
         now = time.time()
         cache_key = f"{instId}_{bar}_{limit}"
         cached = _okx_cache.get(cache_key)
@@ -816,10 +824,14 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
                 lines = f.readlines()
         except Exception:
             pass
+    # Đảm bảo lưu Plaintext cho các file bot (.api_sub1, .api_sub2, ...) để tiến trình bot độc lập (sys_bot_*.py) đọc trực tiếp được không bị lỗi ENC:
+    clean_api_key = decrypt_value(api_key)
+    clean_secret_key = decrypt_value(secret_key)
+    clean_passphrase = decrypt_value(passphrase)
     keys = {
-        "OKX_API_KEY": encrypt_value(api_key),
-        "OKX_SECRET_KEY": encrypt_value(secret_key),
-        "OKX_PASSPHRASE": encrypt_value(passphrase),
+        "OKX_API_KEY": clean_api_key,
+        "OKX_SECRET_KEY": clean_secret_key,
+        "OKX_PASSPHRASE": clean_passphrase,
         "OKX_IS_DEMO": "True" if is_demo else "False",
     }
     new_lines = []

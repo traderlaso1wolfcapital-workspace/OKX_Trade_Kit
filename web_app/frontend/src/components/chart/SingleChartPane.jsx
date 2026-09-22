@@ -68,6 +68,7 @@ export default function SingleChartPane({
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const emaSeriesRef = useRef(null);
+  const latestEma200Ref = useRef(null);
   const overlayRef = useRef(null);
   const liquidV5OverlayRef = useRef(null);
   const liquidV5BoxesOverlayRef = useRef(null);
@@ -312,7 +313,7 @@ export default function SingleChartPane({
   const applyDefaultZoom = () => {
     if (!chartRef.current || !candlesRef.current || candlesRef.current.length === 0) return;
     const total = candlesRef.current.length;
-    const candleCount = 55;
+    const candleCount = 60;
     const rightOffset = 8;
     try {
       chartRef.current.priceScale('right').applyOptions({
@@ -1117,6 +1118,9 @@ export default function SingleChartPane({
     if (emaSeriesRef.current) {
       if (currentActive.includes("ema200") && !isIndHidden("ema200")) {
         const emaData = calculateEMA(candles, 200);
+        if (emaData && emaData.length > 0) {
+          latestEma200Ref.current = emaData[emaData.length - 1].value;
+        }
         try { emaSeriesRef.current.setData(emaData); } catch { }
       } else {
         try { emaSeriesRef.current.setData([]); } catch { }
@@ -1204,7 +1208,7 @@ export default function SingleChartPane({
         chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.25 } });
         chart.priceScale("macd").applyOptions({ scaleMargins: { top: 0.77, bottom: 0.02 }, visible: true });
       } else {
-        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.06, bottom: 0.12 } });
+        chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.04, bottom: 0.04 } });
       }
     } catch { }
 
@@ -1389,8 +1393,8 @@ export default function SingleChartPane({
         autoScale: true,
         mode: 1,
         scaleMargins: {
-          top: 0.08,
-          bottom: 0.25,
+          top: 0.04,
+          bottom: 0.04,
         },
       },
     });
@@ -1426,7 +1430,7 @@ export default function SingleChartPane({
 
         const lastCandle = candles[candles.length - 1];
         const currentPrice = lastCandle ? lastCandle.close : null;
-        if (typeof currentPrice !== 'number' || isNaN(currentPrice)) return res;
+        if (typeof currentPrice !== 'number' || isNaN(currentPrice) || currentPrice <= 0) return res;
 
         try {
           const lr = chartRef.current ? chartRef.current.timeScale().getVisibleLogicalRange() : null;
@@ -1435,22 +1439,69 @@ export default function SingleChartPane({
           }
         } catch { }
 
-        const range = max - min;
-        if (range <= 0) return res;
-
-        const pos = (currentPrice - min) / range;
-        const minAllowedPos = 0.38;
-        const maxAllowedPos = 0.62;
-
-        if (pos < minAllowedPos) {
-          const newMin = currentPrice - (max - currentPrice);
-          if (newMin > 0 && newMin < max) {
-            min = newMin;
+        // Lấy giá trị EMA 200 hiện tại
+        let currentEma = latestEma200Ref.current;
+        if (typeof currentEma !== 'number' || isNaN(currentEma) || currentEma <= 0) {
+          const emaData = calculateEMA(candles, 200);
+          if (emaData && emaData.length > 0) {
+            currentEma = emaData[emaData.length - 1].value;
+            latestEma200Ref.current = currentEma;
           }
-        } else if (pos > maxAllowedPos) {
-          const newMax = currentPrice + (currentPrice - min);
-          if (newMax > min) {
-            max = newMax;
+        }
+
+        const cMin = min;
+        const cMax = max;
+        const cSpan = Math.max(0.0000001, cMax - cMin);
+
+        if (typeof currentEma === 'number' && !isNaN(currentEma) && currentEma > 0) {
+          const pTop = Math.max(currentPrice, currentEma);
+          const pBottom = Math.min(currentPrice, currentEma);
+          const peSpread = pTop - pBottom;
+
+          // Điều kiện nhận diện: Khi Giá và EMA200 "gần nhau quá"
+          // (Khoảng cách giữa giá và EMA200 nhỏ hơn 40% biên độ dao động của các cây nến đang thấy trên màn hình)
+          const isClose = peSpread < 0.40 * cSpan;
+
+          if (isLogScaleRef.current) {
+            // ============ CHẾ ĐỘ LOG SCALE (L) ============
+            if (isClose) {
+              // TRƯỜNG HỢP GẦN NHAU: Đưa cụm Giá & EMA200 ra CHÍNH GIỮA (50%) và zoom nhỏ lại để thấy trọn vẹn mọi cây nến
+              const centerLog = Math.sqrt(currentPrice * currentEma);
+              const ratioUp = cMax / centerLog;
+              const ratioDown = centerLog / Math.max(0.0000001, cMin);
+              const maxRatio = Math.max(ratioUp, ratioDown, 1.03);
+              const marginRatio = Math.pow(maxRatio, 1.12);
+              max = centerLog * marginRatio;
+              min = Math.max(0.0000001, centerLog / marginRatio);
+            } else {
+              // TRƯỜNG HỢP CÁCH XA NHAU: Áp dụng cơ chế 1/4 (Giá và EMA200 cách 2 cạnh trên/dưới một khoảng ~ 1/4)
+              const ratio = pTop / pBottom;
+              const sqrtRatio = Math.sqrt(ratio);
+              const targetMax = pTop * sqrtRatio;
+              const targetMin = pBottom / sqrtRatio;
+              // Luôn bảo toàn không bao giờ bị cắt mất nến
+              max = Math.max(targetMax, cMax * 1.02);
+              min = Math.max(0.0000001, Math.min(targetMin, cMin * 0.98));
+            }
+          } else {
+            // ============ CHẾ ĐỘ TUYẾN TÍNH (LINEAR) ============
+            if (isClose) {
+              // TRƯỜNG HỢP GẦN NHAU: Đưa tâm (Giá & EMA200) ra CHÍNH GIỮA (50%) và zoom ra bao trọn các nến
+              const centerLin = (currentPrice + currentEma) / 2;
+              const distUp = cMax - centerLin;
+              const distDown = centerLin - cMin;
+              const halfSpan = Math.max(distUp, distDown, centerLin * 0.03);
+              const marginSpan = halfSpan * 1.12;
+              max = centerLin + marginSpan;
+              min = Math.max(0.0000001, centerLin - marginSpan);
+            } else {
+              // TRƯỜNG HỢP CÁCH XA NHAU: 1/4 trên và 1/4 dưới
+              const targetMax = pTop + 0.5 * peSpread;
+              const targetMin = pBottom - 0.5 * peSpread;
+              // Luôn bảo toàn không bao giờ bị cắt mất nến
+              max = Math.max(targetMax, cMax + 0.05 * cSpan);
+              min = Math.max(0.0000001, Math.min(targetMin, cMin - 0.05 * cSpan));
+            }
           }
         }
 
@@ -1459,7 +1510,7 @@ export default function SingleChartPane({
             minValue: min,
             maxValue: max,
           },
-          margins: res.margins,
+          margins: { above: 0, below: 0 },
         };
       },
     });
@@ -1492,7 +1543,11 @@ export default function SingleChartPane({
           color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
         }));
         vs.setData(vols);
-        es.setData(calculateEMA(candlesRef.current, 200));
+        const initialEma = calculateEMA(candlesRef.current, 200);
+        if (initialEma && initialEma.length > 0) {
+          latestEma200Ref.current = initialEma[initialEma.length - 1].value;
+        }
+        es.setData(initialEma);
       } catch { }
     }
 
@@ -1580,6 +1635,11 @@ export default function SingleChartPane({
     } else if (liveCandle.time > last.time) {
       candles.push(liveCandle);
       if (candles.length > 2500) candles.shift();
+    }
+
+    if (typeof latestEma200Ref.current === 'number' && latestEma200Ref.current > 0) {
+      const k = 2 / 201;
+      latestEma200Ref.current = liveCandle.close * k + latestEma200Ref.current * (1 - k);
     }
 
     try {
@@ -1681,6 +1741,9 @@ export default function SingleChartPane({
           color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
         }));
         const emaData = calculateEMA(unique, 200);
+        if (emaData && emaData.length > 0) {
+          latestEma200Ref.current = emaData[emaData.length - 1].value;
+        }
 
         _webCandlesCache.set(cacheKey, {
           candles: unique,
@@ -1935,7 +1998,7 @@ export default function SingleChartPane({
             )}
           </div>
 
-          {/* Winrate Stats Table (top-right corner) */}
+          {/* Winrate Stats Table (top-right corner of chart, thu nhỏ 15%) */}
           <div 
             className={`chart-backtest-table-wrap ${isBacktestCollapsed ? 'collapsed' : ''}`}
             style={{ right: `${priceScaleWidth + 4}px` }}
@@ -1962,8 +2025,8 @@ export default function SingleChartPane({
                 title={isBacktestCollapsed ? "Mở rộng" : "Thu gọn"}
               >
                 <svg
-                  width="11"
-                  height="11"
+                  width="10"
+                  height="10"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2003,11 +2066,11 @@ export default function SingleChartPane({
           </div>
 
           <div style={{
-            position: "absolute", bottom: "6px", right: `${priceScaleWidth + 4}px`,
-            display: "flex", gap: "4px", zIndex: 10
+            position: "absolute", bottom: "6px", right: "6px",
+            display: "flex", gap: "3px", zIndex: 10
           }}>
             <button
-              title="Auto (Mặc định zoom 30-80 nến)"
+              title="Auto (Mặc định hiển thị ~60 nến & căn đều nến/EMA200)"
               onClick={(e) => {
                 e.stopPropagation();
                 const next = !isAutoFit;

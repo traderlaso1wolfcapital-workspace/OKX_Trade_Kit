@@ -44,6 +44,19 @@ function App() {
   });
   const [fadeClass, setFadeClass] = useState("tab-fade");
 
+  // Theme Mode: "default" (Bản Gốc) vs "glass_pro" (Kính mờ #181920 Pro)
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem("tls1_theme_mode") || "default";
+  });
+
+  const toggleTheme = () => {
+    setThemeMode((prev) => {
+      const next = prev === "glass_pro" ? "default" : "glass_pro";
+      localStorage.setItem("tls1_theme_mode", next);
+      return next;
+    });
+  };
+
   // 4. Accounts & Mapping
   const [accounts, setAccounts] = useState(() => {
     try {
@@ -216,9 +229,25 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showLayoutMenu]);
 
-  // 7. Workspace Resizer
+  // 7. Workspace Resizer & Split View Mode
+  const [isSplitView, setIsSplitView] = useState(() => {
+    return localStorage.getItem("tls1_split_view") === "true";
+  });
   const [chartRatio, setChartRatio] = useState(50);
   const layoutMode = "vertical";
+
+  const toggleSplitView = () => {
+    setIsSplitView(prev => {
+      const next = !prev;
+      localStorage.setItem("tls1_split_view", next ? "true" : "false");
+      if (next) {
+        // Chuyển sang split view: nếu tab đang là charts thì chuyển về positions
+        if (activeTab === "charts") setActiveTab("positions");
+      }
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
+      return next;
+    });
+  };
 
   const startResizing = (e) => {
     if (e.cancelable) e.preventDefault();
@@ -325,6 +354,9 @@ function App() {
       try {
         localStorage.setItem(`tls1_watchlist_coins_${currentUid || "guest"}`, JSON.stringify(updated));
       } catch { }
+      if (!activePairs.includes(coinValue)) {
+        togglePair(coinValue);
+      }
     }
   };
 
@@ -769,8 +801,14 @@ function App() {
       setSettingsTab("api");
       return;
     }
-    if (activePairs.length === 0) {
-      alert("⚠️ Vui lòng chọn ít nhất 1 Cặp giao dịch và cấu hình TF trade!");
+    // Kiểm tra xem đã có ít nhất 1 cặp giao dịch nào được cấu hình TF trade hay chưa
+    const pairsWithTf = (activePairs || []).filter(pair => {
+      const tfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[pair] || []) : [];
+      return Array.isArray(tfs) && tfs.length > 0;
+    });
+
+    if (pairsWithTf.length === 0) {
+      alert("⚠️ Vui lòng chọn ít nhất 1 khung thời gian (TF trade) để bắt đầu chạy bot!");
       return;
     }
 
@@ -1515,7 +1553,7 @@ function App() {
   const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${themeMode === "glass_pro" ? "theme-glass-pro" : ""}`}>
       {lockMessage && (
         <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "14px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
           {lockMessage}
@@ -1548,6 +1586,8 @@ function App() {
             onSelectBotTab={setActiveBotTab}
             slotCount={slotCount}
             maxSlots={100}
+            themeMode={themeMode}
+            onToggleTheme={toggleTheme}
           />
 
           {/* BOT PANEL CARD */}
@@ -1578,7 +1618,10 @@ function App() {
                   className="btn-action-stop"
                   style={{ width: "fit-content" }}
                 >
-                  ■ DỪNG BOT
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
+                    <rect x="1" y="1" width="10" height="10" rx="1.5" />
+                  </svg>
+                  <span>DỪNG BOT</span>
                 </button>
               ) : (
                 <button
@@ -1586,138 +1629,155 @@ function App() {
                   className="btn-action-start"
                   style={{ width: "fit-content" }}
                 >
-                  ▶ CHẠY BOT
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
+                    <path d="M 2.5 1.5 C 2.5 0.9 3.2 0.5 3.7 0.8 L 10.5 5.3 C 11.0 5.6 11.0 6.4 10.5 6.7 L 3.7 11.2 C 3.2 11.5 2.5 11.1 2.5 10.5 Z" />
+                  </svg>
+                  <span>CHẠY BOT</span>
                 </button>
               )}
               <button
                 onClick={handleFastConnect}
                 className="btn-connect-okx"
               >
-                🔗 CONNECT OKX
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                  <rect x="0" y="0" width="7" height="7" rx="1" />
+                  <rect x="17" y="0" width="7" height="7" rx="1" />
+                  <rect x="8.5" y="8.5" width="7" height="7" rx="1" />
+                  <rect x="0" y="17" width="7" height="7" rx="1" />
+                  <rect x="17" y="17" width="7" height="7" rx="1" />
+                </svg>
+                <span>OKX Connect</span>
               </button>
             </div>
 
             {/* CHARTS & WORKSPACE CONTAINER */}
             <div className="chart-panel-card">
-              <main className={`main-workspace ${layoutMode}`} style={{ '--chart-ratio': `${chartRatio}%` }}>
-                {/* PANE CHART */}
-                <section className="pane-chart" style={{ position: "relative" }}>
-                  <div className={`multi-chart-container layout-${chartLayout}`}>
-                    {chartsConfig.slice(0, 4).map((cfg, idx) => (
-                      <SingleChartPane
-                        key={`chart_slot_${idx}`}
-                        activeBotTab={activeBotTab}
-                        adminClosedPositions={adminClosedPositions}
-                        chartIndex={idx}
-                        coin={cfg.coin}
-                        tf={cfg.tf}
-                        risk={risk}
-                        enabledTfs={enabledTfs}
-                        onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
-                        onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
-                        isActive={activeChartIndex === idx}
-                        onActivate={() => {
-                          setActiveChartIndex(idx);
-                          setSelectedCoin(cfg.coin);
-                        }}
-                        showToolbar={true}
-                        layout={chartLayout}
-                        isVisible={idx < getActiveChartsCount(chartLayout)}
-                        layoutSelector={idx === 0 ? (
-                          <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
-                            <button
-                              type="button"
-                              className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
-                              title="Chọn bố cục biểu đồ (TradingView Layout)"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowLayoutMenu(!showLayoutMenu);
-                              }}
-                            >
-                              {renderLayoutIcon(chartLayout, 14, 14)}
-                            </button>
+              <main
+                className={`main-workspace ${layoutMode}`}
+                style={isSplitView ? { '--chart-ratio': `${chartRatio}%` } : {}}
+              >
+                {/* 1. TOP SPLIT PANE (KHI BẬT CHẾ ĐỘ ⮃: BIỂU ĐỒ NẰM PHÍA TRÊN) */}
+                {isSplitView && (
+                  <>
+                    <section className="pane-chart" style={{ position: "relative" }}>
+                      <div className={`multi-chart-container layout-${chartLayout}`}>
+                        {chartsConfig.slice(0, 4).map((cfg, idx) => (
+                          <SingleChartPane
+                            key={`split_chart_slot_${idx}`}
+                            activeBotTab={activeBotTab}
+                            adminClosedPositions={adminClosedPositions}
+                            chartIndex={idx}
+                            coin={cfg.coin}
+                            tf={cfg.tf}
+                            risk={risk}
+                            enabledTfs={enabledTfs}
+                            onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
+                            onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
+                            isActive={activeChartIndex === idx}
+                            onActivate={() => {
+                              setActiveChartIndex(idx);
+                              setSelectedCoin(cfg.coin);
+                            }}
+                            showToolbar={true}
+                            layout={chartLayout}
+                            isVisible={idx < getActiveChartsCount(chartLayout)}
+                            layoutSelector={idx === 0 ? (
+                              <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
+                                <button
+                                  type="button"
+                                  className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
+                                  title="Chọn bố cục biểu đồ (TradingView Layout)"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowLayoutMenu(!showLayoutMenu);
+                                  }}
+                                >
+                                  {renderLayoutIcon(chartLayout, 14, 14)}
+                                </button>
 
-                            {showLayoutMenu && (
-                              <div className="layout-selector-popover">
-                                <div className="layout-popover-row">
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
-                                    title="1 Biểu đồ đơn"
-                                    onClick={() => handleSelectLayout("1")}
-                                  >
-                                    {renderLayoutIcon("1", 24, 24)}
-                                  </button>
-                                </div>
-                                <div className="layout-popover-divider"></div>
+                                {showLayoutMenu && (
+                                  <div className="layout-selector-popover">
+                                    <div className="layout-popover-row">
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
+                                        title="1 Biểu đồ đơn"
+                                        onClick={() => handleSelectLayout("1")}
+                                      >
+                                        {renderLayoutIcon("1", 24, 24)}
+                                      </button>
+                                    </div>
+                                    <div className="layout-popover-divider"></div>
 
-                                <div className="layout-popover-row">
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
-                                    title="2 Biểu đồ (Cột dọc 1x2)"
-                                    onClick={() => handleSelectLayout("2-col")}
-                                  >
-                                    {renderLayoutIcon("2-col", 24, 24)}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
-                                    title="2 Biểu đồ (Hàng ngang 2x1)"
-                                    onClick={() => handleSelectLayout("2-row")}
-                                  >
-                                    {renderLayoutIcon("2-row", 24, 24)}
-                                  </button>
-                                </div>
-                                <div className="layout-popover-divider"></div>
+                                    <div className="layout-popover-row">
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
+                                        title="2 Biểu đồ (Cột dọc 1x2)"
+                                        onClick={() => handleSelectLayout("2-col")}
+                                      >
+                                        {renderLayoutIcon("2-col", 24, 24)}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
+                                        title="2 Biểu đồ (Hàng ngang 2x1)"
+                                        onClick={() => handleSelectLayout("2-row")}
+                                      >
+                                        {renderLayoutIcon("2-row", 24, 24)}
+                                      </button>
+                                    </div>
+                                    <div className="layout-popover-divider"></div>
 
-                                <div className="layout-popover-row">
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
-                                    title="3 Biểu đồ (Cột dọc 1x3)"
-                                    onClick={() => handleSelectLayout("3-col")}
-                                  >
-                                    {renderLayoutIcon("3-col", 24, 24)}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
-                                    title="3 Biểu đồ (Hàng ngang 3x1)"
-                                    onClick={() => handleSelectLayout("3-row")}
-                                  >
-                                    {renderLayoutIcon("3-row", 24, 24)}
-                                  </button>
-                                </div>
-                                <div className="layout-popover-divider"></div>
+                                    <div className="layout-popover-row">
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
+                                        title="3 Biểu đồ (Cột dọc 1x3)"
+                                        onClick={() => handleSelectLayout("3-col")}
+                                      >
+                                        {renderLayoutIcon("3-col", 24, 24)}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
+                                        title="3 Biểu đồ (Hàng ngang 3x1)"
+                                        onClick={() => handleSelectLayout("3-row")}
+                                      >
+                                        {renderLayoutIcon("3-row", 24, 24)}
+                                      </button>
+                                    </div>
+                                    <div className="layout-popover-divider"></div>
 
-                                <div className="layout-popover-row">
-                                  <button
-                                    type="button"
-                                    className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
-                                    title="4 Biểu đồ (Lưới 2x2)"
-                                    onClick={() => handleSelectLayout("4-grid")}
-                                  >
-                                    {renderLayoutIcon("4-grid", 24, 24)}
-                                  </button>
-                                </div>
+                                    <div className="layout-popover-row">
+                                      <button
+                                        type="button"
+                                        className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
+                                        title="4 Biểu đồ (Lưới 2x2)"
+                                        onClick={() => handleSelectLayout("4-grid")}
+                                      >
+                                        {renderLayoutIcon("4-grid", 24, 24)}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ) : null}
-                      />
-                    ))}
-                  </div>
-                </section>
+                            ) : null}
+                          />
+                        ))}
+                      </div>
+                    </section>
 
-                {/* RESIZER BAR */}
-                <div
-                  className="resizer horizontal-resizer"
-                  onMouseDown={startResizing}
-                  onTouchStart={startResizing}
-                />
+                    {/* Resizer thanh kéo giữa Biểu Đồ và Bảng Vị Thế */}
+                    <div 
+                      className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
+                      onMouseDown={startResizing}
+                      onTouchStart={startResizing}
+                    />
+                  </>
+                )}
 
-                {/* PANE TABS (POSITIONS & LOGS) */}
+                {/* 2. PANE TABS (BẢNG VỊ THẾ - LOGS - BIỂU ĐỒ) */}
                 <section className="pane-tabs">
                   <div className="tab-bar-header">
                     <div className="tab-buttons">
@@ -1733,15 +1793,185 @@ function App() {
                       >
                         Logs
                       </button>
+                      <button
+                        className={`tab-btn ${activeTab === "charts" ? "active" : ""}`}
+                        onClick={() => {
+                          setActiveTab("charts");
+                          setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
+                        }}
+                      >
+                        Biểu Đồ
+                      </button>
                     </div>
+                    <button
+                      type="button"
+                      className={`btn-tab-split ${isSplitView ? "active" : ""}`}
+                      onClick={toggleSplitView}
+                      title={isSplitView ? "Thu gọn về dạng Tab chung" : "Tách Biểu Đồ lên trên và Bảng Vị Thế xuống dưới (Chia đôi màn hình)"}
+                    >
+                      ⮃
+                    </button>
                   </div>
 
                   <div className="tab-content">
-                    {activeTab === "logs" ? (
+                    {/* TAB BIỂU ĐỒ TRONG NỘI BỘ TAB (Chỉ mount khi không ở chế độ splitView) */}
+                    {!isSplitView && (
+                      <div
+                        className="chart-tab-pane"
+                        style={{
+                          display: activeTab === "charts" ? "flex" : "none",
+                          width: "100%",
+                          height: "100%",
+                          flex: 1,
+                          flexDirection: "column",
+                          overflow: "hidden",
+                          position: "relative"
+                        }}
+                      >
+                        <div className={`multi-chart-container layout-${chartLayout}`}>
+                          {chartsConfig.slice(0, 4).map((cfg, idx) => (
+                            <SingleChartPane
+                              key={`chart_slot_${idx}`}
+                              activeBotTab={activeBotTab}
+                              adminClosedPositions={adminClosedPositions}
+                              chartIndex={idx}
+                              coin={cfg.coin}
+                              tf={cfg.tf}
+                              risk={risk}
+                              enabledTfs={enabledTfs}
+                              onChangeCoin={(newCoin) => updateChartConfig(idx, { coin: newCoin })}
+                              onChangeTf={(newTf) => updateChartConfig(idx, { tf: newTf })}
+                              isActive={activeChartIndex === idx}
+                              onActivate={() => {
+                                setActiveChartIndex(idx);
+                                setSelectedCoin(cfg.coin);
+                              }}
+                              showToolbar={true}
+                              layout={chartLayout}
+                              isVisible={activeTab === "charts" && idx < getActiveChartsCount(chartLayout)}
+                              layoutSelector={idx === 0 ? (
+                                <div className="layout-selector-wrapper" ref={layoutSelectorRef}>
+                                  <button
+                                    type="button"
+                                    className={`btn-layout-selector ${showLayoutMenu ? "active" : ""}`}
+                                    title="Chọn bố cục biểu đồ (TradingView Layout)"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setShowLayoutMenu(!showLayoutMenu);
+                                    }}
+                                  >
+                                    {renderLayoutIcon(chartLayout, 14, 14)}
+                                  </button>
+
+                                  {showLayoutMenu && (
+                                    <div className="layout-selector-popover">
+                                      <div className="layout-popover-row">
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "1" ? "selected" : ""}`}
+                                          title="1 Biểu đồ đơn"
+                                          onClick={() => handleSelectLayout("1")}
+                                        >
+                                          {renderLayoutIcon("1", 24, 24)}
+                                        </button>
+                                      </div>
+                                      <div className="layout-popover-divider"></div>
+
+                                      <div className="layout-popover-row">
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "2-col" ? "selected" : ""}`}
+                                          title="2 Biểu đồ (Cột dọc 1x2)"
+                                          onClick={() => handleSelectLayout("2-col")}
+                                        >
+                                          {renderLayoutIcon("2-col", 24, 24)}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "2-row" ? "selected" : ""}`}
+                                          title="2 Biểu đồ (Hàng ngang 2x1)"
+                                          onClick={() => handleSelectLayout("2-row")}
+                                        >
+                                          {renderLayoutIcon("2-row", 24, 24)}
+                                        </button>
+                                      </div>
+                                      <div className="layout-popover-divider"></div>
+
+                                      <div className="layout-popover-row">
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "3-col" ? "selected" : ""}`}
+                                          title="3 Biểu đồ (Cột dọc 1x3)"
+                                          onClick={() => handleSelectLayout("3-col")}
+                                        >
+                                          {renderLayoutIcon("3-col", 24, 24)}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "3-row" ? "selected" : ""}`}
+                                          title="3 Biểu đồ (Hàng ngang 3x1)"
+                                          onClick={() => handleSelectLayout("3-row")}
+                                        >
+                                          {renderLayoutIcon("3-row", 24, 24)}
+                                        </button>
+                                      </div>
+                                      <div className="layout-popover-divider"></div>
+
+                                      <div className="layout-popover-row">
+                                        <button
+                                          type="button"
+                                          className={`layout-option-btn ${chartLayout === "4-grid" ? "selected" : ""}`}
+                                          title="4 Biểu đồ (Lưới 2x2)"
+                                          onClick={() => handleSelectLayout("4-grid")}
+                                        >
+                                          {renderLayoutIcon("4-grid", 24, 24)}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Khi ở chế độ splitView mà người dùng bấm vào tab Biểu Đồ */}
+                    {isSplitView && activeTab === "charts" && (
+                      <div style={{ padding: "20px", textAlign: "center", color: "#888" }}>
+                        <p style={{ fontSize: "13px", marginBottom: "8px" }}>Biểu đồ hiện đang được hiển thị ở khung trên.</p>
+                        <button
+                          className="btn-default"
+                          onClick={() => setActiveTab("positions")}
+                          style={{
+                            background: "#333",
+                            border: "1px solid #555",
+                            color: "#ff9900",
+                            padding: "6px 14px",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            fontWeight: "bold"
+                          }}
+                        >
+                          Xem Bảng Vị Thế
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 2. LOGS TERMINAL */}
+                    {activeTab === "logs" && (
                       <LogsTerminal logs={logs} activeBotTab={activeBotTab} />
-                    ) : activeTab === "history" ? (
+                    )}
+
+                    {/* 3. LỊCH SỬ GIAO DỊCH */}
+                    {activeTab === "history" && (
                       <HistoryTable closedPositions={closedPositions} />
-                    ) : (
+                    )}
+
+                    {/* 4. BẢNG VỊ THẾ */}
+                    {activeTab === "positions" && (
                       <PositionsTable
                         watchlistCoins={watchlistCoins}
                         safePos={safePos}
@@ -1752,6 +1982,10 @@ function App() {
                         handleTfToggle={handleTfToggle}
                         onSelectCoinForChart={(coinValue, mappedTf) => {
                           updateChartConfig(activeChartIndex, { coin: coinValue, tf: mappedTf });
+                          if (!isSplitView) {
+                            setActiveTab("charts");
+                          }
+                          setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
                         }}
                         onCloseTicket={handleClosePosition}
                         coinList={COIN_LIST}

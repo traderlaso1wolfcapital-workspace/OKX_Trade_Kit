@@ -53,6 +53,7 @@ export default function SidebarLeft({
           </span>
 
           <div
+            className="group-box-actions"
             style={{
               position: "absolute",
               top: "-10px",
@@ -60,12 +61,12 @@ export default function SidebarLeft({
               display: "flex",
               alignItems: "center",
               gap: "5px",
-              backgroundColor: "#252526",
               padding: "0 4px",
             }}
           >
             <button
               type="button"
+              className="btn-group-box-collapse"
               onClick={handleToggle}
               style={{
                 background: "transparent",
@@ -88,9 +89,6 @@ export default function SidebarLeft({
               style={{
                 flex: 1,
                 minWidth: 0,
-                background: "#2a2a2a",
-                border: "1px solid #444",
-                color: "#fff",
                 padding: "4px 8px",
                 borderRadius: "4px",
                 fontSize: "12px",
@@ -125,19 +123,28 @@ export default function SidebarLeft({
 
           {!isRiskCollapsed && (
             <div className="risk-grid">
-              <div className="risk-row">
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1 }}>
-                  <label style={{ flex: "none" }}>Ký quỹ:</label>
+              <div
+                className="risk-row"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "4px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
+                  <label style={{ margin: 0, whiteSpace: "nowrap", fontSize: "11.5px", color: "#fff", fontWeight: "bold" }}>Ký quỹ:</label>
                   <div style={{ display: "flex", gap: "2px" }}>
                     <button
                       type="button"
+                      className={`risk-unit-btn ${risk.volUnit === "USDT" ? "active" : ""}`}
                       onClick={() => setRisk((r) => {
                         const currentVal = r.posVol;
                         const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
                         return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
                       })}
                       style={{
-                        padding: "1px 6px",
+                        padding: "1px 5px",
                         fontSize: "10px",
                         fontWeight: "bold",
                         borderRadius: "4px",
@@ -151,13 +158,14 @@ export default function SidebarLeft({
                     </button>
                     <button
                       type="button"
+                      className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
                       onClick={() => setRisk((r) => {
                         const currentVal = r.posVol;
                         const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
                         return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
                       })}
                       style={{
-                        padding: "1px 6px",
+                        padding: "1px 5px",
                         fontSize: "10px",
                         fontWeight: "bold",
                         borderRadius: "4px",
@@ -170,7 +178,70 @@ export default function SidebarLeft({
                       % VỐN
                     </button>
                   </div>
+
+                  {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) */}
+                  <div
+                    style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+                    title={
+                      isRunning
+                        ? "Vui lòng dừng bot để thay đổi thiết lập này"
+                        : risk.multiplyVolumeByTf
+                        ? "Đang BẬT: Khối lượng ký quỹ nhân theo hệ số TF (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0)"
+                        : "Đang TẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian"
+                    }
+                  >
+                    <div
+                      className={`risk-mult-badge ${risk.multiplyVolumeByTf ? "active" : ""}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        padding: "1px 5px",
+                        fontSize: "10px",
+                        fontWeight: "bold",
+                        borderRadius: "4px",
+                        border: "1px solid #444",
+                        background: "#222",
+                        cursor: isRunning ? "not-allowed" : "pointer",
+                        userSelect: "none",
+                        whiteSpace: "nowrap",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
+                        {risk.multiplyVolumeByTf ? "nhân Hệ số" : "Cố định"}
+                      </span>
+                      <span className="risk-mult-arrow" style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
+                    </div>
+
+                    <select
+                      value={risk.multiplyVolumeByTf ? "multiply" : "fixed"}
+                      disabled={isRunning}
+                      onChange={(e) => {
+                        if (isRunning) return;
+                        const nextVal = e.target.value === "multiply";
+                        if (onToggleMultiplyVolume) {
+                          onToggleMultiplyVolume(nextVal);
+                        } else {
+                          setRisk((r) => ({ ...r, multiplyVolumeByTf: nextVal }));
+                        }
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "100%",
+                        opacity: 0,
+                        cursor: isRunning ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value="fixed" style={{ background: "#222", color: "#fff" }}>Cố định</option>
+                      <option value="multiply" style={{ background: "#222", color: "#26a69a" }}>nhân Hệ số Ký Quỹ (Vốn)</option>
+                    </select>
+                  </div>
                 </div>
+
                 <NumberSpinBox
                   value={risk.posVol}
                   onChange={(val) => setRisk((r) => {
@@ -180,66 +251,8 @@ export default function SidebarLeft({
                   min={risk.volUnit === "LOT" ? 0.05 : 0.1}
                   step={risk.volUnit === "LOT" ? 0.05 : 0.1}
                   suffix={risk.volUnit === "USDT" ? "$" : "%"}
+                  width="78px"
                 />
-              </div>
-              <div
-                className="risk-row"
-                style={{
-                  marginTop: "2px",
-                  marginBottom: "4px",
-                  justifyContent: "flex-start",
-                  gap: "8px",
-                  opacity: isRunning ? 0.6 : 1,
-                }}
-                title={isRunning ? "Vui lòng dừng bot để thay đổi thiết lập này" : ""}
-              >
-                <input
-                  type="checkbox"
-                  className="coin-toggle"
-                  checked={risk.multiplyVolumeByTf ?? false}
-                  disabled={isRunning}
-                  onChange={(e) => {
-                    if (isRunning) return;
-                    if (onToggleMultiplyVolume) {
-                      onToggleMultiplyVolume(e.target.checked);
-                    } else {
-                      setRisk((r) => ({ ...r, multiplyVolumeByTf: e.target.checked }));
-                    }
-                  }}
-                  style={{ cursor: isRunning ? "not-allowed" : "pointer" }}
-                />
-                <span
-                  style={{
-                    fontSize: "11px",
-                    color: risk.multiplyVolumeByTf ? "#26a69a" : "#888",
-                    fontWeight: risk.multiplyVolumeByTf ? 600 : "normal",
-                    cursor: isRunning ? "not-allowed" : "pointer",
-                    userSelect: "none",
-                    transition: "color 0.2s ease",
-                  }}
-                  onClick={() => {
-                    if (isRunning) return;
-                    const nextVal = !(risk.multiplyVolumeByTf ?? false);
-                    if (onToggleMultiplyVolume) {
-                      onToggleMultiplyVolume(nextVal);
-                    } else {
-                      setRisk((r) => ({ ...r, multiplyVolumeByTf: nextVal }));
-                    }
-                  }}
-                >
-                  nhân Hệ số Ký Quỹ (Vốn)
-                </span>
-                <button
-                  type="button"
-                  className="btn-help"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    alert("BẬT: Khối lượng ký quỹ của từng khung thời gian sẽ nhân với Hệ số Ký Quỹ tương ứng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0). Khung càng lớn vốn vào lệnh càng lớn theo bảng hệ số.\n\nTẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian (mọi khung đều vào cùng 1 lượng vốn bằng nhau).");
-                  }}
-                  title="BẬT: Khối lượng ký quỹ nhân theo hệ số TF | TẮT: Cố định 1 mức vốn cho mọi khung."
-                >
-                  [?]
-                </button>
               </div>
               {activeBotTab === "sub1" ? (
                 <>
@@ -264,6 +277,7 @@ export default function SidebarLeft({
                       min={0.1}
                       step={0.05}
                       suffix="%"
+                      width="78px"
                     />
                   </div>
                   <div className="risk-row">
@@ -287,6 +301,7 @@ export default function SidebarLeft({
                       min={0.1}
                       step={0.05}
                       suffix="%"
+                      width="78px"
                     />
                   </div>
                 </>
