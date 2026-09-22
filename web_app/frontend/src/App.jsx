@@ -774,7 +774,7 @@ function App() {
     sessionStorage.setItem("okx_oauth_state", state);
     // URL đúng theo tài liệu OKX: /oauth/authorize (KHÔNG có /account/)
     // scope=trade cho phép đọc + giao dịch
-    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=trade&state=${state}`;
+    const okxOAuthUrl = `https://www.okx.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=trade&state=${state}`;
     
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
@@ -1980,6 +1980,7 @@ function App() {
                         enabledTfs={enabledTfs}
                         togglePair={togglePair}
                         handleTfToggle={handleTfToggle}
+                        hasApiKey={!!(apiKey && secretKey && passphrase)}
                         onSelectCoinForChart={(coinValue, mappedTf) => {
                           updateChartConfig(activeChartIndex, { coin: coinValue, tf: mappedTf });
                           if (!isSplitView) {

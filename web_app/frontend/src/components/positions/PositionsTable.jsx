@@ -15,6 +15,7 @@ export default function PositionsTable({
   selectedAccount = "sub1",
   loginUid = "",
   onRefreshPositions,
+  hasApiKey = true,
 }) {
   const handleCoinClick = (coinValue, tf = "1H") => {
     const rawCoin = coinValue || "BTC-USDT-SWAP";
@@ -88,10 +89,10 @@ export default function PositionsTable({
         <thead>
           <tr style={{ background: "#252526" }}>
             <th style={{ textAlign: "left" }}>Cặp vị thế</th>
-            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ký quỹ</th>
-            <th style={{ textAlign: "center", minWidth: "130px" }}>PNL thả nổi</th>
+            {hasApiKey && <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Ký quỹ</th>}
+            {hasApiKey && <th style={{ textAlign: "center", minWidth: "130px" }}>PNL thả nổi</th>}
             <th style={{ textAlign: "center" }}>TF trade</th>
-            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Cắt lệnh</th>
+            {hasApiKey && <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>Cắt lệnh</th>}
           </tr>
         </thead>
         <tbody>
@@ -137,12 +138,16 @@ export default function PositionsTable({
                       <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px" }}>Chờ tín hiệu...</span>
                     </div>
                   </td>
-                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
-                  </td>
-                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
-                  </td>
+                  {hasApiKey && (
+                    <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                      <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
+                    </td>
+                  )}
+                  {hasApiKey && (
+                    <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                      <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
+                    </td>
+                  )}
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
                       {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
@@ -177,9 +182,11 @@ export default function PositionsTable({
                       })}
                     </div>
                   </td>
-                  <td style={{ padding: "4px 6px", textAlign: "center" }}>
-                    <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
-                  </td>
+                  {hasApiKey && (
+                    <td style={{ padding: "4px 6px", textAlign: "center" }}>
+                      <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
+                    </td>
+                  )}
                 </tr>
               );
             }
@@ -295,44 +302,48 @@ export default function PositionsTable({
                       </div>
                     </div>
                   </td>
-                  <td
-                    style={{
-                      textAlign: "center",
-                      padding: "4px 6px",
-                      fontSize: "13px",
-                      color: isChild ? "rgba(255,255,255,0.4)" : "#fff",
-                      whiteSpace: "nowrap",
-                      fontWeight: "400",
-                    }}
-                  >
-                    {margin.toFixed(2)} $
-                  </td>
-                  <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
-                    {(() => {
-                      const roi = parseFloat(pos.roi || 0);
-                      const color = roi >= 0 ? "#00c087" : "#ff4d4f";
-                      return (
-                        <div
-                          style={{
-                            color,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "6px",
-                          }}
-                        >
-                          <span style={{ fontWeight: "400", fontSize: "14.2px" }}>
-                            {upl >= 0 ? "+" : ""}
-                            {upl.toFixed(2)} USDT
-                          </span>
-                          <span style={{ fontSize: "11.5px" }}>
-                            ({roi > 0 ? "+" : ""}
-                            {roi.toFixed(2)}%)
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </td>
+                  {hasApiKey && (
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 6px",
+                        fontSize: "13px",
+                        color: isChild ? "rgba(255,255,255,0.4)" : "#fff",
+                        whiteSpace: "nowrap",
+                        fontWeight: "400",
+                      }}
+                    >
+                      {margin.toFixed(2)} $
+                    </td>
+                  )}
+                  {hasApiKey && (
+                    <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
+                      {(() => {
+                        const roi = parseFloat(pos.roi || 0);
+                        const color = roi >= 0 ? "#00c087" : "#ff4d4f";
+                        return (
+                          <div
+                            style={{
+                              color,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                            }}
+                          >
+                            <span style={{ fontWeight: "400", fontSize: "14.2px" }}>
+                              {upl >= 0 ? "+" : ""}
+                              {upl.toFixed(2)} USDT
+                            </span>
+                            <span style={{ fontSize: "11.5px" }}>
+                              ({roi > 0 ? "+" : ""}
+                              {roi.toFixed(2)}%)
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                  )}
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                     {!isChild && ticketIndex === 0 && (
                       <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
@@ -369,23 +380,25 @@ export default function PositionsTable({
                       </div>
                     )}
                   </td>
-                  <td style={{ textAlign: "center", padding: "4px 6px", whiteSpace: "nowrap" }}>
-                    <button
-                      onClick={() => handleClosePosition(coin, pos)}
-                      style={{
-                        background: "#b32626",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        padding: "4px 14px",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Đóng
-                    </button>
-                  </td>
+                  {hasApiKey && (
+                    <td style={{ textAlign: "center", padding: "4px 6px", whiteSpace: "nowrap" }}>
+                      <button
+                        onClick={() => handleClosePosition(coin, pos)}
+                        style={{
+                          background: "#b32626",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          padding: "4px 14px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        Đóng
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             });

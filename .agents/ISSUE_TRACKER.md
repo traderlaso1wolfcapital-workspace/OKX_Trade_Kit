@@ -18,6 +18,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[22/09/2026]** - Lỗi Nút Connect OKX (Fast API) Dẫn Tới Trang Quản Lý Tài Khoản Chung:
+  - **Mô tả lỗi:** URL kết nối OKX OAuth bị sai (`/account/oauth/authorize`), khiến người dùng bị chuyển tới trang quản lý tài khoản chung thay vì trang cấp quyền ứng dụng Fast API.
+  - **Đã xử lý:** 
+    - Xóa `/account` khỏi URL OAuth trong file `App.jsx` (`https://www.okx.com/oauth/authorize...`).
+  - **Kiểm chứng:** URL nay đã chuẩn xác theo tài liệu API của OKX.
+
+- **[22/09/2026]** - Lỗi Bot Vẫn Nhận Tín Hiệu & Hiện Lên Sau Khi Gỡ Bỏ API Key:
+  - **Mô tả lỗi:** Khi người dùng xóa/gỡ bỏ API Key trong cài đặt, tiến trình (process) bot đang chạy ngầm không bị tắt. Điều này dẫn đến việc bot vẫn tiếp tục lắng nghe tín hiệu webhook từ TradingView và gửi dữ liệu về giao diện thông qua websocket.
+  - **Đã xử lý:**
+    - Cập nhật API endpoint `delete_bot_credentials` trong file `main.py` để bổ sung logic **KILL** tiến trình bot (nếu có) thuộc về tài khoản vừa bị xóa key (tương tự như logic đổi API key).
+  - **Kiểm chứng:** Xóa API key nay đã dứt điểm việc nhận/gửi tín hiệu của bot.
+
+- **[22/09/2026]** - Bảng Vị Thế Vẫn Hiện Thông Tin Ký Quỹ / PNL / Cắt Lệnh Sau Khi Xóa API Key:
+  - **Mô tả lỗi:** Khi người dùng gỡ bỏ (xóa trống) API Key trong Cài Đặt Hệ Thống, Bảng Vị Thế vẫn hiển thị đầy đủ các cột Ký quỹ, PNL thả nổi, và nút Cắt lệnh (Đóng) như khi có API Key. Nguyên nhân: frontend không kiểm tra trạng thái API Key trước khi render các cột dữ liệu giao dịch; danh sách coin hiển thị lấy từ `watchlistCoins` và `activePairs` (hardcode 3 coin mặc định) nên luôn có dữ liệu bất kể API Key tồn tại hay không.
+  - **Đã xử lý:**
+    - Trong [App.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Truyền thêm prop `hasApiKey={!!(apiKey && secretKey && passphrase)}` xuống `PositionsTable`.
+    - Trong [PositionsTable.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx): Nhận prop `hasApiKey` (default `true`). Khi `hasApiKey === false`, ẩn hoàn toàn 3 cột header (Ký quỹ, PNL thả nổi, Cắt lệnh) và ẩn toàn bộ các ô dữ liệu tương ứng trong cả hàng trống (Chờ tín hiệu) lẫn hàng có vị thế. Chỉ giữ lại 2 cột: Cặp vị thế + TF trade để người dùng vẫn có thể bật/tắt khung thời gian.
+  - **Kiểm chứng:** Build Vite production thành công (exit code 0).
+
 - **[22/09/2026]** - Tăng Độ Dài Các Ô Nhập Số Liệu (Spinbox) Trên Mobile Lên 120px Để Nhập Được Nhiều Số Liệu Hơn:
   - **Mô tả yêu cầu:** Trên giao diện Mobile, các ô nhập số liệu (Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5, và các ô trong Cài Đặt) có độ rộng cũ (78px - 95px) bị ngắn, phần ruột input chỉ còn ~38px khiến khi nhập các số lớn hoặc nhiều chữ số thập phân bị che khuất, chật chội. Cần kéo dài ô nhập trên mobile để hiển thị và nhập được nhiều số liệu hơn.
   - **Đã xử lý:**

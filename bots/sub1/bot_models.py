@@ -5,6 +5,7 @@ import time
 
 def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = "", pnl: float = 0.0, exit_price: float = 0.0):
     try:
+        coin = coin.upper()
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
         marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')
@@ -12,10 +13,13 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
         marker_file = os.path.join(marker_dir, "trade_markers.json")
         markers = {}
         if os.path.exists(marker_file):
-            try:
-                with open(marker_file, "r", encoding="utf-8") as f:
-                    markers = json.load(f)
-            except Exception: pass
+            for _ in range(5):
+                try:
+                    with open(marker_file, "r", encoding="utf-8") as f:
+                        markers = json.load(f)
+                    break
+                except Exception:
+                    time.sleep(0.05)
             
         if coin not in markers:
             markers[coin] = []
@@ -65,13 +69,19 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
                     filtered_markers.append(m)
             markers[c] = filtered_markers[-50:] # Giữ 50 marker gần nhất trong 30 ngày
             
-        with open(marker_file, "w", encoding="utf-8") as f:
-            json.dump(markers, f)
+        for _ in range(5):
+            try:
+                with open(marker_file, "w", encoding="utf-8") as f:
+                    json.dump(markers, f)
+                break
+            except Exception:
+                time.sleep(0.05)
     except Exception as e:
         print(f"Error recording marker: {e}")
 
 def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: float, tf: str = ""):
     try:
+        coin = coin.upper()
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
         marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')
@@ -79,10 +89,13 @@ def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: fl
         marker_file = os.path.join(marker_dir, "trade_markers.json")
         markers = {}
         if os.path.exists(marker_file):
-            try:
-                with open(marker_file, "r", encoding="utf-8") as f:
-                    markers = json.load(f)
-            except Exception: pass
+            for _ in range(5):
+                try:
+                    with open(marker_file, "r", encoding="utf-8") as f:
+                        markers = json.load(f)
+                    break
+                except Exception:
+                    time.sleep(0.05)
             
         has_active = False
         dirty = False
@@ -120,8 +133,13 @@ def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: fl
                     if current_time_ms - marker_time <= THIRTY_DAYS_MS:
                         filtered_markers.append(m)
                 markers[c] = filtered_markers[-50:]
-            with open(marker_file, "w", encoding="utf-8") as f:
-                json.dump(markers, f)
+            for _ in range(5):
+                try:
+                    with open(marker_file, "w", encoding="utf-8") as f:
+                        json.dump(markers, f)
+                    break
+                except Exception:
+                    time.sleep(0.05)
     except Exception as e:
         print(f"Error syncing initial marker: {e}")
 

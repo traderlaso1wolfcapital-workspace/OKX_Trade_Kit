@@ -1595,6 +1595,31 @@ def delete_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = N
                 os.remove(p)
                 deleted_any = True
             except: pass
+
+    # If the user deletes API key of the running account -> KILL bot
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    if os.path.exists(running_acc_file):
+        with open(running_acc_file, "r") as f:
+            current_running = f.read().strip()
+        if current_running == target_acc:
+            proc = get_nested(bot_processes, uid, strategy)
+            pid = get_running_pid(uid, strategy)
+            if proc or pid > 0:
+                if proc:
+                    try:
+                        import psutil
+                        parent = psutil.Process(proc.pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: proc.kill()
+                elif pid > 0:
+                    try:
+                        import psutil
+                        parent = psutil.Process(pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: pass
+                del_nested(bot_processes, uid, strategy)
             
     return {"status": "ok", "deleted": deleted_any}
 
@@ -1762,10 +1787,14 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                     markers = {}
                     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
                     if os.path.exists(positions_path):
-                        try:
-                            with open(positions_path, "r", encoding="utf-8") as f:
-                                markers = json.load(f)
-                        except Exception: pass
+                        for _ in range(5):
+                            try:
+                                with open(positions_path, "r", encoding="utf-8") as f:
+                                    markers = json.load(f)
+                                break
+                            except Exception:
+                                import time
+                                time.sleep(0.05)
 
                     # Group OKX positions by instId and posSide (handling native OKX split positions)
                     okx_pos_map = {}
@@ -1783,7 +1812,7 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                     # Auto-sync: Clean up zombie virtual tickets in trade_markers if OKX position is closed
                     dirty_markers = False
                     for coin, items in markers.items():
-                        inst_id = f"{coin}-USDT-SWAP"
+                        inst_id = f"{coin.upper()}-USDT-SWAP"
                         for side in ["long", "short"]:
                             side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
                             if side_items and (inst_id, side) not in okx_pos_map:
@@ -1791,10 +1820,14 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                                 dirty_markers = True
 
                     if dirty_markers:
-                        try:
-                            with open(positions_path, "w", encoding="utf-8") as f:
-                                json.dump(markers, f)
-                        except Exception: pass
+                        for _ in range(5):
+                            try:
+                                with open(positions_path, "w", encoding="utf-8") as f:
+                                    json.dump(markers, f)
+                                break
+                            except Exception:
+                                import time
+                                time.sleep(0.05)
 
                     # Build formatted positions
                     for key, items_okx in okx_pos_map.items():
@@ -2489,3 +2522,4 @@ if __name__ == "__main__":
 # z7721 | Update default margin/volume settings to 1.0
 # z7722 | Implemented bcrypt for password hashing and automatic migration from SHA256
 # z7723 | Update OKX OAuth Fast API endpoint and hide closed_positions if API is deleted
+# z7724 | Fix logic error where deleting API Key did not kill the bot process, and removed /account from OAuth URL.
