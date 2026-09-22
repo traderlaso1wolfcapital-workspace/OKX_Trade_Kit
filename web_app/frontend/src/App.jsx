@@ -759,9 +759,9 @@ function App() {
     // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
     const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     sessionStorage.setItem("okx_oauth_state", state);
-    // URL đúng theo tài liệu OKX: /oauth/authorize (KHÔNG có /account/)
+    // URL sử dụng /account/oauth/authorize vì /oauth/authorize trả về 404
     // scope=fast_api cho Fast API mode
-    const okxOAuthUrl = `https://www.okx.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
+    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
     
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
