@@ -58,8 +58,6 @@ export default function AppHeader({
   onSelectBotTab,
   slotCount = 10,
   maxSlots = 100,
-  themeMode = "default",
-  onToggleTheme,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -234,40 +232,8 @@ export default function AppHeader({
         )}
       </div>
 
-      {/* Slot indicator & Nút Join Cộng đồng & Nút Chuyển Theme */}
+      {/* Slot indicator & Nút Join Cộng đồng */}
       <div className="header-right-tools" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {/* Nút chuyển đổi nhanh Bản Gốc / Kính Mờ #181920 */}
-        {onToggleTheme && (
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            title={themeMode === "glass_pro" ? "Đang xem: Kính mờ #181920 (Bấm để quay về Bản Gốc)" : "Đang xem: Bản Gốc (Bấm để xem Kính mờ #181920)"}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "3px 8px",
-              borderRadius: "4px",
-              backgroundColor: themeMode === "glass_pro" ? "#1d1f2c" : "#222",
-              border: themeMode === "glass_pro" ? "1px solid #33374b" : "1px solid #444",
-              color: themeMode === "glass_pro" ? "#ffb74d" : "#888888",
-              cursor: "pointer",
-              fontSize: "11px",
-              fontWeight: 600,
-              transition: "all 0.18s ease"
-            }}
-          >
-            {themeMode === "glass_pro" ? (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffb74d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <span style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#666666" }} />
-            )}
-            <span>{themeMode === "glass_pro" ? "Kính Mờ" : "Bản Gốc"}</span>
-          </button>
-        )}
-
         <a
           href="https://discord.gg/8NXaSCvZ6u"
           target="_blank"

@@ -44,19 +44,6 @@ function App() {
   });
   const [fadeClass, setFadeClass] = useState("tab-fade");
 
-  // Theme Mode: "default" (Bản Gốc) vs "glass_pro" (Kính mờ #181920 Pro)
-  const [themeMode, setThemeMode] = useState(() => {
-    return localStorage.getItem("tls1_theme_mode") || "default";
-  });
-
-  const toggleTheme = () => {
-    setThemeMode((prev) => {
-      const next = prev === "glass_pro" ? "default" : "glass_pro";
-      localStorage.setItem("tls1_theme_mode", next);
-      return next;
-    });
-  };
-
   // 4. Accounts & Mapping
   const [accounts, setAccounts] = useState(() => {
     try {
@@ -773,8 +760,8 @@ function App() {
     const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     sessionStorage.setItem("okx_oauth_state", state);
     // URL đúng theo tài liệu OKX: /oauth/authorize (KHÔNG có /account/)
-    // scope=trade cho phép đọc + giao dịch
-    const okxOAuthUrl = `https://www.okx.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=trade&state=${state}`;
+    // scope=fast_api cho Fast API mode
+    const okxOAuthUrl = `https://www.okx.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
     
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
@@ -1553,7 +1540,7 @@ function App() {
   const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
 
   return (
-    <div className={`app-container ${themeMode === "glass_pro" ? "theme-glass-pro" : ""}`}>
+    <div className="app-container">
       {lockMessage && (
         <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "14px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
           {lockMessage}
@@ -1586,8 +1573,6 @@ function App() {
             onSelectBotTab={setActiveBotTab}
             slotCount={slotCount}
             maxSlots={100}
-            themeMode={themeMode}
-            onToggleTheme={toggleTheme}
           />
 
           {/* BOT PANEL CARD */}
