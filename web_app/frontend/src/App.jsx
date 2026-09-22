@@ -761,7 +761,7 @@ function App() {
     sessionStorage.setItem("okx_oauth_state", state);
     // URL sử dụng /account/oauth/authorize (theo tài liệu OKX Broker)
     // scope=read_only+trade theo tài liệu OKX (fast_api không phải scope hợp lệ → redirect về hồ sơ)
-    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=read_only,trade&state=${state}`;
+    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
     
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
