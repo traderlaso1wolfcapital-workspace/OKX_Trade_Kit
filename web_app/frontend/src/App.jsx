@@ -784,9 +784,9 @@ function App() {
     // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
     const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     sessionStorage.setItem("okx_oauth_state", state);
-    // URL sử dụng /account/oauth/authorize (theo tài liệu OKX Broker)
-    // scope=read_only,trade thay vì fast_api vì fast_api không hợp lệ và gây lỗi redirect về trang hồ sơ
-    const okxOAuthUrl = `https://www.okx.com/account/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&scope=read_only,trade&state=${state}`;
+    // Dựa theo URL thực tế đang chạy chuẩn của Titan Trading:
+    // https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=...&redirect_uri=...&scope=fast_api&state=...
+    const okxOAuthUrl = `https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
 
     // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
     // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
