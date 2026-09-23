@@ -787,42 +787,15 @@ function App() {
     
     const okxOAuthUrl = `https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
 
+    // OKX OAuth bắt buộc chạy qua trình duyệt hệ thống (Safari/Chrome).
+    // Deep link okx:// chỉ mở trình duyệt dApp nội bộ (Web3) → không render được trang OAuth.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      // MOBILE: Thử mở app OKX qua Deep Link trước, fallback sang trình duyệt web sau.
-      // Deep Link scheme OKX: okx://wallet/dapp/url?dappUrl=<encoded_url>
-      // Nếu app OKX đã cài đặt → OS sẽ mở thẳng app, user xác nhận trong app.
-      // Nếu không cài app → sau 1.5s timeout sẽ tự redirect sang web browser.
-      const deepLinkUrl = `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(okxOAuthUrl)}`;
-      
-      let hasLeftPage = false;
-      
-      // Lắng nghe sự kiện: nếu trang bị blur/hidden = app đã mở thành công
-      const onVisibilityChange = () => {
-        if (document.hidden || document.visibilityState === "hidden") {
-          hasLeftPage = true;
-        }
-      };
-      const onBlur = () => { hasLeftPage = true; };
-      
-      document.addEventListener("visibilitychange", onVisibilityChange);
-      window.addEventListener("blur", onBlur);
-      
-      // Thử mở deep link (app OKX)
-      window.location.href = deepLinkUrl;
-      
-      // Fallback: nếu sau 1.5s app không mở (vẫn ở trang web) → redirect sang trình duyệt
-      setTimeout(() => {
-        document.removeEventListener("visibilitychange", onVisibilityChange);
-        window.removeEventListener("blur", onBlur);
-        
-        if (!hasLeftPage) {
-          // App OKX chưa cài hoặc deep link không xử lý được → mở web
-          window.location.href = okxOAuthUrl;
-        }
-      }, 1500);
+      // Mobile: Mở OAuth trong chính trình duyệt hiện tại
+      // User đăng nhập OKX → xác nhận → redirect callback về autotrader.fun
+      window.location.href = okxOAuthUrl;
     } else {
-      // DESKTOP: Mở tab mới, không ảnh hưởng trang hiện tại
+      // Desktop: Mở tab mới, không ảnh hưởng trang hiện tại
       window.open(okxOAuthUrl, "_blank");
     }
   };
