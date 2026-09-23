@@ -784,17 +784,45 @@ function App() {
     // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
     const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     sessionStorage.setItem("okx_oauth_state", state);
-    // Dựa theo URL thực tế đang chạy chuẩn của Titan Trading:
-    // https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=...&redirect_uri=...&scope=fast_api&state=...
+    
     const okxOAuthUrl = `https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
 
-    // Trên mobile dùng window.location.href để OS bắt Universal Link và mở thẳng app OKX.
-    // Trên desktop dùng window.open để mở tab mới, không làm mất trang hiện tại.
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
-      // window.location.href kích hoạt Universal Link trên iOS/Android, mở thẳng app OKX
-      window.location.href = okxOAuthUrl;
+      // MOBILE: Thử mở app OKX qua Deep Link trước, fallback sang trình duyệt web sau.
+      // Deep Link scheme OKX: okx://wallet/dapp/url?dappUrl=<encoded_url>
+      // Nếu app OKX đã cài đặt → OS sẽ mở thẳng app, user xác nhận trong app.
+      // Nếu không cài app → sau 1.5s timeout sẽ tự redirect sang web browser.
+      const deepLinkUrl = `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(okxOAuthUrl)}`;
+      
+      let hasLeftPage = false;
+      
+      // Lắng nghe sự kiện: nếu trang bị blur/hidden = app đã mở thành công
+      const onVisibilityChange = () => {
+        if (document.hidden || document.visibilityState === "hidden") {
+          hasLeftPage = true;
+        }
+      };
+      const onBlur = () => { hasLeftPage = true; };
+      
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      window.addEventListener("blur", onBlur);
+      
+      // Thử mở deep link (app OKX)
+      window.location.href = deepLinkUrl;
+      
+      // Fallback: nếu sau 1.5s app không mở (vẫn ở trang web) → redirect sang trình duyệt
+      setTimeout(() => {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("blur", onBlur);
+        
+        if (!hasLeftPage) {
+          // App OKX chưa cài hoặc deep link không xử lý được → mở web
+          window.location.href = okxOAuthUrl;
+        }
+      }, 1500);
     } else {
+      // DESKTOP: Mở tab mới, không ảnh hưởng trang hiện tại
       window.open(okxOAuthUrl, "_blank");
     }
   };
