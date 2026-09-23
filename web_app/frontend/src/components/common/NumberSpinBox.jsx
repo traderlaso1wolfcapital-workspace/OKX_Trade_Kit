@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function NumberSpinBox({ value, onChange, min = 0, max, step = 1, suffix = "", width = "90px" }) {
+export default function NumberSpinBox({ value, onChange, min = 0, max, step = 1, suffix = "", width = "84px" }) {
   const handleStep = (delta) => {
     const cur = parseFloat(value || 0);
     const stepStr = step.toString();

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "../../i18n";
 
 console.log("AppHeader loaded! Force HMR");
 
@@ -32,35 +33,36 @@ const PatternLiquidation = () => (
   </svg>
 );
 
-const BOT_OPTIONS = [
-  {
-    id: "sub1",
-    name: "Bot EMA200",
-    desc: "Lưới Đa Khung & Trailing Limit",
-    pattern: <PatternEMA200 />,
-  },
-  {
-    id: "sub2",
-    name: "Bot SMC",
-    desc: "Order Block & Mitigation Box",
-    pattern: <PatternSMC />,
-  },
-  {
-    id: "sub3",
-    name: "Bot Liquidation",
-    desc: "Quét Thanh Khoản & Stop Hunt",
-    pattern: <PatternLiquidation />,
-  },
-];
-
 export default function AppHeader({
   activeBotTab,
   onSelectBotTab,
   slotCount = 10,
   maxSlots = 100,
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const BOT_OPTIONS = [
+    {
+      id: "sub1",
+      name: t("bot_ema200"),
+      desc: t("desc_ema200"),
+      pattern: <PatternEMA200 />,
+    },
+    {
+      id: "sub2",
+      name: t("bot_smc"),
+      desc: t("desc_smc"),
+      pattern: <PatternSMC />,
+    },
+    {
+      id: "sub3",
+      name: t("bot_liquidation"),
+      desc: t("desc_liquidation"),
+      pattern: <PatternLiquidation />,
+    },
+  ];
 
   const currentBot = BOT_OPTIONS.find((b) => b.id === activeBotTab) || BOT_OPTIONS[0];
 

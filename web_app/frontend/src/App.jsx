@@ -9,14 +9,18 @@ import LogsTerminal from "./components/terminal/LogsTerminal";
 import HistoryTable from "./components/history/HistoryTable";
 import SystemSettingsModal from "./components/modals/SystemSettingsModal";
 import ConnectModal from "./components/modals/ConnectModal";
+import LanguageSelector from "./components/common/LanguageSelector";
+import { useTranslation } from "./i18n";
 import { AddAccountModal, DeleteAccountModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
 import "./App.css";
 
 function App() {
+  const { t } = useTranslation();
   // 1. Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem("tls1_auth") === "true");
   const [loginUid, setLoginUid] = useState("");
+  const [okxUid, setOkxUid] = useState(() => localStorage.getItem("tls1_uid") || "");
   const [authStep, setAuthStep] = useState("uid");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
@@ -68,20 +72,12 @@ function App() {
     return defaults;
   });
 
-  const availableAccountsForTab = useMemo(() => {
-    return accounts.filter(acc => {
-      return !Object.entries(botAccountMap).some(([bot, accountId]) => {
-        return bot !== activeBotTab && accountId === acc.id;
-      });
-    });
-  }, [accounts, botAccountMap, activeBotTab]);
-
   const effectiveAccId = useMemo(() => {
-    if (botAccountMap[activeBotTab] && availableAccountsForTab.some(a => a.id === botAccountMap[activeBotTab])) {
+    if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
       return botAccountMap[activeBotTab];
     }
-    return availableAccountsForTab.length > 0 ? availableAccountsForTab[0].id : "";
-  }, [botAccountMap, activeBotTab, availableAccountsForTab]);
+    return accounts.length > 0 ? accounts[0].id : "";
+  }, [botAccountMap, activeBotTab, accounts]);
 
   const [selectedAccount, setSelectedAccount] = useState(effectiveAccId);
 
@@ -104,12 +100,19 @@ function App() {
   const {
     botStatus,
     setBotStatus,
+    activeAccounts: wsActiveAccounts,
     positions,
     setPositions,
     closedPositions,
     setClosedPositions,
     refresh: refreshBotData,
   } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
+
+  const [httpActiveAccounts, setHttpActiveAccounts] = useState({});
+
+  const mergedActiveAccounts = useMemo(() => {
+    return { ...(httpActiveAccounts || {}), ...(wsActiveAccounts || {}) };
+  }, [wsActiveAccounts, httpActiveAccounts]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);
@@ -910,7 +913,7 @@ function App() {
         } catch { }
         setOverrideBotRunning(true);
         if (setBotStatus) setBotStatus("RUNNING");
-        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}${cleanMsg}`);
+        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}${cleanMsg}`);
         refreshBotData();
         // Giữ hiệu ứng loading tối thiểu 600ms mượt mà, sau đó khi tắt loading thì giao diện chuyển thẳng sang nút DỪNG BOT
         await new Promise(resolve => setTimeout(resolve, 600));
@@ -1014,10 +1017,18 @@ function App() {
 
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
+    const targetAccountId = selectedAccount;
+    const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetAccountId);
+    if (isRunning) {
+      const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+      const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+      alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản!`);
+      setShowDeleteAccountModal(false);
+      return;
+    }
     setIsDeletingAccount(true);
     await new Promise(resolve => setTimeout(resolve, 1200));
 
-    const targetAccountId = selectedAccount;
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
 
@@ -1140,13 +1151,18 @@ function App() {
       const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${selectedAccount}&uid=${currentUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase })
+        body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase, okx_uid: okxUid })
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        alert(`❌ Lỗi: ${err.detail || "Không thể lưu API Key"}`);
+        alert(`❌ Lỗi: ${data.detail || "Không thể lưu API Key"}`);
         setIsSavingConfig(false);
         return;
+      }
+      if (data.detected_uid) {
+        localStorage.setItem("tls1_uid", data.detected_uid);
+        setOkxUid(data.detected_uid);
+        setLoginUid(data.detected_uid);
       }
       handleAssignAccountToActiveBot(selectedAccount);
       const curAccName = accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
@@ -1213,7 +1229,7 @@ function App() {
         return;
       }
 
-      const curBotName = activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation";
+      const curBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!${cancelMsg}`);
       const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Lưới Đa Khung";
       addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình ${curBotName}: Chế độ = ${dcaMode}${cancelMsg}`);
@@ -1305,8 +1321,8 @@ function App() {
             cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX, bảo lưu 100% TP/SL)`;
           }
         }
-        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho Bot EMA200 thành công!${cancelMsg}`);
-        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định Bot EMA200: Ký quỹ 1$, Lưới Đa Khung, Đồng pha BTC, XAU/BTC/ETH${cancelMsg}`);
+        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho EMA200 Bot thành công!${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 1$, Lưới Đa Khung, Đồng pha BTC, XAU/BTC/ETH${cancelMsg}`);
         refreshBotData();
       } else if (activeBotTab === "sub2") {
         setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT", multiplyVolumeByTf: false });
@@ -1332,8 +1348,8 @@ function App() {
           const d = await res.json().catch(() => ({}));
           if (d?.canceled_count > 0) cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX)`;
         }
-        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho Bot SMC thành công!${cancelMsg}`);
-        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định Bot SMC${cancelMsg}`);
+        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho SMC Bot thành công!${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định SMC Bot${cancelMsg}`);
         refreshBotData();
       } else {
         setRisk({ posVol: 1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
@@ -1484,6 +1500,7 @@ function App() {
         if (r.ok) {
           const d = await r.json();
           if (d?.status && setBotStatus) setBotStatus(d.status);
+          if (d?.active_accounts) setHttpActiveAccounts(d.active_accounts);
         }
       } catch { }
     };
@@ -1552,6 +1569,9 @@ function App() {
         handleFastConnectClick={handleFastConnectClick}
         okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleConnectApiKey}
+        isAuthenticated={isAuthenticated}
+        currentUid={currentUid}
+        onLogout={handleLogout}
       />
 
       <div className={`content-wrapper ${fadeClass}`}>
@@ -1561,6 +1581,7 @@ function App() {
           effectiveAccId={effectiveAccId}
           accounts={accounts}
           botAccountMap={botAccountMap}
+          activeAccounts={mergedActiveAccounts}
           onAssignAccount={handleAssignAccountToActiveBot}
           onOpenSettings={() => setShowSettings(true)}
           isRiskCollapsed={isRiskCollapsed}
@@ -1593,7 +1614,7 @@ function App() {
                   style={{ width: "fit-content" }}
                 >
                   <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
-                  ĐANG KHỞI ĐỘNG BOT...
+                  {t("starting_bot")}
                 </button>
               ) : isStoppingBot ? (
                 <button
@@ -1602,7 +1623,7 @@ function App() {
                   style={{ width: "fit-content" }}
                 >
                   <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
-                  ĐANG DỪNG BOT...
+                  {t("stopping_bot")}
                 </button>
               ) : isRunning ? (
                 <button
@@ -1613,7 +1634,7 @@ function App() {
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
                     <rect x="1" y="1" width="10" height="10" rx="1.5" />
                   </svg>
-                  <span>DỪNG BOT</span>
+                  <span>{t("stop_bot")}</span>
                 </button>
               ) : (
                 <button
@@ -1624,22 +1645,18 @@ function App() {
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
                     <path d="M 2.5 1.5 C 2.5 0.9 3.2 0.5 3.7 0.8 L 10.5 5.3 C 11.0 5.6 11.0 6.4 10.5 6.7 L 3.7 11.2 C 3.2 11.5 2.5 11.1 2.5 10.5 Z" />
                   </svg>
-                  <span>CHẠY BOT</span>
+                  <span>{t("start_bot")}</span>
                 </button>
               )}
-              <button
-                onClick={() => setShowConnectModal(true)}
-                className="btn-connect-okx"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-                  <rect x="0" y="0" width="7" height="7" rx="1" />
-                  <rect x="17" y="0" width="7" height="7" rx="1" />
-                  <rect x="8.5" y="8.5" width="7" height="7" rx="1" />
-                  <rect x="0" y="17" width="7" height="7" rx="1" />
-                  <rect x="17" y="17" width="7" height="7" rx="1" />
-                </svg>
-                <span>OKX Connect</span>
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => setShowConnectModal(true)}
+                  className="btn-connect-okx"
+                >
+                  <span>{t("connect")}</span>
+                </button>
+                <LanguageSelector />
+              </div>
             </div>
 
             {/* CHARTS & WORKSPACE CONTAINER */}
@@ -1777,13 +1794,13 @@ function App() {
                         className={`tab-btn ${activeTab === "positions" ? "active" : ""}`}
                         onClick={() => setActiveTab("positions")}
                       >
-                        Bảng Vị Thế ({safePos.length})
+                        {t("positions_tab")} ({safePos.length})
                       </button>
                       <button
                         className={`tab-btn ${activeTab === "logs" ? "active" : ""}`}
                         onClick={() => setActiveTab("logs")}
                       >
-                        Logs
+                        {t("logs_tab")}
                       </button>
                       <button
                         className={`tab-btn ${activeTab === "charts" ? "active" : ""}`}
@@ -1792,7 +1809,7 @@ function App() {
                           setTimeout(() => window.dispatchEvent(new Event("resize")), 40);
                         }}
                       >
-                        Biểu Đồ
+                        {t("chart_tab")}
                       </button>
                     </div>
                     <button
@@ -1932,7 +1949,7 @@ function App() {
                     {/* Khi ở chế độ splitView mà người dùng bấm vào tab Biểu Đồ */}
                     {isSplitView && activeTab === "charts" && (
                       <div style={{ padding: "20px", textAlign: "center", color: "#888" }}>
-                        <p style={{ fontSize: "13px", marginBottom: "8px" }}>Biểu đồ hiện đang được hiển thị ở khung trên.</p>
+                        <p style={{ fontSize: "13px", marginBottom: "8px" }}>{t("chart_in_split_pane")}</p>
                         <button
                           className="btn-default"
                           onClick={() => setActiveTab("positions")}
@@ -1947,7 +1964,7 @@ function App() {
                             fontWeight: "bold"
                           }}
                         >
-                          Xem Bảng Vị Thế
+                          {t("view_positions_btn")}
                         </button>
                       </div>
                     )}
@@ -1972,7 +1989,6 @@ function App() {
                         enabledTfs={enabledTfs}
                         togglePair={togglePair}
                         handleTfToggle={handleTfToggle}
-                        hasApiKey={!!(apiKey && secretKey && passphrase)}
                         onSelectCoinForChart={(coinValue, mappedTf) => {
                           updateChartConfig(activeChartIndex, { coin: coinValue, tf: mappedTf });
                           if (!isSplitView) {
@@ -2004,6 +2020,7 @@ function App() {
         selectedAccount={selectedAccount}
         onAssignAccount={handleAssignAccountToActiveBot}
         botAccountMap={botAccountMap}
+        activeAccounts={mergedActiveAccounts}
         onCreateAccount={() => {
           setApiKey("");
           setSecretKey("");
@@ -2011,7 +2028,18 @@ function App() {
           setNewAccountInput("");
           setShowAddAccountModal(true);
         }}
-        onDeleteAccount={() => setShowDeleteAccountModal(true)}
+        onDeleteAccount={() => {
+          const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
+          if (isRunning) {
+            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+            const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+            alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
+            return;
+          }
+          setShowDeleteAccountModal(true);
+        }}
+        okxUid={okxUid}
+        setOkxUid={setOkxUid}
         apiKey={apiKey}
         setApiKey={setApiKey}
         secretKey={secretKey}

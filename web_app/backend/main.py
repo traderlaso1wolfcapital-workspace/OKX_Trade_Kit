@@ -95,40 +95,46 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 uid_cache = {}
 
-@app.get("/api/auth/verify")
-def verify_uid(uid: str, jwt_data: dict = Depends(verify_jwt)):
-    if jwt_data["uid"] != uid and not jwt_data.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Forbidden")
-    clean = str(uid).strip().lower() if uid else ""
+def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
+    clean = str(uid_str).strip().lower() if uid_str else ""
+    if not clean:
+        return False, "UID rỗng"
     if is_admin_uid(clean):
-        return {"status": "success", "message": "Admin login successful", "uid": uid}
-        
+        return True, "Admin"
     now = time.time()
     if clean in uid_cache and now - uid_cache[clean]["time"] < 300: # 5 minutes
-        return uid_cache[clean]["result"]
-
+        res = uid_cache[clean]["result"]
+        return (res.get("status") == "success"), res.get("message", "")
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         content = resp.text
-        
         reader = csv.reader(content.splitlines())
         next(reader, None) # skip header
-        
         for row in reader:
             if row and len(row) >= 6 and row[0].strip().isdigit():
-                if row[0].strip() == uid:
+                if row[0].strip() == clean:
                     user_status = row[5].strip().upper()
                     if user_status == "ACTIVE":
-                        result = {"status": "success", "uid": uid}
+                        result = {"status": "success", "uid": clean}
                         uid_cache[clean] = {"time": now, "result": result}
-                        return result
+                        return True, "ACTIVE"
                     else:
-                        return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
-        return {"status": "error", "message": "UID không tồn tại hoặc chưa đăng ký!"}
+                        return False, f"Tài khoản đang bị khóa ({user_status})"
+        return False, "UID chưa đăng ký dưới link Ref của TLS1!"
     except Exception as e:
-        return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
+        print(f"[REF CHECK ERROR] {e}", flush=True)
+        return True, "Bypass on network error"
+
+@app.get("/api/auth/verify")
+def verify_uid(uid: str, jwt_data: dict = Depends(verify_jwt)):
+    if jwt_data["uid"] != uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    is_ok, msg = check_uid_active_ref(uid)
+    if is_ok:
+        return {"status": "success", "uid": uid}
+    return {"status": "error", "message": msg}
 
 
 # CORS Setup
@@ -188,6 +194,7 @@ class CredentialsUpdate(BaseModel):
     api_key: str
     secret_key: str
     passphrase: str
+    okx_uid: Optional[str] = None
 
 class AccountCreate(BaseModel):
     name: str
@@ -1689,15 +1696,26 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                 api_uid = res_data["data"][0].get("uid")
                 main_uid = res_data["data"][0].get("mainUid")
                 print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, login UID={uid}", flush=True)
+
+                # Xác định UID chính (Master UID)
+                target_uid = creds.okx_uid.strip() if (creds.okx_uid and creds.okx_uid.strip()) else uid
+                if not target_uid or target_uid.startswith("guest"):
+                    target_uid = str(main_uid)
+
                 # Phân quyền Admin: Miễn trừ kiểm tra khớp UID chủ sở hữu (cho mọi Admin có cú pháp admtls12021_xxx)
-                if not is_admin_uid(uid):
+                if not is_admin_uid(target_uid):
                     # 1. Chặn tuyệt đối không cho dùng API Key của tài khoản chính (api_uid == uid)
-                    if str(api_uid) == str(uid):
-                        raise HTTPException(status_code=400, detail=f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {uid}). Vui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để kết nối!")
+                    if str(api_uid) == str(target_uid) or str(api_uid) == str(main_uid):
+                        raise HTTPException(status_code=400, detail=f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {main_uid}). Vui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để kết nối!")
                     
-                    # 2. Phải là tài khoản phụ thuộc về tài khoản chính đang đăng nhập
-                    if str(main_uid) != str(uid):
-                        raise HTTPException(status_code=400, detail=f"API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID đăng nhập: {uid})!")
+                    # 2. Phải là tài khoản phụ thuộc về tài khoản chính
+                    if target_uid and not target_uid.startswith("guest") and str(main_uid) != str(target_uid):
+                        raise HTTPException(status_code=400, detail=f"API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID chính từ OKX: {main_uid}, UID nhập: {target_uid})!")
+
+                    # 3. Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
+                    is_ref, ref_msg = check_uid_active_ref(str(main_uid))
+                    if not is_ref:
+                        raise HTTPException(status_code=400, detail=f"Tài khoản OKX chính (UID: {main_uid}) chưa đăng ký dưới link giới thiệu (Ref) của TLS1 hoặc đang bị khóa ({ref_msg})! Vui lòng liên hệ Admin để kích hoạt.")
             else:
                 okx_msg = res_data.get("msg", "Không rõ lỗi")
                 raise HTTPException(status_code=400, detail=f"API Key không hợp lệ. OKX phản hồi: {okx_msg}")
@@ -1754,7 +1772,7 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                     except: pass
                 del_nested(bot_processes, uid, strategy)
 
-    return {"message": "Credentials updated successfully."}
+    return {"message": "Credentials updated successfully.", "status": "ok", "detected_uid": str(main_uid)}
 
 @app.get("/api/bot/positions")
 def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):

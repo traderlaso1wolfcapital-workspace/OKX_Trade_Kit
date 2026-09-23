@@ -1,11 +1,13 @@
 import React from "react";
 import NumberSpinBox from "../common/NumberSpinBox";
+import { useTranslation } from "../../i18n";
 
 export default function SidebarLeft({
   activeBotTab,
   accounts = [],
   effectiveAccId,
   botAccountMap = {},
+  activeAccounts = {},
   onAssignAccount,
   handleAssignAccountToActiveBot,
   onOpenSettings,
@@ -17,6 +19,8 @@ export default function SidebarLeft({
   isRunning = false,
   onToggleMultiplyVolume,
 }) {
+  const { t } = useTranslation();
+
   const handleToggle = () => {
     if (typeof onToggleRiskCollapse === "function") {
       onToggleRiskCollapse();
@@ -34,9 +38,9 @@ export default function SidebarLeft({
   };
 
   const getBotLabel = () => {
-    if (activeBotTab === "sub1") return "Bot EMA200";
-    if (activeBotTab === "sub2") return "Bot SMC";
-    return "Bot Liquidation";
+    if (activeBotTab === "sub1") return t("bot_ema200");
+    if (activeBotTab === "sub2") return t("bot_smc");
+    return t("bot_liquidation");
   };
 
   return (
@@ -48,8 +52,16 @@ export default function SidebarLeft({
 
       <div className="sidebar-content">
         <div className="group-box" style={{ position: "relative", marginTop: "12px", paddingTop: "15px" }}>
-          <span className="group-box-title" style={{ color: "#ffffff", fontSize: "13px", fontWeight: "bold" }}>
-            Tài khoản ({getBotLabel()}):
+          <span
+            className="group-box-title"
+            style={{
+              color: "#ffffff",
+              fontSize: "12.5px",
+              fontWeight: "bold",
+              textTransform: "none",
+            }}
+          >
+            {t("account_label")} ({getBotLabel()}):
           </span>
 
           <div
@@ -98,14 +110,28 @@ export default function SidebarLeft({
               value={effectiveAccId}
               onChange={(e) => handleAccountSelect(e.target.value)}
             >
-              {accounts.length === 0 && <option value="">(Chưa có tài khoản)</option>}
+              {accounts.length === 0 && <option value="">{t("no_account")}</option>}
               {accounts.map((acc) => {
-                const isUsedByOtherBot = Object.entries(botAccountMap).some(([bot, accountId]) => {
-                  return bot !== activeBotTab && accountId === acc.id;
-                });
+                const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
+                const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
+                const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
+
+                const getTargetBotName = (key) => {
+                  if (key === "sub1") return t("bot_ema200");
+                  if (key === "sub2") return t("bot_smc");
+                  return t("bot_liquidation");
+                };
+
+                let labelSuffix = "";
+                if (isRunningOnOtherBot) {
+                  labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                } else if (assignedOtherBot) {
+                  labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                }
+
                 return (
-                  <option key={acc.id} value={acc.id} disabled={isUsedByOtherBot}>
-                    {acc.name} {isUsedByOtherBot ? "(Đang chạy)" : ""}
+                  <option key={acc.id} value={acc.id} disabled={isRunningOnOtherBot}>
+                    {acc.name} {labelSuffix}
                   </option>
                 );
               })}
@@ -117,7 +143,7 @@ export default function SidebarLeft({
               onClick={onOpenSettings}
               title="Cài đặt hệ thống & API Key"
             >
-              ⚙ Cài Đặt
+              ⚙ {t("settings")}
             </button>
           </div>
 
@@ -133,7 +159,7 @@ export default function SidebarLeft({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
-                  <label style={{ margin: 0, whiteSpace: "nowrap", fontSize: "11.5px", color: "#fff", fontWeight: "bold" }}>Ký quỹ:</label>
+                  <label style={{ margin: 0, whiteSpace: "nowrap", fontSize: "11.5px", color: "#fff", fontWeight: "bold" }}>{t("margin_label")}</label>
                   <div style={{ display: "flex", gap: "2px" }}>
                     <button
                       type="button"
@@ -175,7 +201,7 @@ export default function SidebarLeft({
                         cursor: "pointer",
                       }}
                     >
-                      % VỐN
+                      {t("capital_percent")}
                     </button>
                   </div>
 
@@ -209,7 +235,7 @@ export default function SidebarLeft({
                       }}
                     >
                       <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
-                        {risk.multiplyVolumeByTf ? "nhân Hệ số" : "Cố định"}
+                        {risk.multiplyVolumeByTf ? t("multiply_tf") : t("fixed")}
                       </span>
                       <span className="risk-mult-arrow" style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
                     </div>
@@ -236,8 +262,8 @@ export default function SidebarLeft({
                         cursor: isRunning ? "not-allowed" : "pointer",
                       }}
                     >
-                      <option value="fixed" style={{ background: "#222", color: "#fff" }}>Cố định</option>
-                      <option value="multiply" style={{ background: "#222", color: "#26a69a" }}>nhân Hệ số Ký Quỹ (Vốn)</option>
+                      <option value="fixed" style={{ background: "#222", color: "#fff" }}>{t("fixed")}</option>
+                      <option value="multiply" style={{ background: "#222", color: "#26a69a" }}>{t("multiply_margin_tf")}</option>
                     </select>
                   </div>
                 </div>
@@ -251,14 +277,14 @@ export default function SidebarLeft({
                   min={risk.volUnit === "LOT" ? 0.05 : 0.1}
                   step={risk.volUnit === "LOT" ? 0.05 : 0.1}
                   suffix={risk.volUnit === "USDT" ? "$" : "%"}
-                  width="78px"
+                  width="84px"
                 />
               </div>
               {activeBotTab === "sub1" ? (
                 <>
                   <div className="risk-row">
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <label style={{ margin: 0 }}>Mức chốt lời gốc M5:</label>
+                      <label style={{ margin: 0 }}>{t("tp_m5_label")}</label>
                       <button
                         type="button"
                         className="btn-help"
@@ -277,12 +303,12 @@ export default function SidebarLeft({
                       min={0.1}
                       step={0.05}
                       suffix="%"
-                      width="78px"
+                      width="84px"
                     />
                   </div>
                   <div className="risk-row">
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <label style={{ margin: 0 }}>Mức cắt lỗ gốc M5:</label>
+                      <label style={{ margin: 0 }}>{t("sl_m5_label")}</label>
                       <button
                         type="button"
                         className="btn-help"
@@ -301,7 +327,7 @@ export default function SidebarLeft({
                       min={0.1}
                       step={0.05}
                       suffix="%"
-                      width="78px"
+                      width="84px"
                     />
                   </div>
                 </>

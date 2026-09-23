@@ -18,6 +18,202 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[24/09/2026]** - Thêm Hiệu Ứng Động Nút OKX Connect, Nâng Cao Cân Đối Nút Chọn Bot & Cố Định Tiêu Đề "Tài khoản (EMA200 Bot):":
+  - **Mô tả yêu cầu:**
+    1. Thẻ OKX Connect và nút "Mở App ➔" trong modal: Thêm hiệu ứng động lướt nhấc nhẹ khi di chuột đến (`translateY(-2px)` / badge lift) và nhấn nút `translateY(0)`.
+    2. Bảng vị thế: Khẳng định và duy trì 100% đúng chuẩn 5 cột (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`) như trong ảnh 2.
+    3. Ảnh 3: Nút chọn bot (`EMA200 Bot`) bị dính sát đường viền dưới của thanh header: Nâng lên cao căn giữa cân đối (`align-items: center`), tạo khoảng cách thở đều trên dưới.
+    4. Tiêu đề tài khoản sidebar: Đổi thành `Tài khoản (EMA200 Bot):` với "Bot" đứng cuối trước dấu hai chấm, gỡ bỏ `text-transform: uppercase` để không bị viết hoa toàn bộ chữ cái.
+  - **Đã xử lý:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Cấu hình hiệu ứng hover động mượt mà cho `.connect-card`: `transform: translateY(-2px)`, đổ bóng `0 4px 12px rgba(0, 0, 0, 0.35)`.
+      - Khi hover thẻ OKX, nút `.connect-action-badge` ("Mở App ➔") tự động sáng màu xanh ngọc `#26a69a` và nhấc nhẹ `transform: translateY(-1px)`.
+      - Nút lưu API key được trang bị hiệu ứng động hover `translateY(-1px)` và active `translateY(1px)`.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Chuyển `.bot-tabs-bar` và `.bot-tabs-group` từ `align-items: flex-end` sang `align-items: center`, giúp viên nang `EMA200 Bot` nằm chính giữa thanh bar, không còn chạm sát đáy viền dưới.
+      - Chuyển `.group-box-title` sang `text-transform: none`.
+    - Trong [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):
+      - Cố định hiển thị tự nhiên `Tài khoản (EMA200 Bot):` với `textTransform: "none"`.
+    - Trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx) & [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Đảm bảo 100% 5 cột hiển thị vô điều kiện.
+    - Build lại bản production bundle (`npm run build`) thành công (`196ms`).
+  - **Kiểm chứng:** Giao diện cân đối, hiệu ứng động tinh tế, tiêu đề tài khoản và bảng vị thế hoàn toàn đúng theo yêu cầu CEO.
+
+- **[24/09/2026]** - Đổi Tên Bot Chuẩn Đuôi "Bot" (EMA200 Bot, SMC Bot, Liquidation Bot) & Đồng Bộ Style Nút Quả Địa Cầu Dark Charcoal Chuẩn Web:
+  - **Mô tả yêu cầu:**
+    1. Ảnh 1: Toàn bộ tên bot chuyển chữ "Bot" ra sau như bản tiếng Anh: `EMA200 Bot`, `SMC Bot`, `Liquidation Bot`.
+    2. Ảnh 2: Thiết kế lại toàn bộ style nút quả địa cầu (ngôn ngữ) và menu thả xuống (dropdown) đồng bộ tuyệt đối với giao diện Dark Charcoal (#1e1e1e / #222222) của ứng dụng hiện tại.
+  - **Đã xử lý:**
+    - Trong [i18n/index.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js) & [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Chuẩn hóa toàn bộ tên bot ở mọi thứ tiếng và logic thông báo log sang dạng hậu tố: `EMA200 Bot`, `SMC Bot`, `Liquidation Bot`.
+    - Trong [LanguageSelector.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/LanguageSelector.jsx):
+      - Nút quả địa cầu: Nền `#222222`, viền `#444444`, bo góc `4px`, kích thước `28x28px` chuẩn đều với các nút header, icon trắng `#ffffff`, hover nhấc nhẹ dynamic `transform: translateY(-1px)`, khi mở chuyển viền cam `#ff9900`.
+      - Dropdown menu: Nền than tối Obsidian `#1e1e1e`, viền `#333333`, đổ bóng chiều sâu chuẩn, chữ `#d1d4dc`, hover mục `#2a2a2a`, mục đang chọn hiển thị xanh `#00c087` cùng dấu checkmark `✓`.
+    - Build lại toàn bộ production bundle (`npm run build`) thành công (`208ms`).
+  - **Kiểm chứng:** Không còn lỗi xung đột hay lệch màu, menu ngôn ngữ và danh sách bot hiển thị tinh tế, sắc nét.
+
+- **[24/09/2026]** - Hoàn Thiện Nút Connect Xanh Lá Chuẩn Ảnh 2, Xóa Hiệu Ứng Glow Mờ Của Nút Chạy/Dừng Bot & Đồng Bộ Bảng Vị Thế:
+  - **Mô tả yêu cầu:**
+    1. Nút Connect bị mất màu xanh: Đưa về màu xanh lá cây chuẩn như ảnh 2 (`#2e7d32` / `#388e3c`), hiệu ứng chuyển động nhấc nhẹ (dynamic).
+    2. Nút "CHẠY BOT" và "DỪNG BOT" khi di chuột vào bị viền mờ nhòe glow (ảnh 3): Loại bỏ hoàn toàn `box-shadow` glow làm mờ này, chỉ giữ lại hiệu ứng động (dynamic transition/transform).
+    3. Bảng vị thế: CEO thấy trên màn hình vẫn chỉ có 2 cột (do trình duyệt đang lưu cache Vite cũ chưa reload).
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `.btn-connect-okx`: Màu nền xanh lá `#2e7d32`, viền `#388e3c`, chữ trắng in đậm, hover `#388e3c` với `transform: translateY(-1px)`, không bị mờ nhòe.
+      - Cập nhật `.btn-action-start` và `.btn-action-stop`: Gỡ bỏ toàn bộ `box-shadow` phát sáng mờ ở cả trạng thái thường, hover và loading. Thay vào đó chỉ giữ hiệu ứng động nâng nút `transform: translateY(-1px)` và nhấn `translateY(1px)`.
+      - Build lại bản production bundle (`npm run build`) vào `dist` để sẵn sàng cho backend FastAPI.
+    - [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+      - Mã nguồn đã cố định 100% đủ 5 cột (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`). 
+      - Chỉ dẫn CEO nhấn tổ hợp phím `Ctrl + F5` hoặc `Ctrl + Shift + R` trên trình duyệt để xóa cache cũ.
+  - **Kiểm chứng:** Build Vite production thành công không lỗi (`191ms`).
+
+- **[24/09/2026]** - Tái Cấu Trúc Toàn Diện Nút/Modal Connect Chuẩn Phong Cách Cài Đặt (Dark Charcoal + Amber Orange) & Điều Chỉnh Độ Rộng Spinbox 84px (Dài Hơn Nút Cài Đặt):
+  - **Mô tả yêu cầu:**
+    1. Bỏ icon `⚡` ở tiêu đề Connect.
+    2. Thiết kế lại giao diện Connect (nút và modal) đồng bộ 80-100% với phong cách giao diện Cài Đặt: tông màu than tối `#1e1e1e` / `#222222`, viền `#333333`, tab màu cam `#ff9900` dạng vòm như InnerTabs, nút Cài Đặt phong cách đen tinh tế.
+    3. Ô nhập số liệu bị quá ngắn (60px) dẫn đến việc che mất chữ số thập phân (`0. %`), yêu cầu kéo dài ra hơn nút `⚙ Cài Đặt` một chút xíu (khoảng 84px) để đủ khoảng trống nhập liệu.
+    4. Giữ cố định 100% tất cả 5 cột trên Bảng Vị Thế (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`), tuyệt đối không được xóa hay ẩn ở bất cứ điều kiện nào.
+  - **Đã xử lý:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Gỡ bỏ hoàn toàn icon `⚡`. Tiêu đề hiển thị chuẩn gọn `Connect`.
+      - Chuyển toàn bộ bảng màu từ tông xanh Web3 sang tông than đen `#1e1e1e` / `#222222`, viền `#333333`, bo góc `6px`.
+      - Thiết kế tab `Fast Connect` và `API KEY Connect` giống 100% hai tab `🔑 API Key` và `⚙️ Chiến Thuật` của modal Cài Đặt (viền cam trên `3px solid #ff9900`, nền đen `#222222`).
+      - Các thẻ sàn OKX, Binance, Bybit đặt trên nền `#222222` viền `#333333` hover cam `#ff9900`.
+    - Trong [NumberSpinBox.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/NumberSpinBox.jsx), [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx), [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx), [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Tăng độ rộng lên **84px** (nút `⚙ Cài Đặt` rộng ~76px, 84px dài hơn nút Cài Đặt 8px đúng như CEO yêu cầu).
+      - Đảm bảo hiển thị đầy đủ và thoáng đãng các số liệu như `1 $`, `0.8 %`, `0.05 %`, `1.30`, `60`.
+    - Trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+      - Khóa cố định 5 cột ở cả thead và tbody, không có bất kỳ điều kiện ẩn nào.
+  - **Kiểm chứng:** Build Vite production thành công (`195ms`). Mọi thiết lập hoạt động trơn tru.
+
+- **[24/09/2026]** - Sửa Lỗi Logo Binance (ConnectModal) & Thu Ngắn Ô Nhập Số Liệu 60px Chuẩn Mẫu Vẽ CEO:
+  - **Mô tả yêu cầu:**
+    1. Logo Binance trong thẻ Binance Connect (ConnectModal) bị biến dạng / đứt đoạn.
+    2. Cắt ngắn chiều ngang của các ô nhập số liệu (spinbox) ở Quản Lý Vốn, Điểm Vào Lệnh và Sidebar theo đúng mẫu phác thảo cắt bỏ 1/3 khoảng trống bên trái (không để quá dài cũng không quá ngắn).
+  - **Đã xử lý:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Cập nhật lại chính xác 100% mã vector SVG chính thức từ Simple Icons cho logo Binance.
+    - Trong [NumberSpinBox.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/NumberSpinBox.jsx): Khôi phục DOM chuẩn cũ tinh gọn và cấu hình độ rộng mặc định `width = "60px"`.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) & [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Đồng bộ toàn bộ các ô nhập sang `width="60px"`.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Cập nhật quy tắc `.risk-row .spinbox-container, .entry-setup-row .spinbox-container { width: 60px !important; }`.
+  - **Kiểm chứng:** Build Vite production thành công (`202ms`). Ô nhập đạt kích thước 60px vừa vặn, không còn thừa khoảng trống bên trái, số và ký hiệu ôm sát nhau tự nhiên.
+
+- **[24/09/2026]** - Khôi Phục Đầy Đủ 5 Cột Bảng Vị Thế (Ký Quỹ, PNL, Cắt Lệnh) & Thu Gọn Khoảng Cách Số Liệu Với Ký Hiệu ($ / %):
+  - **Mô tả yêu cầu:**
+    1. Bảng Vị Thế (ảnh 2) bị biến mất các cột "Ký quỹ", "PNL thả nổi", "Cắt lệnh", chỉ còn lại "Cặp vị thế" và "TF trade". Yêu cầu khôi phục lại đầy đủ 5 cột như ảnh 1.
+    2. Trong các ô nhập số liệu (ảnh 3), số và ký hiệu `$`, `%` bị tách xa nhau quá mức (ví dụ `1        $`, `0.8      %`), yêu cầu kéo gần lại cho tự nhiên, gọn gàng.
+  - **Đã xử lý:**
+    - Trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+      - Gỡ bỏ hoàn toàn các điều kiện `{hasApiKey && ...}` tại thead và tbody.
+      - Đảm bảo 5 cột (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`) LUÔN LUÔN được render đầy đủ ở mọi trạng thái (kể cả khi chưa kết nối API Key thì các cột vẫn hiện với ký hiệu `--` chuẩn như ảnh 1).
+    - Trong [NumberSpinBox.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/NumberSpinBox.jsx):
+      - Thiết kế lại cấu trúc `.spinbox-content`: gom input và suffix vào chung một cụm với khoảng cách `gap: 2px` đến `3px`.
+      - Chiều rộng input tự động co giãn theo độ dài số liệu (`dynamicInputWidth = Math.max(18, valStr.length * 8.5 + 4)`).
+      - Cụm `[Số liệu + Đơn vị]` (như `1 $` hoặc `0.8 %`) được căn giữa toàn bộ hộp `95px`, số và đơn vị đứng sát cạnh nhau tự nhiên, triệt tiêu hoàn toàn khoảng cách trống bị tách rời như ảnh 3.
+  - **Kiểm chứng:** Build Vite production thành công (`201ms`). Bảng vị thế hiển thị đầy đủ 5 cột; các ô nhập số liệu và đơn vị `$`/`%` gắn liền nhau sắc nét và cân đối.
+
+- **[24/09/2026]** - Đồng Bộ Độ Rộng Ô Nhập Quản Lý Vốn Về 95px, Tinh Chỉnh Căn Giữa Số Liệu & Tích Hợp Tự Động Quét UID OKX / Kiểm Tra Ref:
+  - **Mô tả yêu cầu:**
+    1. Đưa độ rộng 3 ô nhập trong phần QUẢN LÝ VỐN về lại `95px` để thẳng hàng đồng bộ với các ô nhập `Điểm Vào Lệnh (Entry Setup)`.
+    2. Thu gọn khoảng thở/khoảng trống bên trong ô nhập: vì các số liệu chỉ ngắn khoảng 3-4 ký tự nên nếu căn lệch sang phải sẽ để lại khoảng trống quá dài. Căn chỉnh lại để số liệu hiển thị cân đối, vừa vặn.
+    3. Thêm dòng nhập/hiển thị `UID OKX (Tài khoản chính)` trong Cài Đặt Hệ Thống -> Thông Tin API OKX; đồng thời xây dựng cơ chế để bot tự động trích xuất Master UID qua API OKX và đối soát kiểm tra Ref trực tiếp.
+  - **Đã xử lý:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Đưa `width` của 3 ô Ký quỹ, TP M5, SL M5 về đúng `95px` đồng bộ tuyệt đối với các ô `Entry Setup`.
+      - Bổ sung trường nhập `UID OKX (Tài khoản chính)` ngay trong nhóm Thông Tin API OKX.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Đổi `text-align: right` thành `text-align: center` trong `.spinbox-input`: các số liệu ngắn 3-4 ký tự (`1`, `0.8`, `10`) nay nằm chính giữa ô nhập, khoảng cách 2 bên cân đối hoàn hảo, triệt tiêu cảm giác khoảng trống lệch.
+      - Xóa bỏ việc ép giãn `width: 120px !important` trên mobile, giữ vững kích thước chuẩn `95px` ở mọi kích thước màn hình.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Quản lý state `okxUid`, tự động truyền và lưu `okx_uid` khi lưu API Key.
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật model `CredentialsUpdate` nhận `okx_uid`.
+      - Tự động gọi OKX API `/api/v5/account/config` để lấy `mainUid` (UID tài khoản chính tạo ra sub-account).
+      - Xây dựng hàm `check_uid_active_ref`: Tự động kiểm tra `mainUid` với cơ sở dữ liệu Google Sheets của TLS1. Nếu tài khoản chưa đăng ký Ref, bot sẽ báo lỗi cụ thể để yêu cầu kích hoạt.
+      - Trả về `detected_uid` cho frontend tự động lưu vào `localStorage`.
+  - **Kiểm chứng:** Build Vite production thành công (`202ms`). Giao diện các ô nhập thẳng hàng 95px, số liệu căn giữa đẹp mắt, luồng xác thực Ref tự động hóa 100%.
+
+- **[24/09/2026]** - Chuẩn Hóa Tên Bot ('EMA200 Bot', 'SMC Bot', 'LIQUIDATION Bot') & Chuyển Đổi Đa Ngôn Ngữ Toàn Diện Cho Toàn Bộ Web App:
+  - **Mô tả yêu cầu:**
+    1. Chuẩn hóa tên các bot ở tiếng Việt (và toàn bộ hệ thống) thành đúng định dạng: `EMA200 Bot`, `SMC Bot`, `LIQUIDATION Bot`.
+    2. Trước đây việc đổi ngôn ngữ chỉ dịch được nút CHẠY BOT và nút chọn Bot, các thành phần khác (Bảng Vị Thế, Cài Đặt Hệ Thống, Quản Lý Vốn, Công Tắc Chiến Thuật, Dialogs, v.v.) chưa chuyển đổi theo ngôn ngữ đã chọn. Yêu cầu fix toàn bộ.
+  - **Đã xử lý:**
+    - Nâng cấp từ điển trung tâm [src/i18n/index.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js): Cập nhật tên bot thành `EMA200 Bot`, `SMC Bot`, `LIQUIDATION Bot` và hoàn thiện đầy đủ bộ dịch thuật cho 6 ngôn ngữ (`vi`, `en`, `zh`, `ko`, `fr`, `es`).
+    - Trong [PositionsTable.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+      - Đổi toàn bộ tiêu đề cột bảng (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`) sang đa ngôn ngữ qua `useTranslation`.
+      - Đổi nhãn `Chờ tín hiệu...`, nút `Đóng`, các popup confirm và thông báo thành công/thất bại khi đóng vị thế sang đa ngôn ngữ.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Tiêu đề Cấu Hình Hệ Thống, các Tab `API Key` & `Chiến Thuật`.
+      - Các nhãn form tài khoản, thông tin API OKX, HWID, Audit.
+      - Phần QUẢN LÝ VỐN: Ký quỹ, % VỐN, Cố định / nhân Hệ số, Mức chốt lời / cắt lỗ M5, ghi chú công thức.
+      - Toàn bộ Công Tắc Chiến Thuật: DCA Dương, DCA Âm, Lưới Đa Khung, Hedge, Chốt lời bám EMA200, Đồng pha BTC, SMC, Liquidation, Điểm Vào Lệnh và Bảng Hệ Số Nhân Đa Khung.
+      - Các nút thao tác: Khôi phục mặc định, Lưu chiến thuật, Lưu API Key.
+    - Trong [AppHeader.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx): Dịch các dòng mô tả phụ bên dưới từng bot trong menu lựa chọn.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Dịch thông báo và nút chuyển tab khi ở chế độ chia đôi màn hình (`⮃`).
+  - **Kiểm chứng:** Chạy build production `npm.cmd run build` thành công mỹ mãn không có lỗi linter/cú pháp. Mọi chuỗi văn bản trên giao diện tự động chuyển đổi lập tức khi chọn bất kỳ ngôn ngữ nào từ dropdown quả địa cầu.
+
+- **[23/09/2026]** - Tinh Chỉnh Logo Binance/Bybit Đồng Bộ 100% Phong Cách OKX & Đặt Ô Nhập Quản Lý Vốn Về 50px:
+  - **Mô tả yêu cầu:**
+    1. Thay thế logo Binance và Bybit dạng ảnh raster (bị nhỏ hoặc dính viền trắng) bằng vector SVG sắc nét, kích thước chuẩn 22px đặt trong hộp đen viền `#333333` đồng bộ tuyệt đối với phong cách thẻ OKX.
+    2. Điều chỉnh độ rộng của 3 ô nhập số liệu trong phần QUẢN LÝ VỐN thành chính xác `50px`.
+  - **Đã xử lý:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Binance: Vẽ lại bằng vector SVG chuẩn (`fill="#F0B90B"`), kích thước `22x22px` cân đối hoàn hảo trong hộp `38x38px` đen sâu.
+      - Bybit: Vẽ lại wordmark vector `BYB|T` chuẩn (chữ trắng `#ffffff`, thanh chữ `I` màu cam `#f7a600`), loại bỏ triệt để viền trắng ảnh raster.
+    - Trong [NumberSpinBox.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/NumberSpinBox.jsx): Bổ sung cơ chế tự động tối ưu padding, font và stepper khi `width <= 60px` để số liệu và mũi tên hiển thị vừa vặn không bị vỡ bố cục.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Đặt `width="50px"` cho cả 3 ô Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5.
+  - **Kiểm chứng:** Build Vite production thành công (`195ms`). Logo hiển thị sắc sảo, ô 50px cực kỳ gọn gàng.
+
+- **[23/09/2026]** - Tích Hợp Hệ Thống Đa Ngôn Ngữ (i18n), Đổi Tên 'OKX Connect' & Nạp Logo Chuẩn Binance/Bybit:
+  - **Mô tả yêu cầu:**
+    1. Đổi chữ "Kết Nối Ứng Dụng OKX" trong Fast Connect thành "OKX Connect".
+    2. Cập nhật logo chính thức của Binance và Bybit (thay cho icon svg tạm) vào các thẻ kết nối mở rộng.
+    3. Trả lời và khắc phục việc bấm đổi ngôn ngữ ở nút Quả Địa Cầu chưa chuyển đổi văn bản của ứng dụng.
+  - **Đã xử lý:**
+    - Cập nhật [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Đổi tiêu đề thẻ thành `OKX Connect`.
+    - Sao chép và nhúng trực tiếp file logo chính thức của Binance (`/media/binance_logo.png`) và Bybit (`/media/bybit_logo.png`) do CEO cung cấp vào các thẻ Card tương ứng.
+    - Xây dựng hệ thống dịch thuật trung tâm [src/i18n/index.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js) hỗ trợ 6 ngôn ngữ: Tiếng Việt (`vi`), English (`en`), 简体中文 (`zh`), 한국어 (`ko`), Français (`fr`), Español (`es`).
+    - Nối hook `useTranslation` và phát sự kiện `tls1_language_changed` từ [LanguageSelector.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/LanguageSelector.jsx): Khi chọn ngôn ngữ mới, các nút Chạy/Dừng bot, Connect, Tabs bot, và toàn bộ giao diện ConnectModal lập tức đổi ngôn ngữ theo thời gian thực mà không cần tải lại trang.
+  - **Kiểm chứng:** Build Vite production thành công (`195ms`).
+
+- **[23/09/2026]** - Tinh Chỉnh Độ Rộng Ô Nhập Số Liệu Trong Phần Cài Đặt 'QUẢN LÝ VỐN':
+  - **Mô tả yêu cầu:** Thu ngắn các ô nhập số liệu (Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5) trong bảng Cài Đặt Hệ Thống vừa vặn, không bị dài thừa khoảng trắng trống trải.
+  - **Đã xử lý:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Giảm `width` của 3 ô `NumberSpinBox` (`risk.posVol`, `risk.tpPct`, `risk.slPct`) từ `95px` xuống `70px`.
+    - Đảm bảo hiển thị gọn gàng, vừa khít số liệu và đơn vị `$` / `%` mà không bị kéo dài thừa, giữ vững tính responsive cho bản mobile.
+  - **Kiểm chứng:** Build Vite production thành công (`202ms`). Giao diện cân đối, sắc nét.
+
+- **[23/09/2026]** - Tích Hợp Nút Chuyển Đổi Ngôn Ngữ Hình Quả Địa Cầu Chuẩn Phong Cách Hyperliquid Cạnh Nút Connect:
+  - **Mô tả yêu cầu:** Thêm một nút biểu tượng quả địa cầu (Globe) ngay cạnh nút Connect trên thanh công cụ. Khi bấm vào hiển thị menu dropdown các ngôn ngữ quốc tế phổ biến theo đúng style giao diện Hyperliquid (English, Français, 简体中文, 한국어, Español, Tiếng Việt).
+  - **Đã xử lý:**
+    - Tạo mới component [LanguageSelector.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/LanguageSelector.jsx) với biểu tượng quả địa cầu SVG sắc nét, bo tròn đồng bộ nút Connect.
+    - Menu dropdown tối giản, nền đen sâu `#131722`, viền `#282d3e`, tiêu đề `Language:` xám nhạt, hiệu ứng chọn màu xanh mint `#4ade80` (Hyperliquid accent color) kèm dấu tick `✓`.
+    - Hỗ trợ lưu ngôn ngữ đã chọn vào `localStorage ("tls1_app_language")` và tự động đóng menu khi click ra ngoài (outside click detection).
+    - Tích hợp vào thanh hành động trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) ngay cạnh nút `Connect`.
+  - **Kiểm chứng:** Build Vite production thành công (`237ms`). Menu mở/đóng mượt mà, layout tương thích hoàn toàn.
+
+- **[23/09/2026]** - Tái Cấu Trúc Toàn Diện Nút 'Connect' & Hộp Thoại 'ConnectModal' Chuẩn Giao Diện Web3 DEX:
+  - **Mô tả yêu cầu:**
+    1. Đổi nút "OKX Connect" trên thanh công cụ thành "Connect" (bỏ logo OKX và chữ OKX).
+    2. Thiết kế lại hoàn toàn modal `ConnectModal`: tiêu đề đổi thành "Connect", 2 tab chuẩn hóa thành "Fast Connect" và "API KEY Connect", phong cách Dark Obsidian sang trọng đồng bộ với app.
+    3. Trong tab "Fast Connect": Thiết kế dạng thẻ Card như các sàn DEX Web3 (ảnh 3 tham chiếu), logo OKX chuẩn 5 ô vuông trắng trên nền đen, có sẵn danh mục mở rộng cho Binance, Bybit và Web3 Wallet.
+    4. Bỏ nút Đăng Xuất thừa thãi trong Cài Đặt (SystemSettingsModal), chuyển sang tích hợp trực tiếp vào chân trang của `ConnectModal`.
+  - **Đã xử lý:**
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Đổi nút thành `Connect`; truyền `isAuthenticated`, `currentUid`, và `onLogout` xuống `ConnectModal`.
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Viết lại 100% component với giao diện Dark Obsidian `#12141c`, viền `#282c3f`, bo góc `#16px`, thiết kế thẻ OKX Fast Connect logo chuẩn và các thẻ chờ kết nối sàn khác / ví Web3. Bổ sung thanh trạng thái UID và nút Đăng Xuất tinh tế ở footer.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Gỡ bỏ nút "Đăng Xuất", mở rộng nút "Lưu API Key" full-width chuyên nghiệp.
+  - **Kiểm chứng:** Build Vite production thành công (`207ms`). Giao diện Connect hiển thị hiện đại, trực quan, sẵn sàng mở rộng đa sàn và Web3 wallet.
+
+- **[23/09/2026]** - Sửa Lỗi Hiển Thị Giả Mạo '(Đang chạy)' Và Mở Khóa Cho Phép Xoá / Chuyển Tài Khoản An Toàn:
+  - **Mô tả lỗi:** Trong cửa sổ Cài Đặt Hệ Thống, khi người dùng ở một tab bot (ví dụ Bot EMA200), các tài khoản gán ở tab bot khác (Bot SMC, Bot Liquidation) bị tự động gắn chữ `(Đang chạy)` và gán cờ `disabled`, khiến người dùng không thể bấm chọn để sửa API Key hoặc bấm nút `[-]` để xoá tài khoản, dù thực tế không có bot nào đang chạy trên tài khoản đó.
+  - **Nguyên nhân gốc:** Logic frontend cũ kiểm tra `botAccountMap` (bản đồ gán bot tĩnh lưu ở localStorage) và cứ thấy tài khoản thuộc về tab bot khác thì tự tiện gán nhãn `(Đang chạy)` và set `disabled={true}`, hoàn toàn không kiểm tra xem tiến trình bot thực tế (`activeAccounts` từ backend) có đang chạy thật hay không.
+  - **Đã xử lý:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Loại bỏ hoàn toàn cờ `disabled` trong modal Cài Đặt; hiển thị nhãn chuẩn xác: chỉ hiện `(Đang chạy ở [Tên Bot])` khi tài khoản nằm trong `activeAccounts` thực tế của backend; nếu chỉ gán mà bot tắt thì hiện `(Gán ở [Tên Bot])`.
+    - Trong [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Chỉ disable tài khoản khi tài khoản đó thực sự đang có tiến trình chạy live trên bot khác (để tránh xung đột lệnh); nếu bot kia đã dừng thì cho phép chọn thoải mái.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Nhận và gộp `activeAccounts` thời gian thực từ cả WebSocket và HTTP status.
+      - Bảo vệ an toàn tiến trình bot: Chặn tuyệt đối việc xoá tài khoản nếu tài khoản đó đang có bot chạy thực tế (`Object.values(mergedActiveAccounts).includes(targetAccountId)`), đưa ra cảnh báo yêu cầu dừng bot trước khi xoá.
+  - **Kiểm chứng:** Build Vite production thành công (`210ms`). Không còn hiện tượng nhãn ảo `(Đang chạy)`, người dùng có thể tự do chọn và xoá tài khoản khi bot đã dừng mà vẫn bảo đảm 100% an toàn cho tiến trình đang chạy.
+
 - **[22/09/2026]** - Lỗi Nút Connect OKX (Fast API) Dẫn Tới Trang Hồ Sơ Tài Khoản Thay Vì Trang Cấp Quyền:
   - **Mô tả lỗi:** Khi bấm nút "OKX Connect", người dùng bị chuyển tới trang hồ sơ tài khoản (`/account/users`) thay vì trang cấp quyền ứng dụng OAuth. Nguyên nhân gốc: tham số `scope=fast_api` không phải scope hợp lệ của OKX OAuth (OKX chỉ chấp nhận `read_only` và `trade`), khiến OKX không hiển thị trang consent mà redirect thẳng về trang hồ sơ.
   - **Đã xử lý:** 

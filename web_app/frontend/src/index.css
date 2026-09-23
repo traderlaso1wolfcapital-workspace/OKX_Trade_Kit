@@ -120,7 +120,7 @@ body {
   font-size: 10px;
   font-weight: bold;
   color: #888;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
@@ -175,7 +175,7 @@ body {
   font-family: Consolas, 'Courier New', 'Roboto Mono', monospace;
   font-size: 13px;
   font-weight: 600;
-  text-align: right;
+  text-align: center;
   padding: 0;
   outline: none;
   -moz-appearance: textfield;
@@ -426,8 +426,8 @@ body {
   display: flex;
   background-color: transparent;
   width: calc(100% - 20px);
-  margin: 6px 10px 0 10px;
-  align-items: flex-end;
+  margin: 6px 10px 6px 10px;
+  align-items: center;
   justify-content: space-between;
   height: 38px;
   flex-shrink: 0;
@@ -438,7 +438,7 @@ body {
 
 .bot-tabs-group {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   height: 100%;
 }
 
@@ -484,7 +484,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 0;
   white-space: nowrap;
 }
 
@@ -539,13 +539,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 10px rgba(46, 125, 50, 0.35);
+  box-shadow: none;
   width: fit-content;
 }
 
 .btn-action-start:hover:not(:disabled) {
   background-color: #388E3C;
-  box-shadow: 0 0 16px rgba(76, 175, 80, 0.75);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -577,13 +577,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 10px rgba(198, 40, 40, 0.35);
+  box-shadow: none;
   width: fit-content;
 }
 
 .btn-action-stop:hover:not(:disabled) {
   background-color: #D32F2F;
-  box-shadow: 0 0 16px rgba(244, 67, 54, 0.75);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -601,11 +601,11 @@ body {
 }
 
 .btn-connect-okx {
-  background: linear-gradient(90deg, #10b981, #3b82f6);
+  background-color: #2e7d32;
   color: #ffffff;
-  border: none;
+  border: 1px solid #388e3c;
   border-radius: 4px;
-  padding: 5px 12px;
+  padding: 5px 14px;
   font-size: 12.5px;
   font-weight: bold;
   font-family: "Segoe UI", sans-serif;
@@ -615,13 +615,15 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+  box-shadow: none;
   width: fit-content;
 }
 
 .btn-connect-okx:hover:not(:disabled) {
-  background: linear-gradient(90deg, #059669, #2563eb);
-  box-shadow: 0 0 16px rgba(59, 130, 246, 0.7);
+  background-color: #388e3c;
+  border-color: #4caf50;
+  color: #ffffff;
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -634,7 +636,7 @@ body {
   color: #ffffff !important;
   border-color: #66bb6a !important;
   cursor: wait !important;
-  box-shadow: 0 0 12px rgba(76, 175, 80, 0.5) !important;
+  box-shadow: none !important;
   opacity: 0.95 !important;
 }
 
@@ -643,7 +645,7 @@ body {
   color: #ffffff !important;
   border-color: #ef5350 !important;
   cursor: wait !important;
-  box-shadow: 0 0 12px rgba(244, 67, 54, 0.5) !important;
+  box-shadow: none !important;
   opacity: 0.95 !important;
 }
 
@@ -1700,10 +1702,10 @@ a#tv-attr-logo,
   }
 
 
-  /* Tăng độ dài các ô nhập số liệu (spinbox) trên mobile để nhập được nhiều số liệu hơn */
+  /* Độ dài các ô nhập số liệu (spinbox) vừa vặn hơn nút Cài Đặt (84px) */
   .risk-row .spinbox-container,
   .entry-setup-row .spinbox-container {
-    width: 120px !important;
+    width: 84px !important;
   }
 
   /* Select lon hon tren mobile de de bam */
