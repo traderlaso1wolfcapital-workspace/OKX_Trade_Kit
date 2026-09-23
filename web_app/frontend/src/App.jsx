@@ -776,29 +776,24 @@ function App() {
     }
   }, [isAuthenticated, currentUid, effectiveAccId, activeBotTab]);
 
-  // Fast Connect Handler
-  const handleFastConnect = () => {
-    // Tích hợp OKX Fast Connect API (OAuth 2.0)
-    const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
-    const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
-    // Tạo state ngẫu nhiên chống CSRF, lưu vào sessionStorage để verify khi callback
-    const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
-    sessionStorage.setItem("okx_oauth_state", state);
-    
-    const okxOAuthUrl = `https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`;
+  // Fast Connect OAuth State
+  const [okxOAuthUrl, setOkxOAuthUrl] = useState("");
+  const [okxOAuthState, setOkxOAuthState] = useState("");
 
-    // OKX OAuth bắt buộc chạy qua trình duyệt hệ thống (Safari/Chrome).
-    // Deep link okx:// chỉ mở trình duyệt dApp nội bộ (Web3) → không render được trang OAuth.
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      // Mobile: Mở OAuth trong chính trình duyệt hiện tại
-      // User đăng nhập OKX → xác nhận → redirect callback về autotrader.fun
-      window.location.href = okxOAuthUrl;
-    } else {
-      // Desktop: Mở tab mới, không ảnh hưởng trang hiện tại
-      window.open(okxOAuthUrl, "_blank");
+  useEffect(() => {
+    if (showConnectModal) {
+      const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
+      const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
+      const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      setOkxOAuthState(state);
+      setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
     }
+  }, [showConnectModal]);
+
+  const handleFastConnectClick = () => {
+    sessionStorage.setItem("okx_oauth_state", okxOAuthState);
   };
+
 
   const handleConnectApiKey = async (uid, inputApiKey, inputSecretKey, inputPassphrase) => {
     try {
@@ -1554,7 +1549,8 @@ function App() {
       <ConnectModal
         isOpen={showConnectModal}
         onClose={() => setShowConnectModal(false)}
-        handleFastConnect={handleFastConnect}
+        handleFastConnectClick={handleFastConnectClick}
+        okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleConnectApiKey}
       />
 

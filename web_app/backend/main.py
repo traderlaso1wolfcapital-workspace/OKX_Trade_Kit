@@ -353,7 +353,11 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
         }
         
         resp = requests.post(url, data=payload, headers=headers, timeout=10)
-        data = resp.json()
+        
+        try:
+            data = resp.json()
+        except ValueError:
+            return {"status": "error", "message": f"Lỗi server khi gọi OKX. Status: {resp.status_code}. Response: {resp.text[:200]}"}
         
         if "access_token" in data or "apiKey" in data or "api_key" in data:
             # Tùy thuộc vào loại app (Trading/Broker), credentials có thể nằm sẵn trong payload
