@@ -415,8 +415,29 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 base_dir = get_user_data_dir(uid)
                 fpath = os.path.join(base_dir, f"bots/{req.strategy}", f".api_{acc}")
                 _save_env_file(fpath, api_key, secret_key, passphrase, is_demo=False)
+                _save_env_file(os.path.join(base_dir, f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False)
+                _save_env_file(os.path.join(base_dir, f"accounts/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False)
+                _save_env_file(os.path.join(base_dir, f"bots/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False)
+                if req.strategy:
+                    _save_env_file(os.path.join(base_dir, f"bots/{req.strategy}", f".api_{req.strategy}"), api_key, secret_key, passphrase, is_demo=False)
+
+                # Quét thông tin tài khoản từ OKX
+                acc_info = detect_okx_account_info(api_key, secret_key, passphrase)
+                detected_name = acc_info["detected_name"] if acc_info else "Tài khoản OKX"
+                main_uid = acc_info["main_uid"] if acc_info else ""
+                is_main = acc_info["is_main"] if acc_info else False
+
+                # Cập nhật hoặc lưu vào accounts.json
+                updated_accounts = sync_account_name_in_storage(uid, acc, detected_name)
                 
-                return {"status": "success", "message": "Kết nối OKX Fast Connect thành công!"}
+                return {
+                    "status": "success",
+                    "message": f"Kết nối OKX Fast Connect thành công: {detected_name}!",
+                    "detected_name": detected_name,
+                    "detected_uid": main_uid,
+                    "is_main": is_main,
+                    "accounts": updated_accounts
+                }
         
         return {"status": "error", "message": f"Tạo API Key thất bại: {create_data.get('msg', create_data)}", "raw": create_data}
             
@@ -894,6 +915,100 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
             f.writelines(new_lines)
     except Exception as e:
         print(f"[ENV SAVE ERROR] Failed to save {fpath}: {e}", flush=True)
+
+def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_demo: bool = False):
+    """
+    Quét thông tin tài khoản trên OKX từ API Key:
+    - uid, mainUid
+    - label (tên tài khoản phụ hoặc note API Key)
+    - is_main (True nếu là tài khoản chính, False nếu là tài khoản phụ)
+    - detected_name: Tên tài khoản chuẩn quét từ sàn OKX
+    """
+    try:
+        clean_api_key = decrypt_value(api_key)
+        clean_secret_key = decrypt_value(secret_key)
+        clean_passphrase = decrypt_value(passphrase)
+        resp = _okx_signed_request("GET", "/api/v5/account/config", "", clean_api_key, clean_secret_key, clean_passphrase, is_demo, timeout=8)
+        if resp.status_code == 200:
+            res_data = resp.json()
+            if str(res_data.get("code")) == "0" and len(res_data.get("data", [])) > 0:
+                cfg = res_data["data"][0]
+                api_uid = str(cfg.get("uid", "")).strip()
+                main_uid = str(cfg.get("mainUid", "")).strip()
+                label = str(cfg.get("label", "")).strip()
+                is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
+
+                detected_name = ""
+                if label and not label.startswith("TLS1_"):
+                    detected_name = label
+                elif is_main:
+                    detected_name = f"Tài khoản chính ({main_uid[-4:]})" if main_uid else "Tài khoản chính"
+                else:
+                    detected_name = f"Tài khoản phụ ({api_uid[-4:]})" if api_uid else "Tài khoản phụ"
+
+                return {
+                    "status": "ok",
+                    "api_uid": api_uid,
+                    "main_uid": main_uid,
+                    "is_main": is_main,
+                    "label": label,
+                    "detected_name": detected_name
+                }
+    except Exception as e:
+        print(f"[DETECT OKX ACC ERROR] {e}", flush=True)
+    return None
+
+def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, force_rename: bool = False):
+    """
+    Cập nhật hoặc đặt tên cho tài khoản trong accounts.json:
+    - Nếu tài khoản chưa được tạo bằng dấu + với tên thủ công riêng (is_manual != True),
+      hoặc tên hiện tại đang là tên mặc định (Tài khoản 1, sub1, ...), hoặc force_rename == True
+      -> Tự động đặt tên cho tài khoản theo tên quét được trên sàn OKX.
+    - Trả về danh sách accounts mới nhất.
+    """
+    if not detected_name or not detected_name.strip():
+        detected_name = target_acc
+
+    data_dir = get_user_data_dir(uid)
+    os.makedirs(data_dir, exist_ok=True)
+    acc_file = os.path.join(data_dir, "accounts.json")
+    
+    accounts = []
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, list):
+                    accounts = loaded
+        except Exception:
+            pass
+
+    found = False
+    for acc in accounts:
+        if acc.get("id") == target_acc:
+            found = True
+            is_manual = acc.get("is_manual", False)
+            current_name = acc.get("name", "").strip()
+            # Kiểm tra xem có phải tên mặc định chưa qua đổi tên bằng dấu +
+            is_generic = (not is_manual) or (current_name in ["Tài khoản 1", "Tài khoản 2", "Tài khoản 3", "sub1", "sub2", "sub3"]) or current_name.startswith("Tài khoản ")
+            if is_generic or force_rename:
+                acc["name"] = detected_name
+            break
+
+    if not found:
+        accounts.append({
+            "id": target_acc,
+            "name": detected_name,
+            "is_manual": False
+        })
+
+    try:
+        with open(acc_file, "w", encoding="utf-8") as f:
+            json.dump(accounts, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"[SAVE ACCOUNTS ERROR] {e}", flush=True)
+
+    return accounts
 
 def get_running_pid(uid: str, strategy: str) -> int:
     data_dir = get_user_data_dir(uid)
@@ -1548,7 +1663,7 @@ def create_bot_account(req: AccountCreate, uid: str):
         raise HTTPException(status_code=400, detail=f"Tài khoản '{clean_name}' đã tồn tại!")
         
     acc_id = req.id if req.id else f"sub_{int(time.time() * 1000)}"
-    new_acc = {"id": acc_id, "name": clean_name}
+    new_acc = {"id": acc_id, "name": clean_name, "is_manual": True}
     accounts.append(new_acc)
     
     bot_dir = os.path.join(data_dir, f"bots/{acc_id}")
@@ -1693,9 +1808,12 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
             res_data = resp.json()
             print(f"[API CHECK] OKX Response code={res_data.get('code')}, msg={res_data.get('msg', '')}", flush=True)
             if res_data.get("code") == "0" and len(res_data.get("data", [])) > 0:
-                api_uid = res_data["data"][0].get("uid")
-                main_uid = res_data["data"][0].get("mainUid")
-                print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, login UID={uid}", flush=True)
+                cfg = res_data["data"][0]
+                api_uid = str(cfg.get("uid", "")).strip()
+                main_uid = str(cfg.get("mainUid", "")).strip()
+                label = str(cfg.get("label", "")).strip()
+                is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
+                print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, label={label}, is_main={is_main}, login UID={uid}", flush=True)
 
                 # Xác định UID chính (Master UID)
                 target_uid = creds.okx_uid.strip() if (creds.okx_uid and creds.okx_uid.strip()) else uid
@@ -1704,18 +1822,23 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
 
                 # Phân quyền Admin: Miễn trừ kiểm tra khớp UID chủ sở hữu (cho mọi Admin có cú pháp admtls12021_xxx)
                 if not is_admin_uid(target_uid):
-                    # 1. Chặn tuyệt đối không cho dùng API Key của tài khoản chính (api_uid == uid)
-                    if str(api_uid) == str(target_uid) or str(api_uid) == str(main_uid):
-                        raise HTTPException(status_code=400, detail=f"BẢO VỆ TÀI SẢN: Bot KHÔNG CHẤP NHẬN API Key của Tài khoản chính (UID: {main_uid}). Vui lòng tạo Tài Khoản Phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ đó để kết nối!")
-                    
-                    # 2. Phải là tài khoản phụ thuộc về tài khoản chính
+                    # 1. Phải là tài khoản (chính hoặc phụ) thuộc về tài khoản chính hợp lệ
                     if target_uid and not target_uid.startswith("guest") and str(main_uid) != str(target_uid):
                         raise HTTPException(status_code=400, detail=f"API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID chính từ OKX: {main_uid}, UID nhập: {target_uid})!")
 
-                    # 3. Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
+                    # 2. Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
                     is_ref, ref_msg = check_uid_active_ref(str(main_uid))
                     if not is_ref:
                         raise HTTPException(status_code=400, detail=f"Tài khoản OKX chính (UID: {main_uid}) chưa đăng ký dưới link giới thiệu (Ref) của TLS1 hoặc đang bị khóa ({ref_msg})! Vui lòng liên hệ Admin để kích hoạt.")
+
+                # Quét và nhận diện tên tài khoản từ sàn OKX
+                detected_name = ""
+                if label and not label.startswith("TLS1_"):
+                    detected_name = label
+                elif is_main:
+                    detected_name = f"Tài khoản chính ({main_uid[-4:]})" if main_uid else "Tài khoản chính"
+                else:
+                    detected_name = f"Tài khoản phụ ({api_uid[-4:]})" if api_uid else "Tài khoản phụ"
             else:
                 okx_msg = res_data.get("msg", "Không rõ lỗi")
                 raise HTTPException(status_code=400, detail=f"API Key không hợp lệ. OKX phản hồi: {okx_msg}")
@@ -1772,7 +1895,17 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                     except: pass
                 del_nested(bot_processes, uid, strategy)
 
-    return {"message": "Credentials updated successfully.", "status": "ok", "detected_uid": str(main_uid)}
+    # Đồng bộ tên quét được từ sàn OKX vào accounts.json
+    updated_accounts = sync_account_name_in_storage(uid, target_acc, detected_name)
+
+    return {
+        "message": "Credentials updated successfully.",
+        "status": "ok",
+        "detected_uid": str(main_uid),
+        "detected_name": detected_name,
+        "is_main": is_main,
+        "accounts": updated_accounts
+    }
 
 @app.get("/api/bot/positions")
 def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):

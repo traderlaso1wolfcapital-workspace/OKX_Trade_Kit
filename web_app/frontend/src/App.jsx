@@ -747,8 +747,13 @@ function App() {
             });
             const data = await res.json();
             if (res.ok && data.status === "success") {
-              alert("✅ Kết nối OKX Fast Connect thành công!");
-              addSystemLog("✅ [FAST CONNECT] Lấy API Key thành công và đã lưu vào cấu hình.");
+              if (data.accounts && Array.isArray(data.accounts)) {
+                setAccounts(data.accounts);
+                localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
+              }
+              const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
+              alert(`✅ Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`);
+              addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
               // Reload credentials
               const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${currentUid}`);
               if (credRes.ok) {
@@ -757,6 +762,7 @@ function App() {
                 setSecretKey(credData.secret_key || "");
                 setPassphrase(credData.passphrase || "");
               }
+              refreshBotData();
             } else {
               alert("❌ Lỗi kết nối OKX: " + (data.message || "Lỗi máy chủ"));
               addSystemLog("❌ [FAST CONNECT] Lỗi: " + (data.message || "Lỗi máy chủ"));
@@ -832,10 +838,14 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ api_key: inputApiKey, secret_key: inputSecretKey, passphrase: inputPassphrase })
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        alert(`❌ Lỗi: ${err.detail || "Không thể kết nối API Key"}`);
+        alert(`❌ Lỗi: ${data.detail || "Không thể kết nối API Key"}`);
         return;
+      }
+      if (data.accounts && Array.isArray(data.accounts)) {
+        setAccounts(data.accounts);
+        localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
       }
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
@@ -844,8 +854,12 @@ function App() {
       setApiKey(inputApiKey);
       setSecretKey(inputSecretKey);
       setPassphrase(inputPassphrase);
-      alert("✅ Kết nối API Key thành công!");
+      
+      const accDisplayName = data.detected_name || (accounts.find(a => a.id === accId)?.name) || "Tài khoản";
+      alert(`✅ Kết nối API Key thành công cho [${accDisplayName}]!`);
+      addSystemLog(`🔑 [SYSTEM] Đã kết nối API Key OKX cho tài khoản "${accDisplayName}"`);
       setShowConnectModal(false);
+      refreshBotData();
     } catch (e) {
       alert(`Lỗi kết nối: ${e.message}`);
     }
@@ -1164,8 +1178,12 @@ function App() {
         setOkxUid(data.detected_uid);
         setLoginUid(data.detected_uid);
       }
+      if (data.accounts && Array.isArray(data.accounts)) {
+        setAccounts(data.accounts);
+        localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
+      }
       handleAssignAccountToActiveBot(selectedAccount);
-      const curAccName = accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
+      const curAccName = data.detected_name || accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
       alert(`Đã lưu cấu hình API Key cho [${curAccName}] thành công!`);
       addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
       refreshBotData();
@@ -1652,8 +1670,9 @@ function App() {
                 <button
                   onClick={() => setShowConnectModal(true)}
                   className="btn-connect-okx"
+                  title="Connect"
                 >
-                  <span>{t("connect")}</span>
+                  <span>Connect</span>
                 </button>
                 <LanguageSelector />
               </div>

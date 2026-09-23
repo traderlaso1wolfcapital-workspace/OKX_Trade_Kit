@@ -115,7 +115,7 @@ export default function LanguageSelector() {
             style={{
               padding: "4px 12px 6px",
               fontSize: "11px",
-              fontWeight: "bold",
+              fontWeight: "normal",
               color: "#888888",
               textTransform: "uppercase",
               letterSpacing: "0.5px",
@@ -137,7 +137,7 @@ export default function LanguageSelector() {
                   style={{
                     padding: "7px 12px",
                     fontSize: "12.5px",
-                    fontWeight: isSelected ? "bold" : "500",
+                    fontWeight: "normal",
                     color: isSelected ? "#00c087" : "#d1d4dc",
                     backgroundColor: isSelected ? "rgba(0, 192, 135, 0.08)" : "transparent",
                     cursor: "pointer",
@@ -157,7 +157,7 @@ export default function LanguageSelector() {
                 >
                   <span>{lang.label}</span>
                   {isSelected && (
-                    <span style={{ fontSize: "12px", color: "#00c087", fontWeight: "bold" }}>✓</span>
+                    <span style={{ fontSize: "12px", color: "#00c087", fontWeight: "normal" }}>✓</span>
                   )}
                 </div>
               );

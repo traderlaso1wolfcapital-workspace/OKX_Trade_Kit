@@ -18,6 +18,52 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[24/09/2026]** - Tự Động Quét & Đặt Tên Tài Khoản Từ Sàn OKX (Fast Connect & API Key Thủ Công):
+  - **Mô tả yêu cầu:**
+    - Khi kết nối bất kể tài khoản nào qua OKX Fast Connect (OAuth) hoặc nhập API Key thủ công:
+      1. Bot chủ động quét tên của tài khoản đó trực tiếp trên sàn OKX (`label` / tên tài khoản phụ nếu là API Key tài khoản phụ; `label` / tên tài khoản chính nếu là API Key tài khoản chính).
+      2. Tự động đặt tên cho tài khoản đó trong `accounts.json` và cập nhật danh sách tài khoản UI ngay lập tức nếu người dùng không dùng dấu `+` để tạo tài khoản đặt tên thủ công từ trước.
+      3. Bỏ hạn chế chặn API Key của tài khoản chính (vẫn bảo toàn 100% cơ chế kiểm tra UID chính trùng khớp với UID đăng nhập và kiểm tra Ref TLS1 hợp lệ).
+  - **Đã xử lý:**
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Thêm hàm `detect_okx_account_info`: Truy vấn `GET /api/v5/account/config` trên OKX, phân biệt tài khoản chính (`api_uid == main_uid`) hay tài khoản phụ (`api_uid != main_uid`), bóc tách nhãn `label` hoặc định dạng chuẩn tên tài khoản chính/phụ.
+      - Thêm hàm `sync_account_name_in_storage`: Kiểm tra xem tài khoản có phải tạo thủ công bằng nút `+` với tên riêng (`is_manual: True`) hay không. Nếu chưa tạo thủ công hoặc đang mang tên mặc định (`Tài khoản 1`, `Tài khoản 2`, `sub1`, ...), tự động cập nhật tên quét được từ OKX vào `accounts.json`.
+      - Cập nhật `create_bot_account`: Gán flag `is_manual: True` khi người dùng bấm nút `+` để bảo toàn tên tùy chỉnh.
+      - Cập nhật `okx_oauth_callback`: Đồng bộ file env đầy đủ các đường dẫn, quét thông tin tài khoản qua `detect_okx_account_info`, gọi `sync_account_name_in_storage` và trả về `detected_name` cùng mảng `accounts` mới nhất.
+      - Cập nhật `update_bot_credentials`: Mở quyền cho API Key tài khoản chính, quét tên và gọi `sync_account_name_in_storage`, trả về `detected_name` và `accounts`.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Cập nhật `handleCallback` (Fast Connect): Nhận diện `data.accounts` và `data.detected_name`, cập nhật ngay `setAccounts` và `localStorage`, hiển thị tên tài khoản OKX trong alert và log hệ thống.
+      - Cập nhật `handleConnectApiKey`: Tương tự, cập nhật `accounts` và thông báo tên tài khoản đã quét được.
+      - Cập nhật `handleSaveApiKey` trong modal Cài Đặt: Đồng bộ `accounts` và hiển thị tên tài khoản đã nhận diện.
+    - Đã chạy kiểm thử đơn vị (`test_sync_unit.py`) xác nhận thành công 100% cả 2 kịch bản (đổi tên tự động tài khoản generic và bảo toàn tài khoản tạo qua dấu `+`).
+    - Build lại bản production bundle (`npm run build`) thành công (`194ms`).
+  - **Kiểm chứng:** Kết nối API Key hoặc Fast Connect tự động nhận diện và cập nhật tên tài khoản trên sàn OKX vào dropdown mà không cần tải lại trang.
+
+- **[24/09/2026]** - Áp Dụng Gradient Xanh Lá Sang Xanh Dương (90deg) Cho Nút Connect (Giữ Nguyên Chữ "Connect", Bỏ Logo OKX):
+  - **Mô tả yêu cầu:**
+    1. Đổi nút Connect sang dải màu gradient xanh ngọc sang xanh dương `linear-gradient(90deg, #10b981, #3b82f6)`. Bỏ logo OKX và tiền tố OKX, chỉ hiển thị nguyên chữ `Connect`.
+    2. Đổi toàn bộ font chữ trong dropdown ngôn ngữ quả địa cầu về dạng chữ thường (`normal`), không in đậm (`bold`).
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `.btn-connect-okx`: `background: linear-gradient(90deg, #10b981, #3b82f6)`, border `none`, bo góc `4px`, hover `background: linear-gradient(90deg, #059669, #2563eb)` và `transform: translateY(-1px)`.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Bỏ icon OKX và tiền tố OKX, nút chỉ hiển thị chữ `Connect` tinh gọn.
+    - Trong [LanguageSelector.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/LanguageSelector.jsx):
+      - Đổi toàn bộ các thuộc tính `fontWeight` từ `bold` / `500` về `normal` (cả tiêu đề `Language`, tên các thứ tiếng và dấu checkmark `✓`).
+    - Build lại bản production bundle (`npm run build`) thành công (`212ms`).
+  - **Kiểm chứng:** Nút Connect gradient xanh ngọc sang xanh dương cực kỳ bắt mắt, sạch sẽ và đúng ý CEO.
+
+- **[24/09/2026]** - Áp Dụng Hiệu Ứng Premium Emerald Metallic Gradient Cho Nút Connect:
+  - **Mô tả yêu cầu:** Nâng cấp nút Connect với dải màu chuyển tiếp gradient cao cấp (premium gradient) nhưng đảm bảo giữ phong cách sang trọng, không chói lóa, không bị mờ nhòe.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cấu hình dải màu chuyển tiếp Emerald Metallic Gradient 180 độ: từ xanh tươi `#2e7d32` đổ nhẹ dần xuống xanh sâu `#1b5e20`.
+      - Kết hợp đường viền ánh kim loại phía trên `box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2)` và bóng đổ đáy `0 2px 4px rgba(0,0,0,0.25)`.
+      - Trạng thái hover: Dải màu chuyển sang dải sáng hơn (`#388e3c` -> `#256f2a`), nhấc nhẹ `transform: translateY(-1px)`.
+      - Trạng thái click (active): Lún nhẹ `translateY(1px)`, bóng chìm bên trong `inset 0 1px 3px rgba(0,0,0,0.4)`.
+    - Build lại bản production bundle (`npm run build`) thành công (`195ms`).
+  - **Kiểm chứng:** Nút hiển thị sang trọng, có chiều sâu 3D sắc nét chuẩn phong cách Linear/Apple.
+
 - **[24/09/2026]** - Thêm Hiệu Ứng Động Nút OKX Connect, Nâng Cao Cân Đối Nút Chọn Bot & Cố Định Tiêu Đề "Tài khoản (EMA200 Bot):":
   - **Mô tả yêu cầu:**
     1. Thẻ OKX Connect và nút "Mở App ➔" trong modal: Thêm hiệu ứng động lướt nhấc nhẹ khi di chuột đến (`translateY(-2px)` / badge lift) và nhấn nút `translateY(0)`.
