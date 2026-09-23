@@ -338,32 +338,70 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
         return {"status": "error", "message": "Server chưa được cấu hình OKX_OAUTH_CLIENT_SECRET. Hãy thiết lập biến môi trường này cho máy chủ."}
         
     try:
-        url = "https://www.okx.com/oauth2/v1/token"
+        url = "https://www.okx.com/v5/users/oauth/token"
         headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json"
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0"
         }
         
         payload = {
             "grant_type": "authorization_code",
             "code": req.code,
             "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_uri": "https://autotrader.fun/okx-callback"
+            "client_secret": client_secret
         }
         
-        resp = requests.post(url, data=payload, headers=headers, timeout=10)
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
         
         try:
             data = resp.json()
         except ValueError:
             return {"status": "error", "message": f"Lỗi server khi gọi OKX. Status: {resp.status_code}. Response: {resp.text[:200]}"}
         
-        if "access_token" in data or "apiKey" in data or "api_key" in data:
-            # Tùy thuộc vào loại app (Trading/Broker), credentials có thể nằm sẵn trong payload
-            api_key = data.get("apiKey") or data.get("api_key")
-            secret_key = data.get("secretKey") or data.get("secret_key")
-            passphrase = data.get("passphrase")
+        # 1. Lấy access_token
+        access_token = data.get("access_token")
+        if not access_token:
+            return {"status": "error", "message": f"Không thể lấy access_token từ OKX: {data.get('msg', data.get('error_description', data))}", "raw": data}
+            
+        auth_headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        }
+        
+        # 2. Xóa API Key cũ (nếu có) để tránh lỗi 50116 (bỏ qua kết quả lỗi)
+        import secrets
+        import string
+        
+        delete_url = "https://www.okx.com/api/v5/users/oauth/delete-apikey"
+        try:
+            requests.post(delete_url, headers=auth_headers, timeout=5)
+        except Exception:
+            pass
+            
+        # 3. Tạo Fast API Key mới
+        alphabet = string.ascii_letters + string.digits
+        generated_passphrase = ''.join(secrets.choice(alphabet) for _ in range(16)) + "!1A" # Đảm bảo đủ điều kiện passphrase
+        
+        create_url = "https://www.okx.com/api/v5/users/oauth/apikey"
+        create_payload = {
+            "label": f"TLS1_{int(time.time())}",
+            "passphrase": generated_passphrase,
+            "perm": "read_only,trade"
+        }
+        
+        create_resp = requests.post(create_url, json=create_payload, headers=auth_headers, timeout=10)
+        try:
+            create_data = create_resp.json()
+        except ValueError:
+            return {"status": "error", "message": f"Lỗi parse JSON khi tạo API Key. Status: {create_resp.status_code}. Response: {create_resp.text[:200]}"}
+            
+        if str(create_data.get("code")) == "0" and create_data.get("data"):
+            api_data = create_data["data"][0]
+            api_key = api_data.get("apiKey")
+            secret_key = api_data.get("secretKey")
+            # OKX có thể không trả về passphrase, ta sẽ dùng cái vừa sinh ra
+            passphrase = api_data.get("passphrase", generated_passphrase)
             
             if api_key and secret_key and passphrase:
                 acc = req.account_id if req.account_id else req.strategy
@@ -372,10 +410,8 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 _save_env_file(fpath, api_key, secret_key, passphrase, is_demo=False)
                 
                 return {"status": "success", "message": "Kết nối OKX Fast Connect thành công!"}
-            else:
-                return {"status": "error", "message": "Không tìm thấy API Key trong phản hồi OKX. Đảm bảo App OKX là loại Trading/Broker.", "raw": data}
-        else:
-            return {"status": "error", "message": f"OKX trả về lỗi: {data.get('error_description') or data.get('msg') or data}", "raw": data}
+        
+        return {"status": "error", "message": f"Tạo API Key thất bại: {create_data.get('msg', create_data)}", "raw": create_data}
             
     except Exception as e:
         return {"status": "error", "message": f"Lỗi server khi gọi OKX: {str(e)}"}
@@ -2521,3 +2557,4 @@ if __name__ == "__main__":
 # z7722 | Implemented bcrypt for password hashing and automatic migration from SHA256
 # z7723 | Update OKX OAuth Fast API endpoint and hide closed_positions if API is deleted
 # z7724 | Fix logic error where deleting API Key did not kill the bot process, and removed /account from OAuth URL.
+# z7725 | Fix OKX OAuth Fast API token exchange endpoint from /oauth2/v1/token to /v5/users/oauth/token and use JSON payload
