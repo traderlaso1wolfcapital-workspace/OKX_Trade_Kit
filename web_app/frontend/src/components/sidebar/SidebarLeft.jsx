@@ -170,9 +170,13 @@ export default function SidebarLeft({
                         return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
                       })}
                       style={{
-                        padding: "1px 5px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "2.5px 6px 1px 6px",
                         fontSize: "10px",
                         fontWeight: "bold",
+                        lineHeight: "1.2",
                         borderRadius: "4px",
                         border: "1px solid #444",
                         background: risk.volUnit === "USDT" ? "#26a69a" : "#222",
@@ -191,9 +195,13 @@ export default function SidebarLeft({
                         return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
                       })}
                       style={{
-                        padding: "1px 5px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "2.5px 6px 1px 6px",
                         fontSize: "10px",
                         fontWeight: "bold",
+                        lineHeight: "1.2",
                         borderRadius: "4px",
                         border: "1px solid #444",
                         background: risk.volUnit === "LOT" ? "#26a69a" : "#222",

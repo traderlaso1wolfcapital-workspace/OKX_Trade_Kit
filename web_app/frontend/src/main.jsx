@@ -23,12 +23,8 @@ window.fetch = async (...args) => {
     
     const response = await originalFetch(resource, config);
     if (response.status === 401) {
-      localStorage.removeItem("tls1_auth");
-      localStorage.removeItem("tls1_uid");
-      localStorage.removeItem("tls1_token");
-      if (!isReloading) {
-        isReloading = true;
-        window.location.reload();
+      if (token) {
+        localStorage.removeItem("tls1_token");
       }
     }
     return response;

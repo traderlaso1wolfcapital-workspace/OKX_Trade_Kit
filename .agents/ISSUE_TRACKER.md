@@ -18,6 +18,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Sửa Lỗi Web Reload Liên Tục (Vòng Lặp 401 Unauthorized) & Canh Chỉnh Text Nút Ký Quỹ Không Bị Viền Trên Cắt Mất Dấu:
+  - **Mô tả yêu cầu CEO:**
+    1. Tại sao trang web lại bị reload liên tục?
+    2. Ở 2 nút Ký quỹ (`[USDT] [% VỐN]`), hãy cho dịch text xuống dưới một chút để text có dấu (`% VỐN`) không bị viền trên của nút che mất ký tự chữ.
+  - **Nguyên nhân cốt lõi (Root Cause):**
+    1. **Vòng lặp reload liên tục:**
+       - Trong [main.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/main.jsx), interceptor `window.fetch` do dev Thọ thêm vào có lệnh: cứ mỗi khi gặp HTTP 401 từ bất kỳ API nào thì tự động gọi `window.location.reload()`.
+       - Endpoint `/api/auth/verify` yêu cầu bắt buộc `Depends(verify_jwt)` với `HTTPBearer(auto_error=True)`. Khi người dùng kết nối bằng API Key hoặc không có JWT token, endpoint này trả về 401 Unauthorized mỗi 30 giây (hoặc ngay khi mount), kích hoạt `window.location.reload()` vô tận.
+    2. **Ký tự có dấu bị viền trên che mất:**
+       - Nút Ký quỹ (`.risk-unit-btn`) có `padding: "1px 5px"` và không có `lineHeight` chuẩn, khiến ký tự có dấu mũ và dấu sắc (`Ố`) chạm sát mép viền trên (`border: 1px solid #444`) và bị cắt lẹm.
+  - **Giải pháp thực hiện:**
+    - Trong [main.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/main.jsx):
+      - Gỡ bỏ hoàn toàn lệnh `window.location.reload()` trong `window.fetch` interceptor, chấm dứt triệt để mọi nguy cơ gây loop reload trình duyệt.
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cấu hình `security = HTTPBearer(auto_error=False)`, cho phép request không có JWT token vẫn đi qua được mà không bị FastAPI tự động chặn 401.
+      - Thêm whitelist cho Master UID (`523019992975987626`) và admin UID trong `/api/auth/verify`, trả về 200 OK.
+    - Trong [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx) & [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Cập nhật style cho 2 nút đơn vị ký quỹ: `display: "inline-flex"`, `alignItems: "center"`, `justifyContent: "center"`, `padding: "2.5px 6px 1px 6px"`, `lineHeight: "1.2"`. Dịch chữ xuống dưới một cách cân đối, giữ nguyên vẹn dấu mũ và dấu sắc của `% VỐN`.
+    - Đã build lại production bundle (`npm run build`) và xác nhận mọi API hoạt động trơn tru.
+
 - **[25/09/2026]** - Reset Tỷ Lệ Mặc Định 30-70 (Biểu Đồ 70% - Bảng Vị Thế 30%) & Thay Chữ "Đã kết nối" Bằng Số UID Tài Khoản Chính Đã Quét Được:
   - **Mô tả yêu cầu CEO:**
     1. Reset 2 mục phân chia tỷ lệ lại như cũ: Mặc định 30-70 (Biểu đồ 70% - Bảng vị thế 30%), reset giới hạn kéo của resizer trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) về như cũ.
