@@ -39,15 +39,17 @@ body {
   padding-left: env(safe-area-inset-left, 0px);
 }
 
-@media all and (display-mode: standalone) {
+@media all and (display-mode: standalone), (display-mode: fullscreen) {
   body {
     background-color: #1e1e1e;
   }
   .app-container {
-    padding-top: max(env(safe-area-inset-top, 0px), 40px);
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+    padding-top: max(env(safe-area-inset-top, 0px), 48px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 14px) !important;
     margin-top: 0;
     height: 100dvh;
+    height: -webkit-fill-available;
+    box-sizing: border-box !important;
   }
 }
 
@@ -1594,9 +1596,14 @@ a#tv-attr-logo,
   .app-container {
     flex-direction: column;
     height: 100dvh;
+    height: -webkit-fill-available;
     overflow: hidden;
-    padding: 0 !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
+    padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
     width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .content-wrapper {
@@ -1618,8 +1625,7 @@ a#tv-attr-logo,
     order: 1;
     display: flex;
     flex-direction: column;
-    flex: 1 !important;
-    height: auto !important;
+    flex: 1 1 auto !important;
     min-height: 0;
     margin: 0 !important;
     padding: 0 !important;
@@ -1628,7 +1634,7 @@ a#tv-attr-logo,
   /* Trên mobile: cụm Bot tabs bar và thẻ Bot panel card có đường chỉ dọc 2 bên viền mép màu #333333 */
   .bot-tabs-bar {
     width: 100% !important;
-    margin: 4px 0 0 0 !important;
+    margin: 2px 0 0 0 !important;
     padding: 0 5px !important;
     box-sizing: border-box;
   }
@@ -1647,27 +1653,30 @@ a#tv-attr-logo,
   .main-workspace {
     width: 100% !important;
     flex-direction: column !important;
-    flex: 1 !important;
-    height: 0 !important; /* Let flex control height */
+    flex: 1 1 auto !important;
+    min-height: 380px !important; /* Co giãn linh hoạt lấp đầy khung nhìn, triệt tiêu khoảng đen thừa cằm dưới */
     border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 trọn vẹn 4 cạnh */
     border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
     box-sizing: border-box !important;
+    display: flex !important;
   }
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: var(--chart-ratio, 50%) !important;
+    flex: 1.2 1 200px !important;
+    height: auto !important;
+    min-height: 190px !important;
     border-left: none;
     border-right: none;
-    border-bottom: none !important;
+    border-bottom: 1.5px solid #333 !important;
     flex-shrink: 0;
   }
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    flex: 1 !important;
-    height: 100% !important;
-    min-height: 0 !important;
+    flex: 1 1 170px !important;
+    height: auto !important;
+    min-height: 160px !important;
     flex-shrink: 0;
     border: none !important;
   }
@@ -1684,6 +1693,7 @@ a#tv-attr-logo,
     order: 2;
     flex-shrink: 0;
     box-sizing: border-box;
+    margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
   }
   
   .sidebar-header {
