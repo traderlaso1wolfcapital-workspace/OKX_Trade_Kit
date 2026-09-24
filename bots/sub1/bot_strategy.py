@@ -92,9 +92,14 @@ def sync_config_to_json(env_paths: dict, globals_ref: Any):
             "AI_CONFIDENCE_SCORE": str(globals_ref.AI_CONFIDENCE_SCORE),
             "TP_TARGET_OPTIMAL": str(globals_ref.SCALPING_TP_PCT),
             "SL_TARGET_OPTIMAL": str(globals_ref.SCALPING_SL_PCT),
-            "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "1"))),
+            "POSITION_VOLUME_HIGH_CONFIDENCE": str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "1.0"))),
+            "VOL_UNIT": str(existing_cfg.get("VOL_UNIT", "USDT")),
+            "POSITION_VOLUME_USDT": str(existing_cfg.get("POSITION_VOLUME_USDT", existing_cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", "1.0"))),
+            "POSITION_VOLUME_PCT": str(existing_cfg.get("POSITION_VOLUME_PCT", "0.1")),
+            "USE_DYNAMIC_RISK": bool(existing_cfg.get("USE_DYNAMIC_RISK", False)),
+            "DYNAMIC_RISK_PCT": str(existing_cfg.get("DYNAMIC_RISK_PCT", "0.001")),
             "ENABLE_STRATEGY_MAIN": bool(globals_ref.ENABLE_STRATEGY_MAIN),
-            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False))),
+            "ENABLE_PYRAMID_DCA": bool(existing_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", True))),
             "ENABLE_NEGATIVE_DCA": bool(existing_cfg.get("ENABLE_NEGATIVE_DCA", getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False))),
             "ENABLE_MULTITF_GRID": bool(existing_cfg.get("ENABLE_MULTITF_GRID", getattr(globals_ref, "ENABLE_MULTITF_GRID", True))),
             "ENABLE_STRATEGY_HEDGE": bool(existing_cfg.get("ENABLE_STRATEGY_HEDGE", existing_cfg.get("ENABLE_STRATEGY_XOLE", getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", True))))),
@@ -154,8 +159,10 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 
                 # Đồng bộ thông số quản lý vốn và hiệu suất
                 set_val("AI_CONFIDENCE_SCORE", Decimal(str(cfg.get("AI_CONFIDENCE_SCORE", "0"))))
-                set_val("SCALPING_TP_PCT", Decimal(str(cfg.get("TP_TARGET_OPTIMAL", "0.01500"))))
-                set_val("SCALPING_SL_PCT", Decimal(str(cfg.get("SL_TARGET_OPTIMAL", "0.01500"))))
+                _tp_val = cfg.get("SCALPING_TP_PCT", cfg.get("TP_TARGET_OPTIMAL", "0.01500"))
+                _sl_val = cfg.get("SCALPING_SL_PCT", cfg.get("SL_TARGET_OPTIMAL", "0.01500"))
+                set_val("SCALPING_TP_PCT", Decimal(str(_tp_val)))
+                set_val("SCALPING_SL_PCT", Decimal(str(_sl_val)))
                 
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg:
                     set_val("POSITION_VOLUME_HIGH_CONFIDENCE", Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"])))
@@ -409,18 +416,9 @@ def run_strategy_cycle(*args, **kwargs):
     original_enabled_tfs = getattr(globals_ref, "ENABLED_TFS", {})
     
     if isinstance(original_enabled_tfs, dict):
-        if swap_id in original_enabled_tfs:
-            current_coin_tfs = original_enabled_tfs[swap_id]
-        elif coin_name in original_enabled_tfs:
-            current_coin_tfs = original_enabled_tfs[coin_name]
-        elif inst_id in original_enabled_tfs:
-            current_coin_tfs = original_enabled_tfs[inst_id]
-        else:
-            current_coin_tfs = []
-    elif isinstance(original_enabled_tfs, list):
-        current_coin_tfs = original_enabled_tfs
+        current_coin_tfs = original_enabled_tfs.get(swap_id, original_enabled_tfs.get(coin_name, original_enabled_tfs.get(inst_id, [])))
     else:
-        current_coin_tfs = []
+        current_coin_tfs = original_enabled_tfs if isinstance(original_enabled_tfs, list) else []
         
     globals_ref.ENABLED_TFS = current_coin_tfs
     try:
@@ -2281,15 +2279,33 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 if cfg_file and os.path.exists(cfg_file):
                     with open(cfg_file, "r", encoding="utf-8") as _f:
                         _cfg = json.load(_f)
-                        if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
+                        _unit = _cfg.get("VOL_UNIT", "USDT")
+                        if _unit in ("LOT", "PERCENT") or _cfg.get("USE_DYNAMIC_RISK", False):
+                            _pct = Decimal(str(_cfg.get("POSITION_VOLUME_PCT", "0.1")))
+                            _cur_eq = Decimal("2000")
+                            try:
+                                _evo_path = env_paths.get("JSON_EVOLUTION_DATA_FILE", "")
+                                if _evo_path and os.path.exists(_evo_path):
+                                    with open(_evo_path, "r", encoding="utf-8") as _ef:
+                                        _ed = json.load(_ef)
+                                        _w = _ed.get("wallet_stats", {})
+                                        if "von_hien_tai" in _w and float(_w["von_hien_tai"]) > 0:
+                                            _cur_eq = Decimal(str(_w["von_hien_tai"]))
+                            except: pass
+                            target_usdt = max(Decimal("0.1"), _cur_eq * (_pct / Decimal("100")))
+                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = target_usdt
+                        elif "POSITION_VOLUME_USDT" in _cfg:
+                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_USDT"]))
+                            target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+                        elif "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
                             globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
                         if "ENABLE_TF_VOLUME_MULTIPLIER" in _cfg:
                             globals_ref.ENABLE_TF_VOLUME_MULTIPLIER = bool(_cfg["ENABLE_TF_VOLUME_MULTIPLIER"])
                 if getattr(tracker, "_last_seen_mult_flag", None) != getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False):
                     tracker._last_seen_mult_flag = getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)
                     print(f"⚙️ [CONFIG SYNC] Ký quỹ đa khung (ENABLE_TF_VOLUME_MULTIPLIER): {globals_ref.ENABLE_TF_VOLUME_MULTIPLIER}")
-            except Exception: pass
-            target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
+            except: pass
+            target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("0.4"))
 
             if not is_enabled:
                 # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
@@ -2524,41 +2540,63 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             _filled_long = tracker.pos_cycle_filled_tfs if tracker.has_long else []
             
             _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-            _is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+            _is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+            TFS_RAW = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+            if isinstance(TFS_RAW, dict):
+                TFS = TFS_RAW.get(swap_id, TFS_RAW.get(coin_name, ["M5", "M15", "M30", "H1", "H2", "H4"]))
+            else:
+                TFS = TFS_RAW
+
             if _is_pyramid:
-                TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
                 max_anchor_tf = reversed_tfs[0] if reversed_tfs else "H4"
                 
                 new_target_long_tfs = []
                 if not tracker.has_long:
-                    # Chưa có vị thế: BẮT BUỘC chỉ mở vị thế tại khung lớn nhất (H4) khi H4 đủ điều kiện UPTREND
                     if max_anchor_tf in aligned_long_tfs:
                         new_target_long_tfs.append(max_anchor_tf)
                 else:
-                    # Đã có vị thế:
-                    # 1. Nếu khung lớn nhất (H4) CHƯA khớp: BẮT BUỘC chỉ đặt Limit đón tại H4, cấm mọi TF nhỏ hơn
                     if max_anchor_tf not in _filled_long:
                         new_target_long_tfs.append(max_anchor_tf)
                     else:
-                        # 2. Khung H4 đã khớp: Tìm khung liền kề tiếp theo chưa khớp từ trên xuống dưới
                         for i in range(len(reversed_tfs) - 1):
                             current_tf = reversed_tfs[i]
                             next_tf = reversed_tfs[i+1]
                             if current_tf in _filled_long and next_tf not in _filled_long:
                                 if next_tf in aligned_long_tfs:
                                     new_target_long_tfs.append(next_tf)
-                                # Dừng lại ngay tại bậc thang tiếp theo, cấm tuyệt đối nhảy cóc xuống TF nhỏ hơn!
                                 break
                             
                 target_long_tfs = new_target_long_tfs
-            elif _is_neg_dca:
-                target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
+            elif _is_negative_dca:
+                sorted_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in TFS]
+                min_anchor_tf = sorted_tfs[0] if sorted_tfs else "M5"
+                new_target_long_tfs = []
+                if not tracker.has_long:
+                    if min_anchor_tf in aligned_long_tfs:
+                        new_target_long_tfs.append(min_anchor_tf)
+                else:
+                    if min_anchor_tf not in _filled_long:
+                        new_target_long_tfs.append(min_anchor_tf)
+                    else:
+                        for i in range(len(sorted_tfs) - 1):
+                            current_tf = sorted_tfs[i]
+                            next_tf = sorted_tfs[i+1]
+                            if current_tf in _filled_long and next_tf not in _filled_long:
+                                if next_tf in aligned_long_tfs:
+                                    new_target_long_tfs.append(next_tf)
+                                break
+                target_long_tfs = new_target_long_tfs
             else:
-                # ⚡ LƯỚI LIMIT ĐA KHUNG ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
-                # Theo yêu cầu CEO: Vẫn giữ nguyên toàn bộ lưới limit ở các TF chưa khớp,
-                # thị trường chạy đến đâu khớp đến đó, không chuyển sang chế độ đơn lệnh.
-                target_long_tfs = [tf for tf in aligned_long_tfs if tf not in _filled_long]
+                # ⚡ CHẾ ĐỘ ĐỘC LẬP TẤT CẢ CÁC TF ĐƯỢC CHỌN (KHI CẢ 2 NÚT CÙNG OFF):
+                # Toàn bộ các TF trade được chọn sẽ giao dịch độc lập, có thể một lúc limit tất cả các TF trade đã chọn!
+                target_long_tfs = []
+                for tf in TFS:
+                    if tf in _filled_long: continue
+                    _ema = get_ema200_for_tf(tf)
+                    if _ema > 0 and tracker.live_price >= _ema:
+                        if not getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                            target_long_tfs.append(tf)
                 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
@@ -2566,35 +2604,53 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
             
             if _is_pyramid:
+                reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
+                max_anchor_tf = reversed_tfs[0] if reversed_tfs else "H4"
                 new_target_short_tfs = []
                 if not tracker.has_short:
-                    # Chưa có vị thế: BẮT BUỘC chỉ mở vị thế tại khung lớn nhất (H4) khi H4 đủ điều kiện DOWNTREND
                     if max_anchor_tf in aligned_short_tfs:
                         new_target_short_tfs.append(max_anchor_tf)
                 else:
-                    # Đã có vị thế:
-                    # 1. Nếu khung lớn nhất (H4) CHƯA khớp: BẮT BUỘC chỉ đặt Limit đón tại H4, cấm mọi TF nhỏ hơn
                     if max_anchor_tf not in _filled_short:
                         new_target_short_tfs.append(max_anchor_tf)
                     else:
-                        # 2. Khung H4 đã khớp: Tìm khung liền kề tiếp theo chưa khớp từ trên xuống dưới
                         for i in range(len(reversed_tfs) - 1):
                             current_tf = reversed_tfs[i]
                             next_tf = reversed_tfs[i+1]
                             if current_tf in _filled_short and next_tf not in _filled_short:
                                 if next_tf in aligned_short_tfs:
                                     new_target_short_tfs.append(next_tf)
-                                # Dừng lại ngay tại bậc thang tiếp theo, cấm tuyệt đối nhảy cóc xuống TF nhỏ hơn!
                                 break
                             
                 target_short_tfs = new_target_short_tfs
-            elif _is_neg_dca:
-                target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+            elif _is_negative_dca:
+                sorted_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in TFS]
+                min_anchor_tf = sorted_tfs[0] if sorted_tfs else "M5"
+                new_target_short_tfs = []
+                if not tracker.has_short:
+                    if min_anchor_tf in aligned_short_tfs:
+                        new_target_short_tfs.append(min_anchor_tf)
+                else:
+                    if min_anchor_tf not in _filled_short:
+                        new_target_short_tfs.append(min_anchor_tf)
+                    else:
+                        for i in range(len(sorted_tfs) - 1):
+                            current_tf = sorted_tfs[i]
+                            next_tf = sorted_tfs[i+1]
+                            if current_tf in _filled_short and next_tf not in _filled_short:
+                                if next_tf in aligned_short_tfs:
+                                    new_target_short_tfs.append(next_tf)
+                                break
+                target_short_tfs = new_target_short_tfs
             else:
-                # ⚡ LƯỚI LIMIT ĐA KHUNG ĐỘC LẬP (TẮT CẢ 2 NÚT DCA DƯƠNG VÀ DCA ÂM):
-                # Theo yêu cầu CEO: Vẫn giữ nguyên toàn bộ lưới limit ở các TF chưa khớp,
-                # thị trường chạy đến đâu khớp đến đó, không chuyển sang chế độ đơn lệnh.
-                target_short_tfs = [tf for tf in aligned_short_tfs if tf not in _filled_short]
+                # ⚡ CHẾ ĐỘ ĐỘC LẬP TẤT CẢ CÁC TF ĐƯỢC CHỌN (KHI CẢ 2 NÚT CÙNG OFF):
+                target_short_tfs = []
+                for tf in TFS:
+                    if tf in _filled_short: continue
+                    _ema = get_ema200_for_tf(tf)
+                    if _ema > 0 and tracker.live_price < _ema:
+                        if not getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                            target_short_tfs.append(tf)
                 
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
 
@@ -2603,9 +2659,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # Phải đảm bảo fallback_tf nằm trong TFS (khung thời gian được tích chọn)
             if coin_name != "BTC" and _is_alt_synced and not tracker.has_long and not tracker.has_short:
                 fallback_tf = None
-                TFS = getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
                 if _is_pyramid:
-                    # ⚡ DCA DƯƠNG: Lấy khung lớn nhất ĐƯỢC TÍCH CHỌN trong bảng TF trade làm điểm khởi đầu
                     _anchor_candidate = max(TFS, key=tf_weight) if TFS else "H4"
                     _anchor_ema = get_ema200_for_tf(_anchor_candidate)
                     if allowed_long and _anchor_ema > 0 and tracker.live_price >= _anchor_ema:
@@ -2614,12 +2668,17 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         fallback_tf = _anchor_candidate
                     else:
                         fallback_tf = None
+                elif _is_negative_dca:
+                    _anchor_candidate = min(TFS, key=tf_weight) if TFS else "M5"
+                    _anchor_ema = get_ema200_for_tf(_anchor_candidate)
+                    if allowed_long and _anchor_ema > 0 and tracker.live_price >= _anchor_ema:
+                        fallback_tf = _anchor_candidate
+                    elif allowed_short and _anchor_ema > 0 and tracker.live_price < _anchor_ema:
+                        fallback_tf = _anchor_candidate
+                    else:
+                        fallback_tf = None
                 else:
-                    # DCA Âm hoặc Đơn Lệnh: Lấy best_tf nếu nằm trong TFS
-                    if best_tf in TFS:
-                        fallback_tf = best_tf
-                    elif TFS:
-                        fallback_tf = max(TFS, key=tf_weight)
+                    fallback_tf = None
                 
                 if fallback_tf and fallback_tf not in _blocked_tfs:
                     if allowed_long and not target_long_tfs:

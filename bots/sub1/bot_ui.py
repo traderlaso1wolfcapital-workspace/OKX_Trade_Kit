@@ -150,35 +150,29 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     # Calculate Uptime
     bot_start_time = system_config.get("BOT_START_TIME", time.time())
     
-    # Hiển thị Chế độ DCA (DCA Dương / DCA Âm / Đơn Lệnh)
+    # Hiển thị Chế độ DCA (DCA Dương / DCA Âm / Độc Lập TF)
     is_pyramid = False
-    is_neg_dca = False
+    is_negative_dca = False
     try:
         cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
         if cfg_path and os.path.exists(cfg_path):
             with open(cfg_path, "r", encoding="utf-8") as _f:
                 _cfg = json.load(_f)
-                if "ENABLE_PYRAMID_DCA" in _cfg:
-                    is_pyramid = bool(_cfg["ENABLE_PYRAMID_DCA"])
-                else:
-                    is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-                if "ENABLE_NEGATIVE_DCA" in _cfg:
-                    is_neg_dca = bool(_cfg["ENABLE_NEGATIVE_DCA"])
-                else:
-                    is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+                is_pyramid = bool(_cfg.get("ENABLE_PYRAMID_DCA", getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)))
+                is_negative_dca = bool(_cfg.get("ENABLE_NEGATIVE_DCA", getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)))
         else:
             is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-            is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+            is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
     except:
         is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
-        is_neg_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+        is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
         
     if is_pyramid:
         mode_txt = "Mode: DCA Dương"
-    elif is_neg_dca:
+    elif is_negative_dca:
         mode_txt = "Mode: DCA Âm"
     else:
-        mode_txt = "Mode: Lưới Đa Khung"
+        mode_txt = "Mode: Độc Lập TF"
     r2_c1 = f"{mode_txt:^21}"
     
     r2_c2 = f" PNL: {pnl_str:>8} $ "
@@ -421,12 +415,14 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         # MAIN DCA limits (Only print standalone if NO position is active)
         if not tk.has_long and active_tfs_long:
             grid_details = ", ".join([f"{fmt_tf(tf)}: {placed_long_dict[tf]}" for tf in active_tfs_long_sorted])
-            exp_groups["LIMIT"].append((0, globals_ref.tf_weight(active_tfs_long_sorted[0]), cfg_idx, f"  ✧ [{cfg['coin']}]: Chờ khớp LONG đa khung ({format_with_commas(target_vol, 0)}U) -> {grid_details}."))
+            _vol_disp = format_with_commas(target_vol, 0 if target_vol >= 10 else (1 if target_vol >= 1 else 2))
+            exp_groups["LIMIT"].append((0, globals_ref.tf_weight(active_tfs_long_sorted[0]), cfg_idx, f"  ✧ [{cfg['coin']}]: Chờ khớp LONG đa khung ({_vol_disp}U) -> {grid_details}."))
             has_any_exp = True
             
         if not tk.has_short and active_tfs_short:
             grid_details = ", ".join([f"{fmt_tf(tf)}: {placed_short_dict[tf]}" for tf in active_tfs_short_sorted])
-            exp_groups["LIMIT"].append((1, globals_ref.tf_weight(active_tfs_short_sorted[0]), cfg_idx, f"  ✧ [{cfg['coin']}]: Chờ khớp SHORT đa khung ({format_with_commas(target_vol, 0)}U) -> {grid_details}."))
+            _vol_disp = format_with_commas(target_vol, 0 if target_vol >= 10 else (1 if target_vol >= 1 else 2))
+            exp_groups["LIMIT"].append((1, globals_ref.tf_weight(active_tfs_short_sorted[0]), cfg_idx, f"  ✧ [{cfg['coin']}]: Chờ khớp SHORT đa khung ({_vol_disp}U) -> {grid_details}."))
             has_any_exp = True
 
         # Nếu không có vị thế và không có limit nào chờ, thì mới in lý do tại sao đứng ngoài

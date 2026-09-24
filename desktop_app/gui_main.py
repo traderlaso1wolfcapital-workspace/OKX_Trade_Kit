@@ -1678,7 +1678,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             "ENABLE_STRATEGY_XOLE": True,
             "ENABLE_DYNAMIC_EMA200_TP": True,
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
-            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ALTCOIN_FOLLOW_BTC_EMA": False,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
             "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
             "ENABLE_SAFEGUARD_ENTRY_EXIT": True,
@@ -2580,7 +2580,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         if getattr(self, '_is_loading_settings', False): return
         if not hasattr(self, 'enabled_tfs_dict'):
             self.enabled_tfs_dict = {}
-            self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+            self.fallback_tfs = []
             
         current = self.enabled_tfs_dict.get(coin_id, self.fallback_tfs).copy()
         if tf in current:
@@ -2740,7 +2740,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             
             if not hasattr(self, 'enabled_tfs_dict'):
                 self.enabled_tfs_dict = {}
-                self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                self.fallback_tfs = []
             
             swap_id = f"{instId}-SWAP"
             current_tfs = self.enabled_tfs_dict.get(swap_id, self.fallback_tfs)
@@ -3304,13 +3304,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.chk_sideway_vap = ToggleSwitch()
         self.chk_h4_flip = ToggleSwitch()
         
-        # add_checkbox(l_safeguard, 0, 0, "Chốt sớm khi đi ngang (Sideway)", self.chk_sideway_safe, "Chốt lời chủ động khi giá đi ngang + ROI >= 20%.")
-        # add_checkbox(l_safeguard, 0, 1, "Thoát sớm khi bị nén giá", self.chk_squeeze_escape, "Thoát sớm khi khung vị thế bị nén tam giác (Squeeze).")
-        add_checkbox(l_safeguard, 0, 0, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
-        add_checkbox(l_safeguard, 0, 1, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
-        add_checkbox(l_safeguard, 1, 0, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
-        # add_checkbox(l_safeguard, 1, 2, "Cắt hòa khi vấp cản 2 lần", self.chk_sideway_vap, "Cắt hòa/dương khi vấp trục cản EMA200 >= 2 lần liên tiếp.")
-        add_checkbox(l_safeguard, 1, 1, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
+        lbl_safeguard_dev = QtWidgets.QLabel("Tính năng đang phát triển..")
+        lbl_safeguard_dev.setStyleSheet("color: #888888; font-style: italic; padding: 12px; font-size: 12px;")
+        lbl_safeguard_dev.setAlignment(QtCore.Qt.AlignCenter)
+        l_safeguard.addWidget(lbl_safeguard_dev, 0, 0, 1, 2)
+        # add_checkbox(l_safeguard, 0, 0, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
+        # add_checkbox(l_safeguard, 0, 1, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
+        # add_checkbox(l_safeguard, 1, 0, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
+        # add_checkbox(l_safeguard, 1, 1, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
         layout.addWidget(grp_safeguard)
 
         # 3. QUẢN LÝ VỐN
@@ -3348,11 +3349,14 @@ class BotInstanceWidget(QtWidgets.QWidget):
         self.input_confluence_pct = QtWidgets.QDoubleSpinBox(); self.input_confluence_pct.setSuffix(" %"); self.input_confluence_pct.setDecimals(3)
         add_field(l_filter, 2, "Độ chụm đa khung (%):", self.input_confluence_pct, "Dung sai độ lệch cho phép (VD: 0.23%) khi xét điểm hợp lưu EMA200 giữa nhiều khung giờ.")
         
-        self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4); self.input_entry_offset.setMinimum(0.0); self.input_entry_offset.setMaximum(0.3)
-        add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (VD: 0.05%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
+        self.input_entry_offset = QtWidgets.QDoubleSpinBox(); self.input_entry_offset.setSuffix(" %"); self.input_entry_offset.setDecimals(4)
+        self.input_entry_offset.setRange(0.0, 0.3000)
+        self.input_entry_offset.setValue(0.05)
+        add_field(l_filter, 3, "Đón trước cản (%):", self.input_entry_offset, "Đệm đón trước (mặc định 0.05%, tối đa 0.3%) trừ lùi vào vị trí đặt Limit để dễ khớp trước vạch cản.")
         
-        self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setMinimum(10); self.input_accum_candles.setMaximum(9999)
-        add_field(l_filter, 4, "Số nến xu hướng tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh.")
+        self.input_accum_candles = QtWidgets.QSpinBox(); self.input_accum_candles.setRange(10, 9999)
+        self.input_accum_candles.setValue(60)
+        add_field(l_filter, 4, "Số nến xu hướng tối thiểu:", self.input_accum_candles, "Số nến tối thiểu phải duy trì xu hướng liên tục để xác nhận tín hiệu vào lệnh (Tối thiểu 10 nến).")
         # Tạm ẩn theo yêu cầu khách phổ thông bằng cách hide() thay vì bỏ addWidget để tránh lỗi C++ object deleted
         layout.addWidget(grp_filter)
         grp_filter.hide()
@@ -3430,7 +3434,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             if hasattr(self, 'chk_xole'): self.chk_xole.setChecked(True)
             if hasattr(self, 'chk_dynamic_ema200_tp'): self.chk_dynamic_ema200_tp.setChecked(False)
             if hasattr(self, 'chk_dynamic_pingpong_tp'): self.chk_dynamic_pingpong_tp.setChecked(False)
-            if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(True)
+            if hasattr(self, 'chk_altcoin_follow_btc_ema'): self.chk_altcoin_follow_btc_ema.setChecked(False)
             if hasattr(self, 'chk_sideway_safe'): self.chk_sideway_safe.setChecked(False)
             if hasattr(self, 'chk_squeeze_escape'): self.chk_squeeze_escape.setChecked(False)
             if hasattr(self, 'chk_safeguard_entry'): self.chk_safeguard_entry.setChecked(False)
@@ -3946,13 +3950,13 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 return
 
             
-            enabled_tfs = cfg.get("ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])
+            enabled_tfs = cfg.get("ENABLED_TFS", {})
             if isinstance(enabled_tfs, list):
                 self.enabled_tfs_dict = {}
-                self.fallback_tfs = enabled_tfs
+                self.fallback_tfs = []
             else:
                 self.enabled_tfs_dict = enabled_tfs
-                self.fallback_tfs = ["M5", "M15", "M30", "H1", "H2", "H4"]
+                self.fallback_tfs = []
             
             
             self.input_q_buffer.setValue(int(cfg.get("QUANTUM_BUFFER_CANDLES", getattr(bot_config, "QUANTUM_BUFFER_CANDLES", 10))))
@@ -4262,7 +4266,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
                 "ENABLED_COINS": enabled,
                 "RESET_CONFIG_V23": True,
                 
-                "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', ["M5", "M15", "M30", "H1", "H2", "H4"]),
+                "ENABLED_TFS": getattr(self, 'enabled_tfs_dict', {}),
                 "ENABLE_STRATEGY_MAIN": self.chk_main.isChecked(),
                 "ENABLE_PYRAMID_DCA": self.chk_pyramid.isChecked(),
                 "ENABLE_NEGATIVE_DCA": self.chk_negative_dca.isChecked() if hasattr(self, 'chk_negative_dca') else False,
@@ -4911,7 +4915,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "ENABLE_STRATEGY_XOLE": True,
             "ENABLE_DYNAMIC_EMA200_TP": True,
             "ENABLE_DYNAMIC_PINGPONG_TP": False,
-            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ALTCOIN_FOLLOW_BTC_EMA": False,
             "ENABLE_SIDEWAY_SAFE_EXIT": False,
             "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
             "ENABLE_SAFEGUARD_ENTRY_EXIT": True,

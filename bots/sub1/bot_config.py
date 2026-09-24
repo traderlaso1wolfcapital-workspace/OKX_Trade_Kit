@@ -21,7 +21,7 @@ ENABLE_STRATEGY_XOLE = False      # Alias tương thích ngược
 ENABLE_DYNAMIC_EMA200_TP = False  # CHỐT LỜI ĐỘNG (TP THEO CẢN EMA200 CỦA TF TIẾP THEO) - MẶC ĐỊNH TẮT
 ENABLE_DYNAMIC_PINGPONG_TP = False # CHỐT LỜI ĐỘNG TẠM THỜI (PING-PONG)
 
-ALTCOIN_FOLLOW_BTC_EMA = True     # 🔄 ON: Altcoin neo limit theo BTC | OFF: Altcoin dùng EMA200 của chính nó (Mặc định: ON)
+ALTCOIN_FOLLOW_BTC_EMA = False    # 🔄 ON: Altcoin neo limit theo BTC | OFF: Altcoin dùng EMA200 của chính nó (Mặc định: OFF)
 # ------------------------------------------------------------------------------
 
 # ==============================================================================
@@ -33,7 +33,7 @@ LIMIT_CANDLES = "900"
 # ==============================================================================
 # 2. CẤU HÌNH QUẢN LÝ VỐN & ĐÒN BẨY
 # ==============================================================================
-POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 1$)
+POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("0.4")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 0.4$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
 ENABLE_TF_VOLUME_MULTIPLIER = False                # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: TẮT)

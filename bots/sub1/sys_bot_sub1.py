@@ -272,7 +272,7 @@ def main():
                 "ENABLE_STRATEGY_XOLE": True,
                 "ENABLE_DYNAMIC_EMA200_TP": False,
                 "ENABLE_DYNAMIC_PINGPONG_TP": False,
-                "ALTCOIN_FOLLOW_BTC_EMA": True,
+                "ALTCOIN_FOLLOW_BTC_EMA": False,
                 "ENABLE_SIDEWAY_SAFE_EXIT": False,
                 "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
                 "ENABLE_SAFEGUARD_ENTRY_EXIT": False,

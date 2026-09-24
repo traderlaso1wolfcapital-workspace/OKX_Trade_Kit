@@ -1233,6 +1233,163 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
        - Tích hợp custom hook `useMarketWebSocket` kết nối trực tiếp OKX Public WebSocket (`wss://ws.okx.com:8443/ws/v5/public`, kênh `candle*`), đẩy từng tick biến động giá theo thời gian thực trực tiếp vào `candleSeries.update(candle)` mà không cần tải lại toàn bộ 2500 nến.
        - Sử dụng `requestAnimationFrame` (RAF) throttling cho các tác vụ vẽ Order Blocks (`drawObs`) và Liquid V5 boxes (`drawLiquidV5Boxes`), loại bỏ tình trạng đơ chuột khi cuộn hoặc zoom nến.
     5. **Kiểm thử:** Biên dịch production frontend bằng Vite thành công 100% không lỗi (`npm run build`), kiểm tra biên dịch Python backend thành công (`py_compile`).
+- **[17/09/2026]** - Mặc Định TẮT (OFF) Toàn Bộ TF Trade Khi Vào Web/App (Chỉ Lưu Khi User Tích Chọn):
+  - **Yêu cầu của CEO:** TF Trade mặc định phải OFF toàn bộ (tối màu, không chọn khung thời gian nào). Người dùng muốn trade TF nào thì chủ động bấm tích vào TF đó của cặp coin đó rồi hệ thống mới bắt đầu lưu cấu hình cho họ.
+  - **Đã thực hiện:**
+    - `web_app/frontend/src/App.jsx`:
+      - Khởi tạo `enabledTfs` mặc định là object rỗng `{}`.
+      - Hàm `fetchConfig` chỉ nhận cấu hình dict đã lưu theo coin, nếu là mảng cũ thì reset về `{}` để không tự bật toàn bộ.
+      - Các bảng vị thế và watchlist đọc TF theo coin, nếu chưa được tích chọn thì toàn bộ các nút `5, 15, 30, H1, H2, H4` đều hiển thị trạng thái OFF (nền tối `#222`, viền `#444`, chữ `#aaa`).
+      - Hàm `handleTfToggle` chỉ cập nhật và lưu lên server chính xác các khung thời gian user chủ động bấm chọn.
+      - Nút "KHÔI PHỤC MẶC ĐỊNH" đặt lại `enabledTfs = {}`.
+    - `web_app/backend/main.py`:
+      - Cập nhật `default_cfg["ENABLED_TFS"] = {}`.
+      - Tự động chuyển đổi các config cũ đang chứa list full sang `{}`.
+    - `desktop_app/gui_main.py`:
+      - Cập nhật `self.fallback_tfs = []` và `self.enabled_tfs_dict = {}` làm mặc định thay vì fallback toàn bộ 6 TF.
+    - `bots/sub1/bot_strategy.py`:
+      - Khi coin chưa được tích chọn bất kỳ TF nào trong `ENABLED_TFS`, fallback về danh sách rỗng `[]` (cấm bot tự ý quét lệnh đa khung khi user chưa bật).
+    - Biên dịch production Vite (`dist/`) và biên dịch Python thành công 100%.
+
+- **[17/09/2026]** - Tối Ưu Giao Diện Cấu Hình Chiến Thuật (Quản Lý Vốn, Ẩn Safeguard, Giới Hạn Entry Offset & Nến Xu Hướng):
+  - **Yêu cầu của CEO:**
+    1. Đổi tên nhóm "QUẢN LÝ VỐN & RỦI RO" thành "QUẢN LÝ VỐN".
+    2. Tạm thời ẩn các nút trong nhóm "Bảo Vệ & Cắt Lệnh Tự Động" và hiển thị dòng chữ: `Tính năng đang phát triển..`.
+    3. "Đón trước cản": Mặc định `0.05%`, chặn tối đa không được quá `0.3%` (`min=0%`, `max=0.3%`).
+    4. "Số nến xu hướng tối thiểu": Đặt cận dưới `min=10` nến (tránh whipsaw / nhiễu tín hiệu giả trên M5), mặc định `60` nến.
+  - **Đã thực hiện:**
+    - `web_app/frontend/src/App.jsx`:
+      - Cập nhật tiêu đề thành `QUẢN LÝ VỐN`.
+      - Ẩn 4 toggle trong nhóm Bảo Vệ & Cắt Lệnh Tự Động, thay bằng khung thông báo `Tính năng đang phát triển..`.
+      - `NumberSpinBox`: Bổ sung kiểm soát clamping cả khi gõ số và onBlur.
+      - "Đón trước cản": Gán `max={0.3}`, `min={0}`, `step={0.01}`, hàm `onChange` tự động chặn không vượt quá 0.3%.
+      - "Số nến xu hướng tối thiểu": Đổi `min={10}`, `max={200}`, `step={1}`, hàm `onChange` tự động chặn không nhỏ hơn 10.
+    - `desktop_app/gui_main.py`:
+      - Đổi tiêu đề GroupBox thành "Quản Lý Vốn".
+      - Ẩn các checkbox của `grp_safeguard`, hiển thị QLabel "Tính năng đang phát triển..".
+      - Giới hạn `self.input_entry_offset` từ 0.0% đến 0.3%.
+      - Giới hạn `self.input_accum_candles` tối thiểu 10 nến.
+    - Build production Vite cho web app (`cmd /c npm run build`) thành công 100%.
+
+- **[17/09/2026]** - Đổi Vị Trí 2 Cột Trong Bảng "Hệ Số Nhân Đa Khung (TF Multipliers)":
+  - **Yêu cầu của CEO:** Đổi vị trí cột `Hệ số Vào Lệnh (Entry)` và `Hệ số Ký Quỹ (Vốn)` cho nhau.
+  - **Thứ tự mới:**
+    - Cột 1: `Khung` (M5, M15, M30, H1, H2, H4).
+    - Cột 2: `Hệ số Ký Quỹ (Vốn)` (1.0x, 1.2x, 1.5x, 2.0x, 3.0x, 5.0x - màu cam nổi bật).
+    - Cột 3: `Hệ số Vào Lệnh (Entry)` (1.0x, 1.5x, 2.3x, 3.3x, 4.7x, 6.8x).
+  - **Đã thực hiện:**
+    - Cập nhật cả thẻ tiêu đề `<th>` và dữ liệu dòng `<td>` tương ứng trong `web_app/frontend/src/App.jsx`.
+    - Biên dịch production Vite thành công (`dist/`).
+
+- **[17/09/2026]** - Thiết Lập Bộ Thông Số Mặc Định Chuẩn Của Cấu Hình Chiến Thuật (Khởi Tạo & Khôi Phục):
+  - **Yêu cầu của CEO:** Thiết lập bộ thông số mặc định của cấu hình chiến thuật khi user lần đầu vào web và chưa ấn lưu chuẩn 100% theo ảnh: toàn bộ các nút công tắc OFF hết, và các thông số khớp ảnh.
+  - **Thông số chuẩn mặc định:**
+    1. **Thêm Mã Giao Dịch:** Mặc định chọn 3 mã `XAU`, `BTC`, `ETH`.
+    2. **Quản Lý Vốn & Rủi Ro:**
+       - Ký quỹ: Đơn vị `USDT`, Giá trị `0,4 $`.
+       - Mức chốt lời gốc M5: `0,8 %`.
+       - Mức cắt lỗ gốc M5: `0,8 %`.
+    3. **Công Tắc Chiến Thuật:** Toàn bộ **OFF** (`DCA Dương: OFF`, `DCA Âm: OFF`, `Altcoin đồng pha BTC: OFF`, `Đánh Sóng Đảo Chiều (Hedge): OFF`, `Chốt lời bám EMA200: OFF`).
+    4. **Bảo Vệ & Cắt Lệnh Tự Động:** Toàn bộ **OFF** (`Thoát hòa vốn: OFF`, `Khóa lời động: OFF`, `Chốt lời lớn: OFF`, `Cắt lệnh khi H4 đảo chiều: OFF`).
+    5. **Điểm Vào Lệnh (Entry Setup):**
+       - Đón trước cản: `0,05 %`.
+       - Khoảng cách nhồi DCA: `0,20 %`.
+       - Số nến xu hướng tối thiểu: `60`.
+    6. **Khôi phục mặc định:** Bấm nút "KHÔI PHỤC MẶC ĐỊNH" khôi phục chính xác toàn bộ cấu hình trên.
+  - **Đã thực hiện:**
+    - `web_app/frontend/src/App.jsx`: Cập nhật state khởi tạo `strat`, `risk`, `useEffect` tab sub1, `fetchConfig` fallback và nút `btn-reset-strat`.
+    - `web_app/backend/main.py`: Cập nhật `default_cfg` và các nhánh fallback khi thiếu key trả về đúng 0.4$ và toàn bộ cờ False.
+    - `bots/sub1/bot_config.py`: Cập nhật các hằng số mặc định khớp 100% với giao diện.
+    - Biên dịch production Vite thành công (`dist/`).
+
+- **[17/09/2026]** - Đổi Tên 2 Cột Trong Bảng "Hệ Số Nhân Đa Khung (TF Multipliers)":
+  - **Yêu cầu của CEO:** Đổi tên 2 cột "Hệ số đón trước" và "Hệ số Volume" trong bảng Hệ Số Nhân Đa Khung cho trực quan, dễ hiểu và khoa học hơn cho người dùng.
+  - **Đã thực hiện:**
+    - Cột 1: `Hệ số đón trước` ➔ `Hệ số Vào Lệnh (Entry)` (thể hiện mức co dãn khoảng cách Entry đón đầu so với cản EMA).
+    - Cột 2: `Hệ số Volume` ➔ `Hệ số Ký Quỹ (Vốn)` (thể hiện tỷ lệ phân bổ khối lượng ký quỹ cho từng khung thời gian).
+    - Đã cập nhật `web_app/frontend/src/App.jsx` và build production Vite thành công (`dist/`).
+
+- **[17/09/2026]** - Giữ Lại Dữ Liệu Ký Quỹ Đã Lưu Khi Chuyển Đổi Qua Lại Giữa "USDT" và "% VỐN":
+  - **Hiện tượng:** Trước đó khi người dùng bấm nút chuyển đổi giữa `USDT` và `% VỐN` ở mục Ký quỹ, hệ thống tự động reset giá trị nhập về `1$` hoặc `0.01%`, làm mất số liệu người dùng đã thiết lập trước đó.
+  - **Yêu cầu của CEO:**
+    1. Khi chuyển đổi qua lại giữa `USDT` và `% VỐN`, phải lấy lại chính xác số liệu trước đó mà user đang sử dụng và đã lưu, không được reset về mặc định.
+    2. Hai mốc `1$` (ký quỹ USDT) và `0.1%` (ký quỹ % Vốn) chỉ là mặc định ban đầu khi lần đầu vào app và chưa từng lưu cấu hình.
+    3. Đồng bộ lưu server đầy đủ cho cả 2 mốc và chế độ đang chọn.
+  - **Đã thực hiện:**
+    1. **Backend (`main.py`):**
+       - Bổ sung các trường `vol_unit`, `vol_usdt`, `vol_pct`, `use_dynamic_risk`, `dynamic_risk_pct` vào `ConfigUpdate`.
+       - Trong `get_bot_config` và `update_bot_config`: Phân tách lưu trữ độc lập `POSITION_VOLUME_USDT` (mặc định 1.0$) và `POSITION_VOLUME_PCT` (mặc định 0.1%), cùng `VOL_UNIT` ("USDT" / "LOT").
+    2. **Bot Engine (`bot_strategy.py`):**
+       - Cập nhật logic tính toán `target_usdt`: Nếu `VOL_UNIT` là `% VỐN` (hoặc `USE_DYNAMIC_RISK = True`), bot đọc `POSITION_VOLUME_PCT` và tự động nhân với vốn hiện tại (`von_hien_tai` từ `wallet_stats`) để ra số volume USDT chuẩn xác khi gài lệnh.
+       - Bảo tồn các trường này trong `sync_config_to_json`.
+    3. **Frontend (`App.jsx`):**
+       - Mở rộng state `risk`: `{ posVol, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80 }`.
+       - Viết hàm `handleSwitchVolUnit`: Khi bấm sang `USDT` thì khôi phục lại `volUsdt` đã dùng (mặc định 1 nếu chưa có); khi bấm sang `% VỐN` thì khôi phục lại `volPct` đã dùng (mặc định 0.1% nếu chưa có). Tuyệt đối không reset mất số liệu của user.
+       - Viết hàm `handlePosVolChange`: Cập nhật đồng thời giá trị hiện tại và lưu vào biến bộ nhớ tương ứng (`volUsdt` hoặc `volPct`).
+       - Đồng bộ cả ở Sidebar và ở Settings Dialog Tab 2.
+       - Cập nhật payload auto-save và nút "Lưu Cấu Hình Chiến Thuật" gửi đầy đủ dữ liệu lên server.
+       - Build production frontend Vite thành công 100%.
+
+
+- **[17/09/2026]** - Tích Hợp Chế Độ "DCA Âm", "DCA Dương" & Cơ Chế Độc Lập Khung Thời Gian (Independent Multi-TF):
+  - **Yêu cầu của CEO:**
+    1. Bổ sung nút `DCA Âm` nằm dưới `DCA Dương` (rút ngắn tên gọn gàng thành `DCA Dương` và `DCA Âm`).
+    2. Logic loại trừ tương hỗ: 1 nút này ON thì nút kia phải OFF, hoặc cả 2 nút cùng OFF. Tuyệt đối không để 2 nút cùng ON.
+    3. Khi cả 2 nút cùng OFF: Cơ chế chuyển sang giao dịch Độc lập tất cả các TF trade được chọn (`Mode: Độc Lập TF`), bot có thể đặt limit đồng thời cho toàn bộ các TF đã tích chọn.
+    4. Sắp xếp lại layout: 3 nút `Altcoin đồng pha BTC`, `Đánh Sóng Đảo Chiều (Hedge)` và `Chốt lời bám EMA200` nằm cùng hàng/cùng cột bên phải.
+    5. Bảo mật: CEO tự chạy `zzPush_To_GitHub.py`, tuyệt đối không AI nào được push lên GitHub.
+  - **Đã thực hiện:**
+    1. `bot_config.py`: Khởi tạo `ENABLE_NEGATIVE_DCA = False`.
+    2. `bot_strategy.py`:
+       - Triển khai 3 nhánh logic rải Limit: Nhánh Pyramiding (`_is_pyramid` H4->M5), Nhánh Negative DCA (`_is_negative_dca` M5->H4), và Nhánh Độc Lập TF (khi cả 2 đều False, quét đặt limit đồng thời trên mọi TF trong `ENABLED_TFS` thỏa mãn vị thế so với EMA200).
+       - Đồng bộ đọc key `ENABLE_NEGATIVE_DCA` trong `run_ai_self_evolution` và ghi vào json.
+    3. `bot_ui.py`: Cập nhật hiển thị Terminal Dashboard theo 3 chế độ: `Mode: DCA Dương`, `Mode: DCA Âm`, hoặc `Mode: Độc Lập TF`.
+    4. Backend `main.py`:
+       - Thêm `enable_pyramid_dca`, `enable_negative_dca`, `altcoin_follow_btc`, `enable_strategy_hedge`, `enable_dynamic_ema200_tp` vào schema `ConfigUpdate`.
+       - Đồng bộ đọc/ghi các trường trên trong `get_bot_config` và `update_bot_config`.
+    5. Frontend `App.jsx` & `index.css`:
+       - Tái cấu trúc layout 2 cột cho "Công Tắc Chiến Thuật" với `align-items: start`: Cột trái gồm `DCA Dương` & `DCA Âm`; Cột phải gồm `Altcoin đồng pha BTC`, `Đánh Sóng Đảo Chiều (Hedge)`, `Chốt lời bám EMA200`.
+       - Ràng buộc logic mutual exclusion giữa `DCA Dương` và `DCA Âm`.
+       - Gắn sự kiện lưu tự động `saveTacticsConfig` khi bật/tắt công tắc và kích hoạt nút `LƯU CẤU HÌNH CHIẾN THUẬT` gửi trực tiếp dữ liệu lên server backend.
+       - Build production frontend Vite thành công 100%.
+
+- **[17/09/2026]** - Sửa Lỗi Đồng Bộ & Hiển Thị Lưu Server Cho Cụm "Ký Quỹ - Chốt Lời - Cắt Lỗ":
+  - **Hiện tượng:** Khi người dùng chỉnh thông số Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5 trên Web, giao diện không có phản hồi trực quan và bot có thể không nhận đúng TP/SL mới.
+  - **Nguyên nhân:**
+    1. Web backend trước đó chỉ ghi key `SCALPING_TP_PCT` và `SCALPING_SL_PCT` vào `global_config.json`, trong khi hàm `run_ai_self_evolution` của bot lại đọc key `TP_TARGET_OPTIMAL` và `SL_TARGET_OPTIMAL`, dẫn tới bot tiếp tục dùng mốc mặc định 1.5%.
+    2. Giao diện Web thiếu nhãn trạng thái trực quan bên cạnh cụm nhập liệu, khiến người dùng không rõ dữ liệu đã được lưu lên server hay chưa.
+    3. Terminal bot format làm tròn Volume `{target_vol, 0}` khiến các giá trị volume nhỏ (ví dụ `0.4$`) bị hiển thị thành `0U`.
+  - **Đã thực hiện:**
+    1. Backend `main.py`: Đồng bộ ghi đồng thời cả `SCALPING_TP_PCT/SL_PCT` và `TP_TARGET_OPTIMAL/SL_TARGET_OPTIMAL` vào JSON.
+    2. Bot `bot_strategy.py`: Cập nhật đọc cả 2 chuẩn key khi reload cấu hình.
+    3. Bot `bot_ui.py`: Format volume hiển thị chuẩn số thập phân khi volume < 10 (ví dụ `0.4U`).
+    4. Frontend `App.jsx`: Bổ sung huy hiệu trạng thái tự động hiển thị `⏳ Đang lưu...` -> `✓ Đã lưu server` ngay cạnh nút Cài Đặt khi người dùng thay đổi bất kỳ ô nhập nào.
+
+- **[17/09/2026]** - Thiết Lập Mặc Định "Altcoin đồng pha BTC" Sang Trạng Thái TẮT (OFF):
+  - **Yêu cầu:** Mặc định của công tắc "Altcoin đồng pha BTC" phải là OFF (TẮT) để các Altcoin đánh độc lập theo sóng và EMA200 của chính chúng.
+  - **Đã thực hiện:**
+    1. Cập nhật `bot_config.py`: `ALTCOIN_FOLLOW_BTC_EMA = False`.
+    2. Cập nhật `sys_bot_sub1.py`: `"ALTCOIN_FOLLOW_BTC_EMA": False` trong template cấu hình khởi tạo.
+    3. Cập nhật `desktop_app/gui_main.py`: Mặc định ToggleSwitch đồng pha BTC là `False`.
+    4. Cập nhật `web_app/frontend/src/App.jsx`: Mặc định `altcoinFollowBtc: false` ở tất cả các state khởi tạo, chuyển đổi tab bot và chức năng "Khôi phục mặc định".
+    5. Đã build production frontend thành công.
+
+- **[17/09/2026]** - Sửa Lỗi Nút "CHẠY BOT" Không Phản Hồi Loading & Không Chuyển Sang "DỪNG BOT":
+  - **Hiện tượng:** Khi click vào nút "CHẠY BOT", log ghi `🚀 [BOT] Đã khởi động...` nhưng nút vẫn đứng yên ở chữ "▶ CHẠY BOT", không có hiệu ứng loading, không đổi sang nút "■ DỪNG BOT".
+  - **Nguyên nhân:**
+    1. Backend `start_bot` trả về `{"status": "success"}` thay vì `{"status": "RUNNING"}`. Frontend gán `setBotStatus(d.status)` khiến `botStatus = "success"`, trong khi điều kiện `isRunning` yêu cầu `botStatus === "RUNNING"`.
+    2. Request kích hoạt bot hoàn tất quá nhanh (~2ms), React re-render tức thì khiến mắt người không kịp thấy trạng thái loading.
+    3. Cờ `dry_run_{acc_name}.flag` không được set về `0` ngay khi kích hoạt khiến các lần polling `/api/bot/status` tiếp theo vẫn nhận diện là `SHADOW`.
+  - **Giải pháp đã thực hiện:**
+    1. **Backend (`main.py`):**
+       - Trong `start_bot`: Cập nhật trả về `{"status": "RUNNING"}` và ghi ngay cờ `dry_run_{acc_name}.flag` về `"0"`.
+       - Trong `stop_bot`: Cập nhật trả về `{"status": "STOPPED"}` và ghi cờ `dry_run_{acc_name}.flag` về `"1"`.
+       - Trong `_is_shadow_mode`: Tự động nhận diện không phải shadow nếu có cờ `activate_{acc_name}.flag`.
+    2. **Frontend (`App.jsx` & `index.css`):**
+       - Tạo style `.btn-action-loading` với hiệu ứng spinner xoay `@keyframes spin` màu cam nổi bật, hiển thị `⏳ ĐANG KHỞI ĐỘNG...` rõ ràng ngay khi user click.
+       - Tự động duy trì hiệu ứng phản hồi loading tối thiểu 400ms và lập tức chuyển trạng thái sang `■ DỪNG BOT` màu đỏ khi hoàn tất.
+       - Làm tương tự cho nút "■ DỪNG BOT" khi click dừng.
+       - Đã build production frontend thành công.
 
 - **[13/09/2026]** - Tái Cấu Trúc Tín Hiệu Long/Short Bot Liqui Chuẩn TradingView (Ảnh 1) & Đồng Bộ SMC OB:
   - **Yêu cầu của CEO:** "toàn bộ tín hiệu long short hiện tại của bot liqui thiết kế lại giống như ảnh 1, ko nên dùng các kẻ nét đứt, và cho độ dài của chúng luôn dài ra bao chọn 25 cây nến. các box smc ở bot liqui chỉ cần thể hiện OB giống như thông số bên bot smc là đc".

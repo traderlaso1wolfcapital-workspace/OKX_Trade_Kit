@@ -212,9 +212,19 @@ class ConfigUpdate(BaseModel):
     enabled_tfs: Optional[Union[List[str], Dict[str, List[str]]]] = None
     enabled_coins: Optional[List[str]] = None
     position_volume: Optional[float] = None
+    vol_unit: Optional[str] = None
+    vol_usdt: Optional[float] = None
+    vol_pct: Optional[float] = None
+    use_dynamic_risk: Optional[bool] = None
+    dynamic_risk_pct: Optional[float] = None
     scalping_tp_pct: Optional[float] = None
     scalping_sl_pct: Optional[float] = None
     strategy_config: Optional[Dict[str, Any]] = None
+    enable_pyramid_dca: Optional[bool] = None
+    enable_negative_dca: Optional[bool] = None
+    altcoin_follow_btc: Optional[bool] = None
+    enable_strategy_hedge: Optional[bool] = None
+    enable_dynamic_ema200_tp: Optional[bool] = None
 
 class CredentialsUpdate(BaseModel):
     api_key: str
@@ -1109,7 +1119,10 @@ def _get_flag_dir(uid: str, strategy: str) -> str:
 def _is_shadow_mode(uid: str, strategy: str) -> bool:
     """Trả về True nếu bot đang chạy ngầm (dry_run=True)"""
     acc_name = strategy
-    flag = os.path.join(_get_flag_dir(uid, strategy), f"dry_run_{acc_name}.flag")
+    flag_dir = _get_flag_dir(uid, strategy)
+    if os.path.exists(os.path.join(flag_dir, f"activate_{acc_name}.flag")):
+        return False
+    flag = os.path.join(flag_dir, f"dry_run_{acc_name}.flag")
     if os.path.exists(flag):
         try:
             return open(flag).read().strip() == "1"
@@ -1572,8 +1585,13 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
         # Mặc định cấu hình chuẩn xác cho người dùng mới (khớp 100% hình 1)
         default_cfg = {
             "ENABLED_TFS": {},
-            "ENABLED_COINS": ["XAU", "BTC", "ETH"],
-            "POSITION_VOLUME_HIGH_CONFIDENCE": 1.0,
+            "ENABLED_COINS": ["BTC", "ETH", "XAU"],
+            "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
+            "VOL_UNIT": "USDT",
+            "POSITION_VOLUME_USDT": 0.4,
+            "POSITION_VOLUME_PCT": 0.1,
+            "USE_DYNAMIC_RISK": False,
+            "DYNAMIC_RISK_PCT": 0.001,
             "SCALPING_TP_PCT": 0.008,
             "SCALPING_SL_PCT": 0.008,
             "ENABLE_TF_VOLUME_MULTIPLIER": False,
@@ -1583,7 +1601,7 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             "ENABLE_MULTITF_GRID": True,
             "ENABLE_STRATEGY_HEDGE": False,
             "ENABLE_DYNAMIC_EMA200_TP": False,
-            "ALTCOIN_FOLLOW_BTC_EMA": True,
+            "ALTCOIN_FOLLOW_BTC_EMA": False,
             "ENTRY_OFFSET_PCT": 0.05,
             "DCA_GAP_PCT": 0.20,
             "CONFLUENCE_PCT": 0.23,
@@ -1607,7 +1625,16 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             cfg["ENABLED_TFS"] = {}
             dirty = True
         if "POSITION_VOLUME_HIGH_CONFIDENCE" not in cfg:
-            cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 1.0
+            cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = 0.4
+            dirty = True
+        if "VOL_UNIT" not in cfg:
+            cfg["VOL_UNIT"] = "USDT"
+            dirty = True
+        if "POSITION_VOLUME_USDT" not in cfg:
+            cfg["POSITION_VOLUME_USDT"] = float(cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE", 0.4))
+            dirty = True
+        if "POSITION_VOLUME_PCT" not in cfg:
+            cfg["POSITION_VOLUME_PCT"] = 0.1
             dirty = True
         if "SCALPING_TP_PCT" not in cfg:
             cfg["SCALPING_TP_PCT"] = 0.008
@@ -1622,7 +1649,20 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             cfg["ENABLE_MULTITF_GRID"] = True
             dirty = True
         if "ALTCOIN_FOLLOW_BTC_EMA" not in cfg:
-            cfg["ALTCOIN_FOLLOW_BTC_EMA"] = True
+            cfg["ALTCOIN_FOLLOW_BTC_EMA"] = False
+            dirty = True
+        if "ENABLE_PYRAMID_DCA" not in cfg:
+            cfg["ENABLE_PYRAMID_DCA"] = False
+            dirty = True
+        if "ENABLE_NEGATIVE_DCA" not in cfg:
+            cfg["ENABLE_NEGATIVE_DCA"] = False
+            dirty = True
+        if "ENABLE_STRATEGY_HEDGE" not in cfg:
+            cfg["ENABLE_STRATEGY_HEDGE"] = False
+            dirty = True
+        if "ENABLE_DYNAMIC_EMA200_TP" not in cfg:
+            cfg["ENABLE_DYNAMIC_EMA200_TP"] = False
+            dirty = True
             dirty = True
         if dirty:
             try:
@@ -1652,10 +1692,25 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         cfg["ENABLED_TFS"] = update_data.enabled_tfs
     if update_data.enabled_coins is not None:
         cfg["ENABLED_COINS"] = update_data.enabled_coins
+    if update_data.vol_unit is not None:
+        cfg["VOL_UNIT"] = update_data.vol_unit
+    if update_data.vol_usdt is not None:
+        cfg["POSITION_VOLUME_USDT"] = update_data.vol_usdt
+    if update_data.vol_pct is not None:
+        cfg["POSITION_VOLUME_PCT"] = update_data.vol_pct
+    if update_data.use_dynamic_risk is not None:
+        cfg["USE_DYNAMIC_RISK"] = update_data.use_dynamic_risk
+    if update_data.dynamic_risk_pct is not None:
+        cfg["DYNAMIC_RISK_PCT"] = update_data.dynamic_risk_pct
     if update_data.position_volume is not None:
         cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = update_data.position_volume
+        if update_data.vol_unit == "USDT" or cfg.get("VOL_UNIT") == "USDT":
+            cfg["POSITION_VOLUME_USDT"] = update_data.position_volume
+        elif update_data.vol_unit in ("LOT", "PERCENT") or cfg.get("VOL_UNIT") in ("LOT", "PERCENT"):
+            cfg["POSITION_VOLUME_PCT"] = update_data.position_volume
     if update_data.scalping_tp_pct is not None:
         cfg["SCALPING_TP_PCT"] = update_data.scalping_tp_pct
+        cfg["TP_TARGET_OPTIMAL"] = str(update_data.scalping_tp_pct)
     if update_data.scalping_sl_pct is not None:
         cfg["SCALPING_SL_PCT"] = update_data.scalping_sl_pct
     if update_data.strategy_config is not None:
@@ -1664,6 +1719,18 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
             
     if strategy == "sub1":
         cfg["ENABLE_STRATEGY_MAIN"] = True
+    cfg["SL_TARGET_OPTIMAL"] = str(update_data.scalping_sl_pct) if update_data.scalping_sl_pct is not None else cfg.get("SL_TARGET_OPTIMAL", "0.008")
+    if update_data.enable_pyramid_dca is not None:
+        cfg["ENABLE_PYRAMID_DCA"] = update_data.enable_pyramid_dca
+    if update_data.enable_negative_dca is not None:
+        cfg["ENABLE_NEGATIVE_DCA"] = update_data.enable_negative_dca
+    if update_data.altcoin_follow_btc is not None:
+        cfg["ALTCOIN_FOLLOW_BTC_EMA"] = update_data.altcoin_follow_btc
+        cfg["ALTCOIN_FOLLOW_BTC"] = update_data.altcoin_follow_btc
+    if update_data.enable_strategy_hedge is not None:
+        cfg["ENABLE_STRATEGY_HEDGE"] = update_data.enable_strategy_hedge
+    if update_data.enable_dynamic_ema200_tp is not None:
+        cfg["ENABLE_DYNAMIC_EMA200_TP"] = update_data.enable_dynamic_ema200_tp
     
     try:
         with open(config_path, "w", encoding="utf-8") as f:

@@ -577,6 +577,38 @@ body {
   transform: none;
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner-mini {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.btn-action-loading {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 4px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: "Segoe UI", sans-serif;
+  cursor: wait;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
 .btn-action-stop {
   background-color: #C62828;
   color: #ffffff;
@@ -1926,7 +1958,7 @@ input[type="checkbox"].coin-toggle:checked:hover::after {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px 24px;
-  align-items: center;
+  align-items: start;
 }
 
 .tactics-left-col {

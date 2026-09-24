@@ -23,6 +23,21 @@ hft_logger.addHandler(handler)
 
 from bots.sub1.bot_indicators import *
 
+def _clean_num_str(val) -> str:
+    """Loại bỏ các số 0 thừa ở phần thập phân (VD: 0.1900000000000000000000000000 -> 0.19)"""
+    try:
+        from decimal import Decimal
+        d = Decimal(str(val))
+        s = f"{d:f}"
+        if "." in s:
+            s = s.rstrip('0').rstrip('.')
+        return s if s else "0"
+    except Exception:
+        return str(val)
+
+# Cờ kiểm soát hiển thị log DRY-RUN (Mặc định: False để ẩn hoàn toàn khỏi terminal/logs, tránh spam khi chạy ngầm)
+SHOW_DRY_RUN_LOGS = False
+
 def send_telegram_notification(message: str):
     token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -81,7 +96,8 @@ def fetch_candles_paginated(client, inst_id: str, bar: str, limit: int) -> list[
 def clean_limit_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None, dry_run: bool = False):
     # 🔒 DRY-RUN: Không hủy lệnh thật khi đang chạy ngầm
     if dry_run:
-        print(f"🌑 [DRY-RUN] clean_limit_orders: Bỏ qua hủy Limit cũ cho {inst_id} (shadow mode)")
+        if SHOW_DRY_RUN_LOGS:
+            print(f"🌑 [DRY-RUN] clean_limit_orders: Bỏ qua hủy Limit cũ cho {inst_id} (shadow mode)")
         return
     try:
         pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id})["data"]
@@ -182,7 +198,8 @@ def check_partial_lock_sl(client, inst_id: str, side: str, avg_px: Decimal,
 def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: str | None = None, dry_run: bool = False):
     # 🔒 DRY-RUN: Không hủy TP/SL thật khi đang chạy ngầm
     if dry_run:
-        print(f"🌑 [DRY-RUN] clean_algo_orders: Bỏ qua hủy Algo TP/SL cho {inst_id} (shadow mode)")
+        if SHOW_DRY_RUN_LOGS:
+            print(f"🌑 [DRY-RUN] clean_algo_orders: Bỏ qua hủy Algo TP/SL cho {inst_id} (shadow mode)")
         return
     try:
         pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"})["data"]
@@ -205,7 +222,9 @@ def clean_algo_orders(client, inst_id: str, td_mode: str = "cross", pos_side: st
 def close_position_market(client, inst_id: str, pos_side: str, size: str, log_reason: str, td_mode: str = "cross", dry_run: bool = False):
     # 🔒 DRY-RUN: Không đóng vị thế thật khi đang chạy ngầm
     if dry_run:
-        print(f"🌑 [DRY-RUN] close_position_market: Sẽ đóng {inst_id} {pos_side.upper()} Market — {log_reason} (shadow mode, bỏ qua)")
+        if SHOW_DRY_RUN_LOGS:
+            clean_sz = _clean_num_str(size)
+            print(f"🌑 [DRY-RUN] close_position_market: Sẽ đóng {inst_id} {pos_side.upper()} Market — {log_reason} sz={clean_sz} (shadow mode, bỏ qua)")
         return
     size_dec = Decimal(size)
     norm_side = "long" if pos_side == "long" or (pos_side == "net" and size_dec > 0) else "short"
@@ -237,7 +256,8 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict], dry_run: bool =
     """
     # 🔒 DRY-RUN: Không hủy lệnh khi đang chạy ngầm
     if dry_run:
-        print("🌑 [DRY-RUN] cleanup_all_orders_on_startup: Bỏ qua dọn dẹp Startup (shadow mode)")
+        if SHOW_DRY_RUN_LOGS:
+            print("🌑 [DRY-RUN] cleanup_all_orders_on_startup: Bỏ qua dọn dẹp Startup (shadow mode)")
         return
     try:
         import time
