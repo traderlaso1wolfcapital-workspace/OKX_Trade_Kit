@@ -99,194 +99,16 @@ export default function SystemSettingsModal({
 
         {/* Tab Bar (InnerTabs) */}
         <div className="settings-tab-bar">
-          <button className={`settings-tab-btn ${settingsTab === "api" ? "active" : ""}`} onClick={() => setSettingsTab("api")}>
-            🔑 {t("tab_apikey")}
-          </button>
           <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
             ⚙️ {t("tab_strategy")}
+          </button>
+          <button className={`settings-tab-btn ${settingsTab === "system" ? "active" : ""}`} onClick={() => setSettingsTab("system")}>
+            🛠️ {t("tab_system") || "Hệ Thống"}
           </button>
         </div>
 
         <div className="modal-body settings-body">
-          {/* ===== TAB 1: CẤU HÌNH API KEY ===== */}
-          {settingsTab === "api" && (
-            <div className="settings-tab-content">
-              <div className="settings-tab-scroll">
-                {/* Chọn tài khoản */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", marginBottom: "14px" }}>
-                  <label style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
-                    {t("account_assigned_to")} [{botTitle}]:
-                  </label>
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    <select
-                      className="styled-select"
-                      style={{ minWidth: "200px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "5px 10px", borderRadius: "4px", fontSize: "12px" }}
-                      value={selectedAccount}
-                      onChange={e => onAssignAccount(e.target.value)}
-                    >
-                      {accounts.length === 0 && (
-                        <option value="" disabled selected style={{ color: "#888888" }}>
-                          {t("click_plus_create_acc")}
-                        </option>
-                      )}
-                      {accounts.map(acc => {
-                        const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
-                        const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
-
-                        const getTargetBotName = (key) => {
-                          if (key === "sub1") return t("bot_ema200");
-                          if (key === "sub2") return t("bot_smc");
-                          return t("bot_liquidation");
-                        };
-
-                        let statusBadge = "";
-                        if (runningBotKey) {
-                          statusBadge = `(${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
-                        } else if (assignedOtherBot) {
-                          statusBadge = `(${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
-                        }
-
-                        return (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.name} {statusBadge}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={onCreateAccount}
-                      style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title={t("create_account_tooltip") || "Thêm tài khoản mới"}
-                    >+</button>
-                    <button
-                      type="button"
-                      onClick={onDeleteAccount}
-                      style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title={t("delete_account_tooltip") || "Xoá tài khoản đang chọn"}
-                    >−</button>
-                  </div>
-                </div>
-
-                {/* Thông Tin API OKX */}
-                <div className="settings-group">
-                  <div className="settings-group-title">{t("okx_api_info")}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
-                    <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
-                        {t("apikey_label")}
-                      </label>
-                      <input
-                        type="text"
-                        className="connect-input"
-                        style={{ flex: 1 }}
-                        value={apiKey}
-                        onChange={e => setApiKey(e.target.value)}
-                        placeholder="Nhập API Key..."
-                      />
-                    </div>
-                    <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
-                        {t("secret_label")}
-                      </label>
-                      <input
-                        type="password"
-                        className="connect-input"
-                        style={{ flex: 1 }}
-                        value={secretKey}
-                        onChange={e => setSecretKey(e.target.value)}
-                        placeholder="Nhập Secret Key..."
-                      />
-                    </div>
-                    <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
-                        {t("passphrase_label")}
-                      </label>
-                      <input
-                        type="password"
-                        className="connect-input"
-                        style={{ flex: 1 }}
-                        value={passphrase}
-                        onChange={e => setPassphrase(e.target.value)}
-                        placeholder="Nhập Passphrase..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lệnh Can Thiệp Nhanh */}
-                <div className="settings-group">
-                  <div className="settings-group-title">{t("quick_audit")}</div>
-                  <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
-                    <button className="btn-audit" onClick={handleResetCapital}>
-                      ♻️ {t("reset_audit_btn")}
-                    </button>
-                    {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
-                      <button className="btn-audit" onClick={handleResetNen}>
-                        ♻️ {t("reset_nen_btn")}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Mã Máy HWID */}
-                <div className="settings-group">
-                  <div className="settings-group-title">{t("hwid_label")}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
-                    <span style={{ color: "#aaaaaa", fontSize: "12px" }}>{t("your_hwid")}</span>
-                    <span
-                      className="hwid-value"
-                      style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
-                      title="Click để copy Mã Máy"
-                      onClick={() => {
-                        navigator.clipboard.writeText(hwid);
-                        alert("✅ " + t("copy_hwid_alert") + hwid);
-                      }}
-                    >
-                      {hwid}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
-                      style={{
-                        background: "#1e3a5f",
-                        border: "1px solid #2563eb",
-                        color: "#ffffff",
-                        borderRadius: "4px",
-                        padding: "2px 10px",
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        transition: "all 0.15s ease"
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "#2563eb"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "#1e3a5f"; }}
-                      title="Xem video Hướng Dẫn trên YouTube"
-                    >
-                      {t("guide_btn")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Nút Lưu API Key */}
-              <div className="api-actions-row" style={{ marginTop: "16px" }}>
-                <button
-                  type="button"
-                  className="btn-save-strat"
-                  disabled={isSavingConfig}
-                  onClick={onSaveApiKey}
-                  style={{ width: "100%", justifyContent: "center" }}
-                >
-                  {isSavingConfig ? <><span className="spinner"></span> {t("saving_strat_btn")}</> : t("save_apikey_btn")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ===== TAB 2: CẤU HÌNH CHIẾN THUẬT ===== */}
+          {/* ===== TAB 1: CẤU HÌNH CHIẾN THUẬT (MẶC ĐỊNH) ===== */}
           {settingsTab === "strategy" && (
             <div className="settings-tab-content">
               <div className="settings-tab-scroll">
@@ -312,10 +134,52 @@ export default function SystemSettingsModal({
                   </div>
                 </div>
 
-                {/* 2. QUẢN LÝ VỐN & RỦI RO */}
+                {/* 2. TÀI KHOẢN & QUẢN LÝ VỐN */}
                 <div className="settings-group">
-                  <div className="settings-group-title">{t("capital_mgmt_title")}</div>
+                  <div className="settings-group-title">Tài khoản ({botTitle})</div>
                   <div className="entry-setup-list">
+                    {/* Chọn tài khoản trade */}
+                    <div className="entry-setup-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                        {t("account_assigned_to")} ({botTitle}):
+                      </span>
+                      <select
+                        className="styled-select"
+                        style={{ minWidth: "170px", maxWidth: "230px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}
+                        value={selectedAccount || (accounts.length > 0 ? accounts[0].id : "")}
+                        onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
+                      >
+                        {accounts.length === 0 && (
+                          <option value="" disabled selected style={{ color: "#888888" }}>
+                            {t("click_plus_create_acc")}
+                          </option>
+                        )}
+                        {accounts.map(acc => {
+                          const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
+                          const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
+                          const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
+
+                          const getTargetBotName = (key) => {
+                            if (key === "sub1") return t("bot_ema200") || "EMA200 Bot";
+                            if (key === "sub2") return t("bot_smc") || "SMC Bot";
+                            return t("bot_liquidation") || "Liquidation Bot";
+                          };
+
+                          let labelSuffix = "";
+                          if (isRunningOnOtherBot) {
+                            labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                          } else if (assignedOtherBot) {
+                            labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                          }
+
+                          return (
+                            <option key={acc.id} value={acc.id} disabled={isRunningOnOtherBot}>
+                              {acc.name} {labelSuffix}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap" }}>
                         <span>{t("margin_label")}</span>
@@ -787,6 +651,69 @@ export default function SystemSettingsModal({
                 >
                   {isSavingConfig ? <><span className="spinner"></span> {t("saving_strat_btn")}</> : t("save_strat_btn")}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG ===== */}
+          {settingsTab === "system" && (
+            <div className="settings-tab-content">
+              <div className="settings-tab-scroll">
+                {/* Lệnh Can Thiệp Nhanh */}
+                <div className="settings-group">
+                  <div className="settings-group-title">{t("quick_audit")}</div>
+                  <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
+                    <button className="btn-audit" onClick={handleResetCapital}>
+                      ♻️ {t("reset_audit_btn")}
+                    </button>
+                    {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                      <button className="btn-audit" onClick={handleResetNen}>
+                        ♻️ {t("reset_nen_btn")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mã Máy HWID */}
+                <div className="settings-group">
+                  <div className="settings-group-title">{t("hwid_label")}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
+                    <span style={{ color: "#aaaaaa", fontSize: "12px" }}>{t("your_hwid")}</span>
+                    <span
+                      className="hwid-value"
+                      style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
+                      title="Click để copy Mã Máy"
+                      onClick={() => {
+                        navigator.clipboard.writeText(hwid);
+                        alert("✅ " + t("copy_hwid_alert") + hwid);
+                      }}
+                    >
+                      {hwid}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
+                      style={{
+                        background: "#1e3a5f",
+                        border: "1px solid #2563eb",
+                        color: "#ffffff",
+                        borderRadius: "4px",
+                        padding: "2px 10px",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        transition: "all 0.15s ease"
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "#2563eb"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "#1e3a5f"; }}
+                      title="Xem video Hướng Dẫn trên YouTube"
+                    >
+                      {t("guide_btn")}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

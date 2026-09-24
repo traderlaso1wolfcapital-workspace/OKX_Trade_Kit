@@ -11,6 +11,20 @@ export default function ConnectModal({
   isAuthenticated = false,
   currentUid = "",
   accounts = [],
+  selectedAccount = "",
+  activeBotTab = "sub1",
+  onAssignAccount,
+  onCreateAccount,
+  onDeleteAccount,
+  activeAccounts = {},
+  botAccountMap = {},
+  apiKey = "",
+  setApiKey,
+  secretKey = "",
+  setSecretKey,
+  passphrase = "",
+  setPassphrase,
+  isSavingConfig = false,
   accountName = "",
   onDisconnectAccount,
   onLogout,
@@ -18,24 +32,14 @@ export default function ConnectModal({
   const { t } = useTranslation();
   const [connectTab, setConnectTab] = useState("fast"); // 'fast' | 'apikey'
 
-  // API Key Form State
-  const [uid, setUid] = useState(currentUid || "");
-  const [apiKey, setApiKey] = useState("");
-  const [secretKey, setSecretKey] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-
   if (!isOpen) return null;
 
-  const handleSubmitApiKey = async (e) => {
-    e.preventDefault();
-    if (!apiKey || !secretKey || !passphrase) {
-      setErrorMsg("Vui lòng điền đầy đủ API Key, Secret Key và Passphrase!");
-      return;
-    }
-    setErrorMsg("");
-    await onSaveApiKey(currentUid || uid || "", apiKey, secretKey, passphrase);
+  const getBotTitle = () => {
+    if (activeBotTab === "sub1") return t("bot_ema200") || "EMA200 Bot";
+    if (activeBotTab === "sub2") return t("bot_smc") || "SMC Bot";
+    return t("bot_liquidation") || "Liquidation Bot";
   };
+  const botTitle = getBotTitle();
 
   return (
     <div
@@ -61,7 +65,7 @@ export default function ConnectModal({
       <div
         style={{
           width: "100%",
-          maxWidth: "440px",
+          maxWidth: "460px",
           backgroundColor: "#1e1e1e",
           border: "1px solid #333333",
           borderRadius: "6px",
@@ -529,115 +533,149 @@ export default function ConnectModal({
             </div>
           )}
 
-          {/* TAB 2: MANUAL API KEY FORM */}
+          {/* TAB 2: CẤU HÌNH API KEY (Tài khoản gán cho bot & Cụm Thông Tin API OKX) */}
           {connectTab === "apikey" && (
-            <form onSubmit={handleSubmitApiKey} style={{ display: "flex", flexDirection: "column", gap: "11px" }}>
-              <p style={{ color: "#aaaaaa", fontSize: "12px", margin: 0 }}>
-                {t("apikey_connect_desc")}
-              </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {/* Chọn tài khoản gán cho bot */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                <label style={{ color: "#e0e0e0", fontSize: "11.5px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                  {t("account_assigned_to")} [{botTitle}]:
+                </label>
+                <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                  <select
+                    className="styled-select"
+                    style={{ minWidth: "160px", maxWidth: "210px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "11.5px" }}
+                    value={selectedAccount || (accounts.length > 0 ? accounts[0].id : "")}
+                    onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
+                  >
+                    {accounts.length === 0 && (
+                      <option value="" disabled selected style={{ color: "#888888" }}>
+                        {t("click_plus_create_acc")}
+                      </option>
+                    )}
+                    {accounts.map(acc => {
+                      const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
+                      const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
 
-              {errorMsg && (
-                <div
-                  style={{
-                    background: "rgba(220, 53, 69, 0.15)",
-                    border: "1px solid #dc3545",
-                    color: "#ff6b6b",
-                    padding: "8px 12px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  <span>⚠️</span>
-                  <span>{errorMsg}</span>
+                      const getTargetBotName = (key) => {
+                        if (key === "sub1") return t("bot_ema200") || "EMA200 Bot";
+                        if (key === "sub2") return t("bot_smc") || "SMC Bot";
+                        return t("bot_liquidation") || "Liquidation Bot";
+                      };
+
+                      let statusBadge = "";
+                      if (runningBotKey) {
+                        statusBadge = `(${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                      } else if (assignedOtherBot) {
+                        statusBadge = `(${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                      }
+
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} {statusBadge}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={onCreateAccount}
+                    style={{ backgroundColor: "#28a745", color: "white", fontSize: "15px", fontWeight: "bold", borderRadius: "4px", width: "28px", height: "26px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title={t("create_account_tooltip") || "Thêm tài khoản mới"}
+                  >+</button>
+                  <button
+                    type="button"
+                    onClick={onDeleteAccount}
+                    style={{ backgroundColor: "#dc3545", color: "white", fontSize: "15px", fontWeight: "bold", borderRadius: "4px", width: "28px", height: "26px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title={t("delete_account_tooltip") || "Xoá tài khoản đang chọn"}
+                  >−</button>
                 </div>
-              )}
-
-
-              <div>
-                <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "4px", fontWeight: "bold" }}>
-                  {t("apikey_label")}
-                </label>
-                <input
-                  type="text"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Nhập API Key..."
-                  className="connect-input"
-                />
               </div>
 
-              <div>
-                <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "4px", fontWeight: "bold" }}>
-                  {t("secret_label")}
-                </label>
-                <input
-                  type="password"
-                  value={secretKey}
-                  onChange={(e) => setSecretKey(e.target.value)}
-                  placeholder="Nhập Secret Key..."
-                  className="connect-input"
-                />
+              {/* Thông Tin API OKX */}
+              <div className="settings-group" style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid #333333", borderRadius: "6px", padding: "10px 12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: "bold", color: "#aaaaaa", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {t("okx_api_info")}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <label style={{ width: "90px", color: "#aaaaaa", fontSize: "11px", fontWeight: "bold", flexShrink: 0 }}>
+                      {t("apikey_label")}
+                    </label>
+                    <input
+                      type="text"
+                      className="connect-input"
+                      style={{ flex: 1 }}
+                      value={apiKey}
+                      onChange={e => setApiKey && setApiKey(e.target.value)}
+                      placeholder="Nhập API Key..."
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <label style={{ width: "90px", color: "#aaaaaa", fontSize: "11px", fontWeight: "bold", flexShrink: 0 }}>
+                      {t("secret_label")}
+                    </label>
+                    <input
+                      type="password"
+                      className="connect-input"
+                      style={{ flex: 1 }}
+                      value={secretKey}
+                      onChange={e => setSecretKey && setSecretKey(e.target.value)}
+                      placeholder="Nhập Secret Key..."
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <label style={{ width: "90px", color: "#aaaaaa", fontSize: "11px", fontWeight: "bold", flexShrink: 0 }}>
+                      {t("passphrase_label")}
+                    </label>
+                    <input
+                      type="password"
+                      className="connect-input"
+                      style={{ flex: 1 }}
+                      value={passphrase}
+                      onChange={e => setPassphrase && setPassphrase(e.target.value)}
+                      placeholder="Nhập Passphrase..."
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "4px", fontWeight: "bold" }}>
-                  {t("passphrase_label")}
-                </label>
-                <input
-                  type="password"
-                  value={passphrase}
-                  onChange={(e) => setPassphrase(e.target.value)}
-                  placeholder="Nhập Passphrase..."
-                  className="connect-input"
-                />
-              </div>
-
+              {/* Nút Lưu API Key */}
               <button
-                type="submit"
-                disabled={isConnecting}
+                type="button"
+                disabled={isSavingConfig || isConnecting}
+                onClick={onSaveApiKey}
                 style={{
                   width: "100%",
-                  padding: "10px 18px",
-                  backgroundColor: isConnecting ? "#3a3a3a" : "#2e7d32",
+                  padding: "9px 18px",
+                  backgroundColor: (isSavingConfig || isConnecting) ? "#3a3a3a" : "#2e7d32",
                   border: "none",
                   color: "#ffffff",
                   borderRadius: "4px",
                   fontSize: "13px",
                   fontWeight: "bold",
-                  cursor: isConnecting ? "not-allowed" : "pointer",
-                  marginTop: "6px",
+                  cursor: (isSavingConfig || isConnecting) ? "not-allowed" : "pointer",
+                  marginTop: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
                   transition: "all 0.18s ease",
-                  boxShadow: "none",
                 }}
                 onMouseOver={(e) => {
-                  if (!isConnecting) {
+                  if (!isSavingConfig && !isConnecting) {
                     e.currentTarget.style.backgroundColor = "#388e3c";
-                    e.currentTarget.style.transform = "translateY(-1px)";
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (!isConnecting) {
+                  if (!isSavingConfig && !isConnecting) {
                     e.currentTarget.style.backgroundColor = "#2e7d32";
-                    e.currentTarget.style.transform = "none";
-                  }
-                }}
-                onMouseDown={(e) => {
-                  if (!isConnecting) {
-                    e.currentTarget.style.transform = "translateY(1px)";
-                  }
-                }}
-                onMouseUp={(e) => {
-                  if (!isConnecting) {
-                    e.currentTarget.style.transform = "translateY(-1px)";
                   }
                 }}
               >
-                {isConnecting ? t("saving_btn") : t("save_connect_btn")}
+                {isSavingConfig ? <><span className="spinner"></span> {t("saving_strat_btn") || "Đang lưu..."}</> : (t("save_apikey_btn") || "Lưu API Key")}
               </button>
-            </form>
+            </div>
           )}
 
           {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT */}

@@ -1771,10 +1771,36 @@ function App() {
         onClose={() => setShowConnectModal(false)}
         handleFastConnectClick={handleFastConnectClick}
         okxOAuthUrl={okxOAuthUrl}
-        onSaveApiKey={handleConnectApiKey}
+        onSaveApiKey={handleSaveApiKey}
         isAuthenticated={isAuthenticated}
         currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}
         accounts={accounts}
+        selectedAccount={selectedAccount}
+        activeBotTab={activeBotTab}
+        onAssignAccount={handleAssignAccountToActiveBot}
+        onCreateAccount={() => {
+          setNewAccountInput("");
+          setShowAddAccountModal(true);
+        }}
+        onDeleteAccount={() => {
+          const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
+          if (isRunning) {
+            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+            const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+            alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
+            return;
+          }
+          setShowDeleteAccountModal(true);
+        }}
+        activeAccounts={mergedActiveAccounts}
+        botAccountMap={botAccountMap}
+        apiKey={apiKey}
+        setApiKey={setApiKey}
+        secretKey={secretKey}
+        setSecretKey={setSecretKey}
+        passphrase={passphrase}
+        setPassphrase={setPassphrase}
+        isSavingConfig={isSavingConfig}
         accountName={accounts.find(a => a.id === effectiveAccId)?.name || (accounts.length > 0 ? accounts[0].name : "") || localStorage.getItem("tls1_last_detected_acc") || ""}
         onDisconnectAccount={handleDisconnectSpecificAccount}
         onLogout={handleLogout}
@@ -1789,7 +1815,7 @@ function App() {
           botAccountMap={botAccountMap}
           activeAccounts={mergedActiveAccounts}
           onAssignAccount={handleAssignAccountToActiveBot}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={() => { setShowSettings(true); setSettingsTab("strategy"); }}
           isRiskCollapsed={isRiskCollapsed}
           setIsRiskCollapsed={setIsRiskCollapsed}
           onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}

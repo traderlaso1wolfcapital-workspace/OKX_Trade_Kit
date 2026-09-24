@@ -18,6 +18,24 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tái Cấu Trúc Khoa Học Giao Diện Connect Modal & Cài Đặt (System Settings):
+  - **Mô tả yêu cầu CEO:**
+    1. Đưa toàn bộ phần API Key trong cài đặt bao gồm `Tài khoản gán cho [EMA200 Bot]:` và cụm `Thông Tin API OKX` sang thay thế cho nội dung tab `API Key Connect` của nút Connect. Giữ kích thước bảng hiện tại của Connect gọn gàng.
+    2. Ở tab API Key trong Cài Đặt: đổi tên thành `🛠️ Hệ Thống`, giữ lại mục `Lệnh Can Thiệp Nhanh (Audit Hệ Thống)`, `Mã Máy (HWID) Cá Nhân`, chấm xanh `UID: 523019992975987626` và Đăng Xuất. Bỏ hoàn toàn 3 ô nhập API Key và nút Lưu API Key. Đổi vị trí để mặc định mở Cài Đặt là vào thẳng tab `Chiến Thuật` đầu tiên.
+    3. Ở tab Chiến Thuật: mục `QUẢN LÝ VỐN` đổi tên thành `Tài khoản (EMA200 Bot)` và đồng bộ thêm phần chọn các tài khoản đã lưu API Key để trade lên đầu mục này.
+  - **Giải pháp thực hiện:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Nhận đầy đủ props từ `App.jsx` (`accounts`, `selectedAccount`, `onAssignAccount`, `onCreateAccount`, `onDeleteAccount`, `apiKey`, `secretKey`, `passphrase`, `onSaveApiKey`).
+      - Tab 2 (`apikey`): Thay thế toàn bộ bằng giao diện chọn tài khoản gán cho bot (`[EMA200 Bot]`) kèm nút `+`, `-`, khung `THÔNG TIN API OKX` với 3 ô nhập hàng ngang sang trọng, và nút `Lưu API Key`. Kích thước modal `maxWidth: 460px` cực kỳ vừa vặn và không bị phình to.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Đổi thứ tự tab bar: Tab 1 là `⚙️ Chiến Thuật` (mặc định mở ra là tab này), Tab 2 là `🛠️ Hệ Thống`.
+      - Trong tab `Chiến Thuật`: Đổi tiêu đề Mục 2 thành `Tài khoản (${botTitle})`. Ngay bên dưới tiêu đề bổ sung dòng chọn `Tài khoản gán cho (${botTitle}):` với dropdown đồng bộ tài khoản trade cùng với thanh Sidebar.
+      - Trong tab `Hệ Thống`: Gỡ bỏ hoàn toàn 3 ô nhập API Key, gỡ bỏ nút Lưu API Key. Giữ nguyên trọn vẹn Lệnh Can Thiệp Nhanh (Audit) và Mã Máy (HWID). Chân trang vẫn giữ nguyên chấm xanh UID và nút Đăng Xuất.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Truyền toàn bộ props liên quan tới tài khoản và API Key sang `ConnectModal`.
+      - Đảm bảo click `⚙ Cài Đặt` từ Sidebar luôn đặt `settingsTab = "strategy"`.
+    - Đã build production bundle (`npm run build`) và kiểm thử tự động 100% bằng browser subagent với đầy đủ ảnh chụp nghiệm thu.
+
 - **[25/09/2026]** - Tối Ưu UX Thẻ OKX Connect: Nút Disconnect Riêng Từng Tài Khoản, Subtitle Nghiêng Size 10px Xanh & Bấm Vào Khối Để Connect Thêm Tài Khoản:
   - **Mô tả yêu cầu CEO:**
     1. Trong popup Connect, thay thế nút thừa thãi `Đã Connect` bằng đúng 1 nút `Disconnect` trên từng thẻ tài khoản để ngắt kết nối tài khoản đó khi cần.

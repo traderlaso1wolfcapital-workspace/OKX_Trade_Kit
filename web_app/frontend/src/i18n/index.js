@@ -92,6 +92,7 @@ export const translations = {
     system_settings_title: "Cấu Hình Hệ Thống",
     tab_apikey: "API Key",
     tab_strategy: "Chiến Thuật",
+    tab_system: "Hệ Thống",
     account_assigned_to: "Tài khoản gán cho",
     create_acc_btn_title: "Tạo Tài Khoản Mới",
     delete_acc_btn_title: "Xóa Tài Khoản",
