@@ -59,6 +59,7 @@ export default function SystemSettingsModal({
   };
 
   const botTitle = getBotTitle();
+  const displayUid = localStorage.getItem("tls1_uid") || loginUid || okxUid || t("connected");
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -126,14 +127,16 @@ export default function SystemSettingsModal({
                       })}
                     </select>
                     <button
-                      disabled
-                      style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "not-allowed", opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title="Hệ thống tự động nhận diện tài khoản qua API Key / OAuth 2.0"
+                      type="button"
+                      onClick={onCreateAccount}
+                      style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title={t("create_account_tooltip") || "Thêm tài khoản mới"}
                     >+</button>
                     <button
-                      disabled
-                      style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "not-allowed", opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title="Hệ thống tự động nhận diện tài khoản qua API Key / OAuth 2.0"
+                      type="button"
+                      onClick={onDeleteAccount}
+                      style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title={t("delete_account_tooltip") || "Xoá tài khoản đang chọn"}
                     >−</button>
                   </div>
                 </div>
@@ -142,19 +145,6 @@ export default function SystemSettingsModal({
                 <div className="settings-group">
                   <div className="settings-group-title">{t("okx_api_info")}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
-                    <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>{t("uid_label")}</label>
-                      <input
-                        type="text"
-                        className="styled-input"
-                        style={{ flex: 1, backgroundColor: "#1e1e1e", color: "#888888", border: "1px solid #3d3d3d", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace", cursor: "not-allowed" }}
-                        value={okxUid || ""}
-                        disabled
-                        readOnly
-                        placeholder="Tự động nhận diện UID sau khi kết nối..."
-                        title="UID sàn sẽ được tự động nhận diện sau khi kết nối tài khoản"
-                      />
-                    </div>
                     <div className="settings-form-row">
                       <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>{t("api_key_lbl")}</label>
                       <input
@@ -767,6 +757,62 @@ export default function SystemSettingsModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT (ĐỒNG BỘ VỚI CONNECT MODAL) */}
+        <div
+          style={{
+            padding: "10px 18px",
+            borderTop: "1px solid #333333",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#222222",
+            borderBottomLeftRadius: "6px",
+            borderBottomRightRadius: "6px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#26a69a",
+                display: "inline-block",
+                boxShadow: "0 0 6px #26a69a",
+              }}
+            ></span>
+            <span>
+              UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (onLogout) onLogout();
+              onClose();
+            }}
+            style={{
+              backgroundColor: "transparent",
+              border: "1px solid #ff4d4f",
+              color: "#ff4d4f",
+              padding: "4px 12px",
+              borderRadius: "4px",
+              fontSize: "11.5px",
+              fontWeight: "bold",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            {t("logout")}
+          </button>
         </div>
       </div>
     </div>

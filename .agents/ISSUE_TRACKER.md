@@ -18,6 +18,18 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tối Ưu Cài Đặt: Bỏ Ô OKX UID, Thêm Footer Chấm Xanh UID & Nút Đăng Xuất Toàn Bộ Các Tab, Mở Khóa Nút + và - Tài Khoản:
+  - **Mô tả yêu cầu CEO:**
+    - Trong phần API Key / Cài đặt: Bỏ dòng ô nhập `UID Sàn Giao Dịch:` vì không cần thiết.
+    - Thêm dòng footer cố định ở đáy ở tất cả các tab trong Cài Đặt (đồng bộ với Connect Modal): Chấm xanh `● UID: <uid>` bên trái và nút `[ Đăng Xuất ]` màu đỏ bên phải.
+    - Mở khoá lại các nút `+` (thêm tài khoản) và `-` (xoá tài khoản) cạnh dropdown chọn tài khoản, khôi phục đầy đủ chức năng.
+  - **Giải pháp thực hiện:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Gỡ bỏ hoàn toàn dòng form input `UID Sàn Giao Dịch:` khỏi nhóm Thông Tin API OKX.
+      - Mở khóa thuộc tính `disabled`, kích hoạt lại sự kiện `onClick={onCreateAccount}` cho nút `+` (mở AddAccountModal) và `onClick={onDeleteAccount}` cho nút `-` (mở DeleteAccountModal với cảnh báo bảo vệ bot đang chạy).
+      - Bổ sung footer đồng bộ ở cuối `modal-content`: Hiển thị chấm tròn xanh phát sáng `#26a69a`, text `UID: <displayUid>` cùng nút `[ Đăng Xuất ]` (`#ff4d4f`) gọi `onLogout()`, hiển thị cố định ở đáy xuyên suốt cả tab API Key và tab Chiến Thuật.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan trên trình duyệt cho cả 2 tab thành công 100%.
+
 - **[25/09/2026]** - Hoàn Tác Giao Diện Layout Bên Ngoài Theo Bản Dev Thọ & Bảo Lưu 100% Cài Đặt, Connect, Thông Báo, Text:
   - **Mô tả yêu cầu CEO:**
     - Huỷ bỏ toàn bộ các chỉnh sửa liên quan đến giao diện, vị trí, kích thước (chiều cao bảng vị thế min 168px/222px, padding mobile, PWA standalone padding, `--real-app-height`, v.v.), hoàn tác lại giao diện bên ngoài y như bản của Thọ dev (`origin/main`).
