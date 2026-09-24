@@ -41,12 +41,13 @@ body {
 
 @media all and (display-mode: standalone) {
   body {
-    background-color: #000000;
+    background-color: #1e1e1e;
   }
   .app-container {
-    padding-top: 0;
-    margin-top: max(env(safe-area-inset-top, 0px), 48px);
-    height: calc(100dvh - max(env(safe-area-inset-top, 0px), 48px));
+    padding-top: max(env(safe-area-inset-top, 0px), 40px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+    margin-top: 0;
+    height: 100dvh;
   }
 }
 

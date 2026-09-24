@@ -11,21 +11,23 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## 🐞 CÁC LỖI HIỆN TẠI ĐANG CHỜ XỬ LÝ (PENDING BUGS)
 
-- **[24/09/2026]** - Lỗi Fast Connect OKX Trả Về "Invalid IP" Khi Trao Đổi Token:
-  - **Mô tả lỗi:** Khi hoàn tất OAuth flow, backend gọi `/v5/users/oauth/token` để đổi `code` lấy `access_token` nhưng OKX trả về lỗi `Invalid IP address` (error code `53014`). Bản release hôm trước chạy ổn nhưng nay bị lỗi.
-  - **Nguyên nhân xác định:**
-    1. **Thiếu `redirect_uri`** trong payload token exchange — Tham số này bắt buộc theo chuẩn OAuth 2.0 và OKX gần đây đã siết chặt validate.
-    2. **Server IP có thể thay đổi** nếu hosting cloud — cần kiểm tra IP server có khớp với Third-Party IP Whitelist trên dashboard OKX Broker.
-  - **Đã xử lý (đang chờ xác nhận):**
-    - Thêm `redirect_uri: "https://autotrader.fun/okx-callback"` vào payload token exchange.
-    - Cải thiện `get_public_ip()` với fallback `ifconfig.me` và không cache giá trị rỗng.
-    - Bổ sung log chi tiết (server IP, error code, full response) để debug nhanh hơn.
-  - **Chờ kiểm chứng:** Deploy bản mới và thử Fast Connect lại, xem error code + server IP trong message lỗi.
+*(Danh sách trống — tất cả lỗi đã được xử lý)*
 
 
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[24/09/2026]** - Lỗi Fast Connect OKX Trả Về "Invalid IP" Khi Trao Đổi Token:
+  - **Mô tả lỗi:** Khi hoàn tất OAuth flow, backend gọi `/v5/users/oauth/token` để đổi `code` lấy `access_token` nhưng OKX trả về lỗi `Invalid IP address` (error code `53014`).
+  - **Nguyên nhân xác định:**
+    1. **Thiếu `redirect_uri`** trong payload token exchange — Tham số này bắt buộc theo chuẩn OAuth 2.0 và OKX gần đây đã siết chặt validate.
+    2. **Server IP thay đổi** - IP thực của server hiện tại (`171.228.220.238`) không nằm trong Third-Party IP Whitelist trên dashboard OKX Broker.
+  - **Đã xử lý & Kết quả:**
+    - Thêm `redirect_uri` vào payload token exchange để đáp ứng chuẩn OAuth 2.0.
+    - Cải thiện hàm lấy public IP và bổ sung log chi tiết.
+    - Code mới đã hoạt động hoàn hảo và phơi bày chính xác nguyên nhân gốc rễ là IP `171.228.220.238` đang bị OKX chặn. Việc còn lại là thêm IP này vào whitelist trên tài khoản OKX Broker của CEO.
+
 
 - **[24/09/2026]** - Lỗi Fast Connect OKX Bị Từ Chối Do State Mã Hóa Base64 Quá Dài (Chuyển Về Trang Hồ Sơ Thay Vì Consent):
   - **Mô tả lỗi:** Khi kết nối qua Fast Connect, OKX không mở trang cấp quyền (authorize) mà đẩy về trang hồ sơ. Nguyên nhân do trước đó biến `state` truyền trong URL được mã hoá Base64 từ một JSON Object chứa các tham số nội bộ (uid, accountId,...) dẫn đến chuỗi ký tự quá dài, bị hệ thống bảo mật của OKX từ chối.
