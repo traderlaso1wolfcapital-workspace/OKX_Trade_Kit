@@ -18,6 +18,13 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[24/09/2026]** - Lỗi Fast Connect OKX Bị Từ Chối Do State Mã Hóa Base64 Quá Dài (Chuyển Về Trang Hồ Sơ Thay Vì Consent):
+  - **Mô tả lỗi:** Khi kết nối qua Fast Connect, OKX không mở trang cấp quyền (authorize) mà đẩy về trang hồ sơ. Nguyên nhân do trước đó biến `state` truyền trong URL được mã hoá Base64 từ một JSON Object chứa các tham số nội bộ (uid, accountId,...) dẫn đến chuỗi ký tự quá dài, bị hệ thống bảo mật của OKX từ chối.
+  - **Đã xử lý:**
+    - Khôi phục `state` trong `App.jsx` về chuỗi ngẫu nhiên ngắn (`Math.random().toString(36)...`) để OKX chấp nhận callback.
+    - Duy trì bảo toàn dữ liệu trạng thái nội bộ bằng cách ánh xạ chuỗi `state` ngẫu nhiên này với object thực tế được lưu ẩn trong `localStorage` thay vì truyền phơi bày trên URL. Khi OKX trả callback về, frontend dùng giá trị `state` dự phòng tại LocalStorage để khôi phục uid, accountId, strategy an toàn.
+  - **Kiểm chứng:** URL Fast Connect đã rút gọn đúng chuẩn tài liệu OKX (`state=xyaq5mlcte9mue1j3k8`), hệ thống mở đúng trang cấp quyền ứng dụng thay vì trang hồ sơ cá nhân.
+
 - **[24/09/2026]** - Tự Động Quét & Đặt Tên Tài Khoản Từ Sàn OKX (Fast Connect & API Key Thủ Công):
   - **Mô tả yêu cầu:**
     - Khi kết nối bất kể tài khoản nào qua OKX Fast Connect (OAuth) hoặc nhập API Key thủ công:

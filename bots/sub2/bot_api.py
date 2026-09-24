@@ -6,6 +6,9 @@ import hmac
 import json
 import time
 import requests
+import socket
+import urllib3.util.connection as urllib3_cn
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 from datetime import datetime, timezone
 
 # ==============================================================================

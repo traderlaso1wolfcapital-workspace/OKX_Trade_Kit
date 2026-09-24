@@ -37,6 +37,9 @@ import json
 import subprocess
 import signal
 import requests
+import socket
+import urllib3.util.connection as urllib3_cn
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 import numpy as np
 import pandas as pd
 import dotenv

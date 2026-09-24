@@ -13,6 +13,9 @@ import hmac
 import hashlib
 import base64
 import requests
+import socket
+import urllib3.util.connection as urllib3_cn
+urllib3_cn.allowed_gai_family = lambda: socket.AF_INET
 import csv
 import jwt
 import bcrypt
