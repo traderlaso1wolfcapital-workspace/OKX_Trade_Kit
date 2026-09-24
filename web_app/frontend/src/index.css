@@ -1695,7 +1695,7 @@ a#tv-attr-logo,
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: var(--chart-ratio, 55%) !important;
+    height: var(--chart-ratio, 65%) !important;
     min-height: 200px !important;
     border-left: none;
     border-right: none;
