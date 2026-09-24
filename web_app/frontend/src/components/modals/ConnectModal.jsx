@@ -162,14 +162,21 @@ export default function ConnectModal({
             color: #ffffff;
             border-radius: 4px;
             outline: none;
-            font-size: 13px;
+            font-size: 12.5px;
             box-sizing: border-box;
             transition: border-color 0.2s;
-            font-family: inherit;
+            font-family: Consolas, monospace;
           }
           .connect-input:focus {
             border-color: #ff9900;
             box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.2);
+          }
+          .connect-input::placeholder {
+            font-family: Consolas, monospace;
+            font-style: italic;
+            font-size: 11px;
+            color: #555555;
+            opacity: 0.75;
           }
         `}</style>
 

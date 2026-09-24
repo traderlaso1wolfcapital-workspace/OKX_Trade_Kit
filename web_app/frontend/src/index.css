@@ -1378,6 +1378,15 @@ a#tv-attr-logo,
   border-color: #ff9900;
 }
 
+.settings-modal .styled-input::placeholder,
+.connect-input::placeholder {
+  font-family: Consolas, monospace !important;
+  font-style: italic !important;
+  font-size: 11px !important;
+  color: #555555 !important;
+  opacity: 0.75 !important;
+}
+
 .settings-form-row {
   display: flex;
   align-items: center;
