@@ -27,6 +27,7 @@ function App() {
   const [loginPassphrase, setLoginPassphrase] = useState("");
   const [lockMessage, setLockMessage] = useState("");
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [fastConnectStatus, setFastConnectStatus] = useState(null);
   const audioRef = useRef(null);
 
   // 2. Hardware ID & Bot Slot
@@ -697,13 +698,18 @@ function App() {
     }
   };
 
-  // OKX Fast Connect Callback Interceptor
+// OKX Fast Connect Callback Interceptor
   useEffect(() => {
     const handleCallback = async () => {
-      if (window.location.pathname === "/okx-callback") {
-        const urlParams = new URLSearchParams(window.location.search);
+      const pathname = window.location.pathname.replace(/\/$/, "");
+      if (pathname === "/okx-callback") {
+        // Hỗ trợ cả query string (?code=...) và fragment hash (#code=...) trên mobile
+        const search = window.location.search || window.location.hash.replace("#", "?");
+        const urlParams = new URLSearchParams(search);
         const code = urlParams.get("code");
         const stateParam = urlParams.get("state");
+        const errorParam = urlParams.get("error");
+        const errorMsg = urlParams.get("error_msg");
         
         let callbackUid = currentUid;
         let callbackAcc = effectiveAccId;
@@ -711,14 +717,37 @@ function App() {
         
         if (stateParam) {
            try {
-              const decodedState = atob(decodeURIComponent(stateParam));
-              const parsedState = JSON.parse(decodedState);
+              let base64 = stateParam.replace(/-/g, '+').replace(/_/g, '/');
+              while (base64.length % 4) {
+                base64 += '=';
+              }
+              const jsonString = atob(base64);
+              const parsedState = JSON.parse(jsonString);
+              
               if (parsedState.uid) callbackUid = parsedState.uid;
               if (parsedState.acc) callbackAcc = parsedState.acc;
               if (parsedState.strat) callbackStrat = parsedState.strat;
            } catch (e) {
               console.error("Failed to parse state", e);
+              // Attempt to recover from localStorage
+              const savedState = localStorage.getItem("okx_oauth_state_raw");
+              if (savedState) {
+                 try {
+                    const parsedState = JSON.parse(savedState);
+                    if (parsedState.uid) callbackUid = parsedState.uid;
+                    if (parsedState.acc) callbackAcc = parsedState.acc;
+                    if (parsedState.strat) callbackStrat = parsedState.strat;
+                 } catch(e2) {}
+              } else {
+                 setFastConnectStatus({ type: "error", msg: "Lỗi đọc dữ liệu trạng thái OKX. Vui lòng thử kết nối lại." });
+              }
            }
+        }
+
+        if (errorParam) {
+           setFastConnectStatus({ type: "error", msg: "OKX từ chối kết nối: " + (errorMsg || errorParam) });
+           window.history.replaceState({}, document.title, "/");
+           return;
         }
 
         if (code && callbackUid) {
@@ -753,6 +782,8 @@ function App() {
             }
 
             addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
+            setFastConnectStatus({ type: "info", msg: "Đang xử lý cấp quyền từ OKX, vui lòng chờ..." });
+            
             const res = await fetch("/api/auth/okx/callback", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -777,7 +808,8 @@ function App() {
                 localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
               }
               const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
-              alert(`✅ Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`);
+              
+              setFastConnectStatus({ type: "success", msg: `Kết nối OKX Fast Connect thành công: [${accDisplayName}]!` });
               addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
               // Reload credentials
               const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${callbackUid}`);
@@ -789,23 +821,27 @@ function App() {
               }
               refreshBotData();
             } else {
-              alert("❌ Lỗi kết nối OKX: " + (data.message || "Lỗi máy chủ"));
+              setFastConnectStatus({ type: "error", msg: (data.message || "Lỗi máy chủ khi kết nối OKX") });
               addSystemLog("❌ [FAST CONNECT] Lỗi: " + (data.message || "Lỗi máy chủ"));
             }
           } catch (err) {
-            alert("❌ Lỗi kết nối server: " + err.message);
+            setFastConnectStatus({ type: "error", msg: "Lỗi kết nối server: " + err.message });
           } finally {
             // Clean up URL
             window.history.replaceState({}, document.title, "/");
           }
         } else if (!callbackUid) {
-          // If no user is logged in, just clear url or redirect
+          setFastConnectStatus({ type: "error", msg: "Không tìm thấy thông tin phiên đăng nhập (UID) từ OKX. Có thể do bạn mở trên trình duyệt khác. Vui lòng kết nối lại từ ứng dụng chính." });
+          window.history.replaceState({}, document.title, "/");
+        } else if (!code) {
+          setFastConnectStatus({ type: "error", msg: "Không nhận được mã xác thực (code) từ OKX. Vui lòng thử lại." });
           window.history.replaceState({}, document.title, "/");
         }
       }
     };
 
-    if (isAuthenticated || window.location.pathname === "/okx-callback") {
+    const pathname = window.location.pathname.replace(/\/$/, "");
+    if (isAuthenticated || pathname === "/okx-callback") {
       handleCallback();
     }
   }, [isAuthenticated, currentUid, effectiveAccId, activeBotTab]);
@@ -819,14 +855,16 @@ function App() {
       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
       const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1" };
-      const state = encodeURIComponent(btoa(JSON.stringify(stateObj)));
+      const stateBase64 = btoa(JSON.stringify(stateObj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const state = encodeURIComponent(stateBase64);
       setOkxOAuthState(state);
+      localStorage.setItem("okx_oauth_state_raw", JSON.stringify(stateObj));
       setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
     }
   }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
 
   const handleFastConnectClick = () => {
-    sessionStorage.setItem("okx_oauth_state", okxOAuthState);
+    localStorage.setItem("okx_oauth_state", okxOAuthState);
   };
 
 
@@ -1591,7 +1629,20 @@ function App() {
     autoStartShadow();
     const s = setInterval(fetchStatus, 2000);
     const p = setInterval(fetchPositions, 5000);
-    return () => { clearInterval(s); clearInterval(p); };
+    
+    // Thêm listener để tải lại thông tin credentials khi người dùng quay lại PWA từ Safari/OKX App
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchCreds();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => { 
+      clearInterval(s); 
+      clearInterval(p); 
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [isAuthenticated, activeBotTab, selectedAccount, botAccountMap, loginUid, effectiveAccId, fetchPositions]);
 
 
@@ -2135,6 +2186,39 @@ function App() {
         onConfirm={confirmDeleteAccount}
       />
 
+
+      {/* FAST CONNECT OVERLAY */}
+      {fastConnectStatus && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.85)", zIndex: 99999,
+          display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+          color: "#fff", padding: "20px", textAlign: "center",
+          backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: "#1e1e1e", padding: "30px", borderRadius: "16px", maxWidth: "420px", width: "100%",
+            border: `1px solid ${fastConnectStatus.type === "error" ? "#ff4d4f" : fastConnectStatus.type === "success" ? "#52c41a" : "#1890ff"}`,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)"
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: "15px", fontSize: "20px", color: fastConnectStatus.type === "error" ? "#ff4d4f" : fastConnectStatus.type === "success" ? "#52c41a" : "#fff" }}>
+              {fastConnectStatus.type === "error" ? "❌ Lỗi Kết Nối" : fastConnectStatus.type === "success" ? "✅ Thành Công" : "⏳ Đang Xử Lý"}
+            </h3>
+            <p style={{ fontSize: "16px", lineHeight: "1.5", color: "#e0e0e0" }}>{fastConnectStatus.msg}</p>
+            {fastConnectStatus.type !== "info" && (
+              <button 
+                onClick={() => setFastConnectStatus(null)}
+                style={{
+                  marginTop: "25px", padding: "12px 24px", background: fastConnectStatus.type === "error" ? "#ff4d4f" : "#52c41a", color: "#fff", 
+                  border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "16px", width: "100%"
+                }}
+              >
+                Đóng
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

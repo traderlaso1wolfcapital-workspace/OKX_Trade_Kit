@@ -1,0 +1,56 @@
+--- web_app/frontend/src/App.jsx
++++ web_app/frontend/src/App.jsx
+@@ -714,14 +714,21 @@
+         if (stateParam) {
+            try {
+               // try to parse state. URLSearchParams decodes URL encoding natively, but if double encoded, decodeURIComponent handles it.
+               let decodedState = stateParam;
+-              try { decodedState = decodeURIComponent(stateParam); } catch (e) {}
+-              const parsedState = JSON.parse(decodedState);
++              try {
++                // Fallback decode if double encoded
++                decodedState = decodeURIComponent(stateParam);
++              } catch (e) {}
++              
++              // We encode with btoa to prevent okx from mangling JSON chars
++              const jsonString = atob(decodedState);
++              const parsedState = JSON.parse(jsonString);
++              
+               if (parsedState.uid) callbackUid = parsedState.uid;
+               if (parsedState.acc) callbackAcc = parsedState.acc;
+               if (parsedState.strat) callbackStrat = parsedState.strat;
+            } catch (e) {
+               console.error("Failed to parse state", e);
+-              alert("Lỗi đọc dữ liệu trạng thái OKX. Vui lòng thử lại.\nChi tiết: " + e.message);
++              // Attempt to recover from localStorage
++              const savedState = localStorage.getItem("okx_oauth_state_raw");
++              if (savedState) {
++                 try {
++                    const parsedState = JSON.parse(savedState);
++                    if (parsedState.uid) callbackUid = parsedState.uid;
++                    if (parsedState.acc) callbackAcc = parsedState.acc;
++                    if (parsedState.strat) callbackStrat = parsedState.strat;
++                 } catch(e2) {}
++              } else {
++                 alert("Lỗi đọc dữ liệu trạng thái OKX. Vui lòng kết nối lại.");
++              }
+            }
+         }
+ 
+@@ -833,9 +840,11 @@
+       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
+       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
+       const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1" };
+-      const state = encodeURIComponent(JSON.stringify(stateObj));
++      const stateBase64 = btoa(JSON.stringify(stateObj));
++      const state = encodeURIComponent(stateBase64);
+       setOkxOAuthState(state);
++      localStorage.setItem("okx_oauth_state_raw", JSON.stringify(stateObj));
+       setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
+     }
+   }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
+ 
+   const handleFastConnectClick = () => {
+-    sessionStorage.setItem("okx_oauth_state", okxOAuthState);
++    localStorage.setItem("okx_oauth_state", okxOAuthState);
+   };

@@ -247,17 +247,20 @@ export default function ConnectModal({
 
               <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                 {/* 1. OKX App Connect Card */}
-                <a
-                  href={okxOAuthUrl || "#"}
+                <div
                   onClick={(e) => {
-                    if (isConnecting || !okxOAuthUrl) {
-                      e.preventDefault();
-                      return;
-                    }
+                    if (isConnecting || !okxOAuthUrl) return;
                     if (handleFastConnectClick) handleFastConnectClick();
+                    // On standalone PWA (iOS), use window.location.href to stay inside PWA
+                    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+                    if (isStandalone) {
+                      window.location.href = okxOAuthUrl;
+                    } else {
+                      window.open(okxOAuthUrl, '_self');
+                    }
                   }}
                   className="connect-card"
-                  style={{ opacity: isConnecting ? 0.7 : 1 }}
+                  style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? 'not-allowed' : 'pointer' }}
                 >
                   {/* Authentic OKX Logo Box */}
                   <div
@@ -313,7 +316,7 @@ export default function ConnectModal({
                   >
                     {t("open_app")}
                   </span>
-                </a>
+                </div>
 
                 {/* Divider for Multi-exchange & Web3 ready */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "4px 0" }}>
