@@ -703,10 +703,28 @@ function App() {
       if (window.location.pathname === "/okx-callback") {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get("code");
-        if (code && currentUid) {
+        const stateParam = urlParams.get("state");
+        
+        let callbackUid = currentUid;
+        let callbackAcc = effectiveAccId;
+        let callbackStrat = activeBotTab || "sub1";
+        
+        if (stateParam) {
+           try {
+              const decodedState = atob(decodeURIComponent(stateParam));
+              const parsedState = JSON.parse(decodedState);
+              if (parsedState.uid) callbackUid = parsedState.uid;
+              if (parsedState.acc) callbackAcc = parsedState.acc;
+              if (parsedState.strat) callbackStrat = parsedState.strat;
+           } catch (e) {
+              console.error("Failed to parse state", e);
+           }
+        }
+
+        if (code && callbackUid) {
           try {
-            let acc = effectiveAccId;
-            const strat = activeBotTab || "sub1";
+            let acc = callbackAcc;
+            const strat = callbackStrat;
 
             if (!acc) {
               acc = `sub_${Date.now()}`;
@@ -726,7 +744,7 @@ function App() {
               });
 
               try {
-                await fetch(`/api/bot/accounts?uid=${currentUid}`, {
+                await fetch(`/api/bot/accounts?uid=${callbackUid}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ id: acc, name: cleanName })
@@ -741,12 +759,19 @@ function App() {
               body: JSON.stringify({
                 code,
                 account_id: acc,
-                uid: currentUid,
+                uid: callbackUid,
                 strategy: strat
               })
             });
             const data = await res.json();
             if (res.ok && data.status === "success") {
+              if (!isAuthenticated) {
+                 setIsAuthenticated(true);
+                 setLoginUid(callbackUid);
+                 localStorage.setItem("tls1_auth", "true");
+                 localStorage.setItem("tls1_uid", callbackUid);
+              }
+
               if (data.accounts && Array.isArray(data.accounts)) {
                 setAccounts(data.accounts);
                 localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
@@ -755,7 +780,7 @@ function App() {
               alert(`✅ Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`);
               addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
               // Reload credentials
-              const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${currentUid}`);
+              const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${callbackUid}`);
               if (credRes.ok) {
                 const credData = await credRes.json();
                 setApiKey(credData.api_key || "");
@@ -773,14 +798,14 @@ function App() {
             // Clean up URL
             window.history.replaceState({}, document.title, "/");
           }
-        } else if (!currentUid) {
+        } else if (!callbackUid) {
           // If no user is logged in, just clear url or redirect
           window.history.replaceState({}, document.title, "/");
         }
       }
     };
 
-    if (isAuthenticated) {
+    if (isAuthenticated || window.location.pathname === "/okx-callback") {
       handleCallback();
     }
   }, [isAuthenticated, currentUid, effectiveAccId, activeBotTab]);
@@ -793,11 +818,12 @@ function App() {
     if (showConnectModal) {
       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
-      const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1" };
+      const state = encodeURIComponent(btoa(JSON.stringify(stateObj)));
       setOkxOAuthState(state);
       setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
     }
-  }, [showConnectModal]);
+  }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
 
   const handleFastConnectClick = () => {
     sessionStorage.setItem("okx_oauth_state", okxOAuthState);
