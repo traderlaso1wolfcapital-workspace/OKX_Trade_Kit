@@ -866,51 +866,97 @@ def _parse_env_file(fpath: str):
     return creds
 
 def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
-    data_dir = get_user_data_dir(uid)
-    
-    # Khi chỉ định rõ account_id: TUYỆT ĐỐI KHÔNG fallback sang strategy hay tài khoản khác!
+    primary_dir = get_user_data_dir(uid)
+    search_dirs = [primary_dir]
+    default_dir = get_user_data_dir("default")
+    if default_dir not in search_dirs:
+        search_dirs.append(default_dir)
+    if OKX_TRADE_KIT_DIR not in search_dirs:
+        search_dirs.append(OKX_TRADE_KIT_DIR)
+
+    # Khi chỉ định rõ account_id:
     if account_id and account_id.strip():
         target_acc = account_id.strip()
-        candidate_paths = [
-            os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"),
-            os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
-            os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"),
-            os.path.join(data_dir, f".api_{target_acc}"),
-            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{target_acc}"),
-            os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"),
-        ]
-        # Chỉ kiểm tra .api_botEMA200 nếu chính account_id đó là "sub1" hoặc ".api_botEMA200"
-        if target_acc in ["sub1", ".api_botEMA200"]:
+
+        # Tìm thêm tên gợi nhớ (label) của account_id trong accounts.json nếu có
+        acc_names = []
+        for sdir in [primary_dir, default_dir]:
+            acc_file = os.path.join(sdir, "accounts.json")
+            if os.path.exists(acc_file):
+                try:
+                    with open(acc_file, "r", encoding="utf-8") as f:
+                        acc_list = json.load(f)
+                        if isinstance(acc_list, list):
+                            for a in acc_list:
+                                if a.get("id") == target_acc and a.get("name"):
+                                    acc_names.append(a.get("name").strip())
+                except Exception:
+                    pass
+
+        candidate_paths = []
+        for d in search_dirs:
             candidate_paths.extend([
-                os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"),
-                os.path.join(data_dir, ".api_botEMA200")
+                os.path.join(d, f"bots/{target_acc}", f".api_{target_acc}"),
+                os.path.join(d, f"accounts/{target_acc}", f".api_{target_acc}"),
+                os.path.join(d, f"bots/{strategy}", f".api_{target_acc}"),
+                os.path.join(d, f".api_{target_acc}"),
             ])
-            
+            for aname in acc_names:
+                if aname != target_acc:
+                    candidate_paths.extend([
+                        os.path.join(d, f"bots/{aname}", f".api_{aname}"),
+                        os.path.join(d, f"accounts/{aname}", f".api_{aname}"),
+                        os.path.join(d, f"bots/{strategy}", f".api_{aname}"),
+                        os.path.join(d, f".api_{aname}"),
+                    ])
+            if target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or any(n in ["sub1", "botEMA200"] for n in acc_names) or (strategy == "sub1" and (target_acc.startswith("sub_") or target_acc == "sub1_default")):
+                candidate_paths.extend([
+                    os.path.join(d, ".api_botEMA200"),
+                    os.path.join(d, "bots/sub1", ".api_botEMA200"),
+                    os.path.join(d, ".api_sub1"),
+                    os.path.join(d, "bots/sub1", ".api_sub1")
+                ])
+
         for p in candidate_paths:
             if os.path.exists(p):
                 c = _parse_env_file(p)
                 if c["api_key"] and c["secret_key"] and c["passphrase"]:
+                    # Tự động đồng bộ sang primary_dir nếu tìm thấy ở fallback dir
+                    if not p.startswith(primary_dir):
+                        try:
+                            _save_env_file(os.path.join(primary_dir, f"bots/{target_acc}", f".api_{target_acc}"), c["api_key"], c["secret_key"], c["passphrase"])
+                            _save_env_file(os.path.join(primary_dir, f"accounts/{target_acc}", f".api_{target_acc}"), c["api_key"], c["secret_key"], c["passphrase"])
+                            _save_env_file(os.path.join(primary_dir, f".api_{target_acc}"), c["api_key"], c["secret_key"], c["passphrase"])
+                        except Exception:
+                            pass
                     return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
         return "", "", "", False
 
     # Khi không truyền account_id (lấy mặc định của bot/strategy)
-    target_acc = strategy
-    candidate_paths = [
-        os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"),
-        os.path.join(data_dir, f".api_{strategy}"),
-        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{strategy}"),
-        os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"),
-    ]
-    if strategy == "sub1":
-        candidate_paths.append(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"))
-        candidate_paths.append(os.path.join(data_dir, ".api_botEMA200"))
-        
+    candidate_paths = []
+    for d in search_dirs:
+        candidate_paths.extend([
+            os.path.join(d, f"bots/{strategy}", f".api_{strategy}"),
+            os.path.join(d, f".api_{strategy}"),
+        ])
+        if strategy == "sub1":
+            candidate_paths.extend([
+                os.path.join(d, ".api_botEMA200"),
+                os.path.join(d, "bots/sub1", ".api_botEMA200")
+            ])
+
     for p in candidate_paths:
         if os.path.exists(p):
             c = _parse_env_file(p)
             if c["api_key"] and c["secret_key"] and c["passphrase"]:
+                if not p.startswith(primary_dir):
+                    try:
+                        _save_env_file(os.path.join(primary_dir, f"bots/{strategy}", f".api_{strategy}"), c["api_key"], c["secret_key"], c["passphrase"])
+                        _save_env_file(os.path.join(primary_dir, f".api_{strategy}"), c["api_key"], c["secret_key"], c["passphrase"])
+                    except Exception:
+                        pass
                 return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
-                
+
     return "", "", "", False
 
 def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, timeout: int = 10):
@@ -1752,10 +1798,30 @@ def get_bot_accounts(uid: str):
         try:
             with open(acc_file, "r", encoding="utf-8") as f:
                 accounts = json.load(f)
-                if isinstance(accounts, list):
+                if isinstance(accounts, list) and len(accounts) > 0:
                     return accounts
         except Exception:
             pass
+
+    # Fallback to default user data dir
+    default_dir = get_user_data_dir("default")
+    default_file = os.path.join(default_dir, "accounts.json")
+    if os.path.exists(default_file):
+        try:
+            with open(default_file, "r", encoding="utf-8") as f:
+                accounts = json.load(f)
+                if isinstance(accounts, list) and len(accounts) > 0:
+                    # Đồng bộ vào data_dir của uid
+                    try:
+                        os.makedirs(data_dir, exist_ok=True)
+                        with open(acc_file, "w", encoding="utf-8") as fw:
+                            json.dump(accounts, fw, indent=4, ensure_ascii=False)
+                    except Exception:
+                        pass
+                    return accounts
+        except Exception:
+            pass
+
     return []
 
 @app.post("/api/bot/accounts")
@@ -1981,14 +2047,40 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         print(f"[API CHECK] Unexpected error: {type(e).__name__}: {e}", flush=True)
         raise HTTPException(status_code=400, detail=f"Lỗi hệ thống khi kiểm tra API Key: {str(e)}")
 
+    # Xác định các UID cần lưu đồng bộ
+    sync_uids = set()
+    for u in [uid, target_uid, str(main_uid), "default"]:
+        if u and not u.startswith("guest"):
+            sync_uids.add(u)
+    if not sync_uids:
+        sync_uids.add("default")
+
+    for u in sync_uids:
+        u_data_dir = get_user_data_dir(u)
+        os.makedirs(os.path.join(u_data_dir, f"bots/{target_acc}"), exist_ok=True)
+        os.makedirs(os.path.join(u_data_dir, f"accounts/{target_acc}"), exist_ok=True)
+        _save_env_file(os.path.join(u_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(u_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(u_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        if strategy:
+            _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
+            
+        # Đồng bộ tên quét được từ sàn OKX vào accounts.json của từng UID
+        sync_account_name_in_storage(u, target_acc, detected_name)
+
+    # Đồng bộ vào OKX_TRADE_KIT_DIR (cho standalone bot và sys_bot_sub1)
+    try:
+        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        if strategy == "sub1" or target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or detected_name == "botEMA200":
+            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"), creds.api_key, creds.secret_key, creds.passphrase)
+        if strategy:
+            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
+    except Exception as e:
+        print(f"[SAVE CREDS] Lưu OKX_TRADE_KIT_DIR warning: {e}", flush=True)
+
     data_dir = get_user_data_dir(uid)
-    _save_env_file(os.path.join(data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-    _save_env_file(os.path.join(data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-    _save_env_file(os.path.join(data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-    _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-    if strategy:
-        _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
-        
     running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
     if os.path.exists(running_acc_file):
         with open(running_acc_file, "r") as f:
@@ -2014,8 +2106,8 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                     except: pass
                 del_nested(bot_processes, uid, strategy)
 
-    # Đồng bộ tên quét được từ sàn OKX vào accounts.json
-    updated_accounts = sync_account_name_in_storage(uid, target_acc, detected_name)
+    # Lấy danh sách accounts mới nhất sau khi đồng bộ
+    updated_accounts = get_bot_accounts(target_uid) or get_bot_accounts(uid) or get_bot_accounts("default")
 
     return {
         "message": "Credentials updated successfully.",

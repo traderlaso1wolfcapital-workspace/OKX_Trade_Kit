@@ -566,9 +566,11 @@ function App() {
         const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${currentUid}`);
         if (r.ok) {
           const d = await r.json();
-          setApiKey(d.api_key || "");
-          setSecretKey(d.secret_key || "");
-          setPassphrase(d.passphrase || "");
+          if (d.api_key || d.secret_key || d.passphrase) {
+            setApiKey(d.api_key || "");
+            setSecretKey(d.secret_key || "");
+            setPassphrase(d.passphrase || "");
+          }
         }
       } catch { }
     };
@@ -1330,6 +1332,10 @@ function App() {
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
 
+      setApiKey(cleanApiKey);
+      setSecretKey(cleanSecretKey);
+      setPassphrase(cleanPassphrase);
+
       const curAccName = data.detected_name || accounts.find(a => a.id === targetAcc)?.name || targetAcc;
       alert(`Đã lưu cấu hình API Key cho [${curAccName}] thành công!`);
       addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
@@ -1695,9 +1701,11 @@ function App() {
         const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
-          setApiKey(d.api_key || "");
-          setSecretKey(d.secret_key || "");
-          setPassphrase(d.passphrase || "");
+          if (d.api_key || d.secret_key || d.passphrase) {
+            setApiKey(d.api_key || "");
+            setSecretKey(d.secret_key || "");
+            setPassphrase(d.passphrase || "");
+          }
         }
       } catch { }
     };

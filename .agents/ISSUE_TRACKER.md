@@ -18,6 +18,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Sửa Lỗi Không Lưu API Key Sau Khi Nhận Diện Tài Khoản Dẫn Đến Chạy Bot Bị Bắt Nhập Lại:
+  - **Mô tả hiện tượng:**
+    - Sau khi người dùng nhập đủ 3 thông tin API (API Key, Secret Key, Passphrase) và ấn "LƯU API KEY", bot đã xác thực thành công với OKX và nhận diện được UID/tên tài khoản (`botEMA200`).
+    - Tuy nhiên, sau đó các ô nhập API Key bị biến mất (trở về rỗng), và khi người dùng bấm "CHẠY BOT" thì hệ thống báo lỗi chưa cấu hình API Key và bắt nhập lại.
+  - **Nguyên nhân cốt lõi (Root Cause):**
+    1. *Lệch UID giữa Client và Server:* Khi lưu API Key lần đầu, frontend gửi request kèm `uid="default"` (hoặc guest). Backend gọi OKX xác thực và phát hiện ra Master UID (ví dụ: `523019992975987626`). Backend ghi file `.api` vào thư mục của `default/`, sau đó trả về `"detected_uid": "523019992975987626"`.
+    2. *State và Storage bị rỗng ở UID mới:* Frontend nhận được `detected_uid` và ngay lập tức đổi `currentUid` sang `523019992975987626`. Lập tức hook `useEffect` (`fetchCreds()`) và `refreshBotData()` gửi request `GET /api/bot/credentials?...&uid=523019992975987626`.
+    3. *Backend không tìm thấy credentials ở UID mới:* Trong thư mục `523019992975987626/` chưa có file `.api` hay `accounts.json` nào (do trước đó chỉ ghi vào `default/`). Hàm `_get_okx_creds` trả về rỗng `("", "", "", False)`, làm `fetchCreds()` đè các state `apiKey`, `secretKey`, `passphrase` trên React về chuỗi rỗng `""`.
+    4. *Cản trở chạy Bot:* Khi ấn "CHẠY BOT", `handleStartBotClick` kiểm tra `if (!apiKey || !secretKey || !passphrase)` thấy rỗng nên bật popup yêu cầu kết nối lại.
+  - **Giải pháp thực hiện:**
+    - **Backend ([main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+      - Cập nhật `update_bot_credentials`: Đồng bộ lưu trữ credentials và `accounts.json` trên toàn bộ tập hợp UID liên quan (`sync_uids = {uid, target_uid, main_uid, "default"}`) và đồng bộ luôn ra thư mục gốc `OKX_TRADE_KIT_DIR` (`.api_botEMA200`, `.api_{target_acc}`, `.api_{strategy}`).
+      - Cập nhật `_get_okx_creds`: Nâng cấp cơ chế tìm kiếm đa tầng (`primary_dir`, `default_dir`, `OKX_TRADE_KIT_DIR`), tự động tra cứu tên gợi nhớ (label) từ `accounts.json`, tự động đồng bộ sang `primary_dir` nếu tìm thấy ở fallback (tự sửa lỗi dữ liệu).
+      - Cập nhật `get_bot_accounts`: Nếu thư mục người dùng chưa có `accounts.json`, tự động lấy từ `default/accounts.json` và đồng bộ sang thư mục người dùng.
+    - **Frontend ([App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+      - Trong `handleSaveApiKey`: Sau khi nhận kết quả thành công, gán và giữ nguyên trực tiếp `setApiKey(cleanApiKey)`, `setSecretKey(cleanSecretKey)`, `setPassphrase(cleanPassphrase)` vào React state.
+      - Trong `fetchCreds` (`useEffect` và `refreshBotData`): Thêm điều kiện kiểm tra chỉ cập nhật đè khi backend trả về key hợp lệ, không để các phản hồi rỗng nhất thời xóa mất key đang có trong state.
+    - **Kiểm thử nghiệm thu:**
+      - Đã kiểm tra trực tiếp qua Python test script: Cả 3 endpoint query `523019992975987626`, `default`, và root workspace đều trả về đầy đủ, chính xác bộ key thật vừa lưu.
+      - Đã build lại production bundle (`npm run build`) thành công 100%.
+
 - **[25/09/2026]** - Tự Động Quét Nhận Diện UID & Tạo Tài Khoản Khi Bấm LƯU API KEY (Loại Bỏ Thông Báo Ép Bấm Nút +):
   - **Mô tả yêu cầu CEO:**
     - Khi nhập API Key, Secret Key, Passphrase vào 3 dòng và bấm "LƯU API KEY", hệ thống lại hiện cảnh báo `⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi lưu API Key!`.
