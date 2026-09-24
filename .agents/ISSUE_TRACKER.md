@@ -18,6 +18,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tự Động Kéo Cụm Tài Khoản Sát Đáy Trong Safari Web App (PWA) & Khống Chế Giới Hạn Min 3 Dòng Vị Thế:
+  - **Mô tả yêu cầu:**
+    1. Khi lưu về màn hình chính trên iOS Safari (iPhone 15 Pro Max) mở dưới dạng ứng dụng web độc lập (Standalone PWA), cụm Tài khoản (EMA200 Bot) bị thừa khoảng trống lớn ở đáy màn hình. Cần tự động kéo sát mép dưới cùng.
+    2. Bảng vị thế có giới hạn kéo min luôn hiển thị tối thiểu 3 dòng cặp vị thế (XAU, BTC, ETH), phần còn lại dành cho biểu đồ nến, và đây cũng là mốc phân chia mặc định của web app.
+  - **Đã xử lý:**
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `@media all and (display-mode: standalone)` và `@media (max-width: 768px)`: Chuyển `.app-container` sang `position: fixed !important; inset: 0; height: 100vh;`, loại bỏ `height: -webkit-fill-available` và lỗi thu nhỏ của `100dvh` trên iOS WebKit Standalone mode.
+      - Thêm `margin-top: auto !important;` cho `.sidebar-left` để luôn neo sát cực đại mép đáy màn hình.
+      - Thiết lập `min-height: 222px !important;` cho `.pane-tabs` (khớp chính xác chiều cao của tab header 36px + thead 30px + 3 dòng nến 156px = 222px).
+      - Thiết lập `height: var(--chart-ratio, calc(100% - 231px)) !important; max-height: calc(100% - 231px) !important;` cho `.pane-chart`.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Đặt mặc định `chartRatio` là `null` để tự động ăn theo phân bổ mặc định CSS 3 dòng vị thế.
+      - Trong `startResizing`, khống chế kéo xuống với `minTabsH = 222px`, khóa chặn không cho kéo nhỏ hơn 3 dòng vị thế.
+    - Đã build bundle production và kiểm thử layout trực tiếp trên màn hình iPhone 15 Pro Max (430x932).
+
+
 - **[24/09/2026]** - Lỗi Fast Connect OKX Trả Về "Invalid IP" Khi Trao Đổi Token:
   - **Mô tả lỗi:** Khi hoàn tất OAuth flow, backend gọi `/v5/users/oauth/token` để đổi `code` lấy `access_token` nhưng OKX trả về lỗi `Invalid IP address` (error code `53014`).
   - **Nguyên nhân xác định:**
