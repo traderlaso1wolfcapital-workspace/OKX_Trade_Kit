@@ -718,7 +718,7 @@ export default function SystemSettingsModal({
             </div>
           )}
 
-          {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT (ĐỒNG BỘ 100% VỚI CONNECT MODAL) */}
+          {/* FOOTER: NÚT ĐĂNG XUẤT */}
           {isAuthenticated && (
             <div
               style={{
@@ -727,25 +727,10 @@ export default function SystemSettingsModal({
                 borderTop: "1px solid #333333",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: "#26a69a",
-                    display: "inline-block",
-                    boxShadow: "0 0 6px #26a69a",
-                  }}
-                ></span>
-                <span>
-                  UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
-                </span>
-              </div>
               <button
                 type="button"
                 onClick={() => {

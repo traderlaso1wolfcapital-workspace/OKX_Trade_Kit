@@ -18,6 +18,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Ẩn Thành Phần Chấm Xanh "UID: xxx" Trong Chân Trang Của Hộp Thoại Cài Đặt (System Settings):
+  - **Mô tả yêu cầu CEO:** Tạm thời ẩn phần cuối chấm xanh `UID: xxx` trong các tab của phần Cài Đặt.
+  - **Giải pháp thực hiện:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Ẩn khối hiển thị chấm xanh và chuỗi `UID: ${displayUid}` ở chân trang.
+      - Chuyển `justifyContent` của footer thành `flex-end`, giữ nút `Đăng Xuất` nằm gọn gàng bên góc phải.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử nghiệm thu 100% bằng browser subagent.
+
 - **[25/09/2026]** - Đổi Tên "THÔNG TIN API KEY", Xóa Trắng Ô Key Khi Bấm "+" Tạo Tài Khoản Mới & Rút Ngắn Nhãn "Tài khoản:" Co Giãn Tự Động:
   - **Mô tả yêu cầu CEO:**
     1. Trong tab API KEY Connect: đổi tên nhóm `THÔNG TIN API OKX` thành `THÔNG TIN API KEY`.
