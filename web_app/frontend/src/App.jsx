@@ -224,6 +224,15 @@ function App() {
     const updateRealHeight = () => {
       const h = window.innerHeight;
       document.documentElement.style.setProperty('--real-app-height', `${h}px`);
+      const isStandalone = window.navigator.standalone === true ||
+        (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+      if (isStandalone) {
+        document.documentElement.classList.add('is-pwa-standalone');
+        if (document.body) document.body.classList.add('is-pwa-standalone');
+      } else {
+        document.documentElement.classList.remove('is-pwa-standalone');
+        if (document.body) document.body.classList.remove('is-pwa-standalone');
+      }
     };
     updateRealHeight();
     window.addEventListener('resize', updateRealHeight);

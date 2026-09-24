@@ -70,7 +70,7 @@ body {
     flex-direction: column !important;
     margin: 0 !important;
     box-sizing: border-box !important;
-    padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
+    padding-top: calc(env(safe-area-inset-top, 48px) + 16px) !important;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
     padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
@@ -4236,5 +4236,123 @@ div[class*="tradingview-widget-copyright"],
 
 .theme-glass-pro .btn-reset-strat:hover {
   background-color: #262118 !important;
+}
+
+/* ==========================================================================
+   RIÊNG BIỆT DÀNH CHO MÀN HÌNH CHÍNH / PWA STANDALONE (IOS WEB APP)
+   - Đẩy toàn bộ giao diện xuống dưới để thoát khỏi vùng tai thỏ / Dynamic Island & blur mờ
+   - Phân bổ flex lấp đầy toàn bộ chiều cao màn hình, kéo sát cụm Tài khoản xuống tận đáy
+   ========================================================================== */
+@media all and (display-mode: standalone), (display-mode: fullscreen) {
+  .app-container {
+    padding-top: calc(env(safe-area-inset-top, 50px) + 16px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    height: 100% !important;
+    height: var(--real-app-height, 100vh) !important;
+  }
+
+  .content-wrapper {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-section {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .bot-panel-card {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .chart-panel-card {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-workspace {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-workspace .pane-chart {
+    flex: 1 1 0% !important;
+    height: var(--chart-ratio, auto) !important;
+    max-height: calc(100% - 231px) !important;
+    min-height: 140px !important;
+    flex-shrink: 0;
+  }
+
+  .main-workspace .pane-tabs {
+    flex: 0 0 222px !important;
+    min-height: 222px !important;
+    max-height: 222px !important;
+    height: 222px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sidebar-left {
+    margin-top: 0 !important;
+    margin-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* Đồng bộ kích hoạt qua class .is-pwa-standalone */
+.is-pwa-standalone .app-container {
+  padding-top: calc(env(safe-area-inset-top, 50px) + 16px) !important;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+  height: 100% !important;
+  height: var(--real-app-height, 100vh) !important;
+}
+
+.is-pwa-standalone .content-wrapper,
+.is-pwa-standalone .main-section,
+.is-pwa-standalone .bot-panel-card,
+.is-pwa-standalone .chart-panel-card,
+.is-pwa-standalone .main-workspace {
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.is-pwa-standalone .main-workspace .pane-chart {
+  flex: 1 1 0% !important;
+  height: var(--chart-ratio, auto) !important;
+  max-height: calc(100% - 231px) !important;
+  min-height: 140px !important;
+}
+
+.is-pwa-standalone .main-workspace .pane-tabs {
+  flex: 0 0 222px !important;
+  min-height: 222px !important;
+  max-height: 222px !important;
+  height: 222px !important;
+  flex-shrink: 0 !important;
+}
+
+.is-pwa-standalone .sidebar-left {
+  margin-top: 0 !important;
+  margin-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
+  flex-shrink: 0 !important;
 }
 

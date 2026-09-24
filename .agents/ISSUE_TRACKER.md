@@ -18,6 +18,21 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Chỉnh Riêng Biệt Cho Màn Hình Chính / PWA Standalone (iOS Web App): Dịch Toàn Bộ Giao Diện Xuống Thoát Vùng Blur Mờ & Khắc Phục Triệt Để Khoảng Thừa Ở Đáy:
+  - **Mô tả yêu cầu CEO:**
+    - Safari Browser đã hoạt động chuẩn xác (không cần sửa đổi).
+    - Riêng trên Màn hình chính / PWA Standalone: Bị thừa khoảng trống bên dưới, cụm Tài khoản không sát cạnh dưới. Phần trên đỉnh lại quá cao, nằm trong dải blur mờ (frosted-glass) của Dynamic Island / status bar iOS.
+    - Yêu cầu: Dịch toàn bộ xuống dưới để thoát khỏi vùng mờ phía trên và kéo sát mép dưới cùng, không ảnh hưởng đến Safari Browser.
+  - **Giải pháp thực hiện:**
+    - Phân tách độc lập môi trường PWA thông qua class `.is-pwa-standalone` và `@media all and (display-mode: standalone), (display-mode: fullscreen)` trong [index.html](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/index.html) và [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx).
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Đỉnh (Top): Thiết lập `padding-top: calc(env(safe-area-inset-top, 50px) + 16px) !important;` dịch chuyển toàn bộ header và nội dung xuống thêm 16px (~75px từ đỉnh màn hình), hoàn toàn thoát khỏi vùng phủ mờ của status bar iOS.
+      - Đáy (Bottom): Áp dụng `flex: 1 1 0% !important;` cho `.content-wrapper`, `.main-section`, `.chart-panel-card`, `.main-workspace`, và `.pane-chart`, cho phép biểu đồ tự động hấp thụ toàn bộ khoảng trống dọc còn lại.
+      - Khóa cố định `.pane-tabs` ở `222px` (chuẩn 3 dòng vị thế) và neo `.sidebar-left` với `margin-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;`, ép sát mép đáy của iPhone ngay trên thanh gạt Home Indicator.
+      - Giữ nguyên 100% cấu hình Safari Browser mode, không bị xáo trộn.
+    - Đã build lại production bundle (`dist/index.html`, `dist/assets/index-yYfw4iRC.css`) và nghiệm thu trên Browser Subagent cho cả 2 chế độ.
+
+
 - **[25/09/2026]** - Triệt Để Xử Lý Đồng Thời Che Lấp Đáy Trên Safari & Thừa Khoảng Trống Đáy Trên Standalone PWA:
   - **Mô tả vấn đề:**
     1. Khi mở trên Safari Browser (có thanh công cụ URL ở đáy), cụm `Tài khoản (EMA200 Bot)` bị lấp mất dòng cuối (`Mức cắt lỗ gốc M5`) dưới thanh điều hướng Safari.

@@ -15,6 +15,15 @@
       function setRealAppHeight() {
         var h = window.innerHeight;
         document.documentElement.style.setProperty('--real-app-height', h + 'px');
+        var isStandalone = window.navigator.standalone === true ||
+          (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+        if (isStandalone) {
+          document.documentElement.classList.add('is-pwa-standalone');
+          if (document.body) document.body.classList.add('is-pwa-standalone');
+        } else {
+          document.documentElement.classList.remove('is-pwa-standalone');
+          if (document.body) document.body.classList.remove('is-pwa-standalone');
+        }
       }
       setRealAppHeight();
       window.addEventListener('resize', setRealAppHeight);
