@@ -864,12 +864,13 @@ function App() {
       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const stateObj = { u: currentUid, a: effectiveAccId, s: activeBotTab || "sub1", p: isStandalone };
-      const state = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1", pwa: isStandalone };
+      const stateJson = JSON.stringify(stateObj);
+      const state = btoa(stateJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       
       setOkxOAuthState(state);
-      localStorage.setItem("okx_oauth_state_raw", JSON.stringify(stateObj));
-      setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
+      localStorage.setItem("okx_oauth_state_raw", stateJson);
+      setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}&authLogout=1`);
     }
   }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
 

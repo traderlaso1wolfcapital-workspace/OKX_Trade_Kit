@@ -412,9 +412,9 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
             "perm": "read_only,trade"
         }
         
-        # server_ip = get_public_ip()
-        # if server_ip:
-        #     create_payload["ip"] = server_ip
+        server_ip = get_public_ip()
+        if server_ip:
+            create_payload["ip"] = server_ip
             
         create_resp = requests.post(create_url, json=create_payload, headers=auth_headers, timeout=10)
         try:
