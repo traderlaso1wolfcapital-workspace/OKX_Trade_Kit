@@ -61,7 +61,7 @@ export default function SidebarLeft({
               textTransform: "none",
             }}
           >
-            {t("account_label")} ({getBotLabel()}):
+            {t("account_label")} ({getBotLabel()})
           </span>
 
           <div

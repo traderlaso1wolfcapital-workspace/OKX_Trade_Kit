@@ -1613,7 +1613,7 @@ a#tv-attr-logo,
     height: 100dvh !important;
     overflow: hidden;
     padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
     padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
     width: 100% !important;
@@ -1734,7 +1734,7 @@ a#tv-attr-logo,
   }
 
   .sidebar-content {
-    padding: 0 5px 10px 5px !important;
+    padding: 0 5px 4px 5px !important;
     display: flex;
     flex-direction: column;
     width: 100%;

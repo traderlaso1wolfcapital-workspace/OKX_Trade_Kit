@@ -927,7 +927,7 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(`❌ Lỗi: ${data.detail || "Không thể kết nối API Key"}`);
+        setFastConnectStatus({ type: "error", msg: data.detail || "Không thể kết nối API Key" });
         return;
       }
       if (data.accounts && Array.isArray(data.accounts)) {
@@ -952,12 +952,12 @@ function App() {
       setPassphrase(inputPassphrase);
       
       const accDisplayName = data.detected_name || (accounts.find(a => a.id === accId)?.name) || "Tài khoản";
-      alert(`✅ Kết nối API Key thành công cho [${accDisplayName}]!`);
+      setFastConnectStatus({ type: "success", msg: `Kết nối API Key thành công cho [${accDisplayName}]!` });
       addSystemLog(`🔑 [SYSTEM] Đã kết nối API Key OKX cho tài khoản "${accDisplayName}"`);
       setShowConnectModal(false);
       refreshBotData();
     } catch (e) {
-      alert(`Lỗi kết nối: ${e.message}`);
+      setFastConnectStatus({ type: "error", msg: `Lỗi kết nối: ${e.message}` });
     }
   };
 
@@ -2222,28 +2222,133 @@ function App() {
 
       {/* FAST CONNECT OVERLAY */}
       {fastConnectStatus && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.85)", zIndex: 99999,
-          display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-          color: "#fff", padding: "20px", textAlign: "center",
-          backdropFilter: "blur(4px)"
-        }}>
-          <div style={{
-            background: "#1e1e1e", padding: "30px", borderRadius: "16px", maxWidth: "420px", width: "100%",
-            border: `1px solid ${fastConnectStatus.type === "error" ? "#ff4d4f" : fastConnectStatus.type === "success" ? "#52c41a" : "#1890ff"}`,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5)"
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: "15px", fontSize: "20px", color: fastConnectStatus.type === "error" ? "#ff4d4f" : fastConnectStatus.type === "success" ? "#52c41a" : "#fff" }}>
-              {fastConnectStatus.type === "error" ? "❌ Lỗi Kết Nối" : fastConnectStatus.type === "success" ? "✅ Thành Công" : "⏳ Đang Xử Lý"}
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            zIndex: 99999,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            color: "#fff",
+            padding: "16px",
+            textAlign: "center",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && fastConnectStatus.type !== "info") {
+              setFastConnectStatus(null);
+            }
+          }}
+        >
+          <div
+            style={{
+              background: "#222222",
+              padding: "24px 20px",
+              borderRadius: "6px",
+              maxWidth: "360px",
+              width: "100%",
+              border: `1px solid ${fastConnectStatus.type === "error" ? "rgba(239, 68, 68, 0.4)" : fastConnectStatus.type === "success" ? "rgba(38, 166, 154, 0.4)" : "#333333"}`,
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6)",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "42px",
+                height: "42px",
+                borderRadius: "50%",
+                background:
+                  fastConnectStatus.type === "error"
+                    ? "rgba(239, 68, 68, 0.12)"
+                    : fastConnectStatus.type === "success"
+                    ? "rgba(38, 166, 154, 0.15)"
+                    : "rgba(255, 153, 0, 0.12)",
+                color:
+                  fastConnectStatus.type === "error"
+                    ? "#ef4444"
+                    : fastConnectStatus.type === "success"
+                    ? "#26a69a"
+                    : "#ff9900",
+                marginBottom: "12px",
+                fontSize: "20px",
+                fontWeight: "bold",
+              }}
+            >
+              {fastConnectStatus.type === "error" ? "✕" : fastConnectStatus.type === "success" ? "✓" : "⏳"}
+            </div>
+
+            <h3
+              style={{
+                margin: "0 0 8px 0",
+                fontSize: "15px",
+                fontWeight: "700",
+                color:
+                  fastConnectStatus.type === "error"
+                    ? "#ef4444"
+                    : fastConnectStatus.type === "success"
+                    ? "#26a69a"
+                    : "#ffffff",
+              }}
+            >
+              {fastConnectStatus.type === "error"
+                ? "Lỗi Kết Nối"
+                : fastConnectStatus.type === "success"
+                ? "Thành Công"
+                : "Đang Xử Lý..."}
             </h3>
-            <p style={{ fontSize: "16px", lineHeight: "1.5", color: "#e0e0e0" }}>{fastConnectStatus.msg}</p>
+
+            <p
+              style={{
+                fontSize: "13px",
+                lineHeight: "1.5",
+                color: "#cccccc",
+                margin: "0 0 20px 0",
+                wordBreak: "break-word",
+              }}
+            >
+              {fastConnectStatus.msg}
+            </p>
+
             {fastConnectStatus.type !== "info" && (
-              <button 
+              <button
+                type="button"
                 onClick={() => setFastConnectStatus(null)}
                 style={{
-                  marginTop: "25px", padding: "12px 24px", background: fastConnectStatus.type === "error" ? "#ff4d4f" : "#52c41a", color: "#fff", 
-                  border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "16px", width: "100%"
+                  padding: "8px 20px",
+                  background:
+                    fastConnectStatus.type === "error"
+                      ? "#333333"
+                      : "#2e7d32",
+                  color: "#ffffff",
+                  border:
+                    fastConnectStatus.type === "error"
+                      ? "1px solid #555555"
+                      : "1px solid #388e3c",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  fontSize: "13px",
+                  width: "100%",
+                  transition: "all 0.18s ease",
+                  boxShadow:
+                    fastConnectStatus.type === "success"
+                      ? "0 2px 8px rgba(46, 125, 50, 0.35)"
+                      : "none",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.0)";
                 }}
               >
                 Đóng
