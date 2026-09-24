@@ -96,7 +96,11 @@ export default function SystemSettingsModal({
                       value={selectedAccount}
                       onChange={e => onAssignAccount(e.target.value)}
                     >
-                      {accounts.length === 0 && <option value="">{t("click_plus_create_acc")}</option>}
+                      {accounts.length === 0 && (
+                        <option value="" disabled selected style={{ color: "#888888" }}>
+                          {t("click_plus_create_acc")}
+                        </option>
+                      )}
                       {accounts.map(acc => {
                         const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
                         const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];

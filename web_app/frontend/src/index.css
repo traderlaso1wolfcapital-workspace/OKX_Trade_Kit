@@ -1599,7 +1599,7 @@ a#tv-attr-logo,
     height: -webkit-fill-available;
     overflow: hidden;
     padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
     padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
     width: 100% !important;
@@ -1611,22 +1611,23 @@ a#tv-attr-logo,
     flex: 1;
     width: 100% !important;
     max-width: 100% !important;
-    overflow-y: auto;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch;
+    height: 100% !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Main section (Tabs bot + Chart workspace) luôn hiện trước (order: 1) */
+  /* Main section (Tabs bot + Chart workspace) luôn hiện trước (order: 1) và giãn đầy không gian */
   .main-section {
     width: 100% !important;
     max-width: 100% !important;
     order: 1;
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto !important;
-    min-height: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -1637,6 +1638,7 @@ a#tv-attr-logo,
     margin: 2px 0 0 0 !important;
     padding: 0 5px !important;
     box-sizing: border-box;
+    flex-shrink: 0 !important;
   }
 
   .bot-panel-card {
@@ -1648,24 +1650,38 @@ a#tv-attr-logo,
     border-radius: 0 !important;
     width: 100% !important;
     box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .chart-panel-card {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .main-workspace {
     width: 100% !important;
     flex-direction: column !important;
-    flex: 1 1 auto !important;
-    min-height: 380px !important; /* Co giãn linh hoạt lấp đầy khung nhìn, triệt tiêu khoảng đen thừa cằm dưới */
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: 100% !important;
     border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 trọn vẹn 4 cạnh */
     border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
     box-sizing: border-box !important;
     display: flex !important;
+    overflow: hidden !important;
   }
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    flex: 1.2 1 200px !important;
-    height: auto !important;
-    min-height: 190px !important;
+    height: var(--chart-ratio, 50%) !important;
+    min-height: 160px !important;
     border-left: none;
     border-right: none;
     border-bottom: 1.5px solid #333 !important;
@@ -1674,14 +1690,15 @@ a#tv-attr-logo,
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    flex: 1 1 170px !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
     height: auto !important;
-    min-height: 160px !important;
-    flex-shrink: 0;
+    flex-shrink: 1;
     border: none !important;
+    overflow: hidden !important;
   }
 
-  /* Sidebar controls xuống dưới (order: 2) có đường chỉ dọc 2 bên viền mép màu #333333 dày 2px */
+  /* Sidebar controls xuống dưới (order: 2), nằm sát mép đáy không để thừa khoảng trống */
   .sidebar-left {
     width: 100% !important;
     min-width: unset;
@@ -1689,13 +1706,14 @@ a#tv-attr-logo,
     border-right: 2px solid #333333 !important;
     border-top: none !important;
     border-bottom: 2px solid #333333 !important;
-    height: auto;
+    height: auto !important;
     order: 2;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
     box-sizing: border-box;
-    margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    margin-top: 0 !important;
+    margin-bottom: max(env(safe-area-inset-bottom, 0px), 4px) !important;
   }
-  
+
   .sidebar-header {
     display: none;
   }

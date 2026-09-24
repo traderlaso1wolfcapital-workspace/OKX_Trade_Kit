@@ -21,7 +21,7 @@ export const translations = {
     // Sidebar & Accounts
     account_label: "Tài khoản",
     no_account: "(Chưa có tài khoản)",
-    click_plus_create_acc: "(Bấm nút + để tạo tài khoản)",
+    click_plus_create_acc: "Chọn tài khoản",
     running_on_bot: "Đang chạy ở",
     assigned_on_bot: "Gán ở",
 
@@ -173,7 +173,7 @@ export const translations = {
     // Sidebar & Accounts
     account_label: "Account",
     no_account: "(No account)",
-    click_plus_create_acc: "(Click + to create account)",
+    click_plus_create_acc: "Select account",
     running_on_bot: "Running on",
     assigned_on_bot: "Assigned to",
 
@@ -322,7 +322,7 @@ export const translations = {
 
     account_label: "账户",
     no_account: "(暂无账户)",
-    click_plus_create_acc: "(点击 + 创建账户)",
+    click_plus_create_acc: "选择账户",
     running_on_bot: "正在运行于",
     assigned_on_bot: "分配至",
 
@@ -465,7 +465,7 @@ export const translations = {
 
     account_label: "계정",
     no_account: "(계정 없음)",
-    click_plus_create_acc: "(+ 버튼을 눌러 계정 생성)",
+    click_plus_create_acc: "계정 선택",
     running_on_bot: "실행 중:",
     assigned_on_bot: "할당됨:",
 
@@ -608,7 +608,7 @@ export const translations = {
 
     account_label: "Compte",
     no_account: "(Aucun compte)",
-    click_plus_create_acc: "(Cliquez sur + pour créer)",
+    click_plus_create_acc: "Sélectionner un compte",
     running_on_bot: "En cours sur",
     assigned_on_bot: "Assigné à",
 
@@ -751,7 +751,7 @@ export const translations = {
 
     account_label: "Cuenta",
     no_account: "(Sin cuenta)",
-    click_plus_create_acc: "(Haga clic en + para crear cuenta)",
+    click_plus_create_acc: "Seleccionar cuenta",
     running_on_bot: "Ejecutando en",
     assigned_on_bot: "Asignado a",
 
