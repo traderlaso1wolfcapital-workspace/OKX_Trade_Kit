@@ -67,10 +67,21 @@ def get_public_ip():
     if PUBLIC_IP_CACHE:
         return PUBLIC_IP_CACHE
     try:
-        PUBLIC_IP_CACHE = requests.get('https://api.ipify.org', timeout=3).text.strip()
+        ip = requests.get('https://api.ipify.org', timeout=3).text.strip()
+        if ip:
+            PUBLIC_IP_CACHE = ip
+            return ip
     except Exception:
-        PUBLIC_IP_CACHE = ""
-    return PUBLIC_IP_CACHE
+        pass
+    # Fallback nếu ipify không hoạt động
+    try:
+        ip = requests.get('https://ifconfig.me/ip', timeout=3).text.strip()
+        if ip:
+            PUBLIC_IP_CACHE = ip
+            return ip
+    except Exception:
+        pass
+    return ""
 
 def create_jwt_token(uid: str, is_admin: bool = False):
     payload = {
@@ -360,6 +371,9 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
         return {"status": "error", "message": "Server chưa được cấu hình OKX_OAUTH_CLIENT_SECRET. Hãy thiết lập biến môi trường này cho máy chủ."}
         
     try:
+        # Lấy IP server để debug và whitelist
+        server_ip = get_public_ip()
+        
         url = "https://www.okx.com/v5/users/oauth/token"
         headers = {
             "Content-Type": "application/json",
@@ -367,9 +381,13 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
             "User-Agent": "Mozilla/5.0"
         }
         
+        # redirect_uri BẮT BUỘC phải khớp chính xác với URI đã dùng khi authorization
+        redirect_uri = "https://autotrader.fun/okx-callback"
+        
         payload = {
             "grant_type": "authorization_code",
             "code": req.code,
+            "redirect_uri": redirect_uri,
             "client_id": client_id,
             "client_secret": client_secret
         }
@@ -384,7 +402,10 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
         # 1. Lấy access_token
         access_token = data.get("access_token")
         if not access_token:
-            return {"status": "error", "message": f"Không thể lấy access_token từ OKX: {data.get('msg', data.get('error_description', data))}", "raw": data}
+            err_code = data.get("code", "")
+            err_msg = data.get("msg", data.get("error_description", ""))
+            print(f"[OKX OAuth] Token exchange FAILED. Server IP: {server_ip} | Error code: {err_code} | Error: {err_msg} | Full response: {data}")
+            return {"status": "error", "message": f"Không thể lấy access_token từ OKX: {err_msg or data} (Error code: {err_code}, Server IP: {server_ip})", "raw": data}
             
         auth_headers = {
             "Content-Type": "application/json",
@@ -2740,3 +2761,4 @@ if __name__ == "__main__":
 # z7723 | Update OKX OAuth Fast API endpoint and hide closed_positions if API is deleted
 # z7724 | Fix logic error where deleting API Key did not kill the bot process, and removed /account from OAuth URL.
 # z7725 | Fix OKX OAuth Fast API token exchange endpoint from /oauth2/v1/token to /v5/users/oauth/token and use JSON payload
+# z7726 | Add redirect_uri to OAuth token exchange payload (required by OAuth2 spec), improve get_public_ip with fallback and no-cache-empty, add detailed error logging with server IP
