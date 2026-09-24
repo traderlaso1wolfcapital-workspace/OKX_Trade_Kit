@@ -89,7 +89,21 @@ function App() {
       localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
       return next;
     });
-  }, [activeBotTab]);
+
+    if (accId) {
+      const curUid = localStorage.getItem("tls1_uid") || loginUid || "default";
+      fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${curUid}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d) {
+            setApiKey(d.api_key || "");
+            setSecretKey(d.secret_key || "");
+            setPassphrase(d.passphrase || "");
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeBotTab, loginUid]);
 
   useEffect(() => {
     setSelectedAccount(effectiveAccId);

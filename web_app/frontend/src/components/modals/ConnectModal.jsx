@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "../../i18n";
 
 export default function ConnectModal({
@@ -31,6 +31,23 @@ export default function ConnectModal({
 }) {
   const { t } = useTranslation();
   const [connectTab, setConnectTab] = useState("fast"); // 'fast' | 'apikey'
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const targetAcc = selectedAccount || (accounts.length > 0 ? accounts[0].id : "");
+    if (!targetAcc) return;
+    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          if (setApiKey && d.api_key !== undefined) setApiKey(d.api_key || "");
+          if (setSecretKey && d.secret_key !== undefined) setSecretKey(d.secret_key || "");
+          if (setPassphrase && d.passphrase !== undefined) setPassphrase(d.passphrase || "");
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, selectedAccount, activeBotTab, accounts]);
 
   if (!isOpen) return null;
 
@@ -539,7 +556,7 @@ export default function ConnectModal({
               {/* Chọn tài khoản gán cho bot */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                 <label style={{ color: "#e0e0e0", fontSize: "11.5px", fontWeight: "bold", whiteSpace: "nowrap" }}>
-                  {t("account_assigned_to")} [{botTitle}]:
+                  Quản lý tài khoản:
                 </label>
                 <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
                   <select

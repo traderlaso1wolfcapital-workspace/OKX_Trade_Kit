@@ -18,6 +18,20 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Đổi Tên "Quản Lý Tài Khoản:" Trong Connect Modal & Dịch Text Nút USDT / % VỐN Xuống Dưới Tránh Đè Mất Dấu:
+  - **Mô tả yêu cầu CEO:**
+    1. Mục API KEY Connect trong nút Connect hiện tại sẽ là mục thêm/xoá và quản lý các tài khoản api key đã kết nối/lưu; chọn tài khoản nào thì bên dưới sẽ hiện thông tin API Key của tài khoản đó, khoá bí mật và cụm mật khẩu vẫn giữ bí mật dạng password. Đổi tên `Tài khoản gán cho [EMA200 Bot]:` thành `Quản lý tài khoản:`.
+    2. Hai nút `[USDT]` và `[% VỐN]` chữ sát viền trên quá làm ký tự dấu (`Ố`) bị chạm/cắt bởi viền trên; hãy dịch text xuống dưới gần cạnh dưới của nút để không bị đè mất dấu.
+  - **Giải pháp thực hiện:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Cập nhật nhãn chọn tài khoản thành `Quản lý tài khoản:`.
+      - Bổ sung `useEffect` tự động tải và đồng bộ API Key của tài khoản đang chọn vào ô hiển thị ngay khi mở modal hoặc khi người dùng chuyển đổi tài khoản trong dropdown.
+      - Ô API Key hiển thị dạng text rõ ràng, Khóa Bí Mật và Cụm Mật Khẩu hiển thị dạng `password` (`••••••••`) bảo mật tuyệt đối.
+    - Trong [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx) & [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Căn chỉnh lại CSS của 2 nút `.risk-unit-btn`: `display: "inline-flex"`, `alignItems: "flex-end"`, `height: "21px"`, `boxSizing: "border-box"`, `padding: "4.5px 6px 1.5px 6px"`, `lineHeight: "1"`.
+      - Text được đẩy áp sát mép dưới, tạo khoảng trống 4.5px thoáng đãng phía trên, các ký tự có dấu mũ và sắc (`Ố`) không còn bị viền trên chạm hay cắt lẹm.
+    - Đã build lại production bundle (`npm run build`) và xác nhận sạch đẹp qua browser subagent.
+
 - **[25/09/2026]** - Tái Cấu Trúc Khoa Học Giao Diện Connect Modal & Cài Đặt (System Settings):
   - **Mô tả yêu cầu CEO:**
     1. Đưa toàn bộ phần API Key trong cài đặt bao gồm `Tài khoản gán cho [EMA200 Bot]:` và cụm `Thông Tin API OKX` sang thay thế cho nội dung tab `API Key Connect` của nút Connect. Giữ kích thước bảng hiện tại của Connect gọn gàng.
