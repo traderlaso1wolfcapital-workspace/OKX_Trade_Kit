@@ -327,6 +327,52 @@ export default function ConnectModal({
                   <div style={{ flex: 1, height: "1px", background: "#333333" }}></div>
                 </div>
 
+                {/* Manual Link Fallback for iOS PWA */}
+                <div style={{ marginTop: "4px", marginBottom: "8px", background: "#1a1a1a", padding: "10px", borderRadius: "6px", border: "1px dashed #333" }}>
+                  <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "6px", fontWeight: "bold" }}>
+                    Dán Link Safari (nếu bị lỗi trình duyệt)
+                  </label>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <input
+                      type="text"
+                      placeholder="Dán link bắt đầu bằng https://..."
+                      className="connect-input"
+                      id="manualCodeInput"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = document.getElementById("manualCodeInput").value.trim();
+                        if (!val) return;
+                        if (val.includes("code=")) {
+                           let searchPart = val;
+                           if (val.includes("?")) {
+                             searchPart = val.substring(val.indexOf("?"));
+                           } else if (!val.startsWith("?")) {
+                             searchPart = "?" + val;
+                           }
+                           window.location.href = "/okx-callback" + searchPart;
+                        } else {
+                           alert("Link không chứa mã code. Vui lòng copy toàn bộ link trang bị lỗi.");
+                        }
+                      }}
+                      style={{
+                        padding: "0 12px",
+                        backgroundColor: "#2e7d32",
+                        border: "none",
+                        color: "#fff",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontWeight: "bold",
+                        fontSize: "12px",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      Xác nhận
+                    </button>
+                  </div>
+                </div>
+
                 {/* 2. Binance Connect Card (Coming Soon) */}
                 <div className="connect-card disabled" title="Tính năng đang được phát triển">
                   <div

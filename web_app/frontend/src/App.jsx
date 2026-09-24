@@ -831,7 +831,7 @@ function App() {
             window.history.replaceState({}, document.title, "/");
           }
         } else if (!callbackUid) {
-          setFastConnectStatus({ type: "error", msg: "Không tìm thấy thông tin phiên đăng nhập (UID) từ OKX. Có thể do bạn mở trên trình duyệt khác. Vui lòng kết nối lại từ ứng dụng chính." });
+          setFastConnectStatus({ type: "error", msg: "Không tìm thấy thông tin phiên đăng nhập (UID). (Thường do mở qua Safari/trình duyệt ngoài). Vui lòng copy đường dẫn (link) hiện tại, quay lại ứng dụng chính và dán vào ô 'Nhập Link Liên Kết Thủ Công' trong phần Connect." });
           window.history.replaceState({}, document.title, "/");
         } else if (!code) {
           setFastConnectStatus({ type: "error", msg: "Không nhận được mã xác thực (code) từ OKX. Vui lòng thử lại." });

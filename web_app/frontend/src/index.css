@@ -33,10 +33,16 @@ body {
   height: 100dvh;
   width: 100%;
   background-color: #1e1e1e;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(env(safe-area-inset-top, 0px), 12px);
   padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
+}
+
+@media all and (display-mode: standalone) {
+  .app-container {
+    padding-top: max(env(safe-area-inset-top, 0px), 44px);
+  }
 }
 
 .content-wrapper {
