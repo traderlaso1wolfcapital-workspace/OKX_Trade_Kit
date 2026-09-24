@@ -18,6 +18,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Đồng Bộ Font Chữ & Làm Nghiêng, Nhỏ, Mờ Placeholder Ô Nhập API Key Connect:
+  - **Mô tả yêu cầu:**
+    - Trong modal Connect (tab API Key OKX): Các ô nhập API Key, Secret Key, Passphrase đổi font chữ sang font Monospace (`Consolas, monospace`) giống như ở phần Thông Tin API OKX / Cài đặt.
+    - Phần chữ placeholder note (`Nhập API Key...`, `Nhập Secret Key...`, `Nhập Passphrase...`, `Tự động nhận diện sau khi kết nối...`): Làm nghiêng (`font-style: italic`), kích thước nhỏ (`11px`), màu mờ (`#555555`, opacity `0.75`) tạo cảm giác như một gợi ý phụ không quan trọng.
+  - **Đã xử lý:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Cập nhật `.connect-input` với `font-family: Consolas, monospace; font-size: 12.5px;`. Bổ sung rule `.connect-input::placeholder` với `font-family: Consolas, monospace; font-style: italic; font-size: 11px; color: #555555; opacity: 0.75;`.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Đồng bộ áp dụng rule placeholder này cho cả `.settings-modal .styled-input::placeholder`.
+    - Trong [i18n/index.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js): Bổ sung `apikey_connect_desc` đầy đủ cho cả 6 ngôn ngữ.
+    - Kiểm thử hiển thị thực tế trên trình duyệt thành công 100%.
+
+
 - **[25/09/2026]** - Tự Động Kéo Cụm Tài Khoản Sát Đáy Trong Safari Web App (PWA) & Khống Chế Giới Hạn Min 3 Dòng Vị Thế:
   - **Mô tả yêu cầu:**
     1. Khi lưu về màn hình chính trên iOS Safari (iPhone 15 Pro Max) mở dưới dạng ứng dụng web độc lập (Standalone PWA), cụm Tài khoản (EMA200 Bot) bị thừa khoảng trống lớn ở đáy màn hình. Cần tự động kéo sát mép dưới cùng.
