@@ -219,6 +219,27 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showLayoutMenu]);
 
+  // Sync exact viewport height for iOS Safari & Standalone PWA
+  useEffect(() => {
+    const updateRealHeight = () => {
+      const h = window.innerHeight;
+      document.documentElement.style.setProperty('--real-app-height', `${h}px`);
+    };
+    updateRealHeight();
+    window.addEventListener('resize', updateRealHeight);
+    window.addEventListener('orientationchange', updateRealHeight);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateRealHeight);
+    }
+    return () => {
+      window.removeEventListener('resize', updateRealHeight);
+      window.removeEventListener('orientationchange', updateRealHeight);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateRealHeight);
+      }
+    };
+  }, []);
+
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
     const saved = localStorage.getItem("tls1_split_view");

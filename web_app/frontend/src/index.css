@@ -9,7 +9,7 @@ html, body, #root {
   -webkit-text-size-adjust: 100% !important;
   text-size-adjust: 100% !important;
   height: 100%;
-  height: 100dvh;
+  height: var(--real-app-height, 100dvh);
   width: 100%;
   margin: 0;
   padding: 0;
@@ -36,49 +36,45 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  height: 100dvh;
+  height: var(--real-app-height, 100dvh);
+  max-height: var(--real-app-height, 100dvh);
   width: 100%;
   background-color: #1e1e1e;
   padding-top: max(env(safe-area-inset-top, 0px), 12px);
   padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
   padding-left: env(safe-area-inset-left, 0px);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 @media all and (display-mode: standalone), (display-mode: fullscreen) {
   html, body, #root {
     height: 100% !important;
-    height: 100vh !important;
-    min-height: 100vh !important;
+    height: var(--real-app-height, 100vh) !important;
+    min-height: 100% !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
   }
   body {
     background-color: #1e1e1e;
   }
   .app-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
     height: 100% !important;
-    height: 100vh !important;
+    height: var(--real-app-height, 100vh) !important;
+    max-height: var(--real-app-height, 100vh) !important;
     width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
     padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
+    overflow: hidden !important;
   }
 }
 
@@ -1635,21 +1631,18 @@ a#tv-attr-logo,
 @media screen and (max-width: 1024px), (width <= 1024px) {
   html, body, #root {
     height: 100% !important;
-    height: 100vh !important;
+    height: var(--real-app-height, 100dvh) !important;
     width: 100% !important;
     overflow: hidden !important;
   }
 
   .app-container {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    flex-direction: column;
+    display: flex !important;
+    flex-direction: column !important;
     height: 100% !important;
-    height: 100vh !important;
-    overflow: hidden;
+    height: var(--real-app-height, 100dvh) !important;
+    max-height: var(--real-app-height, 100dvh) !important;
+    overflow: hidden !important;
     padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
@@ -1660,10 +1653,10 @@ a#tv-attr-logo,
 
   .content-wrapper {
     flex-direction: column !important;
+    display: flex !important;
     flex: 1 1 0% !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
     margin: 0 !important;
@@ -1679,7 +1672,6 @@ a#tv-attr-logo,
     flex-direction: column !important;
     flex: 1 1 0% !important;
     min-height: 0 !important;
-    height: 100% !important;
     overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -1723,7 +1715,6 @@ a#tv-attr-logo,
     flex-direction: column !important;
     flex: 1 1 0% !important;
     min-height: 0 !important;
-    height: 100% !important;
     border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 trọn vẹn 4 cạnh */
     border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
     box-sizing: border-box !important;
@@ -1764,7 +1755,7 @@ a#tv-attr-logo,
     order: 2;
     flex-shrink: 0 !important;
     box-sizing: border-box;
-    margin-top: auto !important;
+    margin-top: 0 !important;
     margin-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
   }
 

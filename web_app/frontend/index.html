@@ -11,6 +11,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#1e1e1e" />
     <title>AutoTrader</title>
+    <script>
+      function setRealAppHeight() {
+        var h = window.innerHeight;
+        document.documentElement.style.setProperty('--real-app-height', h + 'px');
+      }
+      setRealAppHeight();
+      window.addEventListener('resize', setRealAppHeight);
+      window.addEventListener('orientationchange', function() {
+        setTimeout(setRealAppHeight, 100);
+      });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setRealAppHeight);
+      }
+    </script>
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
   </head>
   <body>
