@@ -952,7 +952,7 @@ def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
                         os.path.join(d, f"bots/{strategy}", f".api_{aname}"),
                         os.path.join(d, f".api_{aname}"),
                     ])
-            if target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or any(n in ["sub1", "botEMA200"] for n in acc_names) or (strategy == "sub1" and (target_acc.startswith("sub_") or target_acc == "sub1_default")):
+            if target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or any(n in ["sub1", "botEMA200"] for n in acc_names) or (strategy == "sub1" and target_acc == "sub1_default"):
                 candidate_paths.extend([
                     os.path.join(d, ".api_botEMA200"),
                     os.path.join(d, "bots/sub1", ".api_botEMA200"),

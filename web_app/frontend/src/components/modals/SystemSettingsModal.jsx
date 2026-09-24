@@ -139,13 +139,13 @@ export default function SystemSettingsModal({
                   <div className="settings-group-title">Tài khoản ({botTitle})</div>
                   <div className="entry-setup-list">
                     {/* Chọn tài khoản trade */}
-                    <div className="entry-setup-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <div className="entry-setup-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "8px", flexWrap: "wrap" }}>
                       <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
-                        {t("account_assigned_to")} ({botTitle}):
+                        Tài khoản:
                       </span>
                       <select
                         className="styled-select"
-                        style={{ minWidth: "170px", maxWidth: "230px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "12px" }}
+                        style={{ width: "auto", minWidth: "90px", maxWidth: "100%", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 24px 4px 8px", borderRadius: "4px", fontSize: "12px", flexShrink: 1, textOverflow: "ellipsis" }}
                         value={selectedAccount || (accounts.length > 0 ? accounts[0].id : "")}
                         onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
                       >

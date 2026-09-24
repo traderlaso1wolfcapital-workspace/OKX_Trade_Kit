@@ -18,6 +18,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Đổi Tên "THÔNG TIN API KEY", Xóa Trắng Ô Key Khi Bấm "+" Tạo Tài Khoản Mới & Rút Ngắn Nhãn "Tài khoản:" Co Giãn Tự Động:
+  - **Mô tả yêu cầu CEO:**
+    1. Trong tab API KEY Connect: đổi tên nhóm `THÔNG TIN API OKX` thành `THÔNG TIN API KEY`.
+    2. Khi ấn vào dấu `+` tạo tài khoản mới: các ô nhập thông tin API Key bên dưới phải để trống hoàn toàn như chưa điền gì để người dùng nhập key mới rồi ấn lưu; không sao chép lại bản API key của tài khoản trước đó.
+    3. Trong tab Chiến Thuật: nhãn `Tài khoản gán cho (EMA200 Bot):` và ô chọn tài khoản quá dài, bị tràn ra ngoài trên mobile. Cần rút ngắn tên nhãn lại và cho ô chọn co giãn tự động theo tên tài khoản.
+  - **Giải pháp thực hiện:**
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Sửa lỗi điều kiện dòng 955 trong `_get_okx_creds`: Bỏ `target_acc.startswith("sub_")` khỏi điều kiện fallback về `.api_botEMA200`. Nhờ đó, bất kỳ tài khoản mới nào vừa tạo (có id `sub_*`) sẽ không bị backend tự động nhồi key của botEMA200 sang, mà trả về chuỗi rỗng `""`.
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Đổi tiêu đề nhóm thành **`THÔNG TIN API KEY`**.
+      - Khi bấm nút `+` tạo tài khoản mới, hệ thống chủ động reset trắng toàn bộ 3 ô nhập `setApiKey("")`, `setSecretKey("")`, `setPassphrase("")`.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Rút ngắn nhãn thành **`Tài khoản:`** (chỉ 9 ký tự, giảm hơn 65% độ dài).
+      - Bỏ giới hạn cố định `minWidth: 170px, maxWidth: 230px`, chuyển sang `width: auto`, `minWidth: 90px`, `maxWidth: 100%`, `flexShrink: 1` cùng hàng bọc `flexWrap: wrap`. Ô chọn co giãn tự nhiên vừa vặn theo độ dài tên tài khoản, đảm bảo responsive 100% trên màn hình mobile hẹp.
+    - Đã build bundle production (`npm run build`) và xác minh qua browser subagent.
+
 - **[25/09/2026]** - Đổi Tên "Quản Lý Tài Khoản:" Trong Connect Modal & Dịch Text Nút USDT / % VỐN Xuống Dưới Tránh Đè Mất Dấu:
   - **Mô tả yêu cầu CEO:**
     1. Mục API KEY Connect trong nút Connect hiện tại sẽ là mục thêm/xoá và quản lý các tài khoản api key đã kết nối/lưu; chọn tài khoản nào thì bên dưới sẽ hiện thông tin API Key của tài khoản đó, khoá bí mật và cụm mật khẩu vẫn giữ bí mật dạng password. Đổi tên `Tài khoản gán cho [EMA200 Bot]:` thành `Quản lý tài khoản:`.

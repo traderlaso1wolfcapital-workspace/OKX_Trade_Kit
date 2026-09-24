@@ -596,7 +596,12 @@ export default function ConnectModal({
                   </select>
                   <button
                     type="button"
-                    onClick={onCreateAccount}
+                    onClick={() => {
+                      if (setApiKey) setApiKey("");
+                      if (setSecretKey) setSecretKey("");
+                      if (setPassphrase) setPassphrase("");
+                      if (onCreateAccount) onCreateAccount();
+                    }}
                     style={{ backgroundColor: "#28a745", color: "white", fontSize: "15px", fontWeight: "bold", borderRadius: "4px", width: "28px", height: "26px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     title={t("create_account_tooltip") || "Thêm tài khoản mới"}
                   >+</button>
@@ -609,10 +614,10 @@ export default function ConnectModal({
                 </div>
               </div>
 
-              {/* Thông Tin API OKX */}
+              {/* Thông Tin API Key */}
               <div className="settings-group" style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid #333333", borderRadius: "6px", padding: "10px 12px" }}>
                 <div style={{ fontSize: "11px", fontWeight: "bold", color: "#aaaaaa", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  {t("okx_api_info")}
+                  THÔNG TIN API KEY
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
