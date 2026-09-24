@@ -18,6 +18,20 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tự Động Quét Nhận Diện UID & Tạo Tài Khoản Khi Bấm LƯU API KEY (Loại Bỏ Thông Báo Ép Bấm Nút +):
+  - **Mô tả yêu cầu CEO:**
+    - Khi nhập API Key, Secret Key, Passphrase vào 3 dòng và bấm "LƯU API KEY", hệ thống lại hiện cảnh báo `⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi lưu API Key!`.
+    - Trong khi đó, các nút `+` và `-` đã bị vô hiệu hóa vì hệ thống chuyển sang cơ chế tự động nhận diện tài khoản.
+    - Yêu cầu: Nhập xong 3 dòng và bấm "LƯU API KEY" thì bot phải tự động quét OKX, tự nhận diện UID và tên tài khoản từ sàn, tự động tạo/gán tài khoản cho bot mà không bắt người dùng phải bấm nút `+`.
+  - **Giải pháp thực hiện:**
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Cập nhật hàm `handleSaveApiKey`: Xóa bỏ điều kiện chặn `if (!selectedAccount)`. Nếu `selectedAccount` rỗng (chưa có tài khoản nào được tạo trước đó), tự động gán `targetAcc = sub_${Date.now()}`.
+      - Gửi API Key lên backend `/api/bot/credentials`. Backend tự động gọi OKX API `/api/v5/account/config` xác thực, lấy Master UID và Label/Tên tài khoản sàn OKX, tự động thêm vào `accounts.json` và trả về danh sách accounts.
+      - Frontend nhận `detected_uid`, `detected_name`, và `accounts` mới, tự động lưu `tls1_uid`, `tls1_accounts`, gán tài khoản cho bot hiện tại (`botAccountMap`), đăng nhập thành công (`tls1_auth`), thông báo thành công và làm mới dữ liệu bot.
+      - Sửa thông báo chặn ở `handleStartBot`: Thay vì nhắc "Bấm nút +", hiển thị hướng dẫn nhập API Key trong phần Cài Đặt hoặc Connect.
+    - Đã build lại production bundle (`npm run build`).
+
+
 - **[25/09/2026]** - Tinh Chỉnh Bảng Vị Thế Min Sát Mép Bo Cụm (168px) & Dịch Mobile Web Lên Phía Cằm Trên Như Ban Đầu:
   - **Mô tả yêu cầu CEO:**
     1. Bảng vị thế ở mức giới hạn min và mặc định: Dòng thứ 3 (ETH-USDT) phải gần như sát mép bo bên ngoài cụm (`main-workspace`), không để kéo thừa khoảng trống đen bên dưới.

@@ -1007,8 +1007,10 @@ function App() {
   const handleStartBot = async () => {
     if (isStartingBot || isStoppingBot) return;
     const currentAcc = effectiveAccId;
-    if (!currentAcc) {
-      alert("⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi chạy bot!");
+    if (!currentAcc || accounts.length === 0) {
+      alert("⚠️ Vui lòng cấu hình API Key OKX trong phần Cài Đặt (hoặc Connect) trước khi chạy bot!");
+      setShowSettings(true);
+      setSettingsTab("api");
       return;
     }
     if (!apiKey || !secretKey || !passphrase) {
@@ -1285,17 +1287,28 @@ function App() {
   };
 
   const handleSaveApiKey = async () => {
-    if (!selectedAccount) {
-      alert("⚠️ Vui lòng tạo ít nhất 1 tài khoản (Bấm nút +) trước khi lưu API Key!");
+    const cleanApiKey = apiKey?.trim() || "";
+    const cleanSecretKey = secretKey?.trim() || "";
+    const cleanPassphrase = passphrase?.trim() || "";
+
+    if (!cleanApiKey || !cleanSecretKey || !cleanPassphrase) {
+      alert("⚠️ Vui lòng nhập đầy đủ Mã API (API Key), Khóa Bí Mật (Secret) và Cụm Mật Khẩu (Passphrase)!");
       return;
     }
+
+    // Tự động gán hoặc tạo tài khoản mới theo API Key nếu chưa có tài khoản nào được chọn
+    let targetAcc = selectedAccount || effectiveAccId;
+    if (!targetAcc) {
+      targetAcc = `sub_${Date.now()}`;
+    }
+
     setIsSavingConfig(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, 800));
     try {
-      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${selectedAccount}&uid=${currentUid}`, {
+      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${currentUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: apiKey, secret_key: secretKey, passphrase, okx_uid: okxUid })
+        body: JSON.stringify({ api_key: cleanApiKey, secret_key: cleanSecretKey, passphrase: cleanPassphrase, okx_uid: okxUid })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1312,8 +1325,12 @@ function App() {
         setAccounts(data.accounts);
         localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
       }
-      handleAssignAccountToActiveBot(selectedAccount);
-      const curAccName = data.detected_name || accounts.find(a => a.id === selectedAccount)?.name || selectedAccount;
+      setSelectedAccount(targetAcc);
+      handleAssignAccountToActiveBot(targetAcc);
+      setIsAuthenticated(true);
+      localStorage.setItem("tls1_auth", "true");
+
+      const curAccName = data.detected_name || accounts.find(a => a.id === targetAcc)?.name || targetAcc;
       alert(`Đã lưu cấu hình API Key cho [${curAccName}] thành công!`);
       addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
       refreshBotData();
