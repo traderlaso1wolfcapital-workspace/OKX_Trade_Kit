@@ -525,26 +525,88 @@ function App() {
     return () => clearTimeout(timer);
   }, [risk, activeBotTab, currentUid]);
 
+  // Bootstrap accounts & credentials unconditionally on mount
+  useEffect(() => {
+    let isMounted = true;
+    const bootstrap = async () => {
+      try {
+        const uidToUse = localStorage.getItem("tls1_uid") || loginUid || "default";
+        const resAcc = await fetch(`/api/bot/accounts?uid=${uidToUse}`);
+        let accList = [];
+        if (resAcc.ok) {
+          const data = await resAcc.json();
+          if (Array.isArray(data) && data.length > 0) {
+            accList = data;
+            if (isMounted) {
+              setAccounts(data);
+              localStorage.setItem("tls1_accounts", JSON.stringify(data));
+            }
+          }
+        }
+
+        let targetAcc = "";
+        try {
+          const savedMap = JSON.parse(localStorage.getItem("tls1_bot_accounts") || "{}");
+          if (savedMap[activeBotTab] && accList.some(a => a.id === savedMap[activeBotTab])) {
+            targetAcc = savedMap[activeBotTab];
+          }
+        } catch { }
+        if (!targetAcc && accList.length > 0) {
+          targetAcc = accList[0].id;
+        }
+
+        if (targetAcc && isMounted) {
+          setSelectedAccount(targetAcc);
+          setBotAccountMap(prev => {
+            const next = { ...prev, [activeBotTab]: targetAcc };
+            localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+            return next;
+          });
+        }
+
+        const accToQuery = targetAcc || activeBotTab;
+        const resCred = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accToQuery}&uid=${uidToUse}`);
+        if (resCred.ok) {
+          const credData = await resCred.json();
+          if (credData.api_key || credData.secret_key || credData.passphrase) {
+            if (isMounted) {
+              setApiKey(credData.api_key || "");
+              setSecretKey(credData.secret_key || "");
+              setPassphrase(credData.passphrase || "");
+              setIsAuthenticated(true);
+              localStorage.setItem("tls1_auth", "true");
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Auto bootstrap error:", e);
+      }
+    };
+    bootstrap();
+    return () => { isMounted = false; };
+  }, [activeBotTab]);
+
   // Load account credentials
   useEffect(() => {
-    if (!isAuthenticated) return;
     const fetchCreds = async () => {
       try {
-        const targetAcc = selectedAccount || effectiveAccId;
-        if (!targetAcc) return;
-        const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${currentUid}`);
+        const targetAcc = selectedAccount || effectiveAccId || activeBotTab;
+        const uidToUse = currentUid || localStorage.getItem('tls1_uid') || 'default';
+        const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${uidToUse}`);
         if (r.ok) {
           const d = await r.json();
-          if (d.api_key || d.secret_key || d.passphrase) {
-            setApiKey(d.api_key || "");
-            setSecretKey(d.secret_key || "");
-            setPassphrase(d.passphrase || "");
+          setApiKey(d.api_key || "");
+          setSecretKey(d.secret_key || "");
+          setPassphrase(d.passphrase || "");
+          if ((d.api_key || d.secret_key || d.passphrase) && !isAuthenticated) {
+            setIsAuthenticated(true);
+            localStorage.setItem("tls1_auth", "true");
           }
         }
       } catch { }
     };
     fetchCreds();
-  }, [isAuthenticated, activeBotTab, selectedAccount, effectiveAccId, currentUid]);
+  }, [activeBotTab, selectedAccount, effectiveAccId, currentUid, showSettings]);
 
   // Load bot configuration (enabled TFs, coins)
   useEffect(() => {
@@ -611,8 +673,8 @@ function App() {
 
   // Load accounts list
   useEffect(() => {
-    if (!isAuthenticated || !currentUid) return;
-    fetch(`/api/bot/accounts?uid=${currentUid}`)
+    const curUid = currentUid || localStorage.getItem('tls1_uid') || 'default';
+    fetch(`/api/bot/accounts?uid=${curUid}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -621,7 +683,7 @@ function App() {
         }
       })
       .catch(() => { });
-  }, [isAuthenticated, currentUid]);
+  }, [currentUid]);
 
   // Start shadow bot in background
   useEffect(() => {
@@ -631,15 +693,24 @@ function App() {
 
   // 10. WebSocket Logs Terminal stream (with full multi-bot buffer, no line clipping!)
   useEffect(() => {
-    if (!isAuthenticated) return;
     let isMounted = true;
     let ws = null;
 
     const connectWS = () => {
       if (!isMounted) return;
+      const safeUid = currentUid || localStorage.getItem('tls1_uid') || 'default';
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs/${currentUid}/${activeBotTab}`);
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs/${safeUid}/${activeBotTab}`);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        setLogs(prev => {
+          if (prev.length <= 1 && (prev.length === 0 || prev[0] === "Đang kết nối với TLS1 Trading Web Terminal Server...")) {
+            return [{ id: Date.now(), lines: [`✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`] }];
+          }
+          return prev;
+        });
+      };
 
       ws.onmessage = (e) => {
         const text = e.data;
@@ -693,7 +764,7 @@ function App() {
         ws.close();
       }
     };
-  }, [isAuthenticated, activeBotTab, currentUid]);
+  }, [activeBotTab, currentUid]);
 
   const handleToggleMultiplyVolume = async (val) => {
     const nextVal = Boolean(val);
@@ -897,38 +968,26 @@ function App() {
 
 
   const handleConnectApiKey = async (uid, inputApiKey, inputSecretKey, inputPassphrase) => {
+    const cleanApiKey = inputApiKey?.trim() || "";
+    const cleanSecretKey = inputSecretKey?.trim() || "";
+    const cleanPassphrase = inputPassphrase?.trim() || "";
+
+    if (!cleanApiKey || !cleanSecretKey || !cleanPassphrase) {
+      setFastConnectStatus({ type: "error", msg: "Vui lòng nhập đầy đủ API Key, Secret Key và Passphrase!" });
+      return;
+    }
+
     try {
-      let accId = effectiveAccId;
-      if (!accId) {
-        accId = `sub_${Date.now()}`;
-        const cleanName = "Tài khoản 1";
-        const newAcc = { id: accId, name: cleanName };
-
-        setAccounts(prev => {
-          const next = [...prev, newAcc];
-          localStorage.setItem("tls1_accounts", JSON.stringify(next));
-          return next;
-        });
-        setSelectedAccount(accId);
-        setBotAccountMap(prev => {
-          const next = { ...prev, [activeBotTab]: accId };
-          localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-          return next;
-        });
-
-        try {
-          await fetch(`/api/bot/accounts?uid=${uid}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: accId, name: cleanName })
-          });
-        } catch (e) { }
+      let targetAcc = selectedAccount || effectiveAccId;
+      if (!targetAcc) {
+        targetAcc = `sub_${Date.now()}`;
       }
 
-      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${uid}`, {
+      const curUid = uid || currentUid || localStorage.getItem("tls1_uid") || "default";
+      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: inputApiKey, secret_key: inputSecretKey, passphrase: inputPassphrase })
+        body: JSON.stringify({ api_key: cleanApiKey, secret_key: cleanSecretKey, passphrase: cleanPassphrase, okx_uid: curUid })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -942,7 +1001,7 @@ function App() {
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
 
-      const savedUid = data.detected_uid || uid;
+      const savedUid = data.detected_uid || curUid;
       if (savedUid) {
         localStorage.setItem("tls1_uid", savedUid);
         setLoginUid(savedUid);
@@ -952,11 +1011,14 @@ function App() {
         localStorage.setItem("tls1_last_detected_acc", data.detected_name);
       }
 
-      setApiKey(inputApiKey);
-      setSecretKey(inputSecretKey);
-      setPassphrase(inputPassphrase);
+      setSelectedAccount(targetAcc);
+      handleAssignAccountToActiveBot(targetAcc);
+
+      setApiKey(cleanApiKey);
+      setSecretKey(cleanSecretKey);
+      setPassphrase(cleanPassphrase);
       
-      const accDisplayName = data.detected_name || (accounts.find(a => a.id === accId)?.name) || "Tài khoản";
+      const accDisplayName = data.detected_name || (data.accounts && data.accounts.find(a => a.id === targetAcc)?.name) || (accounts.find(a => a.id === targetAcc)?.name) || "Tài khoản";
       setFastConnectStatus({ type: "success", msg: `Kết nối API Key thành công cho [${accDisplayName}]!` });
       addSystemLog(`🔑 [SYSTEM] Đã kết nối API Key OKX cho tài khoản "${accDisplayName}"`);
       setShowConnectModal(false);
@@ -1276,10 +1338,11 @@ function App() {
     setIsSavingConfig(true);
     await new Promise(resolve => setTimeout(resolve, 800));
     try {
-      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${currentUid}`, {
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: cleanApiKey, secret_key: cleanSecretKey, passphrase: cleanPassphrase, okx_uid: okxUid })
+        body: JSON.stringify({ api_key: cleanApiKey, secret_key: cleanSecretKey, passphrase: cleanPassphrase, okx_uid: okxUid || curUid })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1305,7 +1368,7 @@ function App() {
       setSecretKey(cleanSecretKey);
       setPassphrase(cleanPassphrase);
 
-      const curAccName = data.detected_name || accounts.find(a => a.id === targetAcc)?.name || targetAcc;
+      const curAccName = data.detected_name || (data.accounts && data.accounts.find(a => a.id === targetAcc)?.name) || accounts.find(a => a.id === targetAcc)?.name || targetAcc;
       alert(`Đã lưu cấu hình API Key cho [${curAccName}] thành công!`);
       addSystemLog(`🔑 [SYSTEM] Đã lưu cấu hình API Key cho tài khoản "${curAccName}"`);
       refreshBotData();
@@ -1313,7 +1376,6 @@ function App() {
       alert(`Lỗi kết nối khi lưu API Key: ${e.message}`);
     }
     setIsSavingConfig(false);
-    setShowSettings(false);
   };
 
   const handleSaveStratConfig = async () => {
@@ -1533,69 +1595,7 @@ function App() {
     return () => clearInterval(timer);
   }, [isAuthenticated, loginUid]);
 
-  // WebSocket
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let isMounted = true;
-    let ws = null;
 
-    const connectWS = () => {
-      if (!isMounted) return;
-      ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/logs/${localStorage.getItem('tls1_uid') || loginUid}/${activeBotTab}`);
-      wsRef.current = ws;
-      ws.onmessage = (e) => {
-        const now = Date.now();
-        setLogs(prev => {
-          // Xóa hoàn toàn log cũ nếu gặp dấu hiệu in Dashboard mới
-          if (typeof e.data === 'string' && e.data.includes("bot_sub1.py")) {
-            logBlockIdRef.current += 1;
-            return [{ id: logBlockIdRef.current, lines: [e.data] }];
-          }
-
-          let newBlocks = [...prev];
-          // LUÔN LUÔN đẩy log mới nhất lên ĐẦU (tin mới nhất trên cùng)
-          if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
-            logBlockIdRef.current += 1;
-            newBlocks.unshift({ id: logBlockIdRef.current, lines: [e.data] });
-          } else {
-            // Log đến liên tục => gộp vào block ĐẦU TIÊN theo chiều xuôi (để bảng không bị lộn ngược)
-            newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, e.data] };
-            // Bỏ giới hạn 20 dòng để hiển thị trọn vẹn Bảng SYS (Dashboard)
-            if (newBlocks[0].lines.length > 500) {
-              newBlocks[0].lines = newBlocks[0].lines.slice(newBlocks[0].lines.length - 500);
-            }
-          }
-          // Giữ tối đa 20 blocks gần nhất để không lag
-          if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
-          return newBlocks;
-        });
-        lastLogTimeRef.current = now;
-      };
-      ws.onclose = () => {
-        if (isMounted && wsRef.current === ws) {
-          setTimeout(connectWS, 3000);
-        }
-      };
-    };
-
-    // Đổi tab => clear log cũ, nối lại WS mới
-    setLogs([]);
-    lastLogTimeRef.current = 0;
-    logBlockIdRef.current = 0;
-    if (wsRef.current) {
-      wsRef.current.onclose = null;
-      wsRef.current.close();
-    }
-    connectWS();
-
-    return () => {
-      isMounted = false;
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
-      }
-    };
-  }, [isAuthenticated, activeBotTab, loginUid]);
 
   useEffect(() => {
     if (terminalRef.current) {
@@ -2179,9 +2179,6 @@ function App() {
         botAccountMap={botAccountMap}
         activeAccounts={mergedActiveAccounts}
         onCreateAccount={() => {
-          setApiKey("");
-          setSecretKey("");
-          setPassphrase("");
           setNewAccountInput("");
           setShowAddAccountModal(true);
         }}

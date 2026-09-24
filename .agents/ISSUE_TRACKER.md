@@ -18,7 +18,35 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[25/09/2026]** - Loại Bỏ Mặc Định Tỷ Lệ 30-70 Cố Định, Cho Phép Người Dùng Tự Do Kéo Thả Phân Chia Biểu Đồ & Bảng Vị Thế Tuỳ Ý & Lưu Lại:
+- **[25/09/2026]** - Sửa Lỗi Logs Terminal Treo "Đang kết nối..." & Sửa Lỗi Không Lưu/Giữ 3 Dòng API Key Trong Cài Đặt (Đồng Bộ Tuyệt Đối Cài Đặt & Connect Vào Tài Khoản Gán Cho Bot):
+  - **Mô tả yêu cầu CEO:**
+    1. Tại sao trong Logs lại thông báo `Đang kết nối với TLS1 Trading Web Terminal Server...` liên tục mà không nhận được log?
+    2. Nhập API Key trong Cài Đặt ấn Lưu thì quét được tên tài khoản (`botEMA200`) nhưng lại không giữ lại 3 dòng API Key, mở lại bị trống mặc dù đã báo lưu thành công?
+    3. Nhập API Key ở phần Connect hay Cài Đặt đều phải như nhau: đều lưu vào đúng mục "Tài khoản gán cho [EMA200 Bot]:" trong Cài Đặt và giữ nguyên 3 dòng API Key trên giao diện.
+  - **Nguyên nhân cốt lõi (Root Cause):**
+    1. **Logs Terminal bị treo:**
+       - Tồn tại 2 `useEffect` WebSocket trùng lặp trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) (dòng 632 và dòng 1536) gây xung đột.
+       - Cả hai đều có `if (!isAuthenticated) return;`. Khi người dùng truy cập qua IP mạng LAN (`http://192.168.2.92:5173/`), `localStorage` của IP này hoàn toàn mới (`tls1_auth` chưa có), dẫn đến WebSocket không bao giờ được khởi tạo, làm Logs bị treo mãi ở thông báo placeholder ban đầu. Ngoài ra URL `/ws/logs/${uid}/${strat}` bị lỗi nếu `uid` rỗng (`//`).
+    2. **3 Dòng API Key bị trống:**
+       - Hook tải tài khoản (`/api/bot/accounts`) và credentials (`/api/bot/credentials`) bị chặn bởi `if (!isAuthenticated || !currentUid) return;`, khiến giao diện ở IP mới không bootstrap được danh sách accounts và API Key có sẵn từ backend.
+       - Sau khi lưu API Key thành công, `handleSaveApiKey` đột ngột đóng modal (`setShowSettings(false)`). Khi mở lại modal, không có cơ chế tự động query lại credentials theo account đang chọn nếu chưa load xong state.
+       - Ngoài ra, nút bấm `+` (Tạo tài khoản mới) có dòng lệnh `setApiKey("")`, `setSecretKey("")`, `setPassphrase("")` ngay khi vừa bấm mở popup khiến key bị xóa sớm nếu người dùng bấm vào.
+    3. **Lệch gán tài khoản giữa Connect và Cài Đặt:**
+       - `ConnectModal` trước đó tự tạo ra một `accId` mới thay vì gán vào tài khoản được chọn của Bot tab đang kích hoạt (`activeBotTab`).
+  - **Giải pháp thực hiện:**
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật `websocket_logs`: Khi client kết nối, tự động tìm buffer log từ queue của `uid` hiện tại hoặc fallback sang queue `default` / bất kỳ queue nào đang có log của bot đó.
+      - Cập nhật `log_reader_task`: Phát sóng đồng thời cho mọi client đang lắng nghe bot strategy đó bất kể client kết nối bằng UID hay IP LAN.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Thêm hook **Auto Bootstrap** vô điều kiện khi mount: Tự động fetch `/api/bot/accounts` và `/api/bot/credentials`, tự động nhận diện account gán cho bot và nạp đầy đủ 3 dòng API Key, Secret, Passphrase vào React state và set `isAuthenticated(true)`.
+      - Cập nhật `fetchCreds`: Lắng nghe theo `[activeBotTab, selectedAccount, effectiveAccId, currentUid, showSettings]`. Mỗi khi mở Cài Đặt hoặc chuyển đổi dropdown tài khoản, tự động nạp chính xác 3 dòng key của tài khoản đó.
+      - Xóa bỏ `useEffect` WebSocket trùng lặp (dòng 1536-1598).
+      - Chuẩn hóa WebSocket Logs chính: Sử dụng `safeUid = currentUid || 'default'`, kết nối ngay không phụ thuộc `isAuthenticated`, có sự kiện `ws.onopen` cập nhật `✅ Đã kết nối với TLS1 Trading Web Terminal Server [SUB1]`.
+      - Đồng bộ tuyệt đối `handleSaveApiKey` và `handleConnectApiKey`: Đều lưu vào tài khoản đang gán cho Bot tab hiện tại (`activeBotTab`), cập nhật `selectedAccount`, `botAccountMap`, và giữ nguyên 3 dòng input. Bỏ lệnh `setShowSettings(false)` để modal giữ nguyên 3 dòng hiển thị cho người dùng thấy.
+      - Gỡ bỏ lệnh xóa key sớm khi chỉ mới mở popup `+` (chỉ xóa khi tài khoản mới thực sự được tạo).
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan trên Browser Subagent:
+      - Logs hiển thị `✅ Đã kết nối với TLS1 Trading Web Terminal Server [SUB1]`.
+      - 3 ô nhập API Key hiển thị đầy đủ key đã lưu (`2ed26c86-...`), ấn Lưu thành công và giữ nguyên vẹn.
   - **Mô tả yêu cầu CEO:**
     - Không mặc định giao diện phần bảng vị thế và phần Chart có tỷ lệ 30-70.
     - Cho phép người dùng tự do kéo thả thanh phân chia (resizer) lên hoặc xuống tuỳ theo ý muốn cá nhân và giữ nguyên độ phân chia đó.

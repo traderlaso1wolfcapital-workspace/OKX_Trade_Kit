@@ -521,6 +521,12 @@ async def log_reader_task(stream, uid, strategy):
                 for connection in list(active_connections[uid][strategy]):
                     try: await connection.send_text(line_str)
                     except Exception: pass
+            # Phát sóng cho tất cả các connection khác cùng strategy (ví dụ client kết nối bằng 'default' hoặc UID khác)
+            for other_uid, strat_map in list(active_connections.items()):
+                if other_uid != uid and strategy in strat_map:
+                    for connection in list(strat_map[strategy]):
+                        try: await connection.send_text(line_str)
+                        except Exception: pass
     except Exception as e:
         log_deque.append(f"[SYSTEM ERROR] Log reader task failed: {e}")
 
@@ -2787,11 +2793,22 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
     if strategy not in active_connections[uid]: active_connections[uid][strategy] = []
     active_connections[uid][strategy].append(websocket)
     
-    await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy}) cho user {uid}...")
+    await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy})...")
     
-    # Gửi toàn bộ các dòng gần nhất từ ring buffer (đầy đủ dashboard mới nhất, không bị mất dòng)
-    if uid in bot_log_queues and strategy in bot_log_queues[uid]:
-        recent_logs = list(bot_log_queues[uid][strategy])
+    # Gửi toàn bộ các dòng gần nhất từ ring buffer (tìm uid hiện tại hoặc fallback sang queue có dữ liệu)
+    target_queue = None
+    if uid in bot_log_queues and strategy in bot_log_queues[uid] and len(bot_log_queues[uid][strategy]) > 0:
+        target_queue = bot_log_queues[uid][strategy]
+    elif "default" in bot_log_queues and strategy in bot_log_queues["default"] and len(bot_log_queues["default"][strategy]) > 0:
+        target_queue = bot_log_queues["default"][strategy]
+    else:
+        for u in bot_log_queues:
+            if strategy in bot_log_queues[u] and len(bot_log_queues[u][strategy]) > 0:
+                target_queue = bot_log_queues[u][strategy]
+                break
+
+    if target_queue:
+        recent_logs = list(target_queue)
         for log_line in recent_logs:
             try:
                 await websocket.send_text(log_line)
