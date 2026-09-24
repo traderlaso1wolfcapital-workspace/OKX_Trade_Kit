@@ -122,14 +122,14 @@ export default function SystemSettingsModal({
                       })}
                     </select>
                     <button
-                      style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title={t("create_acc_btn_title")}
-                      onClick={onCreateAccount}
+                      disabled
+                      style={{ backgroundColor: "#28a745", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "not-allowed", opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Hệ thống tự động nhận diện tài khoản qua API Key / OAuth 2.0"
                     >+</button>
                     <button
-                      style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      title={t("delete_acc_btn_title")}
-                      onClick={onDeleteAccount}
+                      disabled
+                      style={{ backgroundColor: "#dc3545", color: "white", fontSize: "16px", fontWeight: "bold", borderRadius: "4px", width: "32px", height: "28px", border: "none", cursor: "not-allowed", opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      title="Hệ thống tự động nhận diện tài khoản qua API Key / OAuth 2.0"
                     >−</button>
                   </div>
                 </div>
@@ -143,10 +143,12 @@ export default function SystemSettingsModal({
                       <input
                         type="text"
                         className="styled-input"
-                        style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                        style={{ flex: 1, backgroundColor: "#1e1e1e", color: "#888888", border: "1px solid #3d3d3d", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace", cursor: "not-allowed" }}
                         value={okxUid || ""}
-                        onChange={e => setOkxUid && setOkxUid(e.target.value)}
-                        placeholder="Nhập UID OKX chính (hoặc để trống để bot tự quét)..."
+                        disabled
+                        readOnly
+                        placeholder="Tự động nhận diện UID sau khi kết nối..."
+                        title="UID sàn sẽ được tự động nhận diện sau khi kết nối tài khoản"
                       />
                     </div>
                     <div className="settings-form-row">

@@ -10,6 +10,7 @@ export default function ConnectModal({
   isConnecting = false,
   isAuthenticated = false,
   currentUid = "",
+  accountName = "",
   onLogout,
 }) {
   const { t } = useTranslation();
@@ -26,12 +27,12 @@ export default function ConnectModal({
 
   const handleSubmitApiKey = async (e) => {
     e.preventDefault();
-    if (!uid || !apiKey || !secretKey || !passphrase) {
-      setErrorMsg("Vui lòng điền đầy đủ các thông tin!");
+    if (!apiKey || !secretKey || !passphrase) {
+      setErrorMsg("Vui lòng điền đầy đủ API Key, Secret Key và Passphrase!");
       return;
     }
     setErrorMsg("");
-    await onSaveApiKey(uid, apiKey, secretKey, passphrase);
+    await onSaveApiKey(currentUid || uid || "", apiKey, secretKey, passphrase);
   };
 
   return (
@@ -134,12 +135,18 @@ export default function ConnectModal({
           .connect-card:active:not(.disabled) {
             transform: translateY(0);
           }
-          .connect-card:hover:not(.disabled) .connect-action-badge {
+          .connect-card:hover:not(.disabled) .connect-action-badge:not(.connected) {
             background-color: #26a69a !important;
             color: #ffffff !important;
             border-color: #26a69a !important;
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(38, 166, 154, 0.35);
+          }
+          .connect-card:hover:not(.disabled) .connect-action-badge.connected {
+            background-color: #388e3c !important;
+            border-color: #43a047 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(56, 142, 60, 0.45);
           }
           .connect-card.disabled {
             background-color: #1a1a1a;
@@ -249,7 +256,13 @@ export default function ConnectModal({
                 {/* 1. OKX App Connect Card */}
                 <div
                   onClick={(e) => {
-                    if (isConnecting || !okxOAuthUrl) return;
+                    if (isConnecting) return;
+                    if (isAuthenticated) {
+                      if (!window.confirm("Tài khoản hiện đã được kết nối với OKX. Bạn có muốn mở lại liên kết ủy quyền OKX để cấp lại quyền không?")) {
+                        return;
+                      }
+                    }
+                    if (!okxOAuthUrl) return;
                     if (handleFastConnectClick) handleFastConnectClick();
                     // Always use window.location.href to stay inside PWA and prevent Safari popup blocking
                     window.location.href = okxOAuthUrl;
@@ -289,27 +302,30 @@ export default function ConnectModal({
                     <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
                       {isConnecting ? t("saving_btn") : t("okx_connect_title")}
                     </div>
-                    <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
-                      {t("okx_connect_sub")}
+                    <div style={{ fontSize: "11px", color: isAuthenticated ? "#4ade80" : "#888888", marginTop: "2px", fontWeight: isAuthenticated ? "600" : "normal" }}>
+                      {isAuthenticated
+                        ? `Đã Connect ${accountName || "Tài khoản OKX"}`
+                        : t("okx_connect_sub")}
                     </div>
                   </div>
 
                   {/* Action Badge */}
                   <span
-                    className="connect-action-badge"
+                    className={`connect-action-badge ${isAuthenticated ? "connected" : ""}`}
                     style={{
                       fontSize: "11px",
                       fontWeight: "700",
-                      color: "#26a69a",
-                      background: "rgba(38, 166, 154, 0.12)",
-                      border: "1px solid rgba(38, 166, 154, 0.3)",
+                      color: isAuthenticated ? "#ffffff" : "#26a69a",
+                      background: isAuthenticated ? "#2e7d32" : "rgba(38, 166, 154, 0.12)",
+                      border: isAuthenticated ? "1px solid #388e3c" : "1px solid rgba(38, 166, 154, 0.3)",
                       padding: "4px 8px",
                       borderRadius: "4px",
                       whiteSpace: "nowrap",
                       transition: "all 0.18s ease",
+                      boxShadow: isAuthenticated ? "0 0 8px rgba(46, 125, 50, 0.35)" : "none",
                     }}
                   >
-                    {t("open_app")}
+                    {isAuthenticated ? "Đã Connect" : t("open_app")}
                   </span>
                 </div>
 
@@ -493,10 +509,18 @@ export default function ConnectModal({
                 </label>
                 <input
                   type="text"
-                  value={uid}
-                  onChange={(e) => setUid(e.target.value)}
-                  placeholder="VD: 523019992975987626"
+                  value={currentUid || uid || ""}
+                  disabled
+                  readOnly
+                  placeholder="Tự động nhận diện sau khi kết nối..."
                   className="connect-input"
+                  style={{
+                    backgroundColor: "#161616",
+                    color: "#888888",
+                    cursor: "not-allowed",
+                    borderColor: "#333333"
+                  }}
+                  title="UID sẽ được tự động nhận diện từ tài khoản chính sau khi kết nối API Key"
                 />
               </div>
 

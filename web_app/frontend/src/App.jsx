@@ -924,8 +924,17 @@ function App() {
       }
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
-      localStorage.setItem("tls1_uid", uid);
-      setLoginUid(uid);
+
+      const savedUid = data.detected_uid || uid;
+      if (savedUid) {
+        localStorage.setItem("tls1_uid", savedUid);
+        setLoginUid(savedUid);
+        setOkxUid(savedUid);
+      }
+      if (data.detected_name) {
+        localStorage.setItem("tls1_last_detected_acc", data.detected_name);
+      }
+
       setApiKey(inputApiKey);
       setSecretKey(inputSecretKey);
       setPassphrase(inputPassphrase);
@@ -1677,6 +1686,7 @@ function App() {
         onSaveApiKey={handleConnectApiKey}
         isAuthenticated={isAuthenticated}
         currentUid={currentUid}
+        accountName={accounts.find(a => a.id === effectiveAccId)?.name || (accounts.length > 0 ? accounts[0].name : "") || localStorage.getItem("tls1_last_detected_acc") || ""}
         onLogout={handleLogout}
       />
 
