@@ -757,62 +757,61 @@ export default function SystemSettingsModal({
               </div>
             </div>
           )}
-        </div>
 
-        {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT (ĐỒNG BỘ VỚI CONNECT MODAL) */}
-        <div
-          style={{
-            padding: "10px 18px",
-            borderTop: "1px solid #333333",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "#222222",
-            borderBottomLeftRadius: "6px",
-            borderBottomRightRadius: "6px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
-            <span
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "#26a69a",
-                display: "inline-block",
-                boxShadow: "0 0 6px #26a69a",
-              }}
-            ></span>
-            <span>
-              UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (onLogout) onLogout();
-              onClose();
-            }}
+          {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT (ĐỒNG BỘ 100% VỚI CONNECT MODAL) */}
+          <div
             style={{
-              backgroundColor: "transparent",
-              border: "1px solid #ff4d4f",
-              color: "#ff4d4f",
-              padding: "4px 12px",
-              borderRadius: "4px",
-              fontSize: "11.5px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
+              marginTop: "16px",
+              paddingTop: "12px",
+              borderTop: "1px solid #333333",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexShrink: 0,
             }}
           >
-            {t("logout")}
-          </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
+              <span
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "#26a69a",
+                  display: "inline-block",
+                  boxShadow: "0 0 6px #26a69a",
+                }}
+              ></span>
+              <span>
+                UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (onLogout) onLogout();
+                onClose();
+              }}
+              style={{
+                backgroundColor: "transparent",
+                border: "1px solid #ff4d4f",
+                color: "#ff4d4f",
+                padding: "4px 12px",
+                borderRadius: "4px",
+                fontSize: "11.5px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              {t("logout")}
+            </button>
+          </div>
         </div>
       </div>
     </div>

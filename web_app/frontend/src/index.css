@@ -1652,6 +1652,8 @@ a#tv-attr-logo,
     order: 2;
     flex-shrink: 0;
     box-sizing: border-box;
+    margin-top: auto !important; /* Luôn luôn đặt sát mép dưới */
+    margin-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;
   }
   
   .sidebar-header {
@@ -1659,7 +1661,7 @@ a#tv-attr-logo,
   }
 
   .sidebar-content {
-    padding: 0 5px 10px 5px !important;
+    padding: 0 5px 4px 5px !important;
     display: flex;
     flex-direction: column;
     width: 100%;

@@ -18,6 +18,19 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Đồng Bộ 100% Style Footer Chấm Xanh UID & Nút Đăng Xuất (SystemSettingsModal vs ConnectModal) & Cố Định Cụm Tài Khoản Sát Mép Đáy:
+  - **Mô tả yêu cầu CEO:**
+    1. Phần Footer Chấm Xanh UID & Nút Đăng Xuất ở cuối bảng tất cả các Tab trong Cài Đặt: Copy style giống 100% thiết kế của phần Connect (đặc biệt là đường chỉ ngăn cách và padding lề hai bên, loại bỏ viền tràn mép và nền lệch màu).
+    2. Cụm Tài khoản (EMA200 Bot) trên thanh bên trái (Sidebar Left) vẫn luôn luôn đặt sát mép dưới.
+  - **Giải pháp thực hiện:**
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Di chuyển footer vào trực tiếp bên trong container nội dung `.modal-body.settings-body`.
+      - Áp dụng chuẩn xác 100% style từ `ConnectModal.jsx`: `marginTop: "16px"`, `paddingTop: "12px"`, `borderTop: "1px solid #333333"`, `display: "flex"`, `alignItems: "center"`, `justifyContent: "space-between"`, `flexShrink: 0`. Đường chỉ ngăn cách nằm cân đối trong lề padding 18px cùng màu nền `#1e1e1e`, y hệt Connect Modal.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Bổ sung `margin-top: auto !important;` và `margin-bottom: max(env(safe-area-inset-bottom, 0px), 0px) !important;` cho `.sidebar-left` trong media query mobile để đẩy cụm Tài khoản luôn luôn áp sát mép dưới cùng màn hình.
+      - Giảm `padding-bottom` của `.sidebar-content` xuống `4px` giúp cụm thẻ bot gọn gàng, chạm đáy hoàn hảo.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan trên browser subagent thành công 100%.
+
 - **[25/09/2026]** - Tối Ưu Cài Đặt: Bỏ Ô OKX UID, Thêm Footer Chấm Xanh UID & Nút Đăng Xuất Toàn Bộ Các Tab, Mở Khóa Nút + và - Tài Khoản:
   - **Mô tả yêu cầu CEO:**
     - Trong phần API Key / Cài đặt: Bỏ dòng ô nhập `UID Sàn Giao Dịch:` vì không cần thiết.
