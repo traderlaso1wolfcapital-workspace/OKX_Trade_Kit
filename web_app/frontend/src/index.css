@@ -1313,6 +1313,34 @@ a#tv-attr-logo,
   border-color: #ff9900;
 }
 
+/* Connect-style Input used across Connect and Settings */
+.connect-input {
+  width: 100%;
+  padding: 8px 10px;
+  background: #181818 !important;
+  border: 1px solid #333333 !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+  outline: none !important;
+  font-size: 12.5px !important;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: Consolas, monospace !important;
+}
+
+.connect-input:focus {
+  border-color: #ff9900 !important;
+  box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.2) !important;
+}
+
+.connect-input::placeholder {
+  font-family: Consolas, monospace !important;
+  font-style: italic !important;
+  font-size: 11px !important;
+  color: #555555 !important;
+  opacity: 0.75 !important;
+}
+
 .settings-form-row {
   display: flex;
   align-items: center;

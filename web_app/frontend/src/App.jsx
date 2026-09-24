@@ -2209,6 +2209,7 @@ function App() {
         onSaveStratConfig={handleSaveStratConfig}
         onLogout={handleLogout}
         onToggleMultiplyVolume={handleToggleMultiplyVolume}
+        isAuthenticated={isAuthenticated}
       />
 
 

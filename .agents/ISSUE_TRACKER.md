@@ -18,6 +18,20 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Xóa Bỏ Dòng UID Khỏi ConnectModal, Đồng Bộ 100% Giao Diện Ô Nhập API Key Giữa Cài Đặt & Connect, Ẩn Footer UID/Đăng Xuất Khi Chưa Kết Nối:
+  - **Mô tả yêu cầu CEO:**
+    1. Ở phần Connect / API KEY Connect: Xóa bỏ dòng `UID Sàn Giao Dịch:` vì không cần thiết (sau khi kết nối bên dưới đã tự động hiện chấm xanh + UID).
+    2. Khi chưa có tài khoản/API key nào được nhập và lưu: Phần footer chấm xanh `● UID: xxx` và nút Đăng Xuất ở Cài Đặt cũng phải ẩn đi giống hệt Connect Modal.
+    3. Học cách thiết kế ô trống nhập API Key và chữ ở phần Connect (nền `#181818`, viền `#333333`, placeholder chữ nghiêng monospace, hiệu ứng focus viền cam `#ff9900`...) và thiết kế lại vào Thông Tin API OKX của phần Cài Đặt (vẫn giữ phong cách nhập ngang hàng theo hàng nhãn).
+  - **Giải pháp thực hiện:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Gỡ bỏ hoàn toàn khối `<div>` chứa label `UID Sàn Giao Dịch:` và ô input UID.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Truyền prop `isAuthenticated={isAuthenticated}` xuống `SystemSettingsModal`.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Tiếp nhận prop `isAuthenticated`. Bao bọc footer Chấm Xanh UID & Nút Đăng Xuất bằng điều kiện `{isAuthenticated && (...)}` giúp ẩn hoàn toàn footer khi chưa kết nối API key, đồng bộ 100% với ConnectModal.
+      - Tái thiết kế 3 ô nhập API Key, Secret Key, Passphrase với class `.connect-input`: Nền tối `#181818`, viền `#333333`, font Consolas monospace 12.5px, placeholder chữ nghiêng xám mờ `#555555` font 11px, focus glow cam `#ff9900`, nhãn bold `color: #aaaaaa`.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Định nghĩa toàn cục cho class `.connect-input` đồng bộ với quy chuẩn thiết kế.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan trên browser subagent thành công 100%.
+
 - **[25/09/2026]** - Đồng Bộ 100% Style Footer Chấm Xanh UID & Nút Đăng Xuất (SystemSettingsModal vs ConnectModal) & Cố Định Cụm Tài Khoản Sát Mép Đáy:
   - **Mô tả yêu cầu CEO:**
     1. Phần Footer Chấm Xanh UID & Nút Đăng Xuất ở cuối bảng tất cả các Tab trong Cài Đặt: Copy style giống 100% thiết kế của phần Connect (đặc biệt là đường chỉ ngăn cách và padding lề hai bên, loại bỏ viền tràn mép và nền lệch màu).

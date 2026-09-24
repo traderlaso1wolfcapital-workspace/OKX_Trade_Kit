@@ -46,7 +46,8 @@ export default function SystemSettingsModal({
   onResetDefaultStrat,
   onSaveStratConfig,
   onLogout,
-  onToggleMultiplyVolume
+  onToggleMultiplyVolume,
+  isAuthenticated = false,
 }) {
   const { t } = useTranslation();
 
@@ -64,6 +65,32 @@ export default function SystemSettingsModal({
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-content settings-modal">
+        <style>{`
+          .connect-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #181818 !important;
+            border: 1px solid #333333 !important;
+            color: #ffffff !important;
+            border-radius: 4px !important;
+            outline: none !important;
+            font-size: 12.5px !important;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: Consolas, monospace !important;
+          }
+          .connect-input:focus {
+            border-color: #ff9900 !important;
+            box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.2) !important;
+          }
+          .connect-input::placeholder {
+            font-family: Consolas, monospace !important;
+            font-style: italic !important;
+            font-size: 11px !important;
+            color: #555555 !important;
+            opacity: 0.75 !important;
+          }
+        `}</style>
         {/* Header Dialog */}
         <div className="modal-header">
           <h3>⚙️ {t("system_settings_title")} - {botTitle}</h3>
@@ -144,35 +171,41 @@ export default function SystemSettingsModal({
                 {/* Thông Tin API OKX */}
                 <div className="settings-group">
                   <div className="settings-group-title">{t("okx_api_info")}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
                     <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>{t("api_key_lbl")}</label>
+                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
+                        {t("apikey_label")}
+                      </label>
                       <input
                         type="text"
-                        className="styled-input"
-                        style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                        className="connect-input"
+                        style={{ flex: 1 }}
                         value={apiKey}
                         onChange={e => setApiKey(e.target.value)}
                         placeholder="Nhập API Key..."
                       />
                     </div>
                     <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>{t("secret_lbl")}</label>
+                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
+                        {t("secret_label")}
+                      </label>
                       <input
                         type="password"
-                        className="styled-input"
-                        style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                        className="connect-input"
+                        style={{ flex: 1 }}
                         value={secretKey}
                         onChange={e => setSecretKey(e.target.value)}
                         placeholder="Nhập Secret Key..."
                       />
                     </div>
                     <div className="settings-form-row">
-                      <label style={{ minWidth: "150px", color: "#e0e0e0", fontSize: "12px" }}>{t("passphrase_lbl")}</label>
+                      <label style={{ minWidth: "150px", color: "#aaaaaa", fontSize: "11.5px", fontWeight: "bold" }}>
+                        {t("passphrase_label")}
+                      </label>
                       <input
                         type="password"
-                        className="styled-input"
-                        style={{ flex: 1, backgroundColor: "#252525", color: "#ffffff", border: "1px solid #444444", borderRadius: "4px", padding: "5px 8px", fontFamily: "Consolas, monospace" }}
+                        className="connect-input"
+                        style={{ flex: 1 }}
                         value={passphrase}
                         onChange={e => setPassphrase(e.target.value)}
                         placeholder="Nhập Passphrase..."
@@ -759,59 +792,61 @@ export default function SystemSettingsModal({
           )}
 
           {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT (ĐỒNG BỘ 100% VỚI CONNECT MODAL) */}
-          <div
-            style={{
-              marginTop: "16px",
-              paddingTop: "12px",
-              borderTop: "1px solid #333333",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
-              <span
-                style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  background: "#26a69a",
-                  display: "inline-block",
-                  boxShadow: "0 0 6px #26a69a",
-                }}
-              ></span>
-              <span>
-                UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (onLogout) onLogout();
-                onClose();
-              }}
+          {isAuthenticated && (
+            <div
               style={{
-                backgroundColor: "transparent",
-                border: "1px solid #ff4d4f",
-                color: "#ff4d4f",
-                padding: "4px 12px",
-                borderRadius: "4px",
-                fontSize: "11.5px",
-                fontWeight: "bold",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
+                marginTop: "16px",
+                paddingTop: "12px",
+                borderTop: "1px solid #333333",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexShrink: 0,
               }}
             >
-              {t("logout")}
-            </button>
-          </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
+                <span
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: "#26a69a",
+                    display: "inline-block",
+                    boxShadow: "0 0 6px #26a69a",
+                  }}
+                ></span>
+                <span>
+                  UID: <strong style={{ color: "#ffffff" }}>{displayUid}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onLogout) onLogout();
+                  onClose();
+                }}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "1px solid #ff4d4f",
+                  color: "#ff4d4f",
+                  padding: "4px 12px",
+                  borderRadius: "4px",
+                  fontSize: "11.5px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {t("logout")}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -465,26 +465,6 @@ export default function ConnectModal({
                 </div>
               )}
 
-              <div>
-                <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "4px", fontWeight: "bold" }}>
-                  {t("uid_label")}
-                </label>
-                <input
-                  type="text"
-                  value={currentUid || uid || ""}
-                  disabled
-                  readOnly
-                  placeholder="Tự động nhận diện sau khi kết nối..."
-                  className="connect-input"
-                  style={{
-                    backgroundColor: "#161616",
-                    color: "#888888",
-                    cursor: "not-allowed",
-                    borderColor: "#333333"
-                  }}
-                  title="UID sẽ được tự động nhận diện từ tài khoản chính sau khi kết nối API Key"
-                />
-              </div>
 
               <div>
                 <label style={{ display: "block", color: "#aaaaaa", fontSize: "11.5px", marginBottom: "4px", fontWeight: "bold" }}>
