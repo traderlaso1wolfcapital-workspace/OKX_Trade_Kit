@@ -141,7 +141,7 @@ export default function SystemSettingsModal({
                     {/* Chọn tài khoản trade */}
                     <div className="entry-setup-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "8px", flexWrap: "wrap" }}>
                       <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
-                        Tài khoản:
+                        Chọn tài khoản:
                       </span>
                       <select
                         className="styled-select"
@@ -192,8 +192,8 @@ export default function SystemSettingsModal({
                               const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
                               return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
                             })}
-                            style={{ display: "inline-flex", alignItems: "flex-end", justifyContent: "center", height: "21px", padding: "4.5px 6px 1.5px 6px", boxSizing: "border-box", fontSize: "10px", fontWeight: "bold", lineHeight: "1", borderRadius: "3px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >USDT</button>
+                            style={{ padding: "1px 5px", fontSize: "10px", fontWeight: "bold", lineHeight: "1.1", borderRadius: "3px", border: "1px solid #444", background: risk.volUnit === "USDT" ? "#26a69a" : "#222", color: risk.volUnit === "USDT" ? "#fff" : "#888", cursor: "pointer" }}
+                          ><span style={{ display: "inline-block", transform: "translateY(1px)" }}>USDT</span></button>
                           <button
                             type="button"
                             className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
@@ -202,8 +202,8 @@ export default function SystemSettingsModal({
                               const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
                               return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
                             })}
-                            style={{ display: "inline-flex", alignItems: "flex-end", justifyContent: "center", height: "21px", padding: "4.5px 6px 1.5px 6px", boxSizing: "border-box", fontSize: "10px", fontWeight: "bold", lineHeight: "1", borderRadius: "3px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
-                          >{t("capital_percent")}</button>
+                            style={{ padding: "1px 5px", fontSize: "10px", fontWeight: "bold", lineHeight: "1.1", borderRadius: "3px", border: "1px solid #444", background: risk.volUnit === "LOT" ? "#26a69a" : "#222", color: risk.volUnit === "LOT" ? "#fff" : "#888", cursor: "pointer" }}
+                          ><span style={{ display: "inline-block", transform: "translateY(1px)" }}>{t("capital_percent")}</span></button>
                         </div>
 
                         {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) */}
@@ -718,47 +718,6 @@ export default function SystemSettingsModal({
             </div>
           )}
 
-          {/* FOOTER: NÚT ĐĂNG XUẤT */}
-          {isAuthenticated && (
-            <div
-              style={{
-                marginTop: "16px",
-                paddingTop: "12px",
-                borderTop: "1px solid #333333",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                flexShrink: 0,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  if (onLogout) onLogout();
-                  onClose();
-                }}
-                style={{
-                  backgroundColor: "transparent",
-                  border: "1px solid #ff4d4f",
-                  color: "#ff4d4f",
-                  padding: "4px 12px",
-                  borderRadius: "4px",
-                  fontSize: "11.5px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {t("logout")}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

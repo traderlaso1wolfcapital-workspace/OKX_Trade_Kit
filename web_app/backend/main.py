@@ -908,6 +908,16 @@ def _get_master_uid(uid: str = None, target_acc: str = None) -> str:
 
     return "523019992975987626"
 
+def _evolution_has_capital(fpath: str) -> bool:
+    """Trả về True nếu file evolution data đã có wallet_stats với von_goc > 0."""
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ws = data.get("wallet_stats", {})
+        return float(ws.get("von_goc", 0)) > 0
+    except Exception:
+        return False
+
 def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
     primary_dir = get_user_data_dir(uid)
     search_dirs = [primary_dir]
@@ -2162,13 +2172,98 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     # Lấy danh sách accounts mới nhất sau khi đồng bộ
     updated_accounts = get_bot_accounts(target_uid) or get_bot_accounts(uid) or get_bot_accounts("default")
 
+    # ── AUTO RESET VỐN GỐC KHI LẦN ĐẦU LƯU API KEY CHO TÀI KHOẢN MỚI ──
+    # Kiểm tra xem tài khoản này đã có dữ liệu vốn gốc chưa (file evolution data).
+    # Nếu chưa → tự động quét số dư từ OKX và khởi tạo kho lưu trữ riêng cho tài khoản đó.
+    primary_data_dir = get_user_data_dir(uid)
+    evo_check_paths = [
+        os.path.join(primary_data_dir, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+        os.path.join(primary_data_dir, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+    ]
+    has_existing_capital_data = any(
+        os.path.exists(p) and _evolution_has_capital(p) for p in evo_check_paths
+    )
+
+    auto_reset_equity = None
+    if not has_existing_capital_data:
+        # Lần đầu tiên: quét số dư OKX và ghi vào kho riêng của tài khoản này
+        try:
+            bal_resp = _okx_signed_request(
+                method="GET",
+                path="/api/v5/account/balance",
+                body_str="",
+                api_key=creds.api_key,
+                secret_key=creds.secret_key,
+                passphrase=creds.passphrase,
+                is_demo=False,
+                timeout=10,
+            )
+            if bal_resp.status_code == 200:
+                bal_json = bal_resp.json()
+                if bal_json.get("code") == "0":
+                    bal_data = bal_json.get("data", [{}])[0]
+                    total_eq_str = bal_data.get("totalEq", "0")
+                    total_equity_auto = float(total_eq_str) if total_eq_str else 0.0
+                    if total_equity_auto <= 0:
+                        for det in bal_data.get("details", []):
+                            if det.get("ccy") == "USDT":
+                                total_equity_auto = float(det.get("eq", det.get("cashBal", 0.0)))
+                                break
+                    if total_equity_auto > 0:
+                        auto_reset_equity = round(total_equity_auto, 2)
+                        # Ghi wallet_stats vào các file evolution data riêng của tài khoản
+                        evo_write_paths = [
+                            os.path.join(primary_data_dir, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+                            os.path.join(primary_data_dir, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+                            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
+                            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+                        ]
+                        wallet_block = {
+                            "von_goc": auto_reset_equity,
+                            "von_hien_tai": auto_reset_equity,
+                            "loi_nhuan": 0.0,
+                            "tang_truong": 0.0,
+                            "last_reset_ts": time.time(),
+                            "account_id": target_acc,
+                        }
+                        for evo_p in evo_write_paths:
+                            try:
+                                os.makedirs(os.path.dirname(evo_p), exist_ok=True)
+                                evo_data = {}
+                                if os.path.exists(evo_p):
+                                    try:
+                                        with open(evo_p, "r", encoding="utf-8") as ef:
+                                            evo_data = json.load(ef)
+                                    except Exception:
+                                        evo_data = {}
+                                evo_data["wallet_stats"] = wallet_block
+                                with open(evo_p, "w", encoding="utf-8") as ef:
+                                    json.dump(evo_data, ef, indent=2, ensure_ascii=False)
+                            except Exception:
+                                pass
+                        # Ghi flag để bot process ngầm đồng bộ ngay
+                        flag_dir = os.path.join(primary_data_dir, f"bots/{strategy}", "json_data")
+                        os.makedirs(flag_dir, exist_ok=True)
+                        for flag_name in [f"reset_wallet_{strategy}.flag", f"reset_wallet_{target_acc}.flag"]:
+                            try:
+                                with open(os.path.join(flag_dir, flag_name), "w") as ff:
+                                    ff.write("1")
+                            except Exception:
+                                pass
+                        print(f"[AUTO_CAPITAL_INIT] Tài khoản [{target_acc}] lần đầu lưu API Key → Vốn gốc tự động: {auto_reset_equity:,.2f} USDT", flush=True)
+        except Exception as auto_err:
+            print(f"[AUTO_CAPITAL_INIT] Lỗi quét vốn gốc tự động cho [{target_acc}]: {auto_err}", flush=True)
+    # ── END AUTO RESET VỐN GỐC ──
+
     return {
         "message": "Credentials updated successfully.",
         "status": "ok",
         "detected_uid": str(main_uid),
         "detected_name": detected_name,
         "is_main": is_main,
-        "accounts": updated_accounts
+        "accounts": updated_accounts,
+        "auto_capital_init": auto_reset_equity,
     }
 
 @app.get("/api/bot/positions")

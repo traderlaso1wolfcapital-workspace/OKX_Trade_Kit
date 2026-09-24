@@ -170,15 +170,10 @@ export default function SidebarLeft({
                         return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
                       })}
                       style={{
-                        display: "inline-flex",
-                        alignItems: "flex-end",
-                        justifyContent: "center",
-                        height: "21px",
-                        padding: "4.5px 6px 1.5px 6px",
-                        boxSizing: "border-box",
+                        padding: "1px 5px",
                         fontSize: "10px",
                         fontWeight: "bold",
-                        lineHeight: "1",
+                        lineHeight: "1.1",
                         borderRadius: "4px",
                         border: "1px solid #444",
                         background: risk.volUnit === "USDT" ? "#26a69a" : "#222",
@@ -186,7 +181,7 @@ export default function SidebarLeft({
                         cursor: "pointer",
                       }}
                     >
-                      USDT
+                      <span style={{ display: "inline-block", transform: "translateY(1px)" }}>USDT</span>
                     </button>
                     <button
                       type="button"
@@ -197,15 +192,10 @@ export default function SidebarLeft({
                         return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
                       })}
                       style={{
-                        display: "inline-flex",
-                        alignItems: "flex-end",
-                        justifyContent: "center",
-                        height: "21px",
-                        padding: "4.5px 6px 1.5px 6px",
-                        boxSizing: "border-box",
+                        padding: "1px 5px",
                         fontSize: "10px",
                         fontWeight: "bold",
-                        lineHeight: "1",
+                        lineHeight: "1.1",
                         borderRadius: "4px",
                         border: "1px solid #444",
                         background: risk.volUnit === "LOT" ? "#26a69a" : "#222",
@@ -213,7 +203,7 @@ export default function SidebarLeft({
                         cursor: "pointer",
                       }}
                     >
-                      {t("capital_percent")}
+                      <span style={{ display: "inline-block", transform: "translateY(1px)" }}>{t("capital_percent")}</span>
                     </button>
                   </div>
 
