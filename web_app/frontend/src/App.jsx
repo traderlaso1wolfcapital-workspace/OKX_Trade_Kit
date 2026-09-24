@@ -228,9 +228,9 @@ function App() {
     const saved = localStorage.getItem("tls1_chart_ratio");
     if (saved) {
       const num = parseFloat(saved);
-      if (!isNaN(num) && num >= 25 && num <= 85) return num;
+      if (!isNaN(num) && num >= 20 && num <= 85) return num;
     }
-    return 65;
+    return null;
   });
   const layoutMode = "vertical";
 
@@ -259,9 +259,13 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
+      const minTabsH = 222; // 3 dòng cặp vị thế (tab header 36px + thead 30px + 3 x 52px = 222px)
+      const resizerH = 9;
+      const maxChartH = Math.max(120, rect.height - minTabsH - resizerH);
+      const maxRatio = (maxChartH / rect.height) * 100;
       let newRatio = ((clientY - rect.top) / rect.height) * 100;
-      if (newRatio < 25) newRatio = 25;
-      if (newRatio > 85) newRatio = 85;
+      if (newRatio < 20) newRatio = 20;
+      if (newRatio > maxRatio) newRatio = maxRatio;
       setChartRatio(newRatio);
       try {
         localStorage.setItem("tls1_chart_ratio", newRatio.toFixed(1));
@@ -1792,7 +1796,7 @@ function App() {
             <div className="chart-panel-card">
               <main
                 className={`main-workspace ${layoutMode}`}
-                style={isSplitView ? { '--chart-ratio': `${chartRatio}%` } : {}}
+                style={isSplitView && chartRatio !== null ? { '--chart-ratio': `${chartRatio}%` } : {}}
               >
                 {/* 1. TOP SPLIT PANE (KHI BẬT CHẾ ĐỘ ⮃: BIỂU ĐỒ NẰM PHÍA TRÊN) */}
                 {isSplitView && (
