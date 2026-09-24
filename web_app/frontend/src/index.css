@@ -70,7 +70,7 @@ body {
     flex-direction: column !important;
     margin: 0 !important;
     box-sizing: border-box !important;
-    padding-top: calc(env(safe-area-inset-top, 48px) + 16px) !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px) !important;
     padding-left: max(env(safe-area-inset-left, 0px), 0px) !important;
     padding-right: max(env(safe-area-inset-right, 0px), 0px) !important;
@@ -817,8 +817,8 @@ a#tv-attr-logo,
 }
 
 .main-workspace.vertical .pane-chart {
-  height: var(--chart-ratio, calc(100% - 231px));
-  max-height: calc(100% - 231px);
+  height: var(--chart-ratio, calc(100% - 177px));
+  max-height: calc(100% - 177px);
   min-height: 140px;
   border-bottom: none;
 }
@@ -964,8 +964,9 @@ a#tv-attr-logo,
 
 .main-workspace.vertical .pane-tabs {
   width: 100%;
-  flex: 1;
-  min-height: 222px;
+  flex: var(--tabs-flex, 0 0 168px);
+  min-height: 168px;
+  height: var(--tabs-height, 168px);
 }
 
 .chart-tab-pane {
@@ -1724,8 +1725,8 @@ a#tv-attr-logo,
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: var(--chart-ratio, calc(100% - 231px)) !important;
-    max-height: calc(100% - 231px) !important;
+    height: var(--chart-ratio, calc(100% - 177px)) !important;
+    max-height: calc(100% - 177px) !important;
     min-height: 140px !important;
     border-left: none;
     border-right: none;
@@ -1735,9 +1736,9 @@ a#tv-attr-logo,
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    flex: 1 1 0% !important;
-    min-height: 222px !important;
-    height: auto !important;
+    flex: var(--tabs-flex, 0 0 168px) !important;
+    min-height: 168px !important;
+    height: var(--tabs-height, 168px) !important;
     flex-shrink: 1;
     border: none !important;
     overflow: hidden !important;
@@ -4245,7 +4246,7 @@ div[class*="tradingview-widget-copyright"],
    ========================================================================== */
 @media all and (display-mode: standalone), (display-mode: fullscreen) {
   .app-container {
-    padding-top: calc(env(safe-area-inset-top, 50px) + 16px) !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
     height: 100% !important;
     height: var(--real-app-height, 100vh) !important;
@@ -4294,16 +4295,16 @@ div[class*="tradingview-widget-copyright"],
   .main-workspace .pane-chart {
     flex: 1 1 0% !important;
     height: var(--chart-ratio, auto) !important;
-    max-height: calc(100% - 231px) !important;
+    max-height: calc(100% - 177px) !important;
     min-height: 140px !important;
     flex-shrink: 0;
   }
 
   .main-workspace .pane-tabs {
-    flex: 0 0 222px !important;
-    min-height: 222px !important;
-    max-height: 222px !important;
-    height: 222px !important;
+    flex: var(--tabs-flex, 0 0 168px) !important;
+    min-height: 168px !important;
+    max-height: var(--tabs-max-h, 168px) !important;
+    height: var(--tabs-height, 168px) !important;
     flex-shrink: 0 !important;
     overflow: hidden !important;
   }
@@ -4317,7 +4318,7 @@ div[class*="tradingview-widget-copyright"],
 
 /* Đồng bộ kích hoạt qua class .is-pwa-standalone */
 .is-pwa-standalone .app-container {
-  padding-top: calc(env(safe-area-inset-top, 50px) + 16px) !important;
+  padding-top: max(env(safe-area-inset-top, 0px), 8px) !important;
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
   height: 100% !important;
   height: var(--real-app-height, 100vh) !important;
@@ -4338,15 +4339,15 @@ div[class*="tradingview-widget-copyright"],
 .is-pwa-standalone .main-workspace .pane-chart {
   flex: 1 1 0% !important;
   height: var(--chart-ratio, auto) !important;
-  max-height: calc(100% - 231px) !important;
+  max-height: calc(100% - 177px) !important;
   min-height: 140px !important;
 }
 
 .is-pwa-standalone .main-workspace .pane-tabs {
-  flex: 0 0 222px !important;
-  min-height: 222px !important;
-  max-height: 222px !important;
-  height: 222px !important;
+  flex: var(--tabs-flex, 0 0 168px) !important;
+  min-height: 168px !important;
+  max-height: var(--tabs-max-h, 168px) !important;
+  height: var(--tabs-height, 168px) !important;
   flex-shrink: 0 !important;
 }
 

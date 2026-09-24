@@ -18,6 +18,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tinh Chỉnh Bảng Vị Thế Min Sát Mép Bo Cụm (168px) & Dịch Mobile Web Lên Phía Cằm Trên Như Ban Đầu:
+  - **Mô tả yêu cầu CEO:**
+    1. Bảng vị thế ở mức giới hạn min và mặc định: Dòng thứ 3 (ETH-USDT) phải gần như sát mép bo bên ngoài cụm (`main-workspace`), không để kéo thừa khoảng trống đen bên dưới.
+    2. Đưa toàn bộ giao diện mobile web dịch lên phía cằm trên một chút xíu như ban đầu (trước khi dịch xuống).
+  - **Giải pháp thực hiện:**
+    - Khôi phục `padding-top` của `.app-container` trên mobile và Standalone PWA về `max(env(safe-area-inset-top, 0px), 8px) !important;` giúp giao diện trở lại sát cằm trên như ý CEO.
+    - Đo lường chính xác chiều cao 3 dòng vị thế (header 32px + thead 30px + 3 dòng ~104px = 166-168px). Cập nhật `minTabsH = 168` trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) và `min-height: 168px; flex: var(--tabs-flex, 0 0 168px); height: var(--tabs-height, 168px);` trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css).
+    - Cập nhật `.pane-chart` mặc định chiếm `calc(100% - 177px)` (168px tabs + 9px resizer), loại bỏ hoàn toàn khoảng đen thừa dưới dòng 3. Dòng ETH-USDT nằm sát mép bo ngoài chuẩn xác 100% như hình mẫu của CEO.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan trên browser subagent.
+
+
 - **[25/09/2026]** - Chỉnh Riêng Biệt Cho Màn Hình Chính / PWA Standalone (iOS Web App): Dịch Toàn Bộ Giao Diện Xuống Thoát Vùng Blur Mờ & Khắc Phục Triệt Để Khoảng Thừa Ở Đáy:
   - **Mô tả yêu cầu CEO:**
     - Safari Browser đã hoạt động chuẩn xác (không cần sửa đổi).

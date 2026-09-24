@@ -289,7 +289,7 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
-      const minTabsH = 222; // 3 dòng cặp vị thế (tab header 36px + thead 30px + 3 x 52px = 222px)
+      const minTabsH = 168; // 3 dòng cặp vị thế sát mép bo ngoài (tab header 32px + thead 30px + 3 dòng ~104px = 166-168px)
       const resizerH = 9;
       const maxChartH = Math.max(120, rect.height - minTabsH - resizerH);
       const maxRatio = (maxChartH / rect.height) * 100;
@@ -1826,7 +1826,12 @@ function App() {
             <div className="chart-panel-card">
               <main
                 className={`main-workspace ${layoutMode}`}
-                style={isSplitView && chartRatio !== null ? { '--chart-ratio': `${chartRatio}%` } : {}}
+                style={isSplitView && chartRatio !== null ? {
+                  '--chart-ratio': `${chartRatio}%`,
+                  '--tabs-flex': '1 1 0%',
+                  '--tabs-height': 'auto',
+                  '--tabs-max-h': 'none'
+                } : {}}
               >
                 {/* 1. TOP SPLIT PANE (KHI BẬT CHẾ ĐỘ ⮃: BIỂU ĐỒ NẰM PHÍA TRÊN) */}
                 {isSplitView && (
