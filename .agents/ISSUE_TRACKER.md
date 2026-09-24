@@ -18,6 +18,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Triệt Để Xử Lý Đồng Thời Che Lấp Đáy Trên Safari & Thừa Khoảng Trống Đáy Trên Standalone PWA:
+  - **Mô tả vấn đề:**
+    1. Khi mở trên Safari Browser (có thanh công cụ URL ở đáy), cụm `Tài khoản (EMA200 Bot)` bị lấp mất dòng cuối (`Mức cắt lỗ gốc M5`) dưới thanh điều hướng Safari.
+    2. Khi mở dạng ứng dụng web lưu về màn hình chính (Standalone PWA), phần đáy lại bị thừa một khoảng đen trống lớn (~120px) khiến cụm Tài khoản không sát cạnh dưới.
+  - **Nguyên nhân cốt lõi:**
+    - CSS đơn vị `100vh` trên Safari Browser tính cả vùng nằm dưới thanh công cụ (932px thay vì ~740px), khiến layout bị đội lên và chìm dưới thanh công cụ Safari.
+    - Ngược lại, trong WebKit Standalone mode, các đơn vị `100dvh` / `100svh` lại bị bug trừ đi thanh công cụ ảo vốn không hề tồn tại trong PWA, khiến chiều cao container bị ép co lại ~740px và để lộ khoảng đen 182px của body.
+    - CSS `main-section` và `main-workspace` bị gán cứng `height: 100% !important;` khiến flexbox không tự co giãn tự nhiên theo chiều cao màn hình thực tế.
+  - **Đã xử lý & Kiểm chứng:**
+    - Tạo cơ chế đo lường chiều cao thực động: Đưa script `setRealAppHeight()` vào [index.html](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/index.html) và hook `useEffect` trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) để bind biến CSS `--real-app-height` theo `window.innerHeight`.
+      - Khi ở Safari Browser: `window.innerHeight` trả về chính xác ~740px (vừa khít bên trên thanh công cụ Safari, không bị che lấp bất kỳ pixel nào).
+      - Khi ở Standalone PWA: `window.innerHeight` trả về đủ 932px (toàn màn hình, không bị trừ ảo, kéo sát đáy).
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `.app-container` sử dụng `var(--real-app-height, 100dvh)`. Bỏ `position: fixed` ép cứng.
+      - Bỏ `height: 100% !important;` trên `.main-section` và `.main-workspace`, để `flex: 1 1 0%` tự động lấp đầy phần chênh lệch giữa bảng điều khiển và `sidebar-left`.
+    - Kiểm thử tự động trên Browser Subagent:
+      - Safari Browser (430x740): Cụm Tài khoản hiển thị trọn vẹn 100%, không bị che lấp.
+      - Standalone PWA (430x932): Cụm Tài khoản neo sát 100% vào đáy màn hình, khoảng cách đáy = 0px, hoàn toàn không còn khoảng đen thừa.
+
+
 - **[25/09/2026]** - Đồng Bộ Font Chữ & Làm Nghiêng, Nhỏ, Mờ Placeholder Ô Nhập API Key Connect:
   - **Mô tả yêu cầu:**
     - Trong modal Connect (tab API Key OKX): Các ô nhập API Key, Secret Key, Passphrase đổi font chữ sang font Monospace (`Consolas, monospace`) giống như ở phần Thông Tin API OKX / Cài đặt.
