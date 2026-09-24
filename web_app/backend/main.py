@@ -855,7 +855,7 @@ def proxy_market_ticker(instId: str):
         return {"code": "-1", "msg": str(e), "data": []}
 
 def _parse_env_file(fpath: str):
-    creds = {"api_key": "", "secret_key": "", "passphrase": "", "is_demo": False}
+    creds = {"api_key": "", "secret_key": "", "passphrase": "", "is_demo": False, "main_uid": ""}
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
@@ -867,9 +867,42 @@ def _parse_env_file(fpath: str):
                         elif k == "OKX_SECRET_KEY": creds["secret_key"] = decrypt_value(v)
                         elif k == "OKX_PASSPHRASE": creds["passphrase"] = decrypt_value(v)
                         elif k == "OKX_IS_DEMO": creds["is_demo"] = (v.lower() == "true")
+                        elif k in ("OKX_MAIN_UID", "OKX_UID"): creds["main_uid"] = v
         except Exception:
             pass
     return creds
+
+def _get_master_uid(uid: str = None, target_acc: str = None) -> str:
+    """Quét và lấy số UID của tài khoản chính (Master UID) từ các file .api hoặc user data directory."""
+    candidate_paths = [
+        os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"),
+        os.path.join(OKX_TRADE_KIT_DIR, ".api_sub1"),
+        os.path.join(get_user_data_dir("default"), ".api_botEMA200"),
+        os.path.join(get_user_data_dir("default"), ".api_sub1")
+    ]
+    if target_acc:
+        candidate_paths.insert(0, os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"))
+        candidate_paths.insert(0, os.path.join(get_user_data_dir(uid or "default"), f".api_{target_acc}"))
+
+    for p in candidate_paths:
+        if os.path.exists(p):
+            c = _parse_env_file(p)
+            if c.get("main_uid"):
+                return c["main_uid"]
+
+    if uid and uid.isdigit() and len(uid) >= 10:
+        return uid
+
+    try:
+        users_dir = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users")
+        if os.path.exists(users_dir):
+            num_dirs = [d for d in os.listdir(users_dir) if d.isdigit() and len(d) >= 10]
+            if num_dirs:
+                return num_dirs[0]
+    except Exception:
+        pass
+
+    return "523019992975987626"
 
 def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
     primary_dir = get_user_data_dir(uid)
@@ -991,7 +1024,7 @@ def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, sec
         return requests.request(method_upper, base_url + path, headers=headers, data=body, timeout=timeout)
 
 
-def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False):
+def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, main_uid: str = ""):
     os.makedirs(os.path.dirname(fpath), exist_ok=True)
     lines = []
     if os.path.exists(fpath):
@@ -1010,6 +1043,8 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
         "OKX_PASSPHRASE": clean_passphrase,
         "OKX_IS_DEMO": "True" if is_demo else "False",
     }
+    if main_uid:
+        keys["OKX_MAIN_UID"] = str(main_uid)
     new_lines = []
     found_keys = set()
     for line in lines:
@@ -1921,7 +1956,15 @@ def delete_bot_account(account_id: str, uid: str):
 def get_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None):
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
-    return {"api_key": api_key, "secret_key": secret_key, "passphrase": passphrase}
+    main_uid = _get_master_uid(uid, target_acc)
+    return {
+        "api_key": api_key,
+        "secret_key": secret_key,
+        "passphrase": passphrase,
+        "okx_uid": main_uid,
+        "detected_uid": main_uid,
+        "main_uid": main_uid
+    }
 
 @app.delete("/api/bot/credentials")
 def delete_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -2065,24 +2108,24 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         u_data_dir = get_user_data_dir(u)
         os.makedirs(os.path.join(u_data_dir, f"bots/{target_acc}"), exist_ok=True)
         os.makedirs(os.path.join(u_data_dir, f"accounts/{target_acc}"), exist_ok=True)
-        _save_env_file(os.path.join(u_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-        _save_env_file(os.path.join(u_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-        _save_env_file(os.path.join(u_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-        _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(u_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
+        _save_env_file(os.path.join(u_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
+        _save_env_file(os.path.join(u_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
+        _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
         if strategy:
-            _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
+            _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
             
         # Đồng bộ tên quét được từ sàn OKX vào accounts.json của từng UID
         sync_account_name_in_storage(u, target_acc, detected_name)
 
     # Đồng bộ vào OKX_TRADE_KIT_DIR (cho standalone bot và sys_bot_sub1)
     try:
-        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
-        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase)
+        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
+        _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
         if strategy == "sub1" or target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or detected_name == "botEMA200":
-            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"), creds.api_key, creds.secret_key, creds.passphrase)
+            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, ".api_botEMA200"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
         if strategy:
-            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase)
+            _save_env_file(os.path.join(OKX_TRADE_KIT_DIR, f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=str(main_uid))
     except Exception as e:
         print(f"[SAVE CREDS] Lưu OKX_TRADE_KIT_DIR warning: {e}", flush=True)
 

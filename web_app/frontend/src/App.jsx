@@ -221,17 +221,9 @@ function App() {
 
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
-    const saved = localStorage.getItem("tls1_split_view");
-    return saved !== null ? saved === "true" : true;
+    return localStorage.getItem("tls1_split_view") === "true";
   });
-  const [chartRatio, setChartRatio] = useState(() => {
-    const saved = localStorage.getItem("tls1_chart_ratio");
-    if (saved) {
-      const num = parseFloat(saved);
-      if (!isNaN(num) && num >= 10 && num <= 90) return num;
-    }
-    return 50; // Mặc định 50/50 cân bằng, không mặc định 30-70
-  });
+  const [chartRatio, setChartRatio] = useState(70); // Mặc định 30-70 (Biểu đồ 70% - Bảng vị thế 30%)
   const layoutMode = "vertical";
 
   const toggleSplitView = () => {
@@ -259,16 +251,10 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
-      const minH = 50; // Tối thiểu 50px mỗi bên để người dùng tự do kéo lên/xuống tối đa
-      const minRatio = (minH / rect.height) * 100;
-      const maxRatio = ((rect.height - minH) / rect.height) * 100;
       let newRatio = ((clientY - rect.top) / rect.height) * 100;
-      if (newRatio < minRatio) newRatio = minRatio;
-      if (newRatio > maxRatio) newRatio = maxRatio;
+      if (newRatio < 25) newRatio = 25;
+      if (newRatio > 75) newRatio = 75;
       setChartRatio(newRatio);
-      try {
-        localStorage.setItem("tls1_chart_ratio", newRatio.toFixed(1));
-      } catch { }
     };
 
     const stopDrag = () => {
@@ -573,6 +559,12 @@ function App() {
               setApiKey(credData.api_key || "");
               setSecretKey(credData.secret_key || "");
               setPassphrase(credData.passphrase || "");
+              if (credData.okx_uid || credData.main_uid || credData.detected_uid) {
+                const masterUid = credData.okx_uid || credData.main_uid || credData.detected_uid;
+                setOkxUid(masterUid);
+                localStorage.setItem("tls1_uid", masterUid);
+                setLoginUid(masterUid);
+              }
               setIsAuthenticated(true);
               localStorage.setItem("tls1_auth", "true");
             }
@@ -598,6 +590,12 @@ function App() {
           setApiKey(d.api_key || "");
           setSecretKey(d.secret_key || "");
           setPassphrase(d.passphrase || "");
+          if (d.okx_uid || d.main_uid || d.detected_uid) {
+            const masterUid = d.okx_uid || d.main_uid || d.detected_uid;
+            setOkxUid(masterUid);
+            localStorage.setItem("tls1_uid", masterUid);
+            setLoginUid(masterUid);
+          }
           if ((d.api_key || d.secret_key || d.passphrase) && !isAuthenticated) {
             setIsAuthenticated(true);
             localStorage.setItem("tls1_auth", "true");
@@ -1725,7 +1723,7 @@ function App() {
         okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleConnectApiKey}
         isAuthenticated={isAuthenticated}
-        currentUid={currentUid}
+        currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}
         accountName={accounts.find(a => a.id === effectiveAccId)?.name || (accounts.length > 0 ? accounts[0].name : "") || localStorage.getItem("tls1_last_detected_acc") || ""}
         onLogout={handleLogout}
       />

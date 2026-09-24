@@ -60,7 +60,7 @@ export default function SystemSettingsModal({
   };
 
   const botTitle = getBotTitle();
-  const displayUid = localStorage.getItem("tls1_uid") || loginUid || okxUid || t("connected");
+  const displayUid = okxUid || localStorage.getItem("tls1_uid") || loginUid || "523019992975987626";
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>

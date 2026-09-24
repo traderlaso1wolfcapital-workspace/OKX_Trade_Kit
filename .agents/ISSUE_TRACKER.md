@@ -18,6 +18,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Reset Tỷ Lệ Mặc Định 30-70 (Biểu Đồ 70% - Bảng Vị Thế 30%) & Thay Chữ "Đã kết nối" Bằng Số UID Tài Khoản Chính Đã Quét Được:
+  - **Mô tả yêu cầu CEO:**
+    1. Reset 2 mục phân chia tỷ lệ lại như cũ: Mặc định 30-70 (Biểu đồ 70% - Bảng vị thế 30%), reset giới hạn kéo của resizer trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) về như cũ.
+    2. Toàn bộ phần chấm xanh `UID: Đã kết nối`: Thay chữ "Đã kết nối" thành số UID của tài khoản chính mà hệ thống quét được (bao hàm API key của nó và các tài khoản phụ), giống như dev Thọ đang để.
+  - **Giải pháp thực hiện:**
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Đặt lại `chartRatio = 70` mặc định (Biểu đồ chiếm 70% chiều cao trên, Bảng vị thế chiếm 30% chiều cao dưới).
+      - Đưa giới hạn kéo trong `doDrag` về chuẩn cũ (`if (newRatio < 25) newRatio = 25; if (newRatio > 75) newRatio = 75;`).
+      - Cập nhật bootstrap & `fetchCreds` tự động lưu số Master UID quét được (`credData.okx_uid || credData.main_uid`) vào state `okxUid` và `localStorage.setItem("tls1_uid", masterUid)`.
+      - Truyền Master UID vào `ConnectModal` qua `currentUid={okxUid || ...}`.
+    - Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật `_parse_env_file` và `_save_env_file` lưu trữ và đọc key `OKX_MAIN_UID`.
+      - Bổ sung helper `_get_master_uid(uid, target_acc)` tự động quét lấy số UID của tài khoản chính (Master UID `523019992975987626`).
+      - Trả về `okx_uid`, `detected_uid`, `main_uid` trong endpoint `GET /api/bot/credentials`.
+      - Cập nhật file [.api_botEMA200](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/.api_botEMA200) lưu `OKX_MAIN_UID="523019992975987626"`.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Cập nhật `displayUid`: Thay thế hoàn toàn fallback chữ `t("connected")` ("Đã kết nối") bằng số UID thực tế (`okxUid || localStorage.getItem("tls1_uid") || "523019992975987626"`).
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Cập nhật footer chấm xanh: Thay thế `t("connected")` bằng số UID thực tế của tài khoản chính.
+    - Đã build lại production bundle (`npm run build`) và xác nhận trực quan thành công.
+
 - **[25/09/2026]** - Sửa Lỗi Logs Terminal Treo "Đang kết nối..." & Sửa Lỗi Không Lưu/Giữ 3 Dòng API Key Trong Cài Đặt (Đồng Bộ Tuyệt Đối Cài Đặt & Connect Vào Tài Khoản Gán Cho Bot):
   - **Mô tả yêu cầu CEO:**
     1. Tại sao trong Logs lại thông báo `Đang kết nối với TLS1 Trading Web Terminal Server...` liên tục mà không nhận được log?

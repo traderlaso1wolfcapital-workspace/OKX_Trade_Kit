@@ -574,7 +574,7 @@ export default function ConnectModal({
                   }}
                 ></span>
                 <span>
-                  UID: <strong style={{ color: "#ffffff" }}>{currentUid || t("connected")}</strong>
+                  UID: <strong style={{ color: "#ffffff" }}>{currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}</strong>
                 </span>
               </div>
               <button
