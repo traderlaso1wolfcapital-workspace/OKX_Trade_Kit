@@ -142,7 +142,7 @@ def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
             if row and len(row) >= 6 and row[0].strip().isdigit():
                 if row[0].strip() == clean:
                     user_status = row[5].strip().upper()
-                    if user_status == "ACTIVE":
+                    if user_status in ["ACTIVE", "ON"]:
                         result = {"status": "success", "uid": clean}
                         uid_cache[clean] = {"time": now, "result": result}
                         return True, "ACTIVE"
@@ -2762,3 +2762,4 @@ if __name__ == "__main__":
 # z7724 | Fix logic error where deleting API Key did not kill the bot process, and removed /account from OAuth URL.
 # z7725 | Fix OKX OAuth Fast API token exchange endpoint from /oauth2/v1/token to /v5/users/oauth/token and use JSON payload
 # z7726 | Add redirect_uri to OAuth token exchange payload (required by OAuth2 spec), improve get_public_ip with fallback and no-cache-empty, add detailed error logging with server IP
+# z7727 | Fix check_uid_active_ref to accept "ON" status as well as "ACTIVE" for admin/users in Google Sheets CSV
