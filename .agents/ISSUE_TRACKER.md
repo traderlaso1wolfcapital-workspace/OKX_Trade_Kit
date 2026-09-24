@@ -18,6 +18,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tối Ưu UX Thẻ OKX Connect: Nút Disconnect Riêng Từng Tài Khoản, Subtitle Nghiêng Size 10px Xanh & Bấm Vào Khối Để Connect Thêm Tài Khoản:
+  - **Mô tả yêu cầu CEO:**
+    1. Trong popup Connect, thay thế nút thừa thãi `Đã Connect` bằng đúng 1 nút `Disconnect` trên từng thẻ tài khoản để ngắt kết nối tài khoản đó khi cần.
+    2. Khi người dùng click vào tổng thể vùng khối OKX Connect thì hệ thống sẽ kích hoạt Connect thêm tài khoản mới như ban đầu. Sau khi kết nối xong, tự động sinh thêm một cụm OKX Connect tương tự ở ngay bên dưới.
+    3. Dòng phụ bên dưới (*`Đã Connect botEMA200`*) để chữ nghiêng (`font-style: italic`), kích thước nhỏ hơn 1 size (`font-size: 10px`), giữ màu xanh `#4ade80`.
+  - **Giải pháp thực hiện:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Cập nhật danh sách thẻ: Khi đã kết nối, lặp qua mảng `accounts` để sinh ra từng cụm `OKX Connect` riêng biệt cho từng tài khoản đã liên kết.
+      - Dòng phụ: Định dạng chuẩn `fontSize: "10px"`, `fontStyle: "italic"`, `color: "#4ade80"`, `fontWeight: "600"`, hiển thị `Đã Connect [tên_tài_khoản]`.
+      - Bên phải: Thay badge thừa thãi bằng 1 nút duy nhất **`Disconnect`** (màu đỏ viền mờ cao cấp). Bắt sự kiện `e.stopPropagation()` để khi bấm ngắt kết nối không kích hoạt mở lại link cấp quyền.
+      - Thao tác click vào toàn bộ khối thẻ: Kích hoạt Fast Connect / mở link OAuth 2.0 để người dùng tiếp tục liên kết thêm tài khoản OKX khác.
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Bổ sung hàm `handleDisconnectSpecificAccount(targetAccountId)`: Có cảnh báo an toàn vốn nếu bot đang chạy giao dịch trên tài khoản đó, có hộp thoại xác nhận `window.confirm`, tự động chuyển sang tài khoản kế tiếp nếu còn nhiều tài khoản, hoặc ngắt kết nối hoàn toàn nếu là tài khoản cuối cùng.
+      - Truyền `accounts={accounts}` và `onDisconnectAccount={handleDisconnectSpecificAccount}` vào `ConnectModal`.
+    - Đã build lại production bundle (`npm run build`) và xác nhận sạch lỗi.
+
 - **[25/09/2026]** - Sửa Lỗi Web Reload Liên Tục (Vòng Lặp 401 Unauthorized) & Canh Chỉnh Text Nút Ký Quỹ Không Bị Viền Trên Cắt Mất Dấu:
   - **Mô tả yêu cầu CEO:**
     1. Tại sao trang web lại bị reload liên tục?

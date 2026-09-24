@@ -1244,6 +1244,56 @@ function App() {
     setIsDeletingAccount(false);
   };
 
+  const handleDisconnectSpecificAccount = async (targetAccountId) => {
+    if (!targetAccountId) return;
+    const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetAccountId);
+    if (isRunning) {
+      const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+      const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+      alert(`⚠️ Không thể ngắt kết nối tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`);
+      return;
+    }
+    const currentAcc = accounts.find(a => a.id === targetAccountId);
+    const accName = currentAcc?.name || targetAccountId;
+    if (!window.confirm(`Bạn có chắc chắn muốn ngắt kết nối tài khoản OKX "${accName}" không?`)) {
+      return;
+    }
+
+    if (accounts.length > 1) {
+      const updatedList = accounts.filter(a => a.id !== targetAccountId);
+      setAccounts(updatedList);
+      localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
+      const nextAcc = updatedList[0];
+      setSelectedAccount(nextAcc.id);
+      setBotAccountMap(prev => {
+        const next = { ...prev };
+        for (const k in next) {
+          if (next[k] === targetAccountId) next[k] = nextAcc.id;
+        }
+        localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+        return next;
+      });
+      addSystemLog(`🔌 [ACCOUNT] Đã ngắt kết nối tài khoản: "${accName}"`);
+    } else {
+      setApiKey("");
+      setSecretKey("");
+      setPassphrase("");
+      setAccounts([]);
+      localStorage.setItem("tls1_accounts", JSON.stringify([]));
+      setSelectedAccount("");
+      setBotAccountMap({});
+      localStorage.setItem("tls1_bot_accounts", JSON.stringify({}));
+      setIsAuthenticated(false);
+      localStorage.removeItem("tls1_auth");
+      addSystemLog(`🔌 [ACCOUNT] Đã ngắt kết nối tài khoản OKX cuối cùng`);
+    }
+
+    try {
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+    } catch { }
+  };
+
   useEffect(() => {
     setFadeClass("");
     setOverrideBotRunning(null);
@@ -1724,7 +1774,9 @@ function App() {
         onSaveApiKey={handleConnectApiKey}
         isAuthenticated={isAuthenticated}
         currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}
+        accounts={accounts}
         accountName={accounts.find(a => a.id === effectiveAccId)?.name || (accounts.length > 0 ? accounts[0].name : "") || localStorage.getItem("tls1_last_detected_acc") || ""}
+        onDisconnectAccount={handleDisconnectSpecificAccount}
         onLogout={handleLogout}
       />
 
