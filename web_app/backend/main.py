@@ -57,6 +57,18 @@ JWT_SECRET = MASTER_KEY.decode('utf-8')
 JWT_ALGORITHM = "HS256"
 security = HTTPBearer()
 
+PUBLIC_IP_CACHE = None
+
+def get_public_ip():
+    global PUBLIC_IP_CACHE
+    if PUBLIC_IP_CACHE:
+        return PUBLIC_IP_CACHE
+    try:
+        PUBLIC_IP_CACHE = requests.get('https://api.ipify.org', timeout=3).text.strip()
+    except Exception:
+        PUBLIC_IP_CACHE = ""
+    return PUBLIC_IP_CACHE
+
 def create_jwt_token(uid: str, is_admin: bool = False):
     payload = {
         "uid": uid,
@@ -397,6 +409,10 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
             "perm": "read_only,trade"
         }
         
+        # server_ip = get_public_ip()
+        # if server_ip:
+        #     create_payload["ip"] = server_ip
+            
         create_resp = requests.post(create_url, json=create_payload, headers=auth_headers, timeout=10)
         try:
             create_data = create_resp.json()
@@ -411,6 +427,24 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
             passphrase = api_data.get("passphrase", generated_passphrase)
             
             if api_key and secret_key and passphrase:
+                # 1. Quét thông tin tài khoản từ OKX TRƯỚC TIÊN
+                acc_info = detect_okx_account_info(api_key, secret_key, passphrase)
+                detected_name = acc_info["detected_name"] if acc_info else "Tài khoản OKX"
+                main_uid = acc_info["main_uid"] if acc_info else ""
+                is_main = acc_info["is_main"] if acc_info else False
+                
+                # 2. Nếu uid bị rỗng (ví dụ người dùng vào từ Safari chưa đăng nhập), lấy main_uid làm uid
+                if not uid:
+                    if not main_uid:
+                        return {"status": "error", "message": "Không thể lấy thông tin UID từ OKX. Vui lòng thử lại!"}
+                    uid = main_uid
+                
+                # 3. Kiểm tra xem UID này có đăng ký Ref TLS1 không
+                ref_ok, ref_msg = check_uid_active_ref(uid)
+                if not ref_ok:
+                    return {"status": "error", "message": f"Tài khoản (UID: {uid}) chưa đăng ký dưới link giới thiệu của TLS1 hoặc đang bị khoá ({ref_msg}). Vui lòng liên hệ Admin!"}
+
+                # 4. Lưu thông tin API
                 acc = req.account_id if req.account_id else req.strategy
                 base_dir = get_user_data_dir(uid)
                 fpath = os.path.join(base_dir, f"bots/{req.strategy}", f".api_{acc}")
@@ -420,12 +454,6 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 _save_env_file(os.path.join(base_dir, f"bots/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False)
                 if req.strategy:
                     _save_env_file(os.path.join(base_dir, f"bots/{req.strategy}", f".api_{req.strategy}"), api_key, secret_key, passphrase, is_demo=False)
-
-                # Quét thông tin tài khoản từ OKX
-                acc_info = detect_okx_account_info(api_key, secret_key, passphrase)
-                detected_name = acc_info["detected_name"] if acc_info else "Tài khoản OKX"
-                main_uid = acc_info["main_uid"] if acc_info else ""
-                is_main = acc_info["is_main"] if acc_info else False
 
                 # Cập nhật hoặc lưu vào accounts.json
                 updated_accounts = sync_account_name_in_storage(uid, acc, detected_name)

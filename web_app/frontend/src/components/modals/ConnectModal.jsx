@@ -251,13 +251,8 @@ export default function ConnectModal({
                   onClick={(e) => {
                     if (isConnecting || !okxOAuthUrl) return;
                     if (handleFastConnectClick) handleFastConnectClick();
-                    // On standalone PWA (iOS), use window.location.href to stay inside PWA
-                    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-                    if (isStandalone) {
-                      window.location.href = okxOAuthUrl;
-                    } else {
-                      window.open(okxOAuthUrl, '_self');
-                    }
+                    // Always use window.location.href to stay inside PWA and prevent Safari popup blocking
+                    window.location.href = okxOAuthUrl;
                   }}
                   className="connect-card"
                   style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? 'not-allowed' : 'pointer' }}

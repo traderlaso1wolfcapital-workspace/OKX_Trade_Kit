@@ -714,6 +714,7 @@ function App() {
         let callbackUid = currentUid;
         let callbackAcc = effectiveAccId;
         let callbackStrat = activeBotTab || "sub1";
+        let callbackPwa = false;
         
         if (stateParam) {
            try {
@@ -724,9 +725,10 @@ function App() {
               const jsonString = atob(base64);
               const parsedState = JSON.parse(jsonString);
               
-              if (parsedState.uid) callbackUid = parsedState.uid;
-              if (parsedState.acc) callbackAcc = parsedState.acc;
-              if (parsedState.strat) callbackStrat = parsedState.strat;
+              if (parsedState.u) callbackUid = parsedState.u;
+              if (parsedState.a) callbackAcc = parsedState.a;
+              if (parsedState.s) callbackStrat = parsedState.s;
+              if (parsedState.p) callbackPwa = parsedState.p;
            } catch (e) {
               console.error("Failed to parse state", e);
               // Attempt to recover from localStorage
@@ -734,9 +736,10 @@ function App() {
               if (savedState) {
                  try {
                     const parsedState = JSON.parse(savedState);
-                    if (parsedState.uid) callbackUid = parsedState.uid;
-                    if (parsedState.acc) callbackAcc = parsedState.acc;
-                    if (parsedState.strat) callbackStrat = parsedState.strat;
+                    if (parsedState.u) callbackUid = parsedState.u;
+                    if (parsedState.a) callbackAcc = parsedState.a;
+                    if (parsedState.s) callbackStrat = parsedState.s;
+                    if (parsedState.p) callbackPwa = parsedState.p;
                  } catch(e2) {}
               } else {
                  setFastConnectStatus({ type: "error", msg: "Lỗi đọc dữ liệu trạng thái OKX. Vui lòng thử kết nối lại." });
@@ -750,7 +753,8 @@ function App() {
            return;
         }
 
-        if (code && callbackUid) {
+        if (code) {
+           const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
           try {
             let acc = callbackAcc;
             const strat = callbackStrat;
@@ -773,11 +777,13 @@ function App() {
               });
 
               try {
-                await fetch(`/api/bot/accounts?uid=${callbackUid}`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ id: acc, name: cleanName })
-                });
+                if (callbackUid) {
+                  await fetch(`/api/bot/accounts?uid=${callbackUid}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: acc, name: cleanName })
+                  });
+                }
               } catch (e) { }
             }
 
@@ -790,17 +796,19 @@ function App() {
               body: JSON.stringify({
                 code,
                 account_id: acc,
-                uid: callbackUid,
+                uid: callbackUid || "",
                 strategy: strat
               })
             });
             const data = await res.json();
             if (res.ok && data.status === "success") {
-              if (!isAuthenticated) {
+              const newUid = data.detected_uid || callbackUid;
+              if (newUid && (!isAuthenticated || callbackUid !== newUid)) {
                  setIsAuthenticated(true);
-                 setLoginUid(callbackUid);
+                 setLoginUid(newUid);
                  localStorage.setItem("tls1_auth", "true");
-                 localStorage.setItem("tls1_uid", callbackUid);
+                 localStorage.setItem("tls1_uid", newUid);
+                 callbackUid = newUid;
               }
 
               if (data.accounts && Array.isArray(data.accounts)) {
@@ -809,7 +817,11 @@ function App() {
               }
               const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
               
-              setFastConnectStatus({ type: "success", msg: `Kết nối OKX Fast Connect thành công: [${accDisplayName}]!` });
+              const successMsg = (!isStandalone && callbackPwa) 
+                 ? `✅ Kết nối thành công! Vui lòng ĐÓNG trang này (nhấn Xong/Done) để quay lại ứng dụng.`
+                 : `Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`;
+              
+              setFastConnectStatus({ type: "success", msg: successMsg });
               addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
               // Reload credentials
               const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${callbackUid}`);
@@ -830,9 +842,6 @@ function App() {
             // Clean up URL
             window.history.replaceState({}, document.title, "/");
           }
-        } else if (!callbackUid) {
-          setFastConnectStatus({ type: "error", msg: "Không tìm thấy thông tin phiên đăng nhập (UID). (Thường do mở qua Safari/trình duyệt ngoài). Vui lòng copy đường dẫn (link) hiện tại, quay lại ứng dụng chính và dán vào ô 'Nhập Link Liên Kết Thủ Công' trong phần Connect." });
-          window.history.replaceState({}, document.title, "/");
         } else if (!code) {
           setFastConnectStatus({ type: "error", msg: "Không nhận được mã xác thực (code) từ OKX. Vui lòng thử lại." });
           window.history.replaceState({}, document.title, "/");
@@ -854,12 +863,13 @@ function App() {
     if (showConnectModal) {
       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
-      const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1" };
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const stateObj = { u: currentUid, a: effectiveAccId, s: activeBotTab || "sub1", p: isStandalone };
       const stateBase64 = btoa(JSON.stringify(stateObj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       const state = encodeURIComponent(stateBase64);
       setOkxOAuthState(state);
       localStorage.setItem("okx_oauth_state_raw", JSON.stringify(stateObj));
-      setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}`);
+      setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth/authorize?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=read_only trade&state=${state}`);
     }
   }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
 
