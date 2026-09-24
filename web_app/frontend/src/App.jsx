@@ -221,9 +221,17 @@ function App() {
 
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
-    return localStorage.getItem("tls1_split_view") === "true";
+    const saved = localStorage.getItem("tls1_split_view");
+    return saved !== null ? saved === "true" : true;
   });
-  const [chartRatio, setChartRatio] = useState(50);
+  const [chartRatio, setChartRatio] = useState(() => {
+    const saved = localStorage.getItem("tls1_chart_ratio");
+    if (saved) {
+      const num = parseFloat(saved);
+      if (!isNaN(num) && num >= 10 && num <= 90) return num;
+    }
+    return 50; // Mặc định 50/50 cân bằng, không mặc định 30-70
+  });
   const layoutMode = "vertical";
 
   const toggleSplitView = () => {
@@ -251,15 +259,22 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
+      const minH = 50; // Tối thiểu 50px mỗi bên để người dùng tự do kéo lên/xuống tối đa
+      const minRatio = (minH / rect.height) * 100;
+      const maxRatio = ((rect.height - minH) / rect.height) * 100;
       let newRatio = ((clientY - rect.top) / rect.height) * 100;
-      if (newRatio < 25) newRatio = 25;
-      if (newRatio > 75) newRatio = 75;
+      if (newRatio < minRatio) newRatio = minRatio;
+      if (newRatio > maxRatio) newRatio = maxRatio;
       setChartRatio(newRatio);
+      try {
+        localStorage.setItem("tls1_chart_ratio", newRatio.toFixed(1));
+      } catch { }
     };
 
     const stopDrag = () => {
       document.body.classList.remove("is-resizing");
       document.body.classList.remove("is-resizing-vertical");
+      window.dispatchEvent(new Event("resize"));
       if (isTouch) {
         document.removeEventListener("touchmove", doDrag);
         document.removeEventListener("touchend", stopDrag);

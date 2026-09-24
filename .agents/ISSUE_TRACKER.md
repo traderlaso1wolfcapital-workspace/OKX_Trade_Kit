@@ -18,6 +18,20 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Loại Bỏ Mặc Định Tỷ Lệ 30-70 Cố Định, Cho Phép Người Dùng Tự Do Kéo Thả Phân Chia Biểu Đồ & Bảng Vị Thế Tuỳ Ý & Lưu Lại:
+  - **Mô tả yêu cầu CEO:**
+    - Không mặc định giao diện phần bảng vị thế và phần Chart có tỷ lệ 30-70.
+    - Cho phép người dùng tự do kéo thả thanh phân chia (resizer) lên hoặc xuống tuỳ theo ý muốn cá nhân và giữ nguyên độ phân chia đó.
+  - **Giải pháp thực hiện:**
+    - Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Cập nhật khởi tạo `chartRatio`: Tự động đọc từ `localStorage.getItem("tls1_chart_ratio")` nếu người dùng đã từng kéo tùy chỉnh trước đó. Mặc định khởi tạo ở mức cân bằng 50/50 (thay vì ép 30-70).
+      - Trong hàm `startResizing`: Mở rộng phạm vi kéo tự do (`minH = 50px` mỗi bên, cho phép tỷ lệ từ 10% đến 90%), loại bỏ mọi giới hạn cứng nhắc.
+      - Tự động lưu `tls1_chart_ratio` vào `localStorage` mỗi khi người dùng kéo thả xong, giúp bảo lưu chuẩn xác tỷ lệ mong muốn qua các lần tải lại trang.
+    - Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Bổ sung `touch-action: none;` và `user-select: none;` cho `.resizer` giúp thao tác chạm vuốt trên mobile/màn cảm ứng nhạy và mượt mà.
+      - Thêm `body.is-resizing iframe { pointer-events: none !important; }` để ngăn chặn iframe TradingView chiếm chuột khi đang kéo phân cách qua biểu đồ.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử trực quan thao tác drag up/down trên browser subagent thành công 100%.
+
 - **[25/09/2026]** - Xóa Bỏ Dòng UID Khỏi ConnectModal, Đồng Bộ 100% Giao Diện Ô Nhập API Key Giữa Cài Đặt & Connect, Ẩn Footer UID/Đăng Xuất Khi Chưa Kết Nối:
   - **Mô tả yêu cầu CEO:**
     1. Ở phần Connect / API KEY Connect: Xóa bỏ dòng `UID Sàn Giao Dịch:` vì không cần thiết (sau khi kết nối bên dưới đã tự động hiện chấm xanh + UID).

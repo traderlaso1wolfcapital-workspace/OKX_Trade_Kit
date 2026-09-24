@@ -771,6 +771,17 @@ a#tv-attr-logo,
   background-color: transparent;
   position: relative;
   z-index: 10;
+  touch-action: none;
+  user-select: none;
+}
+
+body.is-resizing {
+  user-select: none !important;
+  cursor: row-resize !important;
+}
+
+body.is-resizing iframe {
+  pointer-events: none !important;
 }
 
 .resizer.horizontal-resizer {
@@ -783,6 +794,8 @@ a#tv-attr-logo,
   border-top: none;
   border-bottom: 1.5px solid #444;
   box-sizing: border-box;
+  touch-action: none;
+  user-select: none;
 }
 
 .resizer.horizontal-resizer::after {
