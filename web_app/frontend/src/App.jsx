@@ -219,49 +219,11 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showLayoutMenu]);
 
-  // Sync exact viewport height for iOS Safari & Standalone PWA
-  useEffect(() => {
-    const updateRealHeight = () => {
-      const h = window.innerHeight;
-      document.documentElement.style.setProperty('--real-app-height', `${h}px`);
-      const isStandalone = window.navigator.standalone === true ||
-        (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
-      if (isStandalone) {
-        document.documentElement.classList.add('is-pwa-standalone');
-        if (document.body) document.body.classList.add('is-pwa-standalone');
-      } else {
-        document.documentElement.classList.remove('is-pwa-standalone');
-        if (document.body) document.body.classList.remove('is-pwa-standalone');
-      }
-    };
-    updateRealHeight();
-    window.addEventListener('resize', updateRealHeight);
-    window.addEventListener('orientationchange', updateRealHeight);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateRealHeight);
-    }
-    return () => {
-      window.removeEventListener('resize', updateRealHeight);
-      window.removeEventListener('orientationchange', updateRealHeight);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateRealHeight);
-      }
-    };
-  }, []);
-
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
-    const saved = localStorage.getItem("tls1_split_view");
-    return saved !== null ? saved === "true" : true;
+    return localStorage.getItem("tls1_split_view") === "true";
   });
-  const [chartRatio, setChartRatio] = useState(() => {
-    const saved = localStorage.getItem("tls1_chart_ratio");
-    if (saved) {
-      const num = parseFloat(saved);
-      if (!isNaN(num) && num >= 20 && num <= 85) return num;
-    }
-    return null;
-  });
+  const [chartRatio, setChartRatio] = useState(50);
   const layoutMode = "vertical";
 
   const toggleSplitView = () => {
@@ -289,23 +251,15 @@ function App() {
       const workspace = document.querySelector(".main-workspace");
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
-      const minTabsH = 168; // 3 dòng cặp vị thế sát mép bo ngoài (tab header 32px + thead 30px + 3 dòng ~104px = 166-168px)
-      const resizerH = 9;
-      const maxChartH = Math.max(120, rect.height - minTabsH - resizerH);
-      const maxRatio = (maxChartH / rect.height) * 100;
       let newRatio = ((clientY - rect.top) / rect.height) * 100;
-      if (newRatio < 20) newRatio = 20;
-      if (newRatio > maxRatio) newRatio = maxRatio;
+      if (newRatio < 25) newRatio = 25;
+      if (newRatio > 75) newRatio = 75;
       setChartRatio(newRatio);
-      try {
-        localStorage.setItem("tls1_chart_ratio", newRatio.toFixed(1));
-      } catch { }
     };
 
     const stopDrag = () => {
       document.body.classList.remove("is-resizing");
       document.body.classList.remove("is-resizing-vertical");
-      window.dispatchEvent(new Event("resize"));
       if (isTouch) {
         document.removeEventListener("touchmove", doDrag);
         document.removeEventListener("touchend", stopDrag);
@@ -1851,12 +1805,7 @@ function App() {
             <div className="chart-panel-card">
               <main
                 className={`main-workspace ${layoutMode}`}
-                style={isSplitView && chartRatio !== null ? {
-                  '--chart-ratio': `${chartRatio}%`,
-                  '--tabs-flex': '1 1 0%',
-                  '--tabs-height': 'auto',
-                  '--tabs-max-h': 'none'
-                } : {}}
+                style={isSplitView ? { '--chart-ratio': `${chartRatio}%` } : {}}
               >
                 {/* 1. TOP SPLIT PANE (KHI BẬT CHẾ ĐỘ ⮃: BIỂU ĐỒ NẰM PHÍA TRÊN) */}
                 {isSplitView && (

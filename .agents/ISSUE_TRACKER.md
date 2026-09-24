@@ -18,6 +18,18 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Hoàn Tác Giao Diện Layout Bên Ngoài Theo Bản Dev Thọ & Bảo Lưu 100% Cài Đặt, Connect, Thông Báo, Text:
+  - **Mô tả yêu cầu CEO:**
+    - Huỷ bỏ toàn bộ các chỉnh sửa liên quan đến giao diện, vị trí, kích thước (chiều cao bảng vị thế min 168px/222px, padding mobile, PWA standalone padding, `--real-app-height`, v.v.), hoàn tác lại giao diện bên ngoài y như bản của Thọ dev (`origin/main`).
+    - Giữ lại toàn bộ các chỉnh sửa nghiệp vụ: Cài đặt (Settings modal, lưu API key, tự nhận diện UID/tài khoản, fix lưu API key không bị mất), Connect modal (OAuth 2.0 flow, modal popup), thông báo (Fast Connect popup), text và i18n ("Được cấp phép OAuth 2.0 bởi OKX").
+  - **Giải pháp thực hiện:**
+    - [index.html](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/index.html): Hoàn tác 100% về bản gốc của Thọ dev từ `origin/main` (loại bỏ script đo chiều cao ảo).
+    - [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Hoàn tác toàn bộ layout, vị trí, kích thước, padding mobile về bản gốc của Thọ dev (`origin/main`). Chỉ bảo lưu style font chữ gợi ý placeholder cho modal.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Hoàn tác toàn bộ logic resize workspace, split view ratio (`setChartRatio(50)`), bỏ effect `--real-app-height`.
+      - Bảo lưu toàn bộ logic Cài Đặt (tự động nhận diện UID, gán tài khoản, lưu giữ API Key an toàn trong state, fetch an toàn), Connect modal, popup thông báo Fast Connect và text/i18n.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử giao diện trực tiếp trên trình duyệt thành công 100%.
+
 - **[25/09/2026]** - Sửa Lỗi Không Lưu API Key Sau Khi Nhận Diện Tài Khoản Dẫn Đến Chạy Bot Bị Bắt Nhập Lại:
   - **Mô tả hiện tượng:**
     - Sau khi người dùng nhập đủ 3 thông tin API (API Key, Secret Key, Passphrase) và ấn "LƯU API KEY", bot đã xác thực thành công với OKX và nhận diện được UID/tên tài khoản (`botEMA200`).
