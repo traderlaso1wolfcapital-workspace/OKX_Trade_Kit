@@ -3150,7 +3150,8 @@ if os.path.exists(frontend_dist_path):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    is_prod = os.environ.get("NODE_ENV") == "production"
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=not is_prod)
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 
@@ -3164,3 +3165,4 @@ if __name__ == "__main__":
 # z7725 | Fix OKX OAuth Fast API token exchange endpoint from /oauth2/v1/token to /v5/users/oauth/token and use JSON payload
 # z7726 | Add redirect_uri to OAuth token exchange payload (required by OAuth2 spec), improve get_public_ip with fallback and no-cache-empty, add detailed error logging with server IP
 # z7727 | Fix check_uid_active_ref to accept "ON" status as well as "ACTIVE" for admin/users in Google Sheets CSV
+# z7728 | Optimize Uvicorn reload parameter for production by checking NODE_ENV
