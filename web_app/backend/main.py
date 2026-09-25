@@ -374,6 +374,62 @@ def login_with_password(request: Request, req: LoginRequest):
     except Exception as e:
         return {"status": "error", "message": f"Lỗi máy chủ kiểm tra UID: {str(e)}"}
 
+@app.post("/api/auth/logout")
+def logout_account(uid: str):
+    clean_uid = uid.strip() if uid else "default"
+    # 1. Stop all bot processes for this uid
+    for strategy in ["sub1", "sub2", "sub3"]:
+        proc = get_nested(bot_processes, clean_uid, strategy)
+        pid = get_running_pid(clean_uid, strategy)
+        if proc or pid > 0:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try: proc.kill()
+                    except Exception: pass
+            if pid > 0:
+                kill_pid(pid)
+            if clean_uid in bot_processes and strategy in bot_processes[clean_uid]:
+                del bot_processes[clean_uid][strategy]
+    
+    # 2. Clear user data directory accounts and all .api files
+    target_uids = [clean_uid]
+    if clean_uid != "default":
+        target_uids.append("default")
+        
+    for u in target_uids:
+        data_dir = get_user_data_dir(u)
+        if os.path.exists(data_dir):
+            acc_file = os.path.join(data_dir, "accounts.json")
+            try:
+                with open(acc_file, "w", encoding="utf-8") as f:
+                    json.dump([], f, indent=4, ensure_ascii=False)
+            except Exception:
+                pass
+
+            for root, dirs, files in os.walk(data_dir):
+                for file in files:
+                    if file.startswith(".api_") or file.startswith(".running_account_") or file.startswith(".auth_"):
+                        try:
+                            os.remove(os.path.join(root, file))
+                        except Exception:
+                            pass
+
+    # Also clean in OKX_TRADE_KIT_DIR for any .api_* matching
+    try:
+        for file in os.listdir(OKX_TRADE_KIT_DIR):
+            if file.startswith(".api_sub_") or file.startswith(".api_bot") or file.startswith(".running_account_"):
+                try:
+                    os.remove(os.path.join(OKX_TRADE_KIT_DIR, file))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return {"status": "success", "message": "Đã đăng xuất thành công và xoá toàn bộ tài khoản phụ cùng API Key."}
+
 @app.post("/api/auth/okx/callback")
 @limiter.limit("5/minute")
 def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
@@ -1853,26 +1909,7 @@ def get_bot_accounts(uid: str):
         try:
             with open(acc_file, "r", encoding="utf-8") as f:
                 accounts = json.load(f)
-                if isinstance(accounts, list) and len(accounts) > 0:
-                    return accounts
-        except Exception:
-            pass
-
-    # Fallback to default user data dir
-    default_dir = get_user_data_dir("default")
-    default_file = os.path.join(default_dir, "accounts.json")
-    if os.path.exists(default_file):
-        try:
-            with open(default_file, "r", encoding="utf-8") as f:
-                accounts = json.load(f)
-                if isinstance(accounts, list) and len(accounts) > 0:
-                    # Đồng bộ vào data_dir của uid
-                    try:
-                        os.makedirs(data_dir, exist_ok=True)
-                        with open(acc_file, "w", encoding="utf-8") as fw:
-                            json.dump(accounts, fw, indent=4, ensure_ascii=False)
-                    except Exception:
-                        pass
+                if isinstance(accounts, list):
                     return accounts
         except Exception:
             pass
@@ -1923,52 +1960,67 @@ def create_bot_account(req: AccountCreate, uid: str):
 
 @app.delete("/api/bot/accounts/{account_id}")
 def delete_bot_account(account_id: str, uid: str):
-    data_dir = get_user_data_dir(uid)
-    acc_file = os.path.join(data_dir, "accounts.json")
-    
-    accounts = []
-    if os.path.exists(acc_file):
-        try:
-            with open(acc_file, "r", encoding="utf-8") as f:
-                loaded = json.load(f)
-                if isinstance(loaded, list):
-                    accounts = loaded
-        except Exception:
-            pass
+    target_uids = [uid]
+    if uid != "default":
+        target_uids.append("default")
+        
+    for u in target_uids:
+        data_dir = get_user_data_dir(u)
+        acc_file = os.path.join(data_dir, "accounts.json")
+        
+        accounts = []
+        if os.path.exists(acc_file):
+            try:
+                with open(acc_file, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, list):
+                        accounts = loaded
+            except Exception:
+                pass
+                
+        # Xoá file .api và file dữ liệu tín hiệu của tài khoản này
+        paths_to_remove = [
+            os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}"),
+            os.path.join(data_dir, f"accounts/{account_id}", f".api_{account_id}"),
+            os.path.join(data_dir, f".api_{account_id}"),
+            os.path.join(OKX_TRADE_KIT_DIR, f".api_{account_id}")
+        ]
+        
+        for strategy in ["sub1", "sub2", "sub3"]:
+            paths_to_remove.extend([
+                os.path.join(data_dir, f"bots/{strategy}", f".api_{account_id}"),
+                os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
+                os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json"),
+                os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
+                os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json")
+            ])
+        
+        for p in paths_to_remove:
+            if os.path.exists(p):
+                try: os.remove(p)
+                except Exception: pass
             
-    # Xoá file .api và file dữ liệu tín hiệu của tài khoản này
-    paths_to_remove = [
-        os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}"),
-        os.path.join(data_dir, f"accounts/{account_id}", f".api_{account_id}"),
-        os.path.join(data_dir, f".api_{account_id}"),
-        os.path.join(OKX_TRADE_KIT_DIR, f".api_{account_id}")
-    ]
-    
-    for strategy in ["sub1", "sub2", "sub3"]:
-        paths_to_remove.extend([
-            os.path.join(data_dir, f"bots/{strategy}", f".api_{account_id}"),
-            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
-            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json"),
-            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
-            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json")
-        ])
-    
-    for p in paths_to_remove:
-        if os.path.exists(p):
-            try: os.remove(p)
-            except Exception: pass
-        
-    # Lọc bỏ account
-    accounts = [a for a in accounts if a.get("id") != account_id]
-        
-    with open(acc_file, "w", encoding="utf-8") as f:
-        json.dump(accounts, f, indent=4, ensure_ascii=False)
-        
+        # Lọc bỏ account
+        accounts = [a for a in accounts if a.get("id") != account_id]
+            
+        if os.path.exists(data_dir):
+            with open(acc_file, "w", encoding="utf-8") as f:
+                json.dump(accounts, f, indent=4, ensure_ascii=False)
+            
     return {"message": "Account deleted successfully", "accounts": accounts}
 
 @app.get("/api/bot/credentials")
 def get_bot_credentials(uid: str, strategy: str = "sub1", account_id: str = None):
-    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    if not account_id or not account_id.strip():
+        return {
+            "api_key": "",
+            "secret_key": "",
+            "passphrase": "",
+            "okx_uid": "",
+            "detected_uid": "",
+            "main_uid": ""
+        }
+    target_acc = account_id.strip()
     api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
     main_uid = _get_master_uid(uid, target_acc)
     return {

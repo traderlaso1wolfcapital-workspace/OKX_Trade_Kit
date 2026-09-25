@@ -64,7 +64,7 @@ export const translations = {
     // Connect Modal
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "Kết nối an toàn thông qua ứng dụng giao dịch hoặc ví Web3 mà không cần copy API Key thủ công.",
     apikey_connect_desc: "Nhập thông tin API Key OKX V5 để bot tự động giao dịch.",
     okx_connect_title: "OKX Connect",
@@ -218,7 +218,7 @@ export const translations = {
     // Connect Modal
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "Securely connect via exchange mobile app or Web3 wallet without copying keys manually.",
     apikey_connect_desc: "Enter OKX V5 API Key credentials for automated trading.",
     okx_connect_title: "OKX Connect",
@@ -364,7 +364,7 @@ export const translations = {
 
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "通过交易所 App 或 Web3 钱包快速授权，无需手动复制 API 密钥。",
     apikey_connect_desc: "输入OKX V5 API密钥信息以进行自动交易。",
     okx_connect_title: "OKX Connect",
@@ -508,7 +508,7 @@ export const translations = {
 
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "API 키를 수동으로 복사할 필요 없이 앱 또는 Web3 지갑을 통해 안전하게 연결합니다.",
     apikey_connect_desc: "자동 매매를 위해 OKX V5 API 키 정보를 입력하세요.",
     okx_connect_title: "OKX Connect",
@@ -652,7 +652,7 @@ export const translations = {
 
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "Connectez-vous en toute sécurité via l'application mobile ou portefeuille Web3 sans copier les clés à la main.",
     apikey_connect_desc: "Entrez les informations de clé API OKX V5 pour le trading automatique.",
     okx_connect_title: "OKX Connect",
@@ -796,7 +796,7 @@ export const translations = {
 
     connect_title: "Connect",
     fast_connect: "Fast Connect",
-    apikey_connect: "API KEY Connect",
+    apikey_connect: "API Key Connect",
     fast_connect_desc: "Conéctese de forma segura mediante la app móvil o billetera Web3 sin copiar claves a mano.",
     apikey_connect_desc: "Ingrese la información de la clave API de OKX V5 para el trading automático.",
     okx_connect_title: "OKX Connect",

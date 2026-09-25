@@ -146,15 +146,19 @@ export default function SystemSettingsModal({
                       <select
                         className="styled-select"
                         style={{ width: "auto", minWidth: "90px", maxWidth: "100%", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 24px 4px 8px", borderRadius: "4px", fontSize: "12px", flexShrink: 1, textOverflow: "ellipsis" }}
-                        value={selectedAccount || (accounts.length > 0 ? accounts[0].id : "")}
+                        value={selectedAccount || ""}
                         onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
                       >
-                        {accounts.length === 0 && (
-                          <option value="" disabled selected style={{ color: "#888888" }}>
-                            {t("click_plus_create_acc")}
+                        {accounts.length === 0 ? (
+                          <option value="" disabled style={{ color: "#888888" }}>
+                            chưa có tài khoản
                           </option>
-                        )}
-                        {accounts.map(acc => {
+                        ) : (
+                          <>
+                            <option value="" disabled style={{ color: "#888888" }}>
+                              chọn tài khoản
+                            </option>
+                            {accounts.map(acc => {
                           const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
                           const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
                           const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
@@ -178,7 +182,9 @@ export default function SystemSettingsModal({
                             </option>
                           );
                         })}
-                      </select>
+                      </>
+                    )}
+                  </select>
                     </div>
                     <div className="entry-setup-row">
                       <div className="entry-label-wrap" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap" }}>

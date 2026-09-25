@@ -106,9 +106,12 @@ function App() {
   }, [activeBotTab, loginUid]);
 
   useEffect(() => {
-    setSelectedAccount(effectiveAccId);
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
-  }, [activeBotTab, effectiveAccId]);
+    const assigned = botAccountMap[activeBotTab];
+    if (assigned && accounts.some(a => a.id === assigned)) {
+      setSelectedAccount(assigned);
+    }
+  }, [activeBotTab]);
 
   // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
   const currentUid = localStorage.getItem("tls1_uid") || loginUid;
@@ -564,11 +567,16 @@ function App() {
           });
         }
 
-        const accToQuery = targetAcc || activeBotTab;
-        const resCred = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accToQuery}&uid=${uidToUse}`);
-        if (resCred.ok) {
-          const credData = await resCred.json();
-          if (credData.api_key || credData.secret_key || credData.passphrase) {
+        if (!targetAcc) {
+          if (isMounted) {
+            setApiKey("");
+            setSecretKey("");
+            setPassphrase("");
+          }
+        } else {
+          const resCred = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${uidToUse}`);
+          if (resCred.ok) {
+            const credData = await resCred.json();
             if (isMounted) {
               setApiKey(credData.api_key || "");
               setSecretKey(credData.secret_key || "");
@@ -689,7 +697,7 @@ function App() {
     fetch(`/api/bot/accounts?uid=${curUid}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setAccounts(data);
           localStorage.setItem("tls1_accounts", JSON.stringify(data));
         }
@@ -1209,6 +1217,10 @@ function App() {
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
     const targetAccountId = selectedAccount;
+    if (!targetAccountId) {
+      setShowDeleteAccountModal(false);
+      return;
+    }
     const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetAccountId);
     if (isRunning) {
       const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
@@ -1223,16 +1235,20 @@ function App() {
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
 
+    // Luôn dọn sạch API Key hiển thị ở giao diện và chuyển vùng chọn về rỗng
+    setApiKey("");
+    setSecretKey("");
+    setPassphrase("");
+    setSelectedAccount("");
+
     if (accounts.length > 1) {
       const updatedList = accounts.filter(a => a.id !== targetAccountId);
       setAccounts(updatedList);
       localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
-      const nextAcc = updatedList[0];
-      setSelectedAccount(nextAcc.id);
       setBotAccountMap(prev => {
         const next = { ...prev };
         for (const k in next) {
-          if (next[k] === targetAccountId) next[k] = nextAcc.id;
+          if (next[k] === targetAccountId) next[k] = "";
         }
         localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
         return next;
@@ -1240,12 +1256,8 @@ function App() {
       setShowDeleteAccountModal(false);
       addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
     } else {
-      setApiKey("");
-      setSecretKey("");
-      setPassphrase("");
       setAccounts([]);
       localStorage.setItem("tls1_accounts", JSON.stringify([]));
-      setSelectedAccount("");
       setBotAccountMap({});
       localStorage.setItem("tls1_bot_accounts", JSON.stringify({}));
       setShowDeleteAccountModal(false);
@@ -1391,11 +1403,11 @@ function App() {
       return;
     }
 
-    // Tự động gán hoặc tạo tài khoản mới theo API Key nếu chưa có tài khoản nào được chọn
-    let targetAcc = selectedAccount || effectiveAccId;
-    if (!targetAcc) {
-      targetAcc = `sub_${Date.now()}`;
+    if (!selectedAccount || accounts.length === 0) {
+      alert("⚠️ Vui lòng chọn hoặc tạo tài khoản trước khi lưu API Key!");
+      return;
     }
+    let targetAcc = selectedAccount;
 
     setIsSavingConfig(true);
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -1627,9 +1639,25 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const curUid = okxUid || currentUid || localStorage.getItem("tls1_uid") || "default";
+    try {
+      await fetch(`/api/auth/logout?uid=${curUid}`, { method: "POST" });
+    } catch { }
     localStorage.removeItem("tls1_auth");
     localStorage.removeItem("tls1_uid");
+    localStorage.removeItem("tls1_accounts");
+    localStorage.removeItem("tls1_bot_accounts");
+    localStorage.removeItem("tls1_last_detected_acc");
+    setAccounts([]);
+    setSelectedAccount("");
+    setApiKey("");
+    setSecretKey("");
+    setPassphrase("");
+    setOkxUid("");
+    setLoginUid("");
+    setIsAuthenticated(false);
+    setBotAccountMap({});
     window.location.reload();
   };
 
@@ -1727,16 +1755,19 @@ function App() {
     };
     const fetchCreds = async () => {
       try {
-        const targetAcc = selectedAccount || effectiveAccId;
-        if (!targetAcc) return;
+        const targetAcc = selectedAccount;
+        if (!targetAcc) {
+          setApiKey("");
+          setSecretKey("");
+          setPassphrase("");
+          return;
+        }
         const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
         if (r.ok) {
           const d = await r.json();
-          if (d.api_key || d.secret_key || d.passphrase) {
-            setApiKey(d.api_key || "");
-            setSecretKey(d.secret_key || "");
-            setPassphrase(d.passphrase || "");
-          }
+          setApiKey(d.api_key || "");
+          setSecretKey(d.secret_key || "");
+          setPassphrase(d.passphrase || "");
         }
       } catch { }
     };
@@ -1797,6 +1828,10 @@ function App() {
           setShowAddAccountModal(true);
         }}
         onDeleteAccount={() => {
+          if (!selectedAccount || accounts.length === 0) {
+            alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
+            return;
+          }
           const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
           if (isRunning) {
             const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
@@ -2273,6 +2308,10 @@ function App() {
           setShowAddAccountModal(true);
         }}
         onDeleteAccount={() => {
+          if (!selectedAccount || accounts.length === 0) {
+            alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
+            return;
+          }
           const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
           if (isRunning) {
             const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];

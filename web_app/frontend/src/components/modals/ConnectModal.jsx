@@ -34,10 +34,14 @@ export default function ConnectModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const targetAcc = selectedAccount || (accounts.length > 0 ? accounts[0].id : "");
-    if (!targetAcc) return;
+    if (!selectedAccount) {
+      if (setApiKey) setApiKey("");
+      if (setSecretKey) setSecretKey("");
+      if (setPassphrase) setPassphrase("");
+      return;
+    }
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-    fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`)
+    fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${selectedAccount}&uid=${curUid}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) {
@@ -47,7 +51,7 @@ export default function ConnectModal({
         }
       })
       .catch(() => {});
-  }, [isOpen, selectedAccount, activeBotTab, accounts]);
+  }, [isOpen, selectedAccount, activeBotTab]);
 
   if (!isOpen) return null;
 
@@ -343,40 +347,27 @@ export default function ConnectModal({
                         </div>
                       </div>
 
-                      {/* Single Disconnect Action Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onDisconnectAccount) {
-                            onDisconnectAccount(acc.id);
-                          } else if (onLogout) {
-                            onLogout();
-                          }
-                        }}
+                      {/* Connect + text action (hoà trộn nhẹ nhàng vào vùng tổng, bấm để connect thêm tài khoản) */}
+                      <span
                         style={{
-                          fontSize: "11px",
+                          fontSize: "12px",
                           fontWeight: "600",
-                          color: "#ff4d4f",
-                          background: "rgba(255, 77, 79, 0.1)",
-                          border: "1px solid rgba(255, 77, 79, 0.35)",
-                          padding: "4px 10px",
-                          borderRadius: "4px",
-                          cursor: "pointer",
+                          color: "#888888",
+                          padding: "4px 8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
                           whiteSpace: "nowrap",
-                          transition: "all 0.18s ease",
+                          userSelect: "none",
+                          cursor: "pointer",
+                          transition: "color 0.18s ease",
                         }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
-                          e.currentTarget.style.borderColor = "#ff4d4f";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.1)";
-                          e.currentTarget.style.borderColor = "rgba(255, 77, 79, 0.35)";
-                        }}
+                        onMouseOver={(e) => (e.currentTarget.style.color = "#ff9900")}
+                        onMouseOut={(e) => (e.currentTarget.style.color = "#888888")}
+                        title="Bấm vào để kết nối thêm tài khoản khác"
                       >
-                        Disconnect
-                      </button>
+                        Connect +
+                      </span>
                     </div>
                   ))
                 ) : (
@@ -562,37 +553,43 @@ export default function ConnectModal({
                   <select
                     className="styled-select"
                     style={{ minWidth: "160px", maxWidth: "210px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "11.5px" }}
-                    value={selectedAccount || (accounts.length > 0 ? accounts[0].id : "")}
+                    value={selectedAccount || ""}
                     onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
                   >
-                    {accounts.length === 0 && (
-                      <option value="" disabled selected style={{ color: "#888888" }}>
-                        {t("click_plus_create_acc")}
+                    {accounts.length === 0 ? (
+                      <option value="" disabled style={{ color: "#888888" }}>
+                        chưa có tài khoản
                       </option>
-                    )}
-                    {accounts.map(acc => {
-                      const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
-                      const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
-
-                      const getTargetBotName = (key) => {
-                        if (key === "sub1") return t("bot_ema200") || "EMA200 Bot";
-                        if (key === "sub2") return t("bot_smc") || "SMC Bot";
-                        return t("bot_liquidation") || "Liquidation Bot";
-                      };
-
-                      let statusBadge = "";
-                      if (runningBotKey) {
-                        statusBadge = `(${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
-                      } else if (assignedOtherBot) {
-                        statusBadge = `(${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
-                      }
-
-                      return (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name} {statusBadge}
+                    ) : (
+                      <>
+                        <option value="" disabled style={{ color: "#888888" }}>
+                          chọn tài khoản
                         </option>
-                      );
-                    })}
+                        {accounts.map(acc => {
+                          const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
+                          const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
+
+                          const getTargetBotName = (key) => {
+                            if (key === "sub1") return t("bot_ema200") || "EMA200 Bot";
+                            if (key === "sub2") return t("bot_smc") || "SMC Bot";
+                            return t("bot_liquidation") || "Liquidation Bot";
+                          };
+
+                          let statusBadge = "";
+                          if (runningBotKey) {
+                            statusBadge = `(${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                          } else if (assignedOtherBot) {
+                            statusBadge = `(${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                          }
+
+                          return (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} {statusBadge}
+                            </option>
+                          );
+                        })}
+                      </>
+                    )}
                   </select>
                   <button
                     type="button"
@@ -607,8 +604,23 @@ export default function ConnectModal({
                   >+</button>
                   <button
                     type="button"
+                    disabled={!selectedAccount || accounts.length === 0}
                     onClick={onDeleteAccount}
-                    style={{ backgroundColor: "#dc3545", color: "white", fontSize: "15px", fontWeight: "bold", borderRadius: "4px", width: "28px", height: "26px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    style={{
+                      backgroundColor: (!selectedAccount || accounts.length === 0) ? "#444444" : "#dc3545",
+                      color: (!selectedAccount || accounts.length === 0) ? "#888888" : "white",
+                      fontSize: "15px",
+                      fontWeight: "bold",
+                      borderRadius: "4px",
+                      width: "28px",
+                      height: "26px",
+                      border: "none",
+                      cursor: (!selectedAccount || accounts.length === 0) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: (!selectedAccount || accounts.length === 0) ? 0.5 : 1,
+                    }}
                     title={t("delete_account_tooltip") || "Xoá tài khoản đang chọn"}
                   >−</button>
                 </div>
@@ -628,9 +640,10 @@ export default function ConnectModal({
                       type="text"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={apiKey}
+                      value={selectedAccount ? apiKey : ""}
                       onChange={e => setApiKey && setApiKey(e.target.value)}
                       placeholder="Nhập API Key..."
+                      disabled={!selectedAccount}
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -641,9 +654,10 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={secretKey}
+                      value={selectedAccount ? secretKey : ""}
                       onChange={e => setSecretKey && setSecretKey(e.target.value)}
                       placeholder="Nhập Secret Key..."
+                      disabled={!selectedAccount}
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -654,9 +668,10 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={passphrase}
+                      value={selectedAccount ? passphrase : ""}
                       onChange={e => setPassphrase && setPassphrase(e.target.value)}
                       placeholder="Nhập Passphrase..."
+                      disabled={!selectedAccount}
                     />
                   </div>
                 </div>
@@ -665,18 +680,18 @@ export default function ConnectModal({
               {/* Nút Lưu API Key */}
               <button
                 type="button"
-                disabled={isSavingConfig || isConnecting}
+                disabled={isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0}
                 onClick={onSaveApiKey}
                 style={{
                   width: "100%",
                   padding: "9px 18px",
-                  backgroundColor: (isSavingConfig || isConnecting) ? "#3a3a3a" : "#2e7d32",
+                  backgroundColor: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "#3a3a3a" : "#2e7d32",
                   border: "none",
-                  color: "#ffffff",
+                  color: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "#888888" : "#ffffff",
                   borderRadius: "4px",
                   fontSize: "13px",
                   fontWeight: "bold",
-                  cursor: (isSavingConfig || isConnecting) ? "not-allowed" : "pointer",
+                  cursor: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "not-allowed" : "pointer",
                   marginTop: "4px",
                   display: "flex",
                   alignItems: "center",
@@ -685,12 +700,12 @@ export default function ConnectModal({
                   transition: "all 0.18s ease",
                 }}
                 onMouseOver={(e) => {
-                  if (!isSavingConfig && !isConnecting) {
+                  if (!isSavingConfig && !isConnecting && selectedAccount && accounts.length > 0) {
                     e.currentTarget.style.backgroundColor = "#388e3c";
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (!isSavingConfig && !isConnecting) {
+                  if (!isSavingConfig && !isConnecting && selectedAccount && accounts.length > 0) {
                     e.currentTarget.style.backgroundColor = "#2e7d32";
                   }
                 }}
@@ -729,8 +744,8 @@ export default function ConnectModal({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (onLogout) onLogout();
+                onClick={async () => {
+                  if (onLogout) await onLogout();
                   onClose();
                 }}
                 style={{
