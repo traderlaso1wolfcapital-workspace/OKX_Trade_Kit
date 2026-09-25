@@ -98,7 +98,7 @@ export default function PositionsTable({
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
         touchAction: "pan-x pan-y",
-        overscrollBehavior: "contain",
+        overscrollBehavior: "none",
       }}
     >
       <table className="positions-table">
