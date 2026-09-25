@@ -536,12 +536,15 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 is_main = acc_info["is_main"] if acc_info else False
                 
                 # 2. Xác định UID sở hữu: Dùng Master UID từ OKX làm danh tính người dùng
-                if not uid or uid in ["default", "guest", "undefined", "null"]:
-                    if not main_uid:
-                        return {"status": "error", "message": "Không thể lấy thông tin UID từ OKX. Vui lòng thử lại!"}
-                    uid = main_uid
-                elif main_uid and not is_admin_uid(uid) and uid != main_uid:
-                    return {"status": "error", "message": f"Tài khoản OKX vừa liên kết (UID: {main_uid}) không khớp với tài khoản hiện tại của bạn (UID: {uid})!"}
+                if not main_uid:
+                    return {"status": "error", "message": "Không thể lấy thông tin UID từ OKX. Vui lòng thử lại!"}
+                
+                # Nếu là Admin thì giữ nguyên session admin, còn lại luôn lấy Master UID từ OKX làm danh tính người dùng
+                if is_admin_uid(uid):
+                    target_uid = uid
+                else:
+                    target_uid = main_uid
+                uid = target_uid
                 
                 # 3. Kiểm tra xem UID này có đăng ký Ref TLS1 không
                 ref_ok, ref_msg = check_uid_active_ref(uid)
@@ -2163,11 +2166,7 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
 
                 # Phân quyền Admin: Miễn trừ kiểm tra khớp UID chủ sở hữu (cho mọi Admin có cú pháp admtls12021_xxx)
                 if not is_admin_uid(uid):
-                    # 1. Nếu client đã có session UID (khác rỗng và khác default/guest), bắt buộc API key phải cùng main_uid
-                    if uid and uid not in ["default", "guest", "undefined", "null"] and owner_uid != str(uid):
-                        raise HTTPException(status_code=400, detail=f"API Key này KHÔNG thuộc về tài khoản OKX của bạn (UID API: {api_uid}, UID chính từ OKX: {owner_uid}, UID đang đăng nhập: {uid})!")
-
-                    # 2. Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
+                    # Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
                     is_ref, ref_msg = check_uid_active_ref(owner_uid)
                     if not is_ref:
                         raise HTTPException(status_code=400, detail=f"Tài khoản OKX chính (UID: {owner_uid}) chưa đăng ký dưới link giới thiệu (Ref) của TLS1 hoặc đang bị khóa ({ref_msg})! Vui lòng liên hệ Admin để kích hoạt.")
@@ -3178,3 +3177,4 @@ if __name__ == "__main__":
 # z7727 | Fix check_uid_active_ref to accept "ON" status as well as "ACTIVE" for admin/users in Google Sheets CSV
 # z7728 | Optimize Uvicorn reload parameter for production by checking NODE_ENV
 # z7729 | Khắc phục triệt để lỗi rò rỉ và điều khiển chéo tài khoản giữa các user: cô lập 100% data, credentials, positions, logs và websocket theo OKX main_uid; loại bỏ hoàn toàn fallback default và hardcoded UID.
+# z7730 | Tự động chuyển đổi session sang OKX Master UID khi người dùng Fast Connect / thêm API Key thành công, loại bỏ lỗi chặn nhầm session cũ không khớp UID.

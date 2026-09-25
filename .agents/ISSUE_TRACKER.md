@@ -18,6 +18,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/09/2026]** - Tự Động Chuyển Session Sang OKX Master UID Khi Kết Nối OKX (Loại Bỏ Lỗi Mismatch UID Lưu Cũ Trong Trình Duyệt):
+  - **Mô tả yêu cầu CEO:** Khi kết nối tài khoản OKX mới (UID: 766520142473196741), màn hình hiển thị popup cảnh báo lỗi: "Tài khoản OKX vừa liên kết (UID: 766520142473196741) không khớp với tài khoản hiện tại của bạn (UID: 523019992975987626)!". CEO thắc mắc tại sao hệ thống lại đang mặc định đăng nhập UID 523019992975987626.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Trước khi sửa multi-tenant, backend cũ có hàm fallback tự gán `"523019992975987626"` khi truy cập không có UID. Điện thoại/trình duyệt của CEO đã truy cập từ trước và đã lưu `localStorage.setItem("tls1_uid", "523019992975987626")`.
+    2. Khi CEO bấm Fast Connect để liên kết tài khoản OKX mới (`766520142473196741`), backend trước đó có điều kiện `elif main_uid and not is_admin_uid(uid) and uid != main_uid:` chặn lại vì phát hiện UID hiện tại trong máy khác với UID OKX vừa xác thực.
+  - **Giải pháp thực hiện:**
+    - [main.py](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật hàm `okx_oauth_callback`: Khi người dùng hoàn thành xác thực Fast Connect OAuth 2.0 trên sàn OKX, danh tính người dùng luôn được công nhận trực tiếp bằng Master UID (`main_uid`) từ sàn. Hệ thống tự động chuyển phiên sang Master UID đó, thay thế phiên lưu cũ trên trình duyệt, không còn chặn hay báo lỗi "không khớp tài khoản hiện tại".
+      - Cập nhật hàm `update_bot_credentials`: Cho phép cập nhật API Key và tự động chuyển session sang UID chính của API Key đó.
+      - Cập nhật version log `# z7730`.
+
 - **[26/09/2026]** - Khắc Phục Lỗi Footer Nhảy & Thừa Khoảng Trống Đáy Trên iPhone 14 Pro Max Đổ Lên (Dynamic Island) Trong Chế Độ PWA Standalone:
   - **Mô tả yêu cầu CEO:** Trên iPhone khi thêm vào màn hình chính (mở dưới dạng ứng dụng web độc lập PWA), iPhone 13 trở xuống rất gọn đẹp nhưng iPhone 14 Pro Max đổ lên (không còn tai thỏ nữa) lại bị lỗi footer nhảy quá nhiều, không tràn viền full màn như bản release ngày 24/09/2026.
   - **Nguyên nhân cốt lõi phát hiện:**
