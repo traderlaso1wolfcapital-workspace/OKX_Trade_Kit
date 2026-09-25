@@ -65,22 +65,33 @@ function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Object.keys(parsed).length > 0) return parsed;
+        if (parsed && typeof parsed === "object") return parsed;
       } catch { }
     }
-    const defaults = { sub1: "sub1_default", sub2: "sub2_default" };
-    localStorage.setItem("tls1_bot_accounts", JSON.stringify(defaults));
-    return defaults;
+    return {};
   });
 
   const effectiveAccId = useMemo(() => {
     if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
       return botAccountMap[activeBotTab];
     }
-    return accounts.length > 0 ? accounts[0].id : "";
+    return "";
   }, [botAccountMap, activeBotTab, accounts]);
 
   const [selectedAccount, setSelectedAccount] = useState(effectiveAccId);
+
+  // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
+  const currentUid = localStorage.getItem("tls1_uid") || loginUid;
+  const {
+    botStatus,
+    setBotStatus,
+    activeAccounts: wsActiveAccounts,
+    positions,
+    setPositions,
+    closedPositions,
+    setClosedPositions,
+    refresh: refreshBotData,
+  } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
 
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
@@ -102,29 +113,26 @@ function App() {
           }
         })
         .catch(() => {});
+    } else {
+      setApiKey("");
+      setSecretKey("");
+      setPassphrase("");
+      setPositions([]);
+      setClosedPositions([]);
     }
-  }, [activeBotTab, loginUid]);
+  }, [activeBotTab, loginUid, setPositions, setClosedPositions]);
 
   useEffect(() => {
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
     const assigned = botAccountMap[activeBotTab];
     if (assigned && accounts.some(a => a.id === assigned)) {
       setSelectedAccount(assigned);
+    } else {
+      setSelectedAccount("");
+      setPositions([]);
+      setClosedPositions([]);
     }
-  }, [activeBotTab]);
-
-  // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
-  const currentUid = localStorage.getItem("tls1_uid") || loginUid;
-  const {
-    botStatus,
-    setBotStatus,
-    activeAccounts: wsActiveAccounts,
-    positions,
-    setPositions,
-    closedPositions,
-    setClosedPositions,
-    refresh: refreshBotData,
-  } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
+  }, [activeBotTab, botAccountMap, accounts, setPositions, setClosedPositions]);
 
   const [httpActiveAccounts, setHttpActiveAccounts] = useState({});
 
@@ -538,11 +546,17 @@ function App() {
         let accList = [];
         if (resAcc.ok) {
           const data = await resAcc.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             accList = data;
             if (isMounted) {
               setAccounts(data);
               localStorage.setItem("tls1_accounts", JSON.stringify(data));
+              if (data.length === 0) {
+                setIsAuthenticated(false);
+                localStorage.removeItem("tls1_auth");
+                localStorage.removeItem("tls1_last_detected_acc");
+                localStorage.removeItem("tls1_account_name");
+              }
             }
           }
         }
@@ -554,9 +568,6 @@ function App() {
             targetAcc = savedMap[activeBotTab];
           }
         } catch { }
-        if (!targetAcc && accList.length > 0) {
-          targetAcc = accList[0].id;
-        }
 
         if (targetAcc && isMounted) {
           setSelectedAccount(targetAcc);
@@ -565,6 +576,8 @@ function App() {
             localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
             return next;
           });
+        } else if (isMounted) {
+          setSelectedAccount("");
         }
 
         if (!targetAcc) {
@@ -572,6 +585,8 @@ function App() {
             setApiKey("");
             setSecretKey("");
             setPassphrase("");
+            setPositions([]);
+            setClosedPositions([]);
           }
         } else {
           const resCred = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${uidToUse}`);
@@ -1240,6 +1255,8 @@ function App() {
     setSecretKey("");
     setPassphrase("");
     setSelectedAccount("");
+    setPositions([]);
+    setClosedPositions([]);
 
     if (accounts.length > 1) {
       const updatedList = accounts.filter(a => a.id !== targetAccountId);
@@ -1260,6 +1277,11 @@ function App() {
       localStorage.setItem("tls1_accounts", JSON.stringify([]));
       setBotAccountMap({});
       localStorage.setItem("tls1_bot_accounts", JSON.stringify({}));
+      localStorage.removeItem("tls1_last_detected_acc");
+      localStorage.removeItem("tls1_account_name");
+      setAccountName("");
+      setIsAuthenticated(false);
+      localStorage.removeItem("tls1_auth");
       setShowDeleteAccountModal(false);
       addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản cuối cùng`);
     }
@@ -1403,11 +1425,10 @@ function App() {
       return;
     }
 
-    if (!selectedAccount || accounts.length === 0) {
-      alert("⚠️ Vui lòng chọn hoặc tạo tài khoản trước khi lưu API Key!");
-      return;
-    }
     let targetAcc = selectedAccount;
+    if (!targetAcc) {
+      targetAcc = `sub_${Date.now()}`;
+    }
 
     setIsSavingConfig(true);
     await new Promise(resolve => setTimeout(resolve, 800));

@@ -1018,7 +1018,7 @@ def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
                         os.path.join(d, f"bots/{strategy}", f".api_{aname}"),
                         os.path.join(d, f".api_{aname}"),
                     ])
-            if target_acc in ["sub1", "botEMA200", ".api_botEMA200"] or any(n in ["sub1", "botEMA200"] for n in acc_names) or (strategy == "sub1" and target_acc == "sub1_default"):
+            if target_acc in ["botEMA200", ".api_botEMA200"] or any(n in ["botEMA200"] for n in acc_names):
                 candidate_paths.extend([
                     os.path.join(d, ".api_botEMA200"),
                     os.path.join(d, "bots/sub1", ".api_botEMA200"),
@@ -1041,31 +1041,7 @@ def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
                     return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
         return "", "", "", False
 
-    # Khi không truyền account_id (lấy mặc định của bot/strategy)
-    candidate_paths = []
-    for d in search_dirs:
-        candidate_paths.extend([
-            os.path.join(d, f"bots/{strategy}", f".api_{strategy}"),
-            os.path.join(d, f".api_{strategy}"),
-        ])
-        if strategy == "sub1":
-            candidate_paths.extend([
-                os.path.join(d, ".api_botEMA200"),
-                os.path.join(d, "bots/sub1", ".api_botEMA200")
-            ])
-
-    for p in candidate_paths:
-        if os.path.exists(p):
-            c = _parse_env_file(p)
-            if c["api_key"] and c["secret_key"] and c["passphrase"]:
-                if not p.startswith(primary_dir):
-                    try:
-                        _save_env_file(os.path.join(primary_dir, f"bots/{strategy}", f".api_{strategy}"), c["api_key"], c["secret_key"], c["passphrase"])
-                        _save_env_file(os.path.join(primary_dir, f".api_{strategy}"), c["api_key"], c["secret_key"], c["passphrase"])
-                    except Exception:
-                        pass
-                return c["api_key"], c["secret_key"], c["passphrase"], c["is_demo"]
-
+    # Khi không truyền account_id: Tuyệt đối không tự động nạp key của tài khoản khác
     return "", "", "", False
 
 def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, timeout: int = 10):
@@ -2320,7 +2296,9 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
 
 @app.get("/api/bot/positions")
 def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
-    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    if not account_id or not account_id.strip():
+        return []
+    target_acc = account_id.strip()
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
 
     # Nếu chưa nhập API Key, trả về rỗng (tránh hiển thị rác từ trade_markers cũ)
@@ -2899,7 +2877,9 @@ class OrderRequest(BaseModel):
 
 @app.get("/api/account/balance")
 def get_account_balance(uid: str, strategy: str = "sub1", account_id: str = None, ccy: str = "USDT"):
-    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    if not account_id or not account_id.strip():
+        return {"status": "error", "message": "No account selected", "availBal": 0}
+    target_acc = account_id.strip()
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not api_key:
         return {"status": "error", "message": "No OKX Credentials"}
@@ -3027,10 +3007,24 @@ async def websocket_bot_data(websocket: WebSocket, uid: str, strategy: str):
     if strategy not in bot_data_connections[uid]: bot_data_connections[uid][strategy] = []
     bot_data_connections[uid][strategy].append(websocket)
     
-    current_acc = [strategy]
+    current_acc = [""]
     
     async def get_state_payload():
         acc = current_acc[0]
+        if not acc or not acc.strip():
+            try:
+                status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
+            except Exception:
+                status_data = {"status": "STOPPED", "uptime": 0}
+            return {
+                "type": "bot_data",
+                "strategy": strategy,
+                "account_id": "",
+                "status": status_data,
+                "positions": [],
+                "balance": {"status": "error", "availBal": 0},
+                "closed_positions": []
+            }
         try:
             status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
         except Exception:
@@ -3084,15 +3078,14 @@ async def websocket_bot_data(websocket: WebSocket, uid: str, strategy: str):
             try:
                 msg = json.loads(text)
                 if msg.get("action") == "refresh":
-                    if msg.get("account_id"):
-                        current_acc[0] = str(msg["account_id"]).strip()
+                    if "account_id" in msg:
+                        current_acc[0] = str(msg.get("account_id") or "").strip()
                     payload = await get_state_payload()
                     await websocket.send_text(json.dumps(payload))
                 elif msg.get("action") == "switch_account":
-                    if msg.get("account_id"):
-                        current_acc[0] = str(msg["account_id"]).strip()
-                        payload = await get_state_payload()
-                        await websocket.send_text(json.dumps(payload))
+                    current_acc[0] = str(msg.get("account_id") or "").strip()
+                    payload = await get_state_payload()
+                    await websocket.send_text(json.dumps(payload))
             except Exception:
                 pass
     except (WebSocketDisconnect, Exception):

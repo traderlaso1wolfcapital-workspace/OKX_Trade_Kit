@@ -18,6 +18,31 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Chặn Hiển Thị Vị Thế Khi Chưa Chọn Tài Khoản & Đồng Bộ Fast Connect Trống Sạch Khi Xoá Hết Tài Khoản:
+  - **Mô tả yêu cầu CEO:**
+    1. Khi xoá sạch hoặc chưa có tài khoản thì bên Fast Connect cũng trống theo để sẵn sàng kết nối (`OKX Connect` + `Mở App ➔`).
+    2. Khi chưa chọn tài khoản mặc định, ở ngoài Bảng Vị Thế tuyệt đối không được phép hiển thị lệnh của tài khoản trước đó (`Bảng Vị Thế (0)`). Phải chọn tài khoản ở mục `Tài khoản (EMA200 Bot)` thì web bot mới bắt đầu quét và hiện lệnh ra bảng vị thế.
+  - **Nguyên nhân cốt lõi:**
+    1. `main.py`: `websocket_bot_data` mặc định khởi tạo `current_acc = [strategy]` (`sub1`) và `get_bot_positions` fallback về `strategy` (`sub1`), khiến backend tự động đọc `.api_botEMA200` và quét vị thế OKX đẩy về client qua WebSocket mỗi 2 giây.
+    2. `App.jsx`: `effectiveAccId` tự động fallback về `accounts[0].id` khi bot chưa được gán tài khoản, đồng thời không reset rỗng các mảng vị thế khi tài khoản chưa được chọn.
+    3. `confirmDeleteAccount`: Khi xoá tài khoản cuối cùng, chưa gỡ sạch `tls1_auth` và trạng thái xác thực nên Fast Connect vẫn duy trì trạng thái đã kết nối.
+  - **Giải pháp thực hiện:**
+    - [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật `_get_okx_creds`: Nếu `account_id` rỗng, trả về rỗng ngay lập tức, loại bỏ fallback `sub1_default`.
+      - Cập nhật `get_bot_positions` và `get_account_balance`: Bắt buộc phải có `account_id` hợp lệ, nếu không trả về danh sách vị thế rỗng `[]` và số dư `0`.
+      - Cập nhật `websocket_bot_data`: Khởi tạo `current_acc = [""]`, chỉ quét dữ liệu khi client gửi `switch_account` với `account_id` cụ thể.
+    - [useBotWebSocket.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/hooks/useBotWebSocket.js):
+      - Khi `!accountId`, lập tức `setPositions([])`, `setClosedPositions([])`, `setAvailBal(0)` và gửi `switch_account` rỗng lên backend.
+      - Chặn mọi gói tin vị thế từ WebSocket lọt vào bảng khi chưa chọn tài khoản.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - `effectiveAccId`: Chỉ trả về `accId` nếu đã được gán tường minh trong `botAccountMap`, tuyệt đối không fallback ngầm về `accounts[0]`.
+      - `confirmDeleteAccount`: Reset sạch toàn bộ `setPositions([])`, `setClosedPositions([])`, `setIsAuthenticated(false)`, `localStorage.removeItem("tls1_auth")` khi xoá tài khoản cuối cùng.
+    - [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):
+      - Hiển thị option `(Chưa có tài khoản)` nếu danh sách rỗng, hoặc `(chọn tài khoản)` nếu có tài khoản nhưng bot chưa được gán.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Khi không có tài khoản, hiển thị thẻ Fast Connect chưa liên kết sẵn sàng quét mã/mở App.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử nghiệm thu 100% bằng browser subagent.
+
 - **[25/09/2026]** - Ẩn Thành Phần Chấm Xanh "UID: xxx" Trong Chân Trang Của Hộp Thoại Cài Đặt (System Settings):
   - **Mô tả yêu cầu CEO:** Tạm thời ẩn phần cuối chấm xanh `UID: xxx` trong các tab của phần Cài Đặt.
   - **Giải pháp thực hiện:**

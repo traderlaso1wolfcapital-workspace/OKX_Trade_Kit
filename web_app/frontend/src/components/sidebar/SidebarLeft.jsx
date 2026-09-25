@@ -110,7 +110,11 @@ export default function SidebarLeft({
               value={effectiveAccId}
               onChange={(e) => handleAccountSelect(e.target.value)}
             >
-              {accounts.length === 0 && <option value="">{t("no_account")}</option>}
+              {accounts.length === 0 ? (
+                <option value="">{t("no_account")}</option>
+              ) : (
+                <option value="" disabled={!!effectiveAccId}>({t("select_account") || "chọn tài khoản"})</option>
+              )}
               {accounts.map((acc) => {
                 const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
                 const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;

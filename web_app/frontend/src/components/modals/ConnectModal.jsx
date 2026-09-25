@@ -35,9 +35,6 @@ export default function ConnectModal({
   useEffect(() => {
     if (!isOpen) return;
     if (!selectedAccount) {
-      if (setApiKey) setApiKey("");
-      if (setSecretKey) setSecretKey("");
-      if (setPassphrase) setPassphrase("");
       return;
     }
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
@@ -288,8 +285,8 @@ export default function ConnectModal({
 
               <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                 {/* 1. OKX App Connect Cards (hỗ trợ hiển thị từng cụm tài khoản đã kết nối) */}
-                {isAuthenticated && (accounts.length > 0 || accountName) ? (
-                  (accounts.length > 0 ? accounts : [{ id: "default", name: accountName || "Tài khoản OKX" }]).map((acc, idx) => (
+                {isAuthenticated && accounts.length > 0 ? (
+                  accounts.map((acc, idx) => (
                     <div
                       key={acc.id || idx}
                       onClick={() => {
@@ -640,10 +637,9 @@ export default function ConnectModal({
                       type="text"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={selectedAccount ? apiKey : ""}
+                      value={apiKey}
                       onChange={e => setApiKey && setApiKey(e.target.value)}
                       placeholder="Nhập API Key..."
-                      disabled={!selectedAccount}
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -654,10 +650,9 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={selectedAccount ? secretKey : ""}
+                      value={secretKey}
                       onChange={e => setSecretKey && setSecretKey(e.target.value)}
                       placeholder="Nhập Secret Key..."
-                      disabled={!selectedAccount}
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -668,10 +663,9 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={selectedAccount ? passphrase : ""}
+                      value={passphrase}
                       onChange={e => setPassphrase && setPassphrase(e.target.value)}
                       placeholder="Nhập Passphrase..."
-                      disabled={!selectedAccount}
                     />
                   </div>
                 </div>
@@ -680,18 +674,18 @@ export default function ConnectModal({
               {/* Nút Lưu API Key */}
               <button
                 type="button"
-                disabled={isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0}
+                disabled={isSavingConfig || isConnecting}
                 onClick={onSaveApiKey}
                 style={{
                   width: "100%",
                   padding: "9px 18px",
-                  backgroundColor: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "#3a3a3a" : "#2e7d32",
+                  backgroundColor: (isSavingConfig || isConnecting) ? "#3a3a3a" : "#2e7d32",
                   border: "none",
-                  color: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "#888888" : "#ffffff",
+                  color: (isSavingConfig || isConnecting) ? "#888888" : "#ffffff",
                   borderRadius: "4px",
                   fontSize: "13px",
                   fontWeight: "bold",
-                  cursor: (isSavingConfig || isConnecting || !selectedAccount || accounts.length === 0) ? "not-allowed" : "pointer",
+                  cursor: (isSavingConfig || isConnecting) ? "not-allowed" : "pointer",
                   marginTop: "4px",
                   display: "flex",
                   alignItems: "center",
@@ -700,12 +694,12 @@ export default function ConnectModal({
                   transition: "all 0.18s ease",
                 }}
                 onMouseOver={(e) => {
-                  if (!isSavingConfig && !isConnecting && selectedAccount && accounts.length > 0) {
+                  if (!isSavingConfig && !isConnecting) {
                     e.currentTarget.style.backgroundColor = "#388e3c";
                   }
                 }}
                 onMouseOut={(e) => {
-                  if (!isSavingConfig && !isConnecting && selectedAccount && accounts.length > 0) {
+                  if (!isSavingConfig && !isConnecting) {
                     e.currentTarget.style.backgroundColor = "#2e7d32";
                   }
                 }}

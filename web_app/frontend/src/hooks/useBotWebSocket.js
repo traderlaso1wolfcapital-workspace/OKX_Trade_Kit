@@ -22,9 +22,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
     ws.onopen = () => {
       if (!isMountedRef.current) return;
       setIsConnected(true);
-      if (accountId) {
-        ws.send(JSON.stringify({ action: "switch_account", account_id: accountId }));
-      }
+      ws.send(JSON.stringify({ action: "switch_account", account_id: accountId || "" }));
     };
 
     ws.onmessage = (event) => {
@@ -32,6 +30,12 @@ export function useBotWebSocket(uid, strategy, accountId) {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "bot_data") {
+          if (!accountId) {
+            setPositions([]);
+            setClosedPositions([]);
+            setAvailBal(0);
+            return;
+          }
           if (data.status) {
             setBotStatus(data.status.status || "STOPPED");
             setUptime(data.status.uptime || 0);
@@ -87,7 +91,16 @@ export function useBotWebSocket(uid, strategy, accountId) {
 
   // Handle switching account
   useEffect(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && accountId) {
+    if (!accountId) {
+      setPositions([]);
+      setClosedPositions([]);
+      setAvailBal(0);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: "switch_account", account_id: "" }));
+      }
+      return;
+    }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: "switch_account", account_id: accountId }));
     }
   }, [accountId]);
