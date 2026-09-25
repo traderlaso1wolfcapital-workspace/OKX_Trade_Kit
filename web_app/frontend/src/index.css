@@ -5,9 +5,15 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
+html, body, #root {
   -webkit-text-size-adjust: 100% !important;
   text-size-adjust: 100% !important;
+  height: 100%;
+  height: var(--real-app-height, 100dvh);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
@@ -16,7 +22,8 @@ body {
   background-color: #1e1e1e;
   color: #fff;
   overflow: hidden;
-  height: 100dvh;
+  height: 100%;
+  height: var(--real-app-height, 100dvh);
   font-size: 13px;
 }
 
@@ -30,13 +37,16 @@ body {
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100%;
+  height: var(--real-app-height, 100dvh);
+  max-height: var(--real-app-height, 100dvh);
   width: 100%;
   background-color: #1e1e1e;
   padding-top: max(env(safe-area-inset-top, 0px), 12px);
   padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
   padding-left: env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
 }
 
 
@@ -1123,6 +1133,11 @@ body.is-resizing iframe {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  height: 100%;
+  height: var(--real-app-height, 100dvh);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .modal-content.settings-modal {
@@ -1590,32 +1605,45 @@ body.is-resizing iframe {
 
 /* ============= MOBILE RESPONSIVE ============= */
 @media screen and (max-width: 1024px), (width <= 1024px) {
+  html, body, #root {
+    height: 100% !important;
+    height: var(--real-app-height, 100dvh) !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
   .app-container {
     flex-direction: column;
-    height: 100dvh;
+    height: 100% !important;
+    height: var(--real-app-height, 100dvh) !important;
+    max-height: var(--real-app-height, 100dvh) !important;
     overflow: hidden;
     padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
     padding-bottom: 0px !important;
     padding-left: env(safe-area-inset-left, 0px) !important;
     padding-right: env(safe-area-inset-right, 0px) !important;
     width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   @media all and (display-mode: standalone), (display-mode: fullscreen) {
     .app-container {
-      padding-top: max(env(safe-area-inset-top, 0px), 44px) !important;
+      padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
       padding-bottom: 0px !important;
+      height: 100% !important;
+      height: var(--real-app-height, 100vh) !important;
+      max-height: var(--real-app-height, 100vh) !important;
     }
   }
 
   .content-wrapper {
     flex-direction: column !important;
-    flex: 1;
+    display: flex !important;
+    flex: 1 1 0% !important;
     width: 100% !important;
     max-width: 100% !important;
-    overflow-y: auto;
-    overflow-x: hidden !important;
-    -webkit-overflow-scrolling: touch;
+    min-height: 0 !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -1625,11 +1653,11 @@ body.is-resizing iframe {
     width: 100% !important;
     max-width: 100% !important;
     order: 1;
-    display: flex;
-    flex-direction: column;
-    flex: 1 !important;
-    height: auto !important;
-    min-height: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -1640,6 +1668,7 @@ body.is-resizing iframe {
     margin: 4px 0 0 0 !important;
     padding: 0 5px !important;
     box-sizing: border-box;
+    flex-shrink: 0;
   }
 
   .bot-panel-card {
@@ -1651,21 +1680,31 @@ body.is-resizing iframe {
     border-radius: 0 !important;
     width: 100% !important;
     box-sizing: border-box;
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
   }
 
   .main-workspace {
     width: 100% !important;
     flex-direction: column !important;
-    flex: 1 !important;
-    height: 0 !important; /* Let flex control height */
+    display: flex !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
     border: 1.5px solid #444 !important; /* Độ dày 1.5px màu #444 trọn vẹn 4 cạnh */
     border-radius: 4px !important; /* Bo góc hoàn chỉnh 4 góc */
     box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .main-workspace .pane-chart {
     width: 100% !important;
-    height: var(--chart-ratio, 50%) !important;
+    flex: 1 1 0% !important;
+    height: var(--chart-ratio, auto) !important;
+    max-height: calc(100% - 177px) !important;
+    min-height: 140px !important;
     border-left: none;
     border-right: none;
     border-bottom: none !important;
@@ -1674,11 +1713,13 @@ body.is-resizing iframe {
 
   .main-workspace .pane-tabs {
     width: 100% !important;
-    flex: 1 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    flex-shrink: 0;
+    flex: var(--tabs-flex, 0 0 168px) !important;
+    min-height: 168px !important;
+    max-height: var(--tabs-max-h, 168px) !important;
+    height: var(--tabs-height, 168px) !important;
+    flex-shrink: 0 !important;
     border: none !important;
+    overflow: hidden !important;
   }
 
   /* Sidebar controls xuống dưới (order: 2) có đường chỉ dọc 2 bên viền mép màu #333333 dày 2px */
@@ -1691,9 +1732,9 @@ body.is-resizing iframe {
     border-bottom: 2px solid #333333 !important;
     height: auto;
     order: 2;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
     box-sizing: border-box;
-    margin-top: auto !important; /* Luôn luôn đặt sát mép dưới */
+    margin-top: 0 !important; /* Neo thẳng mép dưới mà không bị nhảy lơ lửng */
     margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
   }
   
@@ -4184,4 +4225,133 @@ div[class*="tradingview-widget-copyright"],
   color: #555555 !important;
   opacity: 0.75 !important;
 }
+
+/* ==========================================================================
+   RIÊNG BIỆT DÀNH CHO MÀN HÌNH CHÍNH / PWA STANDALONE (IOS WEB APP)
+   - Đảm bảo tràn viền full màn hình (100vh / --real-app-height) trên iPhone 14 Pro Max/15/16
+   - Triệt tiêu hoàn toàn lỗi 100dvh co giật / nhảy footer trên WebKit Standalone
+   - Khóa sát cụm Tài khoản (footer) xuống tận đáy màn hình
+   ========================================================================== */
+@media all and (display-mode: standalone), (display-mode: fullscreen) {
+  html, body, #root {
+    height: 100% !important;
+    height: var(--real-app-height, 100vh) !important;
+    min-height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .app-container {
+    padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+    padding-bottom: 0px !important;
+    height: 100% !important;
+    height: var(--real-app-height, 100vh) !important;
+    max-height: var(--real-app-height, 100vh) !important;
+  }
+
+  .content-wrapper {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-section {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .bot-panel-card {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-workspace {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .main-workspace .pane-chart {
+    flex: 1 1 0% !important;
+    height: var(--chart-ratio, auto) !important;
+    max-height: calc(100% - 177px) !important;
+    min-height: 140px !important;
+    flex-shrink: 0;
+  }
+
+  .main-workspace .pane-tabs {
+    flex: var(--tabs-flex, 0 0 168px) !important;
+    min-height: 168px !important;
+    max-height: var(--tabs-max-h, 168px) !important;
+    height: var(--tabs-height, 168px) !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .sidebar-left {
+    margin-top: 0 !important;
+    margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* Đồng bộ kích hoạt qua class .is-pwa-standalone trên iOS */
+.is-pwa-standalone html,
+.is-pwa-standalone body,
+.is-pwa-standalone #root {
+  height: 100% !important;
+  height: var(--real-app-height, 100vh) !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.is-pwa-standalone .app-container {
+  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+  padding-bottom: 0px !important;
+  height: 100% !important;
+  height: var(--real-app-height, 100vh) !important;
+  max-height: var(--real-app-height, 100vh) !important;
+}
+
+.is-pwa-standalone .content-wrapper,
+.is-pwa-standalone .main-section,
+.is-pwa-standalone .bot-panel-card,
+.is-pwa-standalone .main-workspace {
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.is-pwa-standalone .main-workspace .pane-chart {
+  flex: 1 1 0% !important;
+  height: var(--chart-ratio, auto) !important;
+  max-height: calc(100% - 177px) !important;
+  min-height: 140px !important;
+}
+
+.is-pwa-standalone .main-workspace .pane-tabs {
+  flex: var(--tabs-flex, 0 0 168px) !important;
+  min-height: 168px !important;
+  max-height: var(--tabs-max-h, 168px) !important;
+  height: var(--tabs-height, 168px) !important;
+  flex-shrink: 0 !important;
+}
+
+.is-pwa-standalone .sidebar-left {
+  margin-top: 0 !important;
+  margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
+  flex-shrink: 0 !important;
+}
+
 

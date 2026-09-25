@@ -56,7 +56,8 @@ export default function ConnectModal({
       setLocalPassphrase("");
       return;
     }
-    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    const curUid = currentUid || localStorage.getItem("tls1_uid");
+    if (!curUid || curUid === "default") return;
     fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${curUid}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {

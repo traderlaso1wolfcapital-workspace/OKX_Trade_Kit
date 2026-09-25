@@ -96,7 +96,7 @@ function App() {
   const [selectedAccount, setSelectedAccount] = useState(effectiveAccId);
 
   // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
-  const currentUid = localStorage.getItem("tls1_uid") || loginUid;
+  const currentUid = localStorage.getItem("tls1_uid") || loginUid || "";
   const {
     botStatus,
     setBotStatus,
@@ -117,7 +117,8 @@ function App() {
     });
 
     if (accId) {
-      const curUid = localStorage.getItem("tls1_uid") || loginUid || "default";
+      const curUid = localStorage.getItem("tls1_uid") || loginUid;
+      if (!curUid || curUid === "default") return;
       fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${curUid}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => {
@@ -258,6 +259,36 @@ function App() {
     if (showLayoutMenu) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showLayoutMenu]);
+
+  // Sync exact viewport height for iOS Safari & Standalone PWA
+  useEffect(() => {
+    const updateRealHeight = () => {
+      const h = window.innerHeight;
+      document.documentElement.style.setProperty('--real-app-height', `${h}px`);
+      const isStandalone = window.navigator.standalone === true ||
+        (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+      if (isStandalone) {
+        document.documentElement.classList.add('is-pwa-standalone');
+        if (document.body) document.body.classList.add('is-pwa-standalone');
+      } else {
+        document.documentElement.classList.remove('is-pwa-standalone');
+        if (document.body) document.body.classList.remove('is-pwa-standalone');
+      }
+    };
+    updateRealHeight();
+    window.addEventListener('resize', updateRealHeight);
+    window.addEventListener('orientationchange', updateRealHeight);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateRealHeight);
+    }
+    return () => {
+      window.removeEventListener('resize', updateRealHeight);
+      window.removeEventListener('orientationchange', updateRealHeight);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateRealHeight);
+      }
+    };
+  }, []);
 
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
@@ -558,7 +589,19 @@ function App() {
     let isMounted = true;
     const bootstrap = async () => {
       try {
-        const uidToUse = localStorage.getItem("tls1_uid") || loginUid || "default";
+        const uidToUse = localStorage.getItem("tls1_uid") || loginUid;
+        if (!uidToUse || uidToUse === "default") {
+          if (isMounted) {
+            setAccounts([]);
+            setSelectedAccount("");
+            setApiKey("");
+            setSecretKey("");
+            setPassphrase("");
+            setPositions([]);
+            setClosedPositions([]);
+          }
+          return;
+        }
         const resAcc = await fetch(`/api/bot/accounts?uid=${uidToUse}`);
         let accList = [];
         if (resAcc.ok) {
@@ -620,8 +663,10 @@ function App() {
                 localStorage.setItem("tls1_uid", masterUid);
                 setLoginUid(masterUid);
               }
-              setIsAuthenticated(true);
-              localStorage.setItem("tls1_auth", "true");
+              if (credData.api_key || credData.secret_key || credData.passphrase) {
+                setIsAuthenticated(true);
+                localStorage.setItem("tls1_auth", "true");
+              }
             }
           }
         }
@@ -637,8 +682,20 @@ function App() {
   useEffect(() => {
     const fetchCreds = async () => {
       try {
-        const targetAcc = selectedAccount || effectiveAccId || activeBotTab;
-        const uidToUse = currentUid || localStorage.getItem('tls1_uid') || 'default';
+        const uidToUse = currentUid || localStorage.getItem('tls1_uid');
+        if (!uidToUse || uidToUse === 'default') {
+          setApiKey("");
+          setSecretKey("");
+          setPassphrase("");
+          return;
+        }
+        const targetAcc = selectedAccount || effectiveAccId;
+        if (!targetAcc) {
+          setApiKey("");
+          setSecretKey("");
+          setPassphrase("");
+          return;
+        }
         const r = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${uidToUse}`);
         if (r.ok) {
           const d = await r.json();
@@ -726,13 +783,18 @@ function App() {
 
   // Load accounts list
   useEffect(() => {
-    const curUid = currentUid || localStorage.getItem('tls1_uid') || 'default';
+    const curUid = currentUid || localStorage.getItem('tls1_uid');
+    if (!curUid || curUid === 'default') {
+      setAccounts([]);
+      return;
+    }
     fetch(`/api/bot/accounts?uid=${curUid}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data)) {
-          setAccounts(data);
-          localStorage.setItem("tls1_accounts", JSON.stringify(data));
+          const clean = dedupeAccounts(data);
+          setAccounts(clean);
+          localStorage.setItem("tls1_accounts", JSON.stringify(clean));
         }
       })
       .catch(() => { });
@@ -751,14 +813,18 @@ function App() {
 
     const connectWS = () => {
       if (!isMounted) return;
-      const safeUid = currentUid || localStorage.getItem('tls1_uid') || 'default';
+      const safeUid = currentUid || localStorage.getItem('tls1_uid');
+      if (!safeUid || safeUid === 'default') {
+        setLogs([{ id: Date.now(), lines: ["ℹ️ Vui lòng kết nối tài khoản OKX để bắt đầu sử dụng và xem logs bot."] }]);
+        return;
+      }
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs/${safeUid}/${activeBotTab}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setLogs(prev => {
-          if (prev.length <= 1 && (prev.length === 0 || prev[0] === "Đang kết nối với TLS1 Trading Web Terminal Server...")) {
+          if (prev.length <= 1 && (prev.length === 0 || prev[0] === "Đang kết nối với TLS1 Trading Web Terminal Server..." || prev[0]?.lines?.[0]?.includes("Vui lòng kết nối tài khoản"))) {
             return [{ id: Date.now(), lines: [`✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`] }];
           }
           return prev;
@@ -1024,7 +1090,7 @@ function App() {
         targetAcc = `sub_${Date.now()}`;
       }
 
-      const curUid = uid || currentUid || localStorage.getItem("tls1_uid") || "default";
+      const curUid = uid || currentUid || localStorage.getItem("tls1_uid") || "";
       const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1162,7 +1228,11 @@ function App() {
     try {
       setIsStoppingBot(true);
       const targetStrat = activeBotTab || "sub1";
-      const targetUid = currentUid || "default";
+      const targetUid = currentUid || localStorage.getItem("tls1_uid") || "";
+      if (!targetUid || targetUid === "default") {
+        setIsStoppingBot(false);
+        return;
+      }
       const targetAcc = selectedAccount || effectiveAccId || "";
       const r = await fetch(`/api/bot/stop?strategy=${targetStrat}&uid=${targetUid}&account_id=${targetAcc}`, { method: "POST" });
       if (r.ok) {
@@ -1302,8 +1372,10 @@ function App() {
     setAccountToDelete("");
 
     try {
-      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-      await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+      const curUid = currentUid || localStorage.getItem("tls1_uid");
+      if (curUid && curUid !== "default") {
+        await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+      }
     } catch { }
   };
 
@@ -1359,8 +1431,10 @@ function App() {
     }
 
     try {
-      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-      await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+      const curUid = currentUid || localStorage.getItem("tls1_uid");
+      if (curUid && curUid !== "default") {
+        await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+      }
     } catch { }
   };
 
@@ -1455,7 +1529,7 @@ function App() {
 
     setIsSavingConfig(true);
     try {
-      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "";
       const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1685,10 +1759,12 @@ function App() {
   };
 
   const handleLogout = async (targetUid) => {
-    const curUid = targetUid || okxUid || currentUid || localStorage.getItem("tls1_uid") || "default";
-    try {
-      await fetch(`/api/auth/logout?uid=${curUid}`, { method: "POST" });
-    } catch { }
+    const curUid = targetUid || okxUid || currentUid || localStorage.getItem("tls1_uid") || "";
+    if (curUid && curUid !== "default") {
+      try {
+        await fetch(`/api/auth/logout?uid=${curUid}`, { method: "POST" });
+      } catch { }
+    }
     localStorage.removeItem("tls1_auth");
     localStorage.removeItem("tls1_uid");
     localStorage.removeItem("tls1_accounts");

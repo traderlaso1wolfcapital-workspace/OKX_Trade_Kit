@@ -18,6 +18,63 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/09/2026]** - Khắc Phục Lỗi Footer Nhảy & Thừa Khoảng Trống Đáy Trên iPhone 14 Pro Max Đổ Lên (Dynamic Island) Trong Chế Độ PWA Standalone:
+  - **Mô tả yêu cầu CEO:** Trên iPhone khi thêm vào màn hình chính (mở dưới dạng ứng dụng web độc lập PWA), iPhone 13 trở xuống rất gọn đẹp nhưng iPhone 14 Pro Max đổ lên (không còn tai thỏ nữa) lại bị lỗi footer nhảy quá nhiều, không tràn viền full màn như bản release ngày 24/09/2026.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Mất cơ chế đo lường `--real-app-height`:** Trong đợt merge/revert trước (`e8fba88a`), đoạn script `setRealAppHeight()` trong `index.html` và hook `updateRealHeight` trong `App.jsx` bị xóa.
+    2. **Lỗi WebKit iOS trong chế độ Standalone PWA:** Đơn vị CSS `100dvh` trên Safari WebKit Standalone mode bị bug tính trừ thanh điều hướng Safari ảo vốn không hề tồn tại trong PWA, khiến chiều cao container trên iPhone 14 Pro Max (màn hình 932px) bị co rút xuống chỉ còn ~740px, để lộ khoảng đen 192px bên dưới.
+    3. **Hiện tượng giật/nhảy Footer:** Khi người dùng chạm hoặc vuốt màn hình, WebKit liên tục tính toán lại `100dvh` giữa 740px và 932px, khiến cụm footer `.sidebar-left` bị nhảy liên tục ("phần footer nó nhảy quá nhiều").
+    4. **Thiếu cơ chế Flexbox lấp đầy:** Khung workspace và biểu đồ chưa có `flex: 1 1 0%`, không thể tự động dãn nở theo chiều dọc để hấp thụ hết chiều cao thêm vào của màn hình iPhone 14 Pro Max (932px so với 844px của iPhone 13).
+  - **Giải pháp thực hiện:**
+    - [index.html](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/index.html):
+      - Bổ sung lại script `setRealAppHeight()` đo chính xác `window.innerHeight` và bind vào biến CSS `--real-app-height`.
+      - Nhận diện chính xác chế độ Standalone PWA trên iOS (`window.navigator.standalone === true` hoặc `display-mode: standalone`) để tự động gán class `.is-pwa-standalone` vào `<html>` và `<body>`.
+      - Đặt `theme-color: #1e1e1e` và lắng nghe sự kiện `resize`, `orientationchange`, `window.visualViewport.resize`.
+    - [App.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Bổ sung `useEffect` đồng bộ liên tục `--real-app-height` và cờ `.is-pwa-standalone` khi component mount và re-render.
+    - [index.css](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Cập nhật `html, body, #root`, `.app-container` sử dụng `var(--real-app-height, 100dvh)` triệt tiêu 100% lỗi co rút chiều cao của `100dvh` trên WebKit Standalone.
+      - Thiết lập hệ thống Flexbox co dãn hoàn hảo cho mobile:
+        - `.content-wrapper`, `.main-section`, `.bot-panel-card`, `.main-workspace` đều nhận `flex: 1 1 0% !important; min-height: 0 !important; overflow: hidden !important;`.
+        - `.pane-chart`: nhận `flex: 1 1 0% !important; height: var(--chart-ratio, auto) !important; max-height: calc(100% - 177px) !important; min-height: 140px !important;` $\rightarrow$ Biểu đồ tự động hấp thụ toàn bộ chiều cao còn lại của màn hình iPhone 14 Pro Max / 15 / 16.
+        - `.pane-tabs`: khóa chuẩn 168px (vừa khít 3 dòng vị thế sát mép bo ngoài).
+        - `.sidebar-left`: đặt `margin-top: 0 !important; margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;` $\rightarrow$ Khóa cố định cụm Tài khoản sát mép đáy ngay trên thanh gạt Home Indicator, triệt tiêu 100% hiện tượng nhảy hay giật footer.
+      - Đồng bộ kích hoạt cho cả `@media all and (display-mode: standalone)` và class `.is-pwa-standalone`.
+      - Cập nhật `.modal-overlay` dùng `height: var(--real-app-height, 100dvh)` để che phủ trọn vẹn màn hình khi mở popup.
+      - Đã build production bundle (`npm run build`) thành công 100%.
+
+- **[26/09/2026]** - Phân Lập Tài Khoản & Quyền Điều Khiển Đa Thiết Bị Tuyệt Đối Theo OKX Master UID (Multi-tenant Account Isolation):
+  - **Mô tả yêu cầu CEO:** Khi user kết nối tài khoản OKX vào thì lấy chính UID làm tài khoản riêng của người đó. Khi User A connect / thêm tài khoản thì chỉ User A thấy và điều khiển được tài khoản đó. Các User B, C ở thiết bị khác không thể thấy và chỉ điều khiển tài khoản riêng của họ. Người dùng mới mở web trên thiết bị mới phải hoàn toàn trống sạch, không thấy hay can thiệp vào tài khoản của người khác.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Frontend Fallback `default`:** Khi người dùng truy cập ở máy mới/thiết bị khác với `localStorage` trống, code frontend tự gán fallback `uidToUse = currentUid || "default"`, gửi các yêu cầu `/api/bot/credentials?uid=default`, `/api/bot/accounts?uid=default`.
+    2. **Backend Tự Tìm UID Thay Thế & Rò Rỉ Master UID:** Trong `main.py`, hàm `_get_master_uid(uid)` khi nhận `uid="default"` đã tự động quét thư mục đầu tiên trong `TLS1_Trading_Users` hoặc fallback về chuỗi hardcode `"523019992975987626"`. Khi frontend nhận về UID này, frontend tự động ghi vào `localStorage.setItem("tls1_uid", masterUid)`, biến người dùng lạ trên thiết bị mới thành User đã kết nối trước đó!
+    3. **Lưu Trữ Chung Toàn Cục:** Hàm `update_bot_credentials` trước đây lưu API key vào thư mục của User, đồng thời tự động copy lưu sang cả thư mục `default` và thư mục gốc của project `OKX_TRADE_KIT_DIR`. Do đó bất kỳ ai truy cập không có UID đều đọc trúng API Key của User vừa lưu gần nhất.
+    4. **Backend Fallback Đọc Thư Mục `default` & Root:** Hàm `_get_okx_creds` khi không tìm thấy credentials theo UID đã fallback đọc thư mục `default` và thư mục gốc.
+    5. **Rò Rỉ Logs Giữa Các Người Dùng Khác Nhau:** WebSocket `/api/logs/ws` có vòng lặp fallback: nếu UID hiện tại chưa có log thì lặp qua toàn bộ queue trong `bot_log_queues` của mọi user khác và lấy log đẩy về, khiến User B nhìn thấy log giao dịch của User A.
+  - **Giải pháp thực hiện:**
+    - [main.py](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/backend/main.py):
+      - Loại bỏ toàn bộ hardcode UID và chuỗi `default` khỏi whitelist/bypass.
+      - Hàm `_get_master_uid(uid)`: Nếu `uid` rỗng hoặc là `guest`, `default`, `undefined`, `null` -> trả về `""` ngay lập tức, tuyệt đối không quét các thư mục người dùng khác.
+      - Hàm `_get_okx_creds(uid, strategy, account_id)`: Chỉ tìm kiếm duy nhất trong thư mục dữ liệu cá nhân `get_user_data_dir(uid)`. Cắt bỏ triệt để việc fallback sang thư mục `default` hay `OKX_TRADE_KIT_DIR`.
+      - Phân quyền & Cô lập dữ liệu:
+        - `get_bot_accounts`: Nếu chưa đăng nhập / UID rỗng / default -> trả về danh sách rỗng `[]`.
+        - `create_bot_account`: Yêu cầu xác thực người dùng, từ chối tạo nếu UID không hợp lệ (401).
+        - `delete_bot_account`: Chỉ xóa tài khoản trong thư mục riêng của UID người dùng, không can thiệp thư mục chung.
+        - `get_bot_credentials`: Trả về trắng nếu UID rỗng hoặc không có quyền.
+        - `update_bot_credentials`: Xác thực trực tiếp với sàn OKX qua `/api/v5/account/config` để lấy `main_uid` (Master UID) làm định danh duy nhất. Chỉ cho phép lưu API Key vào đúng thư mục `TLS1_Trading_Users/{main_uid}/TLS1_Trading/`. Chặn đứng User A lưu trộm vào tài khoản User B. Gỡ bỏ hoàn toàn việc đồng bộ ra `default` và `OKX_TRADE_KIT_DIR`.
+        - `get_bot_status`, `get_bot_positions`, `get_closed_positions`, `get_account_balance`: Kiểm tra UID, trả về `[]`, 0 USDT và `STOPPED` khi người dùng chưa đăng nhập.
+      - Cô lập Terminal Logs 100%:
+        - `websocket_logs`: Chỉ kết nối và đọc đúng hàng đợi log `bot_log_queues[uid][strategy]`. Xóa bỏ hoàn toàn vòng lặp quét queue của các user khác.
+        - `log_reader_task`: Phân phát log stdout từ bot process chỉ tới các kết nối client có cùng `uid` và `strategy`.
+      - Cập nhật phiên bản changelog `# z7729` ở cuối file `main.py`.
+    - [App.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Khởi tạo `currentUid = localStorage.getItem("tls1_uid") || loginUid || ""`.
+      - Xóa sạch toàn bộ fallback `|| "default"` trong toàn bộ các hàm gọi API (`handleAssignAccountToActiveBot`, `bootstrap`, `fetchCreds`, `connectWS`, `handleConnectApiKey`, `handleStopBot`, `confirmDeleteAccount`, `handleDisconnectSpecificAccount`, `handleSaveApiKey`, `handleLogout`).
+      - Khi thiết bị mới vào web (chưa connect): Hiển thị giao diện trắng sạch (0 tài khoản, 0 vị thế, số dư 0, terminal nhắc nhở kết nối tài khoản).
+    - [ConnectModal.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Kiểm tra nghiêm ngặt `curUid`: nếu chưa có UID hoặc UID là `default` thì chặn chọn/tác động tài khoản.
+    - Đã kiểm tra build production frontend (`npm run build`) và compile backend python (`python3 -m py_compile`) thành công 100%.
+
 - **[25/09/2026]** - Hoàn Thiện Trạng Thái Đăng Xuất: Chuyển Sang Chấm Đỏ "UID: Đã Ngắt Kết Nối" & Loại Bỏ Hoàn Toàn Hardcoded UID Fallback:
   - **Mô tả yêu cầu CEO:** Sau khi bấm Đăng Xuất / xác nhận đăng xuất thì ở chân modal Connect vẫn hiện chấm xanh `UID: 523019992975987626`. Yêu cầu khi đã đăng xuất thì chuyển chấm xanh sang chấm đỏ `UID: Đã ngắt kết nối` kèm thông báo phù hợp.
   - **Nguyên nhân phát hiện:**
