@@ -59,8 +59,12 @@ export default function SidebarLeft({
               fontSize: "12.5px",
               fontWeight: "bold",
               textTransform: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
+            {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
             {t("account_label")} ({getBotLabel()})
           </span>
 
@@ -98,6 +102,7 @@ export default function SidebarLeft({
           <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
             <select
               className="styled-select"
+              disabled={isRunning}
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -106,9 +111,14 @@ export default function SidebarLeft({
                 fontSize: "12px",
                 outline: "none",
                 height: "28px",
+                cursor: isRunning ? "not-allowed" : "pointer",
+                opacity: isRunning ? 0.65 : 1,
+                backgroundColor: isRunning ? "#1a1a1a" : undefined,
+                borderColor: isRunning ? "#444444" : undefined,
               }}
               value={effectiveAccId}
               onChange={(e) => handleAccountSelect(e.target.value)}
+              title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản giao dịch"}
             >
               {accounts.length === 0 ? (
                 <option value="">{t("no_account")}</option>

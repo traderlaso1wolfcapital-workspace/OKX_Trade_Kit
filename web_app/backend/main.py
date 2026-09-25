@@ -377,28 +377,73 @@ def login_with_password(request: Request, req: LoginRequest):
 @app.post("/api/auth/logout")
 def logout_account(uid: str):
     clean_uid = uid.strip() if uid else "default"
-    # 1. Stop all bot processes for this uid
-    for strategy in ["sub1", "sub2", "sub3"]:
-        proc = get_nested(bot_processes, clean_uid, strategy)
-        pid = get_running_pid(clean_uid, strategy)
-        if proc or pid > 0:
-            if proc:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=2)
-                except Exception:
-                    try: proc.kill()
-                    except Exception: pass
-            if pid > 0:
-                kill_pid(pid)
-            if clean_uid in bot_processes and strategy in bot_processes[clean_uid]:
-                del bot_processes[clean_uid][strategy]
     
-    # 2. Clear user data directory accounts and all .api files
-    target_uids = [clean_uid]
-    if clean_uid != "default":
-        target_uids.append("default")
-        
+    # 1. Tập hợp danh sách các UID cần dọn sạch triệt để
+    target_uids = set()
+    if clean_uid:
+        target_uids.add(clean_uid)
+    target_uids.add("default")
+    
+    # Quét trong AppData TLS1_Trading_Users để tìm thêm thư mục liên quan
+    users_root = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users")
+    if os.path.exists(users_root):
+        try:
+            for item in os.listdir(users_root):
+                if item == clean_uid or (clean_uid != "default" and clean_uid in item):
+                    target_uids.add(item)
+        except Exception:
+            pass
+
+    # 2. Dừng toàn bộ bot của các UID này (EMA200, SMC, Liquidation):
+    for u in target_uids:
+        for strategy in ["sub1", "sub2", "sub3"]:
+            # Ghi cờ stop flag & dry_run flag
+            try:
+                flag_dir = _get_flag_dir(u, strategy)
+                os.makedirs(flag_dir, exist_ok=True)
+                with open(os.path.join(flag_dir, f"stop_{strategy}.flag"), "w") as f:
+                    f.write("stop")
+                with open(os.path.join(flag_dir, f"dry_run_{strategy}.flag"), "w") as f:
+                    f.write("1")
+                act_flag = os.path.join(flag_dir, f"activate_{strategy}.flag")
+                if os.path.exists(act_flag):
+                    os.remove(act_flag)
+            except Exception:
+                pass
+
+            # Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (bảo lưu 100% TP/SL)
+            try:
+                if "_cancel_unfilled_limit_orders" in globals():
+                    _cancel_unfilled_limit_orders(u, strategy, action_name="LOGOUT STOP ALL")
+            except Exception:
+                pass
+
+            # Diệt sạch tiến trình bot (Process & Tree con)
+            proc = get_nested(bot_processes, u, strategy)
+            pid = get_running_pid(u, strategy)
+            if proc or pid > 0:
+                if proc:
+                    try:
+                        import psutil
+                        parent = psutil.Process(proc.pid)
+                        for child in parent.children(recursive=True):
+                            child.kill()
+                        parent.kill()
+                    except Exception:
+                        try: proc.kill()
+                        except Exception: pass
+                if pid > 0:
+                    try:
+                        import psutil
+                        parent = psutil.Process(pid)
+                        for child in parent.children(recursive=True):
+                            child.kill()
+                        parent.kill()
+                    except Exception:
+                        kill_pid(pid)
+                del_nested(bot_processes, u, strategy)
+
+    # 3. Dọn sạch toàn bộ accounts.json và tất cả file .api_*, .running_account_* trong data_dir
     for u in target_uids:
         data_dir = get_user_data_dir(u)
         if os.path.exists(data_dir):
@@ -417,10 +462,10 @@ def logout_account(uid: str):
                         except Exception:
                             pass
 
-    # Also clean in OKX_TRADE_KIT_DIR for any .api_* matching
+    # 4. Dọn sạch các file .api_* và .running_account_* trong thư mục gốc OKX_TRADE_KIT_DIR
     try:
         for file in os.listdir(OKX_TRADE_KIT_DIR):
-            if file.startswith(".api_sub_") or file.startswith(".api_bot") or file.startswith(".running_account_"):
+            if file.startswith(".api_sub_") or file.startswith(".api_bot") or file.startswith(".running_account_") or file == ".api_botEMA200":
                 try:
                     os.remove(os.path.join(OKX_TRADE_KIT_DIR, file))
                 except Exception:
@@ -428,7 +473,7 @@ def logout_account(uid: str):
     except Exception:
         pass
 
-    return {"status": "success", "message": "Đã đăng xuất thành công và xoá toàn bộ tài khoản phụ cùng API Key."}
+    return {"status": "success", "message": "Đã dừng toàn bộ bot và xoá toàn bộ tài khoản API Key thành công."}
 
 @app.post("/api/auth/okx/callback")
 @limiter.limit("5/minute")
@@ -1179,6 +1224,7 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
             pass
 
     found = False
+    # 1. Tìm theo ID trước
     for acc in accounts:
         if acc.get("id") == target_acc:
             found = True
@@ -1190,12 +1236,35 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
                 acc["name"] = detected_name
             break
 
+    # 2. Nếu chưa tìm thấy theo ID, tìm theo tên để tái sử dụng tài khoản cũ thay vì tạo trùng lặp
+    if not found:
+        for acc in accounts:
+            if acc.get("name", "").strip().lower() == detected_name.strip().lower():
+                found = True
+                target_acc = acc.get("id", target_acc)
+                break
+
+    # 3. Nếu chưa từng tồn tại tài khoản nào cùng ID hoặc cùng Tên thì mới tạo mới
     if not found:
         accounts.append({
             "id": target_acc,
             "name": detected_name,
             "is_manual": False
         })
+
+    # 4. Tự động khử trùng lặp (Deduplicate) theo tên và ID
+    deduped = []
+    seen_names = set()
+    seen_ids = set()
+    for a in accounts:
+        aid = a.get("id", "")
+        aname = a.get("name", "").strip().lower()
+        if aid and aid not in seen_ids and (not aname or aname not in seen_names):
+            seen_ids.add(aid)
+            if aname:
+                seen_names.add(aname)
+            deduped.append(a)
+    accounts = deduped
 
     try:
         with open(acc_file, "w", encoding="utf-8") as f:
@@ -1285,7 +1354,8 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
     for strat in ["sub1", "sub2", "sub3"]:
         s_proc = get_nested(bot_processes, uid, strat)
         s_pid = get_running_pid(uid, strat)
-        if s_pid > 0 or (s_proc and s_proc.poll() is None):
+        # CHỈ ĐƯỢC TÍNH LÀ ACTIVE KHI BOT THỰC SỰ ĐANG CHẠY LIVE (KHÔNG PHẢI SHADOW / STOPPED)
+        if (s_pid > 0 or (s_proc and s_proc.poll() is None)) and not _is_shadow_mode(uid, strat):
             running_acc_file = os.path.join(data_dir, f"bots/{strat}", f".running_account_{strat}")
             if os.path.exists(running_acc_file):
                 try:
@@ -1645,7 +1715,14 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     # Đợi 0.5s để tiến trình bot nhận cờ DRY_RUN và không nhảy vào EMERGENCY RE-PLACE
     await asyncio.sleep(0.5)
 
-    # 2. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
+    # 2. Xóa running_account_{strategy} để không còn đánh dấu là tài khoản đang chạy live
+    data_dir = get_user_data_dir(uid)
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    if os.path.exists(running_acc_file):
+        try: os.remove(running_acc_file)
+        except: pass
+
+    # 3. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
     canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
 
     msg = f"Bot {strategy} đã dừng! Toàn bộ lệnh Limit chưa khớp đã được hủy ({canceled_orders} lệnh). TP/SL của các vị thế đang chạy được giữ nguyên 100%."
@@ -1886,7 +1963,28 @@ def get_bot_accounts(uid: str):
             with open(acc_file, "r", encoding="utf-8") as f:
                 accounts = json.load(f)
                 if isinstance(accounts, list):
-                    return accounts
+                    # Tự động khử trùng lặp (Deduplicate) theo tên và ID
+                    deduped = []
+                    seen_names = set()
+                    seen_ids = set()
+                    has_duplicate = False
+                    for a in accounts:
+                        aid = a.get("id", "")
+                        aname = a.get("name", "").strip().lower()
+                        if aid and aid not in seen_ids and (not aname or aname not in seen_names):
+                            seen_ids.add(aid)
+                            if aname:
+                                seen_names.add(aname)
+                            deduped.append(a)
+                        else:
+                            has_duplicate = True
+                    if has_duplicate:
+                        try:
+                            with open(acc_file, "w", encoding="utf-8") as wf:
+                                json.dump(deduped, wf, indent=4, ensure_ascii=False)
+                        except Exception:
+                            pass
+                    return deduped
         except Exception:
             pass
 

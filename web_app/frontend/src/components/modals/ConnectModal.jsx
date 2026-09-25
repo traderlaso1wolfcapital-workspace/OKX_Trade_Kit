@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "../../i18n";
+import { ConfirmLogoutModal } from "./AccountPromptModals";
 
 export default function ConnectModal({
   isOpen,
@@ -35,6 +36,8 @@ export default function ConnectModal({
   const [localApiKey, setLocalApiKey] = useState("");
   const [localSecretKey, setLocalSecretKey] = useState("");
   const [localPassphrase, setLocalPassphrase] = useState("");
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập
   useEffect(() => {
@@ -83,6 +86,8 @@ export default function ConnectModal({
     return t("bot_liquidation") || "Liquidation Bot";
   };
   const botTitle = getBotTitle();
+  const effectiveUid = isAuthenticated ? (currentUid || localStorage.getItem("tls1_uid") || "") : "";
+  const isConnected = !!(isAuthenticated && effectiveUid);
 
   return (
     <div
@@ -126,6 +131,20 @@ export default function ConnectModal({
           @keyframes modalFadeIn {
             from { opacity: 0; transform: scale(0.96) translateY(6px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
+          }
+          .connect-cards-scroll::-webkit-scrollbar {
+            width: 5px;
+          }
+          .connect-cards-scroll::-webkit-scrollbar-track {
+            background: #141414;
+            border-radius: 4px;
+          }
+          .connect-cards-scroll::-webkit-scrollbar-thumb {
+            background: #383838;
+            border-radius: 4px;
+          }
+          .connect-cards-scroll::-webkit-scrollbar-thumb:hover {
+            background: #505050;
           }
           .connect-tab-btn {
             background-color: #121212;
@@ -179,7 +198,7 @@ export default function ConnectModal({
             background-color: #262626;
             border-color: #ff9900;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(255, 153, 0, 0.25);
           }
           .connect-card:active:not(.disabled) {
             transform: translateY(0);
@@ -300,7 +319,18 @@ export default function ConnectModal({
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: "14px", backgroundColor: "#1e1e1e" }}>
+        <div
+          className="connect-cards-scroll"
+          style={{
+            padding: "16px 18px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "14px",
+            backgroundColor: "#1e1e1e",
+            overflowY: "auto",
+            maxHeight: "calc(90vh - 100px)",
+          }}
+        >
           {/* TAB 1: FAST CONNECT */}
           {connectTab === "fast" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -308,100 +338,105 @@ export default function ConnectModal({
                 {t("fast_connect_desc")}
               </p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
-                {/* 1. OKX App Connect Cards: Có bao nhiêu tài khoản/API Key trong Quản lý tài khoản thì có bấy nhiêu thẻ OKX Connect */}
-                {accounts.length > 0 ? (
-                  accounts.map((acc, idx) => (
-                    <div
-                      key={acc.id || idx}
-                      onClick={() => {
-                        if (isConnecting) return;
-                        if (!okxOAuthUrl) return;
-                        if (handleFastConnectClick) handleFastConnectClick();
-                        window.location.href = okxOAuthUrl;
-                      }}
-                      className="connect-card"
-                      style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? "not-allowed" : "pointer" }}
-                      title="Bấm vào đây để kết nối thêm tài khoản OKX mới"
-                    >
-                      {/* Authentic OKX Logo Box */}
-                      <div
-                        style={{
-                          width: "36px",
-                          height: "36px",
-                          background: "#000000",
-                          border: "1px solid #333333",
-                          borderRadius: "6px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {isConnecting ? (
-                          <span className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></span>
-                        ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
-                            <rect x="2" y="2" width="6" height="6" rx="1" />
-                            <rect x="16" y="2" width="6" height="6" rx="1" />
-                            <rect x="9" y="9" width="6" height="6" rx="1" />
-                            <rect x="2" y="16" width="6" height="6" rx="1" />
-                            <rect x="16" y="16" width="6" height="6" rx="1" />
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Card Content */}
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                          {isConnecting ? t("saving_btn") : t("okx_connect_title")}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "10px",
-                            fontStyle: "italic",
-                            color: "#4ade80",
-                            marginTop: "2px",
-                            fontWeight: "600",
-                          }}
-                        >
-                          {`Đã Connect ${acc.name || "Tài khoản OKX"}`}
-                        </div>
-                      </div>
-
-                      {/* Connect + button badge (khung nút giống [sắp ra mắt] với viền màu xanh) */}
-                      <span
-                        style={{
-                          fontSize: "10.5px",
-                          fontWeight: "600",
-                          color: "#26a69a",
-                          background: "#181818",
-                          border: "1px solid #26a69a",
-                          padding: "3px 7px",
-                          borderRadius: "4px",
-                          whiteSpace: "nowrap",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          userSelect: "none",
-                        }}
-                        title="Bấm vào để kết nối thêm tài khoản khác"
-                      >
-                        Connect +
-                      </span>
-                    </div>
-                  ))
-                ) : (
+              {/* UNIFIED SCROLL CONTAINER: TÍNH CẢ PHẦN 3 THẺ SẮP HỖ TRỢ CHUNG VÀO CON LĂN */}
+              <div
+                className="connect-cards-scroll"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  maxHeight: "390px",
+                  overflowY: "auto",
+                  padding: "6px 8px 6px 4px",
+                }}
+              >
+                {/* 1. THẺ MẶC ĐỊNH: TẠO KẾT NỐI TÀI KHOẢN OKX MỚI (Cố định ở trên cùng) */}
+                <div
+                  onClick={() => {
+                    if (isConnecting) return;
+                    if (!okxOAuthUrl) return;
+                    if (handleFastConnectClick) handleFastConnectClick();
+                    window.location.href = okxOAuthUrl;
+                  }}
+                  className="connect-card"
+                  style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? "not-allowed" : "pointer" }}
+                  title="Bấm vào để kết nối thêm tài khoản OKX mới"
+                >
+                  {/* Authentic OKX Logo Box */}
                   <div
-                    onClick={() => {
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      background: "#000000",
+                      border: "1px solid #333333",
+                      borderRadius: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isConnecting ? (
+                      <span className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></span>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                        <rect x="2" y="2" width="6" height="6" rx="1" />
+                        <rect x="16" y="2" width="6" height="6" rx="1" />
+                        <rect x="9" y="9" width="6" height="6" rx="1" />
+                        <rect x="2" y="16" width="6" height="6" rx="1" />
+                        <rect x="16" y="16" width="6" height="6" rx="1" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Card Content */}
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                      {isConnecting ? t("saving_btn") : t("okx_connect_title")}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
+                      {t("okx_connect_sub")}
+                    </div>
+                  </div>
+
+                  {/* Action Badge [Mở App ➔] chuẩn ban đầu với hiệu ứng đổi màu xanh ngọc & đổ bóng */}
+                  <span
+                    className="connect-action-badge"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (isConnecting) return;
                       if (!okxOAuthUrl) return;
                       if (handleFastConnectClick) handleFastConnectClick();
                       window.location.href = okxOAuthUrl;
                     }}
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      color: "#26a69a",
+                      background: "rgba(38, 166, 154, 0.12)",
+                      border: "1px solid rgba(38, 166, 154, 0.3)",
+                      padding: "4px 9px",
+                      borderRadius: "4px",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.18s ease",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    title="Bấm vào để mở App OKX kết nối"
+                  >
+                    {t("open_app") || "Mở App ➔"}
+                  </span>
+                </div>
+
+                {/* 2. CÁC THẺ ĐÃ KẾT NỐI: Giữ lại hiệu ứng di chuột viền vàng như cũ, nút Disconnect viền đỏ */}
+                {accounts.map((acc, idx) => (
+                  <div
+                    key={acc.id || idx}
                     className="connect-card"
-                    style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? "not-allowed" : "pointer" }}
-                    title="Bấm vào để kết nối tài khoản OKX"
+                    style={{ cursor: "pointer" }}
+                    title={`Tài khoản đã kết nối: ${acc.name || "OKX"}`}
                   >
                     {/* Authentic OKX Logo Box */}
                     <div
@@ -417,37 +452,45 @@ export default function ConnectModal({
                         flexShrink: 0,
                       }}
                     >
-                      {isConnecting ? (
-                        <span className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></span>
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
-                          <rect x="2" y="2" width="6" height="6" rx="1" />
-                          <rect x="16" y="2" width="6" height="6" rx="1" />
-                          <rect x="9" y="9" width="6" height="6" rx="1" />
-                          <rect x="2" y="16" width="6" height="6" rx="1" />
-                          <rect x="16" y="16" width="6" height="6" rx="1" />
-                        </svg>
-                      )}
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                        <rect x="2" y="2" width="6" height="6" rx="1" />
+                        <rect x="16" y="2" width="6" height="6" rx="1" />
+                        <rect x="9" y="9" width="6" height="6" rx="1" />
+                        <rect x="2" y="16" width="6" height="6" rx="1" />
+                        <rect x="16" y="16" width="6" height="6" rx="1" />
+                      </svg>
                     </div>
 
                     {/* Card Content */}
                     <div style={{ flex: 1, textAlign: "left" }}>
                       <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                        {isConnecting ? t("saving_btn") : t("okx_connect_title")}
+                        {t("okx_connect_title")}
                       </div>
-                      <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
-                        {t("okx_connect_sub")}
+                      <div
+                        style={{
+                          fontSize: "10px",
+                          fontStyle: "italic",
+                          color: "#4ade80",
+                          marginTop: "2px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        {`Đã Connect ${acc.name || "Tài khoản OKX"}`}
                       </div>
                     </div>
 
-                    {/* Connect + button badge (khung nút giống [sắp ra mắt] với viền màu xanh) */}
+                    {/* Disconnect button badge (viền đỏ #ff4d4f) */}
                     <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDisconnectAccount) onDisconnectAccount(acc.id);
+                      }}
                       style={{
                         fontSize: "10.5px",
                         fontWeight: "600",
-                        color: "#26a69a",
+                        color: "#ff4d4f",
                         background: "#181818",
-                        border: "1px solid #26a69a",
+                        border: "1px solid #ff4d4f",
                         padding: "3px 7px",
                         borderRadius: "4px",
                         whiteSpace: "nowrap",
@@ -455,13 +498,21 @@ export default function ConnectModal({
                         alignItems: "center",
                         gap: "3px",
                         userSelect: "none",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
                       }}
-                      title="Bấm vào để kết nối tài khoản"
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = "#181818";
+                      }}
+                      title="Ngắt kết nối tài khoản này"
                     >
-                      Connect +
+                      Disconnect
                     </span>
                   </div>
-                )}
+                ))}
 
                 {/* Divider for Multi-exchange & Web3 ready */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "4px 0" }}>
@@ -472,8 +523,7 @@ export default function ConnectModal({
                   <div style={{ flex: 1, height: "1px", background: "#333333" }}></div>
                 </div>
 
-
-                {/* 2. Binance Connect Card (Coming Soon) */}
+                {/* 3. Binance Connect Card (Coming Soon) */}
                 <div className="connect-card disabled" title="Tính năng đang được phát triển">
                   <div
                     style={{
@@ -501,7 +551,7 @@ export default function ConnectModal({
                   </span>
                 </div>
 
-                {/* 3. Bybit Connect Card (Coming Soon) */}
+                {/* 4. Bybit Connect Card (Coming Soon) */}
                 <div className="connect-card disabled" title="Tính năng đang được phát triển">
                   <div
                     style={{
@@ -533,7 +583,7 @@ export default function ConnectModal({
                   </span>
                 </div>
 
-                {/* 4. OKX Web3 Wallet / Crypto Wallet Card (Coming Soon) */}
+                {/* 5. OKX Web3 Wallet / Crypto Wallet Card (Coming Soon) */}
                 <div className="connect-card disabled" title="Tính năng đang được phát triển">
                   <div
                     style={{
@@ -751,38 +801,47 @@ export default function ConnectModal({
           )}
 
           {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT */}
-          {isAuthenticated && (
-            <div
-              style={{
-                marginTop: "4px",
-                paddingTop: "12px",
-                borderTop: "1px solid #333333",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#888888" }}>
-                <span
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    background: "#26a69a",
-                    display: "inline-block",
-                    boxShadow: "0 0 6px #26a69a",
-                  }}
-                ></span>
-                <span>
-                  UID: <strong style={{ color: "#ffffff" }}>{currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}</strong>
-                </span>
-              </div>
+          <div
+            style={{
+              marginTop: "4px",
+              paddingTop: "12px",
+              borderTop: "1px solid #333333",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#888888" }}>
+              <span
+                style={{
+                  width: "9px",
+                  height: "9px",
+                  borderRadius: "50%",
+                  background: isConnected ? "#26a69a" : "#ff4d4f",
+                  display: "inline-block",
+                  boxShadow: isConnected ? "0 0 10px #26a69a, 0 0 4px #26a69a" : "0 0 10px #ff4d4f, 0 0 4px #ff4d4f",
+                  transition: "all 0.3s ease",
+                }}
+              ></span>
+              <span>
+                UID:{" "}
+                {isConnected ? (
+                  <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>{effectiveUid}</strong>
+                ) : (
+                  <>
+                    <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Đã ngắt kết nối</strong>
+                    <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
+                      (Vui lòng kết nối để kích hoạt)
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+
+            {isConnected && (
               <button
                 type="button"
-                onClick={async () => {
-                  if (onLogout) await onLogout();
-                  onClose();
-                }}
+                onClick={() => setShowConfirmLogout(true)}
                 style={{
                   backgroundColor: "transparent",
                   border: "1px solid #ff4d4f",
@@ -803,10 +862,27 @@ export default function ConnectModal({
               >
                 {t("logout")}
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+
+      {/* CONFIRM LOGOUT MODAL (YES/NO) */}
+      <ConfirmLogoutModal
+        isOpen={showConfirmLogout}
+        onClose={() => setShowConfirmLogout(false)}
+        uid={effectiveUid}
+        isLoading={isLoggingOut}
+        onConfirm={async () => {
+          setIsLoggingOut(true);
+          try {
+            if (onLogout) await onLogout(effectiveUid);
+          } finally {
+            setIsLoggingOut(false);
+            setShowConfirmLogout(false);
+          }
+        }}
+      />
     </div>
   );
 }

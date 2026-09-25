@@ -60,7 +60,7 @@ export default function SystemSettingsModal({
   };
 
   const botTitle = getBotTitle();
-  const displayUid = okxUid || localStorage.getItem("tls1_uid") || loginUid || "523019992975987626";
+  const displayUid = okxUid || localStorage.getItem("tls1_uid") || loginUid || "";
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -140,12 +140,29 @@ export default function SystemSettingsModal({
                   <div className="entry-setup-list">
                     {/* Chọn tài khoản trade */}
                     <div className="entry-setup-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "8px", flexWrap: "wrap" }}>
-                      <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                      <span style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "4px" }}>
+                        {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
                         Chọn tài khoản:
                       </span>
                       <select
                         className="styled-select"
-                        style={{ width: "auto", minWidth: "90px", maxWidth: "100%", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 24px 4px 8px", borderRadius: "4px", fontSize: "12px", flexShrink: 1, textOverflow: "ellipsis" }}
+                        disabled={isRunning}
+                        style={{
+                          width: "auto",
+                          minWidth: "90px",
+                          maxWidth: "100%",
+                          background: isRunning ? "#1a1a1a" : "#2d2d2d",
+                          border: isRunning ? "1px solid #444444" : "1px solid #555555",
+                          color: isRunning ? "#888888" : "#e0e0e0",
+                          padding: "4px 24px 4px 8px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          flexShrink: 1,
+                          textOverflow: "ellipsis",
+                          cursor: isRunning ? "not-allowed" : "pointer",
+                          opacity: isRunning ? 0.65 : 1,
+                        }}
+                        title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản"}
                         value={selectedAccount || ""}
                         onChange={e => {
                           const val = e.target.value;

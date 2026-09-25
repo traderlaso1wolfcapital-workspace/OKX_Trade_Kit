@@ -18,6 +18,126 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Hoàn Thiện Trạng Thái Đăng Xuất: Chuyển Sang Chấm Đỏ "UID: Đã Ngắt Kết Nối" & Loại Bỏ Hoàn Toàn Hardcoded UID Fallback:
+  - **Mô tả yêu cầu CEO:** Sau khi bấm Đăng Xuất / xác nhận đăng xuất thì ở chân modal Connect vẫn hiện chấm xanh `UID: 523019992975987626`. Yêu cầu khi đã đăng xuất thì chuyển chấm xanh sang chấm đỏ `UID: Đã ngắt kết nối` kèm thông báo phù hợp.
+  - **Nguyên nhân phát hiện:**
+    1. Trong code frontend (`ConnectModal.jsx`, `App.jsx`, `SystemSettingsModal.jsx`), có chuỗi fallback cứng `|| "523019992975987626"`. Khi đăng xuất xong, dù `tls1_uid` đã bị xóa khỏi `localStorage` thì hệ thống vẫn lấy chuỗi fallback cứng này đắp vào.
+    2. Chân modal trước đây dùng điều kiện `{isAuthenticated && ...}` nên khi đăng xuất nó ẩn luôn hoặc nếu `isAuthenticated` chưa cập nhật thì vẫn hiển thị chấm xanh.
+  - **Giải pháp thực hiện:**
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Tính toán `effectiveUid = isAuthenticated ? (currentUid || localStorage.getItem("tls1_uid") || "") : ""` và `isConnected = !!(isAuthenticated && effectiveUid)`.
+      - Khi kết nối (`isConnected === true`): Hiển thị **chấm xanh ngọc `#26a69a`**, `UID: {effectiveUid}`, cùng nút `[Đăng Xuất]` viền đỏ.
+      - Khi đã đăng xuất (`isConnected === false`): Tự động chuyển ngay sang **chấm đỏ `#ff4d4f`** phát sáng `box-shadow: 0 0 6px #ff4d4f`, hiển thị rõ ràng:
+        `UID: ` **`Đã ngắt kết nối`** `(Vui lòng kết nối để kích hoạt)`.
+      - Ẩn nút `Đăng Xuất` khi tài khoản đã ở trạng thái ngắt kết nối.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Xóa bỏ triệt để chuỗi fallback cứng `"523019992975987626"`.
+      - Cập nhật `handleLogout`: Khi xác nhận đăng xuất, xóa sạch dữ liệu và cập nhật trực tiếp state mà không cần ép reload trang cứng, giúp chân modal Connect lập tức biến chuyển từ chấm xanh sang chấm đỏ mượt mà trước mắt người dùng.
+    - [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Loại bỏ chuỗi fallback cứng.
+    - Build frontend (`npm run build`) hoàn tất 100% không lỗi.
+
+- **[25/09/2026]** - Sửa Lỗi Chặn Xoá Tài Khoản Sai Khi Đã Dừng Bot & Dọn Sạch Toàn Bộ Data Cũ:
+  - **Mô tả yêu cầu CEO:** Đã ấn dừng bot rồi nhưng khi ấn nút `-` xoá tài khoản thì hệ thống vẫn báo lỗi: `Không thể xoá tài khoản này vì EMA200 Bot đang giao dịch thực tế?` và yêu cầu dọn sạch toàn bộ data cũ.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Khi gọi `/api/bot/stop`, backend chỉ ghi cờ `dry_run` và `stop` mà không xóa file `.running_account_{strategy}`, và process bot vẫn chạy ngầm (warm-up shadow mode).
+    2. Hàm `get_bot_status` trong `main.py` khi tính `active_accounts` chỉ kiểm tra process/pid sống mà không kiểm tra xem bot có đang chạy live hay shadow (`not _is_shadow_mode`). Do đó backend vẫn liên tục trả về `active_accounts: { sub1: "botEMA200" }` dù bot đã dừng.
+    3. Phía frontend `App.jsx`, hàm kiểm tra `isRunning` khi xoá tài khoản chỉ kiểm tra `Object.values(mergedActiveAccounts).includes(targetId)` mà không đối chiếu với trạng thái thực tế `botStatus === "RUNNING"`, dẫn đến việc bị chặn xoá oan dù bot đã dừng hẳn.
+  - **Giải pháp thực hiện:**
+    - [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật `get_bot_status`: Thêm điều kiện `and not _is_shadow_mode(uid, strat)`. Chỉ khi nào bot thực sự đang chạy LIVE mới gán tài khoản vào `active_accounts`. Khi bot đã dừng / shadow, `active_accounts` rỗng hoàn toàn.
+      - Cập nhật `stop_bot`: Tự động xóa sạch file `.running_account_{strategy}` ngay khi dừng bot.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Cập nhật `handleStopBot`: Khi dừng bot thành công, gọi ngay `setHttpActiveAccounts({})` để dọn sạch state tài khoản active ngay tức thì.
+      - Cập nhật 4 vị trí kiểm tra xoá / ngắt kết nối tài khoản (`confirmDeleteAccount`, `handleDisconnectSpecificAccount`, `onDeleteAccount` trong ConnectModal và SystemSettingsModal): Chỉ chặn xoá nếu tài khoản thuộc bot đang chạy LIVE (`runningBot && isCurrentBotRunning`). Khi bot đã dừng, người dùng được quyền xoá hoặc ngắt kết nối tự do.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Phục hồi nút **`[Mở App ➔]`** (`className="connect-action-badge"`) trên thẻ `OKX Connect` chuẩn thiết kế ban đầu: màu xanh ngọc `#26a69a`, nền trong suốt nhạt `rgba(38, 166, 154, 0.12)`, khi rê chuột vào thẻ hoặc nút thì chuyển thành nền xanh ngọc đậm `#26a69a`, chữ trắng nổi bật, nhấc nhẹ 1px và phát sáng `box-shadow: 0 2px 8px rgba(38, 166, 154, 0.35)`.
+    - **Dọn sạch toàn bộ data cũ:**
+      - Đã tắt sạch các tiến trình bot ngầm cũ.
+      - Dọn sạch toàn bộ file cấu hình `.api_*`, `.running_*`, `.flag`, `.pid` trong AppData của UID `523019992975987626`, `default` và thư mục gốc project.
+      - Đã reset file `accounts.json` về danh sách rỗng `[]`.
+    - Đã kiểm tra build frontend (`npm run build`) và compile backend python (`python -m py_compile`) thành công 100%.
+
+- **[25/09/2026]** - Sửa Lỗi Cắt Viền Vàng Hover, Hợp Nhất Con Lăn 5-6 Thẻ Bao Gồm Cả 3 Thẻ Sắp Hỗ Trợ, Tách Thẻ Tạo Mặc Định & Thẻ Đã Connect Sang Nút Disconnect Viền Đỏ:
+  - **Mô tả yêu cầu CEO:**
+    1. Khi di chuyển chuột vào thẻ kết nối, thẻ bị đè/cắt mất phần viền vàng trên đầu, cần fix lại.
+    2. Giới hạn 5–6 thẻ Connect & Cuộn mượt (Scrollbar): Tính cả phần 3 thẻ sắp hỗ trợ, các thẻ sắp hỗ trợ cũng được tính chung vào con lăn.
+    3. Khi OKX Connect xong thì thẻ kết nối đó tự động tạo mới thẻ khác và đẩy thẻ mặc định lên trên cố định để lần sau bấm vào tạo tiếp. Còn thẻ có chữ nghiêng `Đã Connect botEMA200` thì ấn vào không còn chức năng tạo thêm nữa, nút `Connect +` ở thẻ này chuyển thành nút `Disconnect` viền đỏ. Tư vấn chức năng hợp lý cho nút Disconnect.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - **Hiệu ứng viền vàng & Động nâng thẻ (Floating):** Phục hồi `transform: translateY(-2px)` tạo hiệu ứng chuyển động nâng thẻ nhẹ nhàng khi rê chuột, kết hợp viền vàng `#ff9900` và đổ bóng hào quang vàng `box-shadow: 0 4px 14px rgba(0,0,0,0.4), 0 0 12px rgba(255,153,0,0.25)` cho toàn bộ các thẻ. Đặt khoảng đệm an toàn `padding: 6px 8px 6px 4px` ở khung cuộn giúp thẻ khi nâng lên 2px vẫn dư 4px khoảng cách, loại bỏ hoàn toàn hiện tượng bị cấn/cắt mép viền trên.
+      - **Nút Connect + mở App như cũ:** Thẻ mặc định trên cùng giữ nguyên nút `Connect +` (viền xanh). Khi click vào thẻ hoặc click vào nút `Connect +` đều kích hoạt mở OKX App / OAuth flow như cũ để kết nối tài khoản.
+      - **Con lăn chung bao gồm cả 3 thẻ sắp hỗ trợ:** Bỏ khung cuộn tách biệt trước đây. Toàn bộ danh sách: (1) Thẻ mặc định `OKX Connect` [Connect +], (2) Danh sách các thẻ đã kết nối [Disconnect], (3) Vạch ngăn `SẮP HỖ TRỢ`, và (4) 3 thẻ Binance, Bybit, Web3 được gộp chung vào 1 container cuộn duy nhất (`maxHeight: 385px`, tương đương vừa vặn 5–6 thẻ, tự động kích hoạt thanh cuộn dọc mượt mà khi danh sách dài ra).
+      - **Thẻ mặc định cố định ở trên cùng:** Luôn có thẻ đầu tiên `OKX Connect` kèm phụ đề hướng dẫn kết nối và nút `Connect +` (viền xanh). Bấm vào thẻ hoặc nút `Connect +` để mở OAuth kết nối thêm tài khoản mới.
+      - **Thẻ đã kết nối & Nút Disconnect viền đỏ:** Các tài khoản đã kết nối (`accounts.map`) hiển thị dòng chữ nghiêng màu xanh lá `Đã Connect {acc.name}`. Nút bên phải chuyển thành `Disconnect` với viền đỏ `#ff4d4f`, chữ đỏ, hover nền đỏ nhạt.
+      - **Tư vấn & Hoàn thiện chức năng nút Disconnect:**
+        - Khi bấm `Disconnect`, kiểm tra an toàn: nếu Bot đang chạy giao dịch trên tài khoản đó thì cảnh báo và chặn ngắt kết nối để bảo vệ an toàn vốn.
+        - Nếu Bot không chạy: Hiển thị hộp thoại xác nhận Yes/No với đầy đủ giải thích. Khi xác nhận, xóa API key và xóa tài khoản an toàn khỏi hệ thống, đồng thời bảo lưu 100% các vị thế và lệnh TP/SL đã có trên sàn OKX.
+    - Đã kiểm tra build frontend (`npm run build`) thành công 100%.
+
+- **[25/09/2026]** - Hoàn Thiện Cơ Chế Đăng Xuất (Dừng Toàn Bộ Bot, Xóa Tài Khoản API Key) & Bổ Sung Hộp Thoại Xác Nhận Yes/No Cho Nút Đăng Xuất & Nút Dừng Bot:
+  - **Mô tả yêu cầu CEO:**
+    1. Nút Đăng Xuất trong bảng Connect dường như không hoạt động. Nút này phải dừng toàn bộ bot của UID main đó, xoá toàn bộ tài khoản API Key, và cần thêm 1 vòng xác nhận Yes/No trước khi kích hoạt đăng xuất.
+    2. Nút Dừng Bot cũng cần thêm 1 vòng xác nhận Yes/No nữa trước khi dừng bot của từng tài khoản API Key.
+  - **Nguyên nhân phát hiện:**
+    1. Nút Đăng Xuất trước đây gọi `onLogout` trực tiếp không có popup xác nhận. Khi thực thi, client gửi `uid="default"` thay vì UID chính thực tế của người dùng (`523019992975987626`), khiến backend chỉ làm sạch thư mục `default` còn thư mục UID chính của người dùng không được xoá. Ngoài ra, backend chưa ghi stop flags, chưa huỷ lệnh Limit chờ trên sàn OKX (`_cancel_unfilled_limit_orders`), và chưa diệt triệt để các sub-processes.
+    2. Nút Dừng Bot trên thanh công cụ gọi thẳng `handleStopBot()` mà không có vòng xác nhận người dùng, dễ gây bấm nhầm dừng bot trong khi bot đang gồng lệnh.
+  - **Giải pháp thực hiện:**
+    - [AccountPromptModals.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/AccountPromptModals.jsx):
+      - Tạo component `ConfirmLogoutModal` với tông màu đỏ cảnh báo (`#ff4d4f`), hiển thị rõ UID sẽ đăng xuất, liệt kê cụ thể các tác vụ sẽ diễn ra (dừng toàn bộ bot, xóa toàn bộ tài khoản/API key trên máy, hủy lệnh limit chờ, bảo lưu 100% TP/SL vị thế trên sàn OKX), có 2 nút Hủy và Xác Nhận Đăng Xuất kèm hiệu ứng loading.
+      - Tạo component `ConfirmStopBotModal` với tông màu cam/đỏ (`#fa8c16`), hiển thị chính xác tên Bot (`EMA200 Bot`, `SMC Bot`...) và tên tài khoản đang chạy, giải thích rõ cơ chế hủy lệnh chờ và bảo lưu vị thế/TP-SL an toàn, có 2 nút Hủy và Xác Nhận Dừng kèm hiệu ứng loading.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Đổi nút `Đăng Xuất` sang mở `ConfirmLogoutModal`.
+      - Khi người dùng bấm Xác Nhận, truyền chính xác UID đang hiển thị (`currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"`) sang hàm `onLogout(uid)`.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Tích hợp `ConfirmStopBotModal`. Khi bấm nút `DỪNG BOT`, mở popup xác nhận thay vì dừng đột ngột.
+      - Nâng cấp `handleLogout(targetUid)`: Xóa sạch toàn bộ key trong `localStorage` (`tls1_auth`, `tls1_uid`, `tls1_accounts`, `tls1_bot_accounts`, `tls1_last_detected_acc`, `tls1_account_name`, `tls1_master_uid`, `tls1_login_uid`, `okx_oauth_state_raw`), reset toàn bộ React state về ban đầu, gọi API logout và reload trang sạch 100%.
+    - [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Nâng cấp endpoint `POST /api/auth/logout`:
+        - Quét và tổng hợp tất cả UID liên quan (UID truyền lên, UID trong thư mục AppData, và `default`).
+        - Ghi cờ `stop` & `dry_run` cho toàn bộ strategies (`sub1`, `sub2`, `sub3`), xóa cờ `activate`.
+        - Gọi `_cancel_unfilled_limit_orders` hủy toàn bộ lệnh Limit chờ trên sàn OKX.
+        - Terminate và kill toàn bộ process bot cùng process con (child tree).
+        - Ghi `accounts.json` rỗng (`[]`) và xóa sạch tất cả file `.api_*`, `.running_account_*`, `.auth_*` trong AppData và trong thư mục gốc `OKX_TRADE_KIT_DIR`.
+    - Đã kiểm tra build frontend (`npm run build`) và compile backend python (`python -m py_compile`) đều thành công 100%.
+
+- **[25/09/2026]** - Khóa Chọn Tài Khoản Khi Bot Đang Chạy (EMA200 Bot) & Giới Hạn 5-6 Thẻ Connect Với Thanh Cuộn Mượt (Scroll):
+  - **Mô tả yêu cầu CEO:**
+    1. Khi bot (ví dụ: EMA200) đang chạy (`isRunning === true`), phần `Chọn tài khoản:` phải được khóa lại, không cho phép đổi sang xem tài khoản khác. Chỉ khi người dùng bấm Dừng Bot thì mới mở khóa ra để chọn tài khoản khác và chạy tiếp.
+    2. Bảng Connect (Fast Connect tab) chỉ giới hạn hiển thị 5–6 thẻ. Nếu số lượng tài khoản/thẻ connect vượt quá 5-6 thì tạo dạng lăn chuột (scrollbar) để cuộn xem các thẻ bên dưới, không làm vỡ kích thước hay tràn khung modal ra ngoài màn hình.
+  - **Giải pháp thực hiện:**
+    - [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):
+      - Thêm cờ `disabled={isRunning}` cho thẻ `<select>` chọn tài khoản bot.
+      - Khi bot chạy: Hiển thị biểu tượng khóa `🔒`, đổi chuột sang `not-allowed`, độ mờ `opacity: 0.65`, thêm tooltip cảnh báo: `"🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!"`.
+    - [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      - Nhận prop `isRunning` từ `App.jsx`.
+      - Khóa dropdown `Chọn tài khoản:` với `disabled={isRunning}` khi bot đang hoạt động.
+      - Hiển thị badge khóa `🔒` bên cạnh tiêu đề `Chọn tài khoản:` và cursor `not-allowed` kèm tooltip hướng dẫn.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Đặt khung danh sách thẻ OKX Connect trong container có `maxHeight: "310px"`, `overflowY: "auto"`, `paddingRight: "4px"`. Chiều cao này hiển thị hoàn hảo 5 thẻ và lộ mép trên thẻ thứ 6, kích hoạt thanh cuộn dọc trực quan mượt mà khi có nhiều hơn 5 tài khoản.
+      - Bổ sung CSS class `.connect-cards-scroll` với thanh cuộn dark theme hiện đại (thumb 4px viền bo tròn `#333`, hover sáng `#555`).
+      - Đảm bảo thân modal cuộn linh hoạt (`maxHeight: "calc(90vh - 100px)"`, `overflowY: "auto"`) chống tràn mọi kích cỡ màn hình.
+    - Đã build kiểm tra production bundle (`npm run build`) thành công 100%.
+
+- **[25/09/2026]** - Sửa Lỗi Tự Động Connect & Sinh Hàng Loạt Bản Ghi Tài Khoản Phụ / Chính Trùng Lặp:
+  - **Mô tả yêu cầu CEO:** Kiểm tra nguyên nhân hệ thống tự động connect và tạo kết nối với rất nhiều tài khoản phụ (và tài khoản chính trùng lặp nhiều lần như `Tài khoản phụ (7103)`, `Tài khoản chính (1907)`).
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Vòng lặp Re-render kích hoạt Callback nhiều lần (Multi-trigger loop):** Trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), `useEffect` xử lý `/okx-callback` có dependency `[isAuthenticated, currentUid, effectiveAccId, activeBotTab]`. Khi có mã `?code=...`, `handleCallback` gọi `setSelectedAccount` và `setAccounts`, gây re-render đổi `effectiveAccId`. Trong lúc request gọi OKX đang chờ phản hồi (mất 2-3s) thì `useEffect` bị kích hoạt lại 3-4 lần song song vì URL chưa kịp bị xoá (chỉ xoá ở `finally`). Mỗi lần kích hoạt lại tự sinh ra một `sub_${Date.now()}` mới!
+    2. **Lệch định dạng State (`stateObj` vs `parsedState`):** Khi tạo URL lưu `{ uid, acc, strat, pwa }`, nhưng khi parse callback lại đọc `parsedState.a, parsedState.u`. Do đó `callbackAcc` luôn bị `undefined`, hệ thống luôn ngộ nhận là tài khoản mới và ép tạo ID mới.
+    3. **Backend thiếu cơ chế Deduplicate (khử trùng lặp) theo tên OKX:** Trong [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py), hàm `sync_account_name_in_storage` chỉ so khớp theo ID `target_acc`. Khi OKX trả về cùng tên (`Tài khoản chính (1907)` hoặc `Tài khoản phụ (7103)`), backend không kiểm tra xem tên này đã tồn tại hay chưa, khiến danh sách bị append thêm nhiều bản ghi trùng tên.
+    4. **Tạo tài khoản tạm `Tài khoản 1` trước khi có phản hồi:** Frontend tự chèn `Tài khoản 1` vào state trước khi gọi server, khiến tài khoản ảo này bị kẹt lại.
+  - **Giải pháp thực hiện:**
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Đặt `isHandlingCallbackRef = useRef(false)` đảm bảo callback chỉ chạy duy nhất 1 lần trong phiên.
+      - Gọi `window.history.replaceState` dọn sạch URL NGAY LẬP TỨC trước khi gọi request bất đồng bộ.
+      - Sửa giải mã state hỗ trợ cả 2 định dạng `{ uid, acc, strat, pwa }` và `{ u, a, s, p }`.
+      - Bỏ tạo `Tài khoản 1` tạm bợ.
+      - Bổ sung hàm `dedupeAccounts` khử toàn bộ bản ghi trùng lặp (theo ID và Name) ở cả khởi tạo state và bootstrap API.
+      - Đưa dependency của callback `useEffect` về `[]` (chỉ chạy mount).
+    - [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Cập nhật `sync_account_name_in_storage`: Nếu tài khoản với `detected_name` đã tồn tại, tự động tái sử dụng ID của tài khoản đó thay vì tạo mới.
+      - Tự động khử trùng lặp và lưu sạch `accounts.json`.
+      - Cập nhật `get_bot_accounts` tự động deduplicate danh sách tài khoản theo tên để dọn sạch mọi bản ghi rác cũ trên thiết bị người dùng.
+    - Đã build lại production bundle (`npm run build`) thành công 100%.
+
 - **[25/09/2026]** - Tối Ưu Tốc Độ Xoá Tài Khoản, Nút Connect + Khung Viền Xanh, Độc Lập Quản Lý Tài Khoản Trong Connect Modal & Đồng Bộ Thẻ Fast Connect Theo Danh Sách API Key:
   - **Mô tả yêu cầu CEO:**
     1. Xoá tài khoản loading đang xoá rất lâu, kiểm tra khắc phục triệt để.

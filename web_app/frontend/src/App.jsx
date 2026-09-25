@@ -11,9 +11,23 @@ import SystemSettingsModal from "./components/modals/SystemSettingsModal";
 import ConnectModal from "./components/modals/ConnectModal";
 import LanguageSelector from "./components/common/LanguageSelector";
 import { useTranslation } from "./i18n";
-import { AddAccountModal, DeleteAccountModal } from "./components/modals/AccountPromptModals";
+import { AddAccountModal, DeleteAccountModal, ConfirmStopBotModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
 import "./App.css";
+
+const dedupeAccounts = (accList) => {
+  if (!Array.isArray(accList)) return [];
+  const seenNames = new Set();
+  const seenIds = new Set();
+  return accList.filter(a => {
+    const aid = a?.id;
+    const aname = a?.name?.trim()?.toLowerCase();
+    if (!aid || seenIds.has(aid) || (aname && seenNames.has(aname))) return false;
+    seenIds.add(aid);
+    if (aname) seenNames.add(aname);
+    return true;
+  });
+};
 
 function App() {
   const { t } = useTranslation();
@@ -29,6 +43,7 @@ function App() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [fastConnectStatus, setFastConnectStatus] = useState(null);
   const audioRef = useRef(null);
+  const isHandlingCallbackRef = useRef(false);
 
   // 2. Hardware ID & Bot Slot
   const [hwid] = useState(() => {
@@ -54,7 +69,7 @@ function App() {
       const cached = localStorage.getItem("tls1_accounts");
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return dedupeAccounts(parsed);
       }
     } catch { }
     return [];
@@ -467,6 +482,7 @@ function App() {
 
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [showStopBotModal, setShowStopBotModal] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState("");
   const [newAccountInput, setNewAccountInput] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
@@ -550,9 +566,10 @@ function App() {
           if (Array.isArray(data)) {
             accList = data;
             if (isMounted) {
-              setAccounts(data);
-              localStorage.setItem("tls1_accounts", JSON.stringify(data));
-              if (data.length === 0) {
+              const cleanData = dedupeAccounts(data);
+              setAccounts(cleanData);
+              localStorage.setItem("tls1_accounts", JSON.stringify(cleanData));
+              if (cleanData.length === 0) {
                 setIsAuthenticated(false);
                 localStorage.removeItem("tls1_auth");
                 localStorage.removeItem("tls1_last_detected_acc");
@@ -822,162 +839,150 @@ function App() {
     }
   };
 
-// OKX Fast Connect Callback Interceptor
+  // OKX Fast Connect Callback Interceptor
   useEffect(() => {
+    const pathname = window.location.pathname.replace(/\/$/, "");
+    const search = window.location.search || window.location.hash.replace("#", "?");
+    const urlParams = new URLSearchParams(search);
+    const code = urlParams.get("code");
+    const errorParam = urlParams.get("error");
+    const errorMsg = urlParams.get("error_msg");
+
+    // Chỉ thực thi khi đúng là đang ở trang callback hoặc có mã code/error trả về từ OKX
+    if (pathname !== "/okx-callback" && !code && !errorParam) {
+      return;
+    }
+
+    if (isHandlingCallbackRef.current) return;
+    isHandlingCallbackRef.current = true;
+
+    // Ngay lập tức dọn sạch query param trên URL để ngăn chặn re-render kích hoạt lại
+    window.history.replaceState({}, document.title, window.location.pathname.replace(/\/okx-callback\/?/, "/"));
+
     const handleCallback = async () => {
-      const pathname = window.location.pathname.replace(/\/$/, "");
-      if (pathname === "/okx-callback") {
-        // Hỗ trợ cả query string (?code=...) và fragment hash (#code=...) trên mobile
-        const search = window.location.search || window.location.hash.replace("#", "?");
-        const urlParams = new URLSearchParams(search);
-        const code = urlParams.get("code");
-        const stateParam = urlParams.get("state");
-        const errorParam = urlParams.get("error");
-        const errorMsg = urlParams.get("error_msg");
-        
-        let callbackUid = currentUid;
-        let callbackAcc = effectiveAccId;
-        let callbackStrat = activeBotTab || "sub1";
-        let callbackPwa = false;
-        
-        if (stateParam) {
-           try {
-              let base64 = stateParam.replace(/-/g, '+').replace(/_/g, '/');
-              while (base64.length % 4) {
-                base64 += '=';
-              }
-              const jsonString = atob(base64);
-              const parsedState = JSON.parse(jsonString);
-              
-              if (parsedState.u) callbackUid = parsedState.u;
-              if (parsedState.a) callbackAcc = parsedState.a;
-              if (parsedState.s) callbackStrat = parsedState.s;
-              if (parsedState.p) callbackPwa = parsedState.p;
-           } catch (e) {
-              console.error("Failed to parse state", e);
-              // Attempt to recover from localStorage
-              const savedState = localStorage.getItem("okx_oauth_state_raw");
-              if (savedState) {
-                 try {
-                    const parsedState = JSON.parse(savedState);
-                    if (parsedState.u) callbackUid = parsedState.u;
-                    if (parsedState.a) callbackAcc = parsedState.a;
-                    if (parsedState.s) callbackStrat = parsedState.s;
-                    if (parsedState.p) callbackPwa = parsedState.p;
-                 } catch(e2) {}
-              } else {
-                 setFastConnectStatus({ type: "error", msg: "Lỗi đọc dữ liệu trạng thái OKX. Vui lòng thử kết nối lại." });
-              }
-           }
-        }
+      const stateParam = urlParams.get("state");
 
-        if (errorParam) {
-           setFastConnectStatus({ type: "error", msg: "OKX từ chối kết nối: " + (errorMsg || errorParam) });
-           window.history.replaceState({}, document.title, "/");
-           return;
-        }
+      let callbackUid = currentUid;
+      let callbackAcc = effectiveAccId;
+      let callbackStrat = activeBotTab || "sub1";
+      let callbackPwa = false;
 
-        if (code) {
-           const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-          try {
-            let acc = callbackAcc;
-            const strat = callbackStrat;
-
-            if (!acc) {
-              acc = `sub_${Date.now()}`;
-              const cleanName = "Tài khoản 1";
-              const newAcc = { id: acc, name: cleanName };
-
-              setAccounts(prev => {
-                const next = [...prev, newAcc];
-                localStorage.setItem("tls1_accounts", JSON.stringify(next));
-                return next;
-              });
-              setSelectedAccount(acc);
-              setBotAccountMap(prev => {
-                const next = { ...prev, [strat]: acc };
-                localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-                return next;
-              });
-
-              try {
-                if (callbackUid) {
-                  await fetch(`/api/bot/accounts?uid=${callbackUid}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: acc, name: cleanName })
-                  });
-                }
-              } catch (e) { }
-            }
-
-            addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
-            setFastConnectStatus({ type: "info", msg: "Đang xử lý cấp quyền từ OKX, vui lòng chờ..." });
-            
-            const res = await fetch("/api/auth/okx/callback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                code,
-                account_id: acc,
-                uid: callbackUid || "",
-                strategy: strat
-              })
-            });
-            const data = await res.json();
-            if (res.ok && data.status === "success") {
-              const newUid = data.detected_uid || callbackUid;
-              if (newUid && (!isAuthenticated || callbackUid !== newUid)) {
-                 setIsAuthenticated(true);
-                 setLoginUid(newUid);
-                 localStorage.setItem("tls1_auth", "true");
-                 localStorage.setItem("tls1_uid", newUid);
-                 callbackUid = newUid;
-              }
-
-              if (data.accounts && Array.isArray(data.accounts)) {
-                setAccounts(data.accounts);
-                localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
-              }
-              const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
-              
-              const successMsg = (!isStandalone && callbackPwa) 
-                 ? `✅ Kết nối thành công! Vui lòng ĐÓNG trang này (nhấn Xong/Done) để quay lại ứng dụng.`
-                 : `Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`;
-              
-              setFastConnectStatus({ type: "success", msg: successMsg });
-              addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
-              // Reload credentials
-              const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${callbackUid}`);
-              if (credRes.ok) {
-                const credData = await credRes.json();
-                setApiKey(credData.api_key || "");
-                setSecretKey(credData.secret_key || "");
-                setPassphrase(credData.passphrase || "");
-              }
-              refreshBotData();
-            } else {
-              setFastConnectStatus({ type: "error", msg: (data.message || "Lỗi máy chủ khi kết nối OKX") });
-              addSystemLog("❌ [FAST CONNECT] Lỗi: " + (data.message || "Lỗi máy chủ"));
-            }
-          } catch (err) {
-            setFastConnectStatus({ type: "error", msg: "Lỗi kết nối server: " + err.message });
-          } finally {
-            // Clean up URL
-            window.history.replaceState({}, document.title, "/");
+      if (stateParam) {
+        try {
+          let base64 = stateParam.replace(/-/g, '+').replace(/_/g, '/');
+          while (base64.length % 4) {
+            base64 += '=';
           }
-        } else if (!code) {
-          setFastConnectStatus({ type: "error", msg: "Không nhận được mã xác thực (code) từ OKX. Vui lòng thử lại." });
-          window.history.replaceState({}, document.title, "/");
+          const jsonString = atob(base64);
+          const parsedState = JSON.parse(jsonString);
+
+          if (parsedState.uid || parsedState.u) callbackUid = parsedState.uid || parsedState.u;
+          if (parsedState.acc || parsedState.a) callbackAcc = parsedState.acc || parsedState.a;
+          if (parsedState.strat || parsedState.s) callbackStrat = parsedState.strat || parsedState.s;
+          if (parsedState.pwa !== undefined || parsedState.p !== undefined) callbackPwa = parsedState.pwa !== undefined ? parsedState.pwa : parsedState.p;
+        } catch (e) {
+          console.error("Failed to parse state", e);
+          const savedState = localStorage.getItem("okx_oauth_state_raw");
+          if (savedState) {
+            try {
+              const parsedState = JSON.parse(savedState);
+              if (parsedState.uid || parsedState.u) callbackUid = parsedState.uid || parsedState.u;
+              if (parsedState.acc || parsedState.a) callbackAcc = parsedState.acc || parsedState.a;
+              if (parsedState.strat || parsedState.s) callbackStrat = parsedState.strat || parsedState.s;
+              if (parsedState.pwa !== undefined || parsedState.p !== undefined) callbackPwa = parsedState.pwa !== undefined ? parsedState.pwa : parsedState.p;
+            } catch (e2) {}
+          }
+        }
+      }
+
+      if (errorParam) {
+        setFastConnectStatus({ type: "error", msg: "OKX từ chối kết nối: " + (errorMsg || errorParam) });
+        return;
+      }
+
+      if (code) {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        try {
+          let acc = callbackAcc;
+          const strat = callbackStrat;
+
+          // Nếu chưa có account ID gán, dùng ID tạm và để backend tự detect tên chuẩn, KHÔNG tạo rác Tài khoản 1
+          if (!acc) {
+            acc = `sub_${Date.now()}`;
+          }
+
+          addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
+          setFastConnectStatus({ type: "info", msg: "Đang xử lý cấp quyền từ OKX, vui lòng chờ..." });
+
+          const res = await fetch("/api/auth/okx/callback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              account_id: acc,
+              uid: callbackUid || "",
+              strategy: strat
+            })
+          });
+          const data = await res.json();
+          if (res.ok && data.status === "success") {
+            const newUid = data.detected_uid || callbackUid;
+            if (newUid && (!isAuthenticated || callbackUid !== newUid)) {
+              setIsAuthenticated(true);
+              setLoginUid(newUid);
+              localStorage.setItem("tls1_auth", "true");
+              localStorage.setItem("tls1_uid", newUid);
+              callbackUid = newUid;
+            }
+
+            if (data.accounts && Array.isArray(data.accounts)) {
+              // Khử trùng lặp client
+              const cleanAccs = dedupeAccounts(data.accounts);
+              setAccounts(cleanAccs);
+              localStorage.setItem("tls1_accounts", JSON.stringify(cleanAccs));
+
+              // Tìm account ID thực tế (có thể backend đã gán cho tài khoản có cùng tên)
+              const matchedAcc = cleanAccs.find(a => a.name === data.detected_name) || cleanAccs.find(a => a.id === acc) || cleanAccs[0];
+              if (matchedAcc) {
+                setSelectedAccount(matchedAcc.id);
+                setBotAccountMap(prev => {
+                  const next = { ...prev, [strat]: matchedAcc.id };
+                  localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+                  return next;
+                });
+                acc = matchedAcc.id;
+              }
+            }
+            const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
+
+            const successMsg = (!isStandalone && callbackPwa)
+              ? `✅ Kết nối thành công! Vui lòng ĐÓNG trang này (nhấn Xong/Done) để quay lại ứng dụng.`
+              : `Kết nối OKX Fast Connect thành công: [${accDisplayName}]!`;
+
+            setFastConnectStatus({ type: "success", msg: successMsg });
+            addSystemLog(`✅ [FAST CONNECT] Lấy API Key thành công cho tài khoản "${accDisplayName}"`);
+
+            // Reload credentials
+            const credRes = await fetch(`/api/bot/credentials?strategy=${strat}&account_id=${acc}&uid=${callbackUid}`);
+            if (credRes.ok) {
+              const credData = await credRes.json();
+              setApiKey(credData.api_key || "");
+              setSecretKey(credData.secret_key || "");
+              setPassphrase(credData.passphrase || "");
+            }
+            refreshBotData();
+          } else {
+            setFastConnectStatus({ type: "error", msg: (data.message || "Lỗi máy chủ khi kết nối OKX") });
+            addSystemLog("❌ [FAST CONNECT] Lỗi: " + (data.message || "Lỗi máy chủ"));
+          }
+        } catch (err) {
+          setFastConnectStatus({ type: "error", msg: "Lỗi kết nối server: " + err.message });
         }
       }
     };
 
-    const pathname = window.location.pathname.replace(/\/$/, "");
-    if (isAuthenticated || pathname === "/okx-callback") {
-      handleCallback();
-    }
-  }, [isAuthenticated, currentUid, effectiveAccId, activeBotTab]);
+    handleCallback();
+  }, []);
 
   // Fast Connect OAuth State
   const [okxOAuthUrl, setOkxOAuthUrl] = useState("");
@@ -1164,6 +1169,7 @@ function App() {
         const resData = await r.json().catch(() => ({}));
         setOverrideBotRunning(false);
         if (setBotStatus) setBotStatus("SHADOW");
+        setHttpActiveAccounts({});
         const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";
         addSystemLog(`🛑 [BOT] Đã dừng bot thành công${cancelCount}.`);
         refreshBotData();
@@ -1237,9 +1243,9 @@ function App() {
       setShowDeleteAccountModal(false);
       return;
     }
-    const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetAccountId);
-    if (isRunning) {
-      const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+    const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    if (runningBot && isCurrentBotRunning) {
       const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản!`);
       setShowDeleteAccountModal(false);
@@ -1296,16 +1302,16 @@ function App() {
 
   const handleDisconnectSpecificAccount = async (targetAccountId) => {
     if (!targetAccountId) return;
-    const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetAccountId);
-    if (isRunning) {
-      const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+    const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    if (runningBot && isCurrentBotRunning) {
       const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`⚠️ Không thể ngắt kết nối tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`);
       return;
     }
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
-    if (!window.confirm(`Bạn có chắc chắn muốn ngắt kết nối tài khoản OKX "${accName}" không?`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn ngắt kết nối (Disconnect) tài khoản OKX "${accName}" không?\n\n• Toàn bộ API Key liên kết của tài khoản này sẽ được xóa khỏi hệ thống.\n• Các lệnh chờ (Limit) chưa khớp sẽ được quét dọn dẹp.\n• Toàn bộ vị thế và TP/SL đã có trên sàn OKX vẫn được bảo lưu 100% an toàn.`)) {
       return;
     }
 
@@ -1664,8 +1670,8 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
-    const curUid = okxUid || currentUid || localStorage.getItem("tls1_uid") || "default";
+  const handleLogout = async (targetUid) => {
+    const curUid = targetUid || okxUid || currentUid || localStorage.getItem("tls1_uid") || "default";
     try {
       await fetch(`/api/auth/logout?uid=${curUid}`, { method: "POST" });
     } catch { }
@@ -1674,6 +1680,10 @@ function App() {
     localStorage.removeItem("tls1_accounts");
     localStorage.removeItem("tls1_bot_accounts");
     localStorage.removeItem("tls1_last_detected_acc");
+    localStorage.removeItem("tls1_account_name");
+    localStorage.removeItem("tls1_master_uid");
+    localStorage.removeItem("tls1_login_uid");
+    localStorage.removeItem("okx_oauth_state_raw");
     setAccounts([]);
     setSelectedAccount("");
     setApiKey("");
@@ -1683,7 +1693,8 @@ function App() {
     setLoginUid("");
     setIsAuthenticated(false);
     setBotAccountMap({});
-    window.location.reload();
+    setOverrideBotRunning(false);
+    if (setBotStatus) setBotStatus("STOPPED");
   };
 
 
@@ -1843,7 +1854,7 @@ function App() {
         okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleSaveApiKey}
         isAuthenticated={isAuthenticated}
-        currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || "523019992975987626"}
+        currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || ""}
         accounts={accounts}
         selectedAccount={selectedAccount}
         activeBotTab={activeBotTab}
@@ -1858,9 +1869,9 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetId);
-          if (isRunning) {
-            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => id === targetId)?.[0];
+          const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+          const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => id === targetId)?.[0];
+          if (runningBot && isCurrentBotRunning) {
             const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
@@ -1935,7 +1946,7 @@ function App() {
                 </button>
               ) : isRunning ? (
                 <button
-                  onClick={handleStopBot}
+                  onClick={() => setShowStopBotModal(true)}
                   className="btn-action-stop"
                   style={{ width: "fit-content" }}
                 >
@@ -2339,9 +2350,9 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
-          if (isRunning) {
-            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+          const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+          const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+          if (runningBot && isCurrentBotRunning) {
             const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
@@ -2403,6 +2414,18 @@ function App() {
         isMultiple={accounts.length > 1}
         isLoading={isDeletingAccount}
         onConfirm={confirmDeleteAccount}
+      />
+
+      <ConfirmStopBotModal
+        isOpen={showStopBotModal}
+        onClose={() => setShowStopBotModal(false)}
+        botName={activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"}
+        accountName={accounts.find(a => a.id === (selectedAccount || effectiveAccId))?.name || (selectedAccount || effectiveAccId || "Mặc định")}
+        isLoading={isStoppingBot}
+        onConfirm={async () => {
+          await handleStopBot();
+          setShowStopBotModal(false);
+        }}
       />
 
 
