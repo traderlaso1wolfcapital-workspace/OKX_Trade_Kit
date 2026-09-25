@@ -1699,34 +1699,96 @@ body.is-resizing iframe {
     overflow: hidden !important;
   }
 
+  /* Thanh kéo resizer giữa Chart và Tabs: Ẩn hoàn toàn trên mobile để cố định trục cứng 168px */
+  .resizer {
+    display: none !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   /* Chế độ Chia đôi màn hình (Split View) trên mobile: Biểu đồ ở trên, Bảng tab ở dưới */
   .main-workspace.is-split-view .pane-chart {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     flex: 1 1 0% !important;
-    height: var(--chart-ratio, auto) !important;
-    max-height: calc(100% - 177px) !important;
-    min-height: 140px !important;
-    border-left: none;
-    border-right: none;
-    border-bottom: none !important;
-    flex-shrink: 0;
+    height: calc(100% - 168px) !important;
+    max-height: calc(100% - 168px) !important;
+    min-height: 120px !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid #333333 !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
   }
 
   .main-workspace.is-split-view .pane-tabs {
     width: 100% !important;
-    flex: var(--tabs-flex, 0 0 168px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 0 0 168px !important;
     min-height: 168px !important;
-    max-height: var(--tabs-max-h, 168px) !important;
-    height: var(--tabs-height, 168px) !important;
+    max-height: 168px !important;
+    height: 168px !important;
     flex-shrink: 0 !important;
     border: none !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .tab-content {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: calc(168px - 30px) !important;
+    max-height: calc(168px - 30px) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .positions-table-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior: contain !important;
+    overscroll-behavior-x: contain !important;
+    overscroll-behavior-y: contain !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .logs-terminal {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
   }
 
   /* Chế độ Hiện đơn (Single View) trên mobile: Tràn viền FULL KHUNG toàn bộ workspace */
   .main-workspace.is-single-view .pane-tabs,
   .main-workspace:not(.is-split-view) .pane-tabs {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -1736,14 +1798,17 @@ body.is-resizing iframe {
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+    position: relative !important;
   }
 
   .main-workspace.is-single-view .tab-content,
   .main-workspace:not(.is-split-view) .tab-content {
     flex: 1 1 0% !important;
     width: 100% !important;
-    height: calc(100% - 32px) !important;
-    max-height: calc(100% - 32px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: calc(100% - 30px) !important;
+    max-height: calc(100% - 30px) !important;
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -1758,6 +1823,8 @@ body.is-resizing iframe {
   .main-workspace.is-single-view .single-chart-card,
   .main-workspace:not(.is-split-view) .single-chart-card {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -1767,15 +1834,27 @@ body.is-resizing iframe {
   .main-workspace.is-single-view .positions-table-wrapper,
   .main-workspace:not(.is-split-view) .positions-table-wrapper {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
     flex: 1 1 0% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior: contain !important;
+    overscroll-behavior-x: contain !important;
+    overscroll-behavior-y: contain !important;
+    position: relative !important;
   }
 
   .main-workspace.is-single-view .logs-terminal,
   .main-workspace:not(.is-split-view) .logs-terminal {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -4363,41 +4442,95 @@ div[class*="tradingview-widget-copyright"],
   /* Chế độ Chia đôi màn hình (Split View) trong PWA Standalone */
   .main-workspace.is-split-view .pane-chart {
     flex: 1 1 0% !important;
-    height: var(--chart-ratio, auto) !important;
-    max-height: calc(100% - 177px) !important;
-    min-height: 140px !important;
-    flex-shrink: 0;
+    height: calc(100% - 168px) !important;
+    max-height: calc(100% - 168px) !important;
+    min-height: 120px !important;
+    border-bottom: 1px solid #333333 !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
   }
 
   .main-workspace.is-split-view .pane-tabs {
-    flex: var(--tabs-flex, 0 0 168px) !important;
+    flex: 0 0 168px !important;
     min-height: 168px !important;
-    max-height: var(--tabs-max-h, 168px) !important;
-    height: var(--tabs-height, 168px) !important;
+    max-height: 168px !important;
+    height: 168px !important;
     flex-shrink: 0 !important;
+    border: none !important;
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .tab-content {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: calc(168px - 30px) !important;
+    max-height: calc(168px - 30px) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .positions-table-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior: contain !important;
+    overscroll-behavior-x: contain !important;
+    overscroll-behavior-y: contain !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-split-view .logs-terminal {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
   }
 
   /* Chế độ Hiện đơn (Single View) trong PWA Standalone: Tràn viền FULL KHUNG */
   .main-workspace.is-single-view .pane-tabs,
   .main-workspace:not(.is-split-view) .pane-tabs {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
     flex: 1 1 0% !important;
     flex-shrink: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    position: relative !important;
   }
 
   .main-workspace.is-single-view .tab-content,
   .main-workspace:not(.is-split-view) .tab-content {
     flex: 1 1 0% !important;
     width: 100% !important;
-    height: calc(100% - 32px) !important;
-    max-height: calc(100% - 32px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: calc(100% - 30px) !important;
+    max-height: calc(100% - 30px) !important;
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -4410,12 +4543,40 @@ div[class*="tradingview-widget-copyright"],
   .main-workspace.is-single-view .multi-chart-container,
   .main-workspace:not(.is-split-view) .multi-chart-container,
   .main-workspace.is-single-view .single-chart-card,
-  .main-workspace:not(.is-split-view) .single-chart-card,
+  .main-workspace:not(.is-split-view) .single-chart-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+  }
+
   .main-workspace.is-single-view .positions-table-wrapper,
-  .main-workspace:not(.is-split-view) .positions-table-wrapper,
+  .main-workspace:not(.is-split-view) .positions-table-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior: contain !important;
+    overscroll-behavior-x: contain !important;
+    overscroll-behavior-y: contain !important;
+    position: relative !important;
+  }
+
   .main-workspace.is-single-view .logs-terminal,
   .main-workspace:not(.is-split-view) .logs-terminal {
     width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
@@ -4460,37 +4621,94 @@ div[class*="tradingview-widget-copyright"],
 
 .is-pwa-standalone .main-workspace.is-split-view .pane-chart {
   flex: 1 1 0% !important;
-  height: var(--chart-ratio, auto) !important;
-  max-height: calc(100% - 177px) !important;
-  min-height: 140px !important;
+  height: calc(100% - 168px) !important;
+  max-height: calc(100% - 168px) !important;
+  min-height: 120px !important;
+  border-bottom: 1px solid #333333 !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
 }
 
 .is-pwa-standalone .main-workspace.is-split-view .pane-tabs {
-  flex: var(--tabs-flex, 0 0 168px) !important;
+  flex: 0 0 168px !important;
   min-height: 168px !important;
-  max-height: var(--tabs-max-h, 168px) !important;
-  height: var(--tabs-height, 168px) !important;
+  max-height: 168px !important;
+  height: 168px !important;
   flex-shrink: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+}
+
+.is-pwa-standalone .main-workspace.is-split-view .tab-content {
+  flex: 1 1 0% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: calc(168px - 30px) !important;
+  max-height: calc(168px - 30px) !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+.is-pwa-standalone .main-workspace.is-split-view .positions-table-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior: contain !important;
+  overscroll-behavior-x: contain !important;
+  overscroll-behavior-y: contain !important;
+  position: relative !important;
+}
+
+.is-pwa-standalone .main-workspace.is-split-view .logs-terminal {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
 }
 
 .is-pwa-standalone .main-workspace.is-single-view .pane-tabs,
 .is-pwa-standalone .main-workspace:not(.is-split-view) .pane-tabs {
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   height: 100% !important;
   max-height: 100% !important;
   min-height: 0 !important;
   flex: 1 1 0% !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden !important;
+  position: relative !important;
 }
 
 .is-pwa-standalone .main-workspace.is-single-view .tab-content,
 .is-pwa-standalone .main-workspace:not(.is-split-view) .tab-content {
   flex: 1 1 0% !important;
   width: 100% !important;
-  height: calc(100% - 32px) !important;
-  max-height: calc(100% - 32px) !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: calc(100% - 30px) !important;
+  max-height: calc(100% - 30px) !important;
   min-height: 0 !important;
   display: flex !important;
   flex-direction: column !important;
@@ -4503,12 +4721,40 @@ div[class*="tradingview-widget-copyright"],
 .is-pwa-standalone .main-workspace.is-single-view .multi-chart-container,
 .is-pwa-standalone .main-workspace:not(.is-split-view) .multi-chart-container,
 .is-pwa-standalone .main-workspace.is-single-view .single-chart-card,
-.is-pwa-standalone .main-workspace:not(.is-split-view) .single-chart-card,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .single-chart-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+}
+
 .is-pwa-standalone .main-workspace.is-single-view .positions-table-wrapper,
-.is-pwa-standalone .main-workspace:not(.is-split-view) .positions-table-wrapper,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .positions-table-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y !important;
+  overscroll-behavior: contain !important;
+  overscroll-behavior-x: contain !important;
+  overscroll-behavior-y: contain !important;
+  position: relative !important;
+}
+
 .is-pwa-standalone .main-workspace.is-single-view .logs-terminal,
 .is-pwa-standalone .main-workspace:not(.is-split-view) .logs-terminal {
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   height: 100% !important;
   max-height: 100% !important;
   min-height: 0 !important;

@@ -89,6 +89,8 @@ export default function PositionsTable({
       style={{
         flex: 1,
         width: "100%",
+        maxWidth: "100%",
+        minWidth: 0,
         height: "100%",
         maxHeight: "100%",
         minHeight: 0,

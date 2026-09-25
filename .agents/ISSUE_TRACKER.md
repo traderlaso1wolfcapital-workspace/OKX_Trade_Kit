@@ -18,24 +18,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[26/09/2026]** - Tối Ưu Chế Độ Hiện Đơn (Single View) Full Khung & Khóa Cứng Trục XY Cho Bảng Vị Thế Trên Mobile:
-  - **Mô tả yêu cầu CEO:** Trên giao diện điện thoại, ở chế độ hiện đơn (nút 2 mũi tên ngược nhau ⮃) biểu đồ và Bảng Vị Thế bị co cụm không hiện full khung, để lại khoảng trống đen lớn bên dưới (trong khi chế độ chia đôi thì đẹp). Đồng thời Bảng Vị Thế bị hiện tượng khi lướt ngón tay thì kéo xê dịch cả khung bảng đi, cần fix lại trục XY chỉ cho phép chuyển động nội bộ ngang/dọc.
+- **[26/09/2026]** - Tối Ưu Chế Độ Hiện Đơn (Single View) Full Khung & Khóa Cứng Trục XY Cho Bảng Vị Thế Cả Chế Độ Đơn Lẫn Đôi (Split View):
+  - **Mô tả yêu cầu CEO:** 
+    1. Ở chế độ hiện đơn, sau khi tối ưu thì bảng vị thế đã kéo cuộn ngang hết qua phải để xem trọn vẹn các cột.
+    2. Tuy nhiên, ở chế độ hiện đôi (Split View - hiện cả biểu đồ và bảng vị thế), khung bảng vị thế vẫn chưa được cố định trục (khi vuốt tay thì xê dịch/lôi cả khung bảng đi thay vì cuộn nội bộ).
   - **Nguyên nhân cốt lõi phát hiện:**
-    1. **Khoá cứng 168px áp dụng nhầm sang Single View:** CSS mobile trước đó áp dụng `flex: 0 0 168px; max-height: 168px; height: 168px;` cho `.pane-tabs` trên mọi chế độ. Trong Single View (không có chart bên trên), `.pane-tabs` là phần tử duy nhất trong workspace nhưng vẫn bị ép cao 168px, khiến 400px+ chiều cao bên dưới bị bỏ trống đen ngòm.
-    2. **Cử chỉ cảm ứng không bị giới hạn trục (`touch-action: auto`):** `.positions-table-wrapper` sử dụng `touch-action: auto` và thiếu `overscroll-behavior: contain`. Khi người dùng vuốt ngón tay chéo hoặc chạm vào bảng, WebKit Safari kích hoạt gesture kéo cả khung trang/khung ngoài (`di cả khung bảng đi`) thay vì chỉ cuộn nội bộ bảng.
+    1. **Thiếu ràng buộc flex & kích thước cho `tab-content` và `positions-table-wrapper` trong Split View:** Bản cập nhật trước chỉ áp dụng `display: flex; flex-direction: column; width: 100%; min-width: 0; max-height: ...` cho selector `.is-single-view` và `:not(.is-split-view)`. Khi ở chế độ Split View (`.is-split-view`), container `.tab-content` thiếu `min-width: 0` và chiều cao cố định `height: calc(168px - 30px) = 138px`. Vì bảng vị thế có `min-width: 600px`, thuật toán Flexbox của WebKit tự động dãn nở chiều ngang của `.tab-content` lên 600px, khiến `scrollWidth === clientWidth` $\rightarrow$ thanh cuộn ngang nội bộ không hoạt động mà cả khối `.tab-content` bị trôi/dịch chuyển qua lại trong `.pane-tabs` ("di cả khung bảng đi").
+    2. **Thanh resizer kéo tỷ lệ giữa Chart và Tabs gây nhiễu cử chỉ chạm:** Thẻ `.resizer` nằm ngay mép trên của `.pane-tabs` với listener `onTouchStart={startResizing}`. Trên điện thoại, khi người dùng đặt ngón tay vuốt bảng gần mép trên, `startResizing` bị kích hoạt và liên tục gán lại `chartRatio`, làm xê dịch toàn bộ trục dọc của khung bảng vị thế.
   - **Giải pháp thực hiện:**
-    - [App.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
-      - Bổ sung class phân biệt rõ ràng: `.main-workspace.is-split-view` (chế độ chia đôi) và `.main-workspace.is-single-view` (chế độ hiện đơn).
     - [index.css](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/index.css):
-      - Trong `is-split-view`: Giữ nguyên Biểu đồ ở trên tự dãn nở, Bảng tab ở dưới khóa chuẩn 168px (3 dòng sát viền mép).
-      - Trong `is-single-view`: `.pane-tabs`, `.tab-content`, `.chart-tab-pane`, `.positions-table-wrapper`, `.logs-terminal` đều nhận `flex: 1 1 0% !important; height: 100% !important; max-height: 100% !important; min-height: 0 !important;` $\rightarrow$ Tràn viền FULL KHUNG 100% chiều cao workspace xuống sát footer.
-      - Đồng bộ cả cho mobile thông thường, PWA Standalone `@media (display-mode: standalone)` và class `.is-pwa-standalone`.
-      - Khóa cứng trục XY cho Bảng Vị Thế:
-        - `.positions-table-wrapper`: thiết lập `touch-action: pan-x pan-y !important; overscroll-behavior: contain !important; overscroll-behavior-x: contain !important; overscroll-behavior-y: contain !important; -webkit-overflow-scrolling: touch !important; position: relative !important;`.
-        - `.positions-table`: bổ sung `user-select: none; -webkit-user-select: none;` chống bôi đen văn bản khi vuốt.
+      - Ẩn triệt để thanh `.resizer` trên mobile (`display: none !important; pointer-events: none !important;`) để cố định cứng 100% trục ranh giới giữa Biểu Đồ và Bảng Vị Thế (168px).
+      - Đồng bộ toàn diện bộ quy tắc khóa trục cho `.main-workspace.is-split-view`:
+        - `.pane-chart`: `height: calc(100% - 168px) !important; max-height: calc(100% - 168px) !important;`
+        - `.pane-tabs`: `flex: 0 0 168px !important; height: 168px !important; display: flex !important; flex-direction: column !important; position: relative !important;`
+        - `.tab-content`: `height: calc(168px - 30px) !important; max-height: calc(168px - 30px) !important; min-width: 0 !important; width: 100% !important; max-width: 100% !important; overflow: hidden !important; position: relative !important;`
+        - `.positions-table-wrapper`: `min-width: 0 !important; width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: 100% !important; overflow-x: auto !important; overflow-y: auto !important; touch-action: pan-x pan-y !important; overscroll-behavior: contain !important; overscroll-behavior-x: contain !important; overscroll-behavior-y: contain !important; position: relative !important;`
+      - Áp dụng tương tự cho `@media (max-width: 1024px)`, `@media (display-mode: standalone)` và class `.is-pwa-standalone`.
     - [PositionsTable.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx) & [HistoryTable.jsx](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/components/history/HistoryTable.jsx):
-      - Cập nhật inline styles với `touchAction: "pan-x pan-y"`, `overscrollBehavior: "contain"`, `width: "100%"`, `height: "100%"`, `maxHeight: "100%"`.
-    - Build kiểm tra `npm run build` thành công 100%.
+      - Bổ sung `maxWidth: "100%"`, `minWidth: 0` vào inline style để đảm bảo flex item không bị bung chiều ngang bởi bảng 600px.
+    - Chạy `npm run build` thành công 100%.
 
 - **[26/09/2026]** - Tự Động Chuyển Session Sang OKX Master UID Khi Kết Nối OKX (Loại Bỏ Lỗi Mismatch UID Lưu Cũ Trong Trình Duyệt):
   - **Mô tả yêu cầu CEO:** Khi kết nối tài khoản OKX mới (UID: 766520142473196741), màn hình hiển thị popup cảnh báo lỗi: "Tài khoản OKX vừa liên kết (UID: 766520142473196741) không khớp với tài khoản hiện tại của bạn (UID: 523019992975987626)!". CEO thắc mắc tại sao hệ thống lại đang mặc định đăng nhập UID 523019992975987626.
