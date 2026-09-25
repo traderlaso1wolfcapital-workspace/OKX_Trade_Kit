@@ -437,10 +437,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     try:
         json_dir = env_paths.get("JSON_DATA_DIR", "")
         if json_dir:
-            if os.path.exists(os.path.join(json_dir, "stop_sub1.flag")):
+            strategy_name = system_config.get("STRATEGY_NAME", "sub1")
+            if os.path.exists(os.path.join(json_dir, f"stop_{strategy_name}.flag")):
                 system_config["DRY_RUN"] = True
-            elif os.path.exists(os.path.join(json_dir, "dry_run_sub1.flag")):
-                with open(os.path.join(json_dir, "dry_run_sub1.flag"), "r") as _rf:
+            elif os.path.exists(os.path.join(json_dir, f"dry_run_{strategy_name}.flag")):
+                with open(os.path.join(json_dir, f"dry_run_{strategy_name}.flag"), "r") as _rf:
                     if _rf.read().strip() == "1":
                         system_config["DRY_RUN"] = True
     except Exception:
@@ -3313,3 +3314,4 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
 # z309 | Update default margin to 1$ and logic volume fallbacks to 1
 # z310 | Upgraded Grid Mode (OFF both DCAs) with native OKX attachAlgoOrds: each TF limit has independent TP/SL sub-position matching OKX Split Position tab
+# z311 | Refactored strategy to dynamically reference STRATEGY_NAME for flag checks instead of hardcoding "sub1"

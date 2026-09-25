@@ -3415,3 +3415,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     3. Đặt điều kiện `if not current_enabled_tfs and not tracker.has_long and not tracker.has_short: return` ngay SAU KHI đã cập nhật xong nến $\rightarrow$ Vừa đảm bảo bộ đếm nến và giá Live hiển thị chuẩn 100%, vừa bảo đảm không đặt bất kỳ lệnh Limit nào khi người dùng chưa chọn TF trade.
   *(Mã patch: `z-bot-candle-count-without-tf-trade`)*
 
+
+- **[25/09/2026]** - Sửa lỗi đồng bộ trạng thái Bot giữa Máy tính và Điện thoại & Lỗi giao diện PWA bị chìm dưới tai thỏ (Notch/Dynamic Island) trên iPhone:
+  - **Vấn đề 1 (Trạng thái Bot):** Cùng 1 tài khoản (cùng uid), khi ấn "Chạy Bot" trên máy tính thì chạy bình thường, nhưng mở web app trên điện thoại lại vẫn hiện nút "▶ CHẠY BOT" thay vì nút Dừng. Nguyên nhân do hàm `_is_shadow_mode` trong backend `main.py` mặc định kiểm tra cờ (flag) theo tên `strategy` (vd: `sub1`), trong khi thực tế bot đang chạy và ghi cờ theo tên tài khoản (`acc_name` vd: `Account1`). Việc này khiến hàm trả về `True` (SHADOW) thay vì `False` (RUNNING), báo sai trạng thái về Frontend trên điện thoại.
+  - **Đã fix 1:** Sửa hàm `_is_shadow_mode` để tự động đọc `acc_name` từ file `.running_account_{strategy}` (giống như cách `get_running_pid` đang làm). Trạng thái RUNNING giờ đã đồng bộ hoàn hảo giữa nhiều thiết bị.
+  - **Vấn đề 2 (Giao diện PWA bị chìm dưới tai thỏ):** Khi "Thêm vào Màn hình chính" trên iPhone (chế độ Standalone/PWA), thanh công cụ trên cùng (Bot tabs bar) bị đẩy lên và chìm dưới phần tai thỏ / Dynamic Island, gây mờ và khó nhìn do status bar trong suốt `black-translucent`.
+  - **Đã fix 2:** Trong `index.css`, phần `@media screen and (max-width: 1024px)` chứa thuộc tính `padding: 0 !important;` ở `.app-container`, làm vô hiệu hóa safe-area-inset. Đã thay thế thành `padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;` (và các cạnh còn lại) để đảm bảo giao diện luôn tự động né vùng tai thỏ trên iOS một cách an toàn.
+  *(Mã patch: `z-web-sync-bot-status-and-pwa-safearea`)*

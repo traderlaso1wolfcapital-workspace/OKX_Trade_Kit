@@ -1243,9 +1243,16 @@ function App() {
       setShowDeleteAccountModal(false);
       return;
     }
-    const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
     const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
-    if (runningBot && isCurrentBotRunning) {
+    let isRunningOnTarget = false;
+    if (runningBot) {
+      if (runningBot === activeBotTab) {
+        isRunningOnTarget = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+      } else {
+        isRunningOnTarget = true;
+      }
+    }
+    if (isRunningOnTarget) {
       const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản!`);
       setShowDeleteAccountModal(false);
@@ -1302,9 +1309,16 @@ function App() {
 
   const handleDisconnectSpecificAccount = async (targetAccountId) => {
     if (!targetAccountId) return;
-    const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
     const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
-    if (runningBot && isCurrentBotRunning) {
+    let isRunningOnTarget = false;
+    if (runningBot) {
+      if (runningBot === activeBotTab) {
+        isRunningOnTarget = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+      } else {
+        isRunningOnTarget = true;
+      }
+    }
+    if (isRunningOnTarget) {
       const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`⚠️ Không thể ngắt kết nối tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`);
       return;
@@ -1869,9 +1883,16 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
           const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => id === targetId)?.[0];
-          if (runningBot && isCurrentBotRunning) {
+          let isRunningOnTarget = false;
+          if (runningBot) {
+            if (runningBot === activeBotTab) {
+              isRunningOnTarget = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+            } else {
+              isRunningOnTarget = true;
+            }
+          }
+          if (isRunningOnTarget) {
             const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
@@ -2350,9 +2371,16 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const isCurrentBotRunning = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
           const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
-          if (runningBot && isCurrentBotRunning) {
+          let isRunningOnTarget = false;
+          if (runningBot) {
+            if (runningBot === activeBotTab) {
+              isRunningOnTarget = (overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING"));
+            } else {
+              isRunningOnTarget = true;
+            }
+          }
+          if (isRunningOnTarget) {
             const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;

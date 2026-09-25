@@ -376,104 +376,10 @@ def login_with_password(request: Request, req: LoginRequest):
 
 @app.post("/api/auth/logout")
 def logout_account(uid: str):
-    clean_uid = uid.strip() if uid else "default"
-    
-    # 1. Tập hợp danh sách các UID cần dọn sạch triệt để
-    target_uids = set()
-    if clean_uid:
-        target_uids.add(clean_uid)
-    target_uids.add("default")
-    
-    # Quét trong AppData TLS1_Trading_Users để tìm thêm thư mục liên quan
-    users_root = os.path.join(LOCAL_APP_DATA, "TLS1_Trading_Users")
-    if os.path.exists(users_root):
-        try:
-            for item in os.listdir(users_root):
-                if item == clean_uid or (clean_uid != "default" and clean_uid in item):
-                    target_uids.add(item)
-        except Exception:
-            pass
-
-    # 2. Dừng toàn bộ bot của các UID này (EMA200, SMC, Liquidation):
-    for u in target_uids:
-        for strategy in ["sub1", "sub2", "sub3"]:
-            # Ghi cờ stop flag & dry_run flag
-            try:
-                flag_dir = _get_flag_dir(u, strategy)
-                os.makedirs(flag_dir, exist_ok=True)
-                with open(os.path.join(flag_dir, f"stop_{strategy}.flag"), "w") as f:
-                    f.write("stop")
-                with open(os.path.join(flag_dir, f"dry_run_{strategy}.flag"), "w") as f:
-                    f.write("1")
-                act_flag = os.path.join(flag_dir, f"activate_{strategy}.flag")
-                if os.path.exists(act_flag):
-                    os.remove(act_flag)
-            except Exception:
-                pass
-
-            # Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (bảo lưu 100% TP/SL)
-            try:
-                if "_cancel_unfilled_limit_orders" in globals():
-                    _cancel_unfilled_limit_orders(u, strategy, action_name="LOGOUT STOP ALL")
-            except Exception:
-                pass
-
-            # Diệt sạch tiến trình bot (Process & Tree con)
-            proc = get_nested(bot_processes, u, strategy)
-            pid = get_running_pid(u, strategy)
-            if proc or pid > 0:
-                if proc:
-                    try:
-                        import psutil
-                        parent = psutil.Process(proc.pid)
-                        for child in parent.children(recursive=True):
-                            child.kill()
-                        parent.kill()
-                    except Exception:
-                        try: proc.kill()
-                        except Exception: pass
-                if pid > 0:
-                    try:
-                        import psutil
-                        parent = psutil.Process(pid)
-                        for child in parent.children(recursive=True):
-                            child.kill()
-                        parent.kill()
-                    except Exception:
-                        kill_pid(pid)
-                del_nested(bot_processes, u, strategy)
-
-    # 3. Dọn sạch toàn bộ accounts.json và tất cả file .api_*, .running_account_* trong data_dir
-    for u in target_uids:
-        data_dir = get_user_data_dir(u)
-        if os.path.exists(data_dir):
-            acc_file = os.path.join(data_dir, "accounts.json")
-            try:
-                with open(acc_file, "w", encoding="utf-8") as f:
-                    json.dump([], f, indent=4, ensure_ascii=False)
-            except Exception:
-                pass
-
-            for root, dirs, files in os.walk(data_dir):
-                for file in files:
-                    if file.startswith(".api_") or file.startswith(".running_account_") or file.startswith(".auth_"):
-                        try:
-                            os.remove(os.path.join(root, file))
-                        except Exception:
-                            pass
-
-    # 4. Dọn sạch các file .api_* và .running_account_* trong thư mục gốc OKX_TRADE_KIT_DIR
-    try:
-        for file in os.listdir(OKX_TRADE_KIT_DIR):
-            if file.startswith(".api_sub_") or file.startswith(".api_bot") or file.startswith(".running_account_") or file == ".api_botEMA200":
-                try:
-                    os.remove(os.path.join(OKX_TRADE_KIT_DIR, file))
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    return {"status": "success", "message": "Đã dừng toàn bộ bot và xoá toàn bộ tài khoản API Key thành công."}
+    clean_uid = uid.strip().lower() if uid else ""
+    if clean_uid in uid_cache:
+        del uid_cache[clean_uid]
+    return {"status": "success", "message": "Đã đăng xuất khỏi thiết bị hiện tại."}
 
 @app.post("/api/auth/okx/callback")
 @limiter.limit("5/minute")
@@ -1309,9 +1215,9 @@ def get_running_pid(uid: str, strategy: str) -> int:
             except ImportError:
                 # Nếu không có psutil (chạy trên môi trường server không cài đủ), fallback là tin tưởng file pid
                 return pid
-            except Exception:
+            except (OSError, IOError, ValueError):
                 pass
-        except:
+        except (OSError, IOError, ValueError):
             pass
     return 0
 
@@ -1319,18 +1225,43 @@ def _get_flag_dir(uid: str, strategy: str) -> str:
     return os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
 
 def _is_shadow_mode(uid: str, strategy: str) -> bool:
-    """Trả về True nếu bot đang chạy ngầm (dry_run=True)"""
+    """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng"""
+    data_dir = get_user_data_dir(uid)
     acc_name = strategy
-    flag_dir = _get_flag_dir(uid, strategy)
-    if os.path.exists(os.path.join(flag_dir, f"activate_{acc_name}.flag")):
-        return False
-    flag = os.path.join(flag_dir, f"dry_run_{acc_name}.flag")
-    if os.path.exists(flag):
+    
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    if os.path.exists(running_acc_file):
         try:
-            return open(flag).read().strip() == "1"
-        except:
+            with open(running_acc_file, "r") as f:
+                content = f.read().strip()
+                if content:
+                    acc_name = content
+        except (OSError, IOError, ValueError):
             pass
-    return True  # mặc định nếu chưa có file — coi như shadow
+
+    flag_dir = _get_flag_dir(uid, strategy)
+
+    # 1. Kiểm tra cờ dừng trước tiên (nếu có stop flag thì chắc chắn là shadow/dừng)
+    for name in [strategy, acc_name]:
+        if os.path.exists(os.path.join(flag_dir, f"stop_{name}.flag")):
+            return True
+
+    # 2. Kiểm tra cờ kích hoạt trực tiếp (Live mode)
+    for name in [strategy, acc_name]:
+        if os.path.exists(os.path.join(flag_dir, f"activate_{name}.flag")):
+            return False
+
+    # 3. Kiểm tra cờ dry_run do bot engine ghi ra
+    for name in [strategy, acc_name]:
+        flag_path = os.path.join(flag_dir, f"dry_run_{name}.flag")
+        if os.path.exists(flag_path):
+            try:
+                with open(flag_path, "r") as f:
+                    return f.read().strip() == "1"
+            except (OSError, IOError, ValueError):
+                pass
+
+    return True
 
 @app.get("/api/bot/status")
 def get_bot_status(uid: str, strategy: str = "sub1"):
@@ -1363,7 +1294,7 @@ def get_bot_status(uid: str, strategy: str = "sub1"):
                         acc = f.read().strip()
                         if acc:
                             active_accounts[strat] = acc
-                except: pass
+                except (OSError, IOError, ValueError): pass
 
     if is_running:
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
@@ -3100,101 +3031,108 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
 
 bot_data_connections = {}
 
+bot_data_tasks = {}
+
+async def get_state_payload(uid: str, strategy: str, acc: str):
+    if not acc or not acc.strip():
+        try:
+            status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
+        except Exception:
+            status_data = {"status": "STOPPED", "uptime": 0}
+        return {
+            "type": "bot_data",
+            "strategy": strategy,
+            "account_id": "",
+            "status": status_data,
+            "positions": [],
+            "balance": {"status": "error", "availBal": 0},
+            "closed_positions": []
+        }
+    try:
+        status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
+    except Exception:
+        status_data = {"status": "STOPPED", "uptime": 0}
+    try:
+        pos_data = await asyncio.to_thread(get_bot_positions, uid, strategy, acc)
+    except Exception:
+        pos_data = []
+    try:
+        bal_data = await asyncio.to_thread(get_account_balance, uid, strategy, "USDT", acc)
+    except Exception:
+        bal_data = {"status": "error", "availBal": 0}
+    try:
+        closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy)
+    except Exception:
+        closed_data = []
+        
+    return {
+        "type": "bot_data",
+        "strategy": strategy,
+        "account_id": acc,
+        "status": status_data,
+        "positions": pos_data if isinstance(pos_data, list) else [],
+        "balance": bal_data,
+        "closed_positions": closed_data if isinstance(closed_data, list) else []
+    }
+
+async def bg_push_for_uid_strategy(uid: str, strategy: str):
+    while True:
+        try:
+            await asyncio.sleep(2.0)
+            conns = bot_data_connections.get(uid, {}).get(strategy, [])
+            if not conns:
+                break
+                
+            unique_accs = {c["acc"] for c in conns}
+            payloads = {}
+            for acc in unique_accs:
+                payloads[acc] = await get_state_payload(uid, strategy, acc)
+                
+            for c in list(conns):
+                try:
+                    await c["ws"].send_text(json.dumps(payloads[c["acc"]]))
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            await asyncio.sleep(1.0)
+    bot_data_tasks.pop((uid, strategy), None)
+
 @app.websocket("/ws/bot_data/{uid}/{strategy}")
 async def websocket_bot_data(websocket: WebSocket, uid: str, strategy: str):
     await websocket.accept()
     if uid not in bot_data_connections: bot_data_connections[uid] = {}
     if strategy not in bot_data_connections[uid]: bot_data_connections[uid][strategy] = []
-    bot_data_connections[uid][strategy].append(websocket)
     
-    current_acc = [""]
+    conn_obj = {"ws": websocket, "acc": ""}
+    bot_data_connections[uid][strategy].append(conn_obj)
     
-    async def get_state_payload():
-        acc = current_acc[0]
-        if not acc or not acc.strip():
-            try:
-                status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
-            except Exception:
-                status_data = {"status": "STOPPED", "uptime": 0}
-            return {
-                "type": "bot_data",
-                "strategy": strategy,
-                "account_id": "",
-                "status": status_data,
-                "positions": [],
-                "balance": {"status": "error", "availBal": 0},
-                "closed_positions": []
-            }
-        try:
-            status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
-        except Exception:
-            status_data = {"status": "STOPPED", "uptime": 0}
-        try:
-            pos_data = await asyncio.to_thread(get_bot_positions, uid, strategy, acc)
-        except Exception:
-            pos_data = []
-        try:
-            bal_data = await asyncio.to_thread(get_account_balance, uid, strategy, "USDT", acc)
-        except Exception:
-            bal_data = {"status": "error", "availBal": 0}
-        try:
-            closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy)
-        except Exception:
-            closed_data = []
-            
-        return {
-            "type": "bot_data",
-            "strategy": strategy,
-            "account_id": acc,
-            "status": status_data,
-            "positions": pos_data if isinstance(pos_data, list) else [],
-            "balance": bal_data,
-            "closed_positions": closed_data if isinstance(closed_data, list) else []
-        }
+    if (uid, strategy) not in bot_data_tasks or bot_data_tasks[(uid, strategy)].done():
+        bot_data_tasks[(uid, strategy)] = asyncio.create_task(bg_push_for_uid_strategy(uid, strategy))
 
-    # Gửi snapshot ban đầu
-    init_data = await get_state_payload()
+    init_data = await get_state_payload(uid, strategy, "")
     await websocket.send_text(json.dumps(init_data))
-    
-    is_active = True
-    
-    async def bg_push():
-        while is_active:
-            try:
-                await asyncio.sleep(2.0)
-                if not is_active: break
-                payload = await get_state_payload()
-                await websocket.send_text(json.dumps(payload))
-            except (asyncio.CancelledError, WebSocketDisconnect):
-                break
-            except Exception:
-                await asyncio.sleep(1.0)
-                
-    bg_task = asyncio.create_task(bg_push())
     
     try:
         while True:
             text = await websocket.receive_text()
             try:
                 msg = json.loads(text)
-                if msg.get("action") == "refresh":
-                    if "account_id" in msg:
-                        current_acc[0] = str(msg.get("account_id") or "").strip()
-                    payload = await get_state_payload()
-                    await websocket.send_text(json.dumps(payload))
-                elif msg.get("action") == "switch_account":
-                    current_acc[0] = str(msg.get("account_id") or "").strip()
-                    payload = await get_state_payload()
+                if msg.get("action") in ["refresh", "switch_account"]:
+                    conn_obj["acc"] = str(msg.get("account_id") or "").strip()
+                    payload = await get_state_payload(uid, strategy, conn_obj["acc"])
                     await websocket.send_text(json.dumps(payload))
             except Exception:
                 pass
     except (WebSocketDisconnect, Exception):
         pass
     finally:
-        is_active = False
-        bg_task.cancel()
-        if uid in bot_data_connections and strategy in bot_data_connections[uid] and websocket in bot_data_connections[uid][strategy]:
-            bot_data_connections[uid][strategy].remove(websocket)
+        if conn_obj in bot_data_connections.get(uid, {}).get(strategy, []):
+            bot_data_connections[uid][strategy].remove(conn_obj)
+        if not bot_data_connections.get(uid, {}).get(strategy, []):
+            task = bot_data_tasks.pop((uid, strategy), None)
+            if task: task.cancel()
 
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
