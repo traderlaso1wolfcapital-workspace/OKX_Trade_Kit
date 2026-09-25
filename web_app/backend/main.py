@@ -1936,6 +1936,8 @@ def create_bot_account(req: AccountCreate, uid: str):
 
 @app.delete("/api/bot/accounts/{account_id}")
 def delete_bot_account(account_id: str, uid: str):
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=400, detail="Account ID cannot be empty")
     target_uids = [uid]
     if uid != "default":
         target_uids.append("default")

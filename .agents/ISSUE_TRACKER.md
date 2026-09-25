@@ -18,6 +18,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Tối Ưu Tốc Độ Xoá Tài Khoản, Nút Connect + Khung Viền Xanh, Độc Lập Quản Lý Tài Khoản Trong Connect Modal & Đồng Bộ Thẻ Fast Connect Theo Danh Sách API Key:
+  - **Mô tả yêu cầu CEO:**
+    1. Xoá tài khoản loading đang xoá rất lâu, kiểm tra khắc phục triệt để.
+    2. Nút `Connect +` đưa vào trong một khung nút giống như khung nút `[sắp ra mắt]` nhưng có viền màu xanh.
+    3. Khi chuyển sang `chọn tài khoản`, 3 ô nhập API Key phải về trắng sạch; mục chọn tài khoản trong Connect Modal là độc lập, không tác động đến việc gán tài khoản trong Cài Đặt và ngoài giao diện Trade (chỉ để xem/chỉnh API Key của tài khoản đó).
+    4. Mục Fast Connect cũng tương tự, chỉ để biết đã connect với các API Key nào: Có bao nhiêu API Key/tài khoản trong Quản lý tài khoản thì có bấy nhiêu thẻ OKX Connect tương ứng.
+  - **Nguyên nhân cốt lõi:**
+    1. Quá trình xoá tài khoản (`confirmDeleteAccount`) bị chèn `setTimeout(1200)` gây chậm trễ nhân tạo, kèm theo việc `accountToDelete` chưa được neo tường minh dẫn đến giao diện hiển thị `Xóa tài khoản ""`.
+    2. `ConnectModal` trước đây dùng chung `selectedAccount` và gọi `onAssignAccount`, làm thay đổi trực tiếp tài khoản đang chạy của bot ở bên ngoài.
+    3. Thẻ Fast Connect phụ thuộc vào cờ `isAuthenticated`, khi người dùng chưa đăng nhập hoặc xoá tài khoản thì chỉ hiển thị 1 thẻ duy nhất với chữ `Mở App ➔` thay vì hiển thị danh sách thẻ theo từng tài khoản trong hệ thống kèm nút `Connect +`.
+  - **Giải pháp thực hiện:**
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Thêm state `accountToDelete`, loại bỏ hoàn toàn độ trễ `setTimeout` nhân tạo ở cả `confirmDeleteAccount` và `handleSaveApiKey`. Cập nhật state nội bộ và đóng modal ngay lập tức, gọi DELETE API ngầm.
+      - Truyền tường minh `targetId` vào `accountToDelete` cho cả `ConnectModal` và `SystemSettingsModal`.
+      - `handleSaveApiKey` hỗ trợ nhận `customParams` từ `ConnectModal` để lưu API Key mà không thay đổi gán bot ngoài giao diện trade.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Tạo state độc lập `modalAccountId`, `localApiKey`, `localSecretKey`, `localPassphrase`. Khi chọn tài khoản trong ConnectModal chỉ fetch xem/sửa API Key, tuyệt đối không ảnh hưởng tới `botAccountMap` hay giao diện trade bên ngoài.
+      - Khi chọn `chọn tài khoản` (hoặc mở modal), lập tức đưa toàn bộ 3 ô nhập về trắng sạch `""` và mở quyền nhập liệu.
+      - Fast Connect: Kiểm tra trực tiếp theo `accounts.length`. Có bao nhiêu tài khoản trong hệ thống thì render bấy nhiêu thẻ OKX Connect hiển thị `Đã Connect [Tên TK]` cùng nút `Connect +`.
+      - Nút `Connect +` được thiết kế chuẩn khung badge như `[sắp ra mắt]` với viền xanh `#26a69a`, nền `#181818`, font `10.5px`, hover hiệu ứng sáng đẹp.
+    - [main.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      - Thêm validation chặn `account_id` rỗng khi gọi DELETE `/api/bot/accounts/{account_id}`.
+    - Đã build thành công bản production bundle (`npm run build`).
+
 - **[25/09/2026]** - Chuyển "chọn tài khoản" Thành Tùy Chọn Khả Dụng & Xóa Trắng Ô Nhập API Key Khi Chọn:
   - **Mô tả yêu cầu CEO:** Mục `chọn tài khoản` cũng là một lựa chọn, khi người dùng chọn mục này thì toàn bộ phần `THÔNG TIN API KEY` bên dưới lập tức quay về trắng thông tin để có thể nhập tiếp API Key mới.
   - **Giải pháp thực hiện:**

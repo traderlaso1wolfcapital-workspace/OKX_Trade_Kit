@@ -467,6 +467,7 @@ function App() {
 
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState("");
   const [newAccountInput, setNewAccountInput] = useState("");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -1231,7 +1232,7 @@ function App() {
 
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
-    const targetAccountId = selectedAccount;
+    const targetAccountId = accountToDelete;
     if (!targetAccountId) {
       setShowDeleteAccountModal(false);
       return;
@@ -1242,54 +1243,55 @@ function App() {
       const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản!`);
       setShowDeleteAccountModal(false);
+      setAccountToDelete("");
       return;
     }
     setIsDeletingAccount(true);
-    await new Promise(resolve => setTimeout(resolve, 1200));
 
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
 
-    // Luôn dọn sạch API Key hiển thị ở giao diện và chuyển vùng chọn về rỗng
-    setApiKey("");
-    setSecretKey("");
-    setPassphrase("");
-    setSelectedAccount("");
-    setPositions([]);
-    setClosedPositions([]);
+    if (selectedAccount === targetAccountId) {
+      setApiKey("");
+      setSecretKey("");
+      setPassphrase("");
+      setSelectedAccount("");
+      setPositions([]);
+      setClosedPositions([]);
+    }
 
-    if (accounts.length > 1) {
-      const updatedList = accounts.filter(a => a.id !== targetAccountId);
-      setAccounts(updatedList);
-      localStorage.setItem("tls1_accounts", JSON.stringify(updatedList));
-      setBotAccountMap(prev => {
-        const next = { ...prev };
-        for (const k in next) {
-          if (next[k] === targetAccountId) next[k] = "";
-        }
-        localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-        return next;
-      });
-      setShowDeleteAccountModal(false);
-      addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
-    } else {
-      setAccounts([]);
-      localStorage.setItem("tls1_accounts", JSON.stringify([]));
-      setBotAccountMap({});
-      localStorage.setItem("tls1_bot_accounts", JSON.stringify({}));
+    const remainingAccounts = accounts.filter(a => a.id !== targetAccountId);
+    setAccounts(remainingAccounts);
+    localStorage.setItem("tls1_accounts", JSON.stringify(remainingAccounts));
+
+    setBotAccountMap(prev => {
+      const next = { ...prev };
+      for (const k in next) {
+        if (next[k] === targetAccountId) next[k] = "";
+      }
+      localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+      return next;
+    });
+
+    if (remainingAccounts.length === 0) {
       localStorage.removeItem("tls1_last_detected_acc");
       localStorage.removeItem("tls1_account_name");
       setAccountName("");
       setIsAuthenticated(false);
       localStorage.removeItem("tls1_auth");
-      setShowDeleteAccountModal(false);
       addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản cuối cùng`);
+    } else {
+      addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
     }
 
-    try {
-      await fetch(`/api/bot/accounts/${targetAccountId}?uid=${currentUid}`, { method: "DELETE" });
-    } catch { }
+    setShowDeleteAccountModal(false);
     setIsDeletingAccount(false);
+    setAccountToDelete("");
+
+    try {
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
+    } catch { }
   };
 
   const handleDisconnectSpecificAccount = async (targetAccountId) => {
@@ -1415,23 +1417,23 @@ function App() {
     }
   };
 
-  const handleSaveApiKey = async () => {
-    const cleanApiKey = apiKey?.trim() || "";
-    const cleanSecretKey = secretKey?.trim() || "";
-    const cleanPassphrase = passphrase?.trim() || "";
+  const handleSaveApiKey = async (customParams) => {
+    const isCustom = customParams && typeof customParams === "object";
+    let targetAcc = isCustom && customParams.accountId !== undefined ? customParams.accountId : selectedAccount;
+    const cleanApiKey = (isCustom && customParams.apiKey !== undefined ? customParams.apiKey : apiKey)?.trim() || "";
+    const cleanSecretKey = (isCustom && customParams.secretKey !== undefined ? customParams.secretKey : secretKey)?.trim() || "";
+    const cleanPassphrase = (isCustom && customParams.passphrase !== undefined ? customParams.passphrase : passphrase)?.trim() || "";
 
     if (!cleanApiKey || !cleanSecretKey || !cleanPassphrase) {
       alert("⚠️ Vui lòng nhập đầy đủ Mã API (API Key), Khóa Bí Mật (Secret) và Cụm Mật Khẩu (Passphrase)!");
       return;
     }
 
-    let targetAcc = selectedAccount;
     if (!targetAcc) {
       targetAcc = `sub_${Date.now()}`;
     }
 
     setIsSavingConfig(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
     try {
       const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
       const res = await fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${targetAcc}&uid=${curUid}`, {
@@ -1454,14 +1456,16 @@ function App() {
         setAccounts(data.accounts);
         localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
       }
-      setSelectedAccount(targetAcc);
-      handleAssignAccountToActiveBot(targetAcc);
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
 
-      setApiKey(cleanApiKey);
-      setSecretKey(cleanSecretKey);
-      setPassphrase(cleanPassphrase);
+      if (!isCustom) {
+        setSelectedAccount(targetAcc);
+        handleAssignAccountToActiveBot(targetAcc);
+        setApiKey(cleanApiKey);
+        setSecretKey(cleanSecretKey);
+        setPassphrase(cleanPassphrase);
+      }
 
       const curAccName = data.detected_name || (data.accounts && data.accounts.find(a => a.id === targetAcc)?.name) || accounts.find(a => a.id === targetAcc)?.name || targetAcc;
       alert(`Đã lưu cấu hình API Key cho [${curAccName}] thành công!`);
@@ -1848,18 +1852,20 @@ function App() {
           setNewAccountInput("");
           setShowAddAccountModal(true);
         }}
-        onDeleteAccount={() => {
-          if (!selectedAccount || accounts.length === 0) {
+        onDeleteAccount={(accId) => {
+          const targetId = accId || selectedAccount;
+          if (!targetId || accounts.length === 0 || !accounts.some(a => a.id === targetId)) {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const isRunning = Object.values(mergedActiveAccounts || {}).includes(selectedAccount);
+          const isRunning = Object.values(mergedActiveAccounts || {}).includes(targetId);
           if (isRunning) {
-            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+            const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => id === targetId)?.[0];
             const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
           }
+          setAccountToDelete(targetId);
           setShowDeleteAccountModal(true);
         }}
         activeAccounts={mergedActiveAccounts}
@@ -2340,6 +2346,7 @@ function App() {
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
           }
+          setAccountToDelete(selectedAccount);
           setShowDeleteAccountModal(true);
         }}
         okxUid={okxUid}
@@ -2388,8 +2395,11 @@ function App() {
       {/* DELETE ACCOUNT MODAL */}
       <DeleteAccountModal
         isOpen={showDeleteAccountModal}
-        onClose={() => setShowDeleteAccountModal(false)}
-        accountName={accounts.find(a => a.id === selectedAccount)?.name || selectedAccount}
+        onClose={() => {
+          setShowDeleteAccountModal(false);
+          setAccountToDelete("");
+        }}
+        accountName={accounts.find(a => a.id === accountToDelete)?.name || accountToDelete || "Tài khoản"}
         isMultiple={accounts.length > 1}
         isLoading={isDeletingAccount}
         onConfirm={confirmDeleteAccount}

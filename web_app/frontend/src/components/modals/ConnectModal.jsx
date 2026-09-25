@@ -31,27 +31,49 @@ export default function ConnectModal({
 }) {
   const { t } = useTranslation();
   const [connectTab, setConnectTab] = useState("fast"); // 'fast' | 'apikey'
+  const [modalAccountId, setModalAccountId] = useState("");
+  const [localApiKey, setLocalApiKey] = useState("");
+  const [localSecretKey, setLocalSecretKey] = useState("");
+  const [localPassphrase, setLocalPassphrase] = useState("");
 
+  // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập
   useEffect(() => {
     if (!isOpen) return;
-    if (!selectedAccount) {
-      if (setApiKey) setApiKey("");
-      if (setSecretKey) setSecretKey("");
-      if (setPassphrase) setPassphrase("");
+    setModalAccountId("");
+    setLocalApiKey("");
+    setLocalSecretKey("");
+    setLocalPassphrase("");
+  }, [isOpen]);
+
+  const handleSelectAccount = (accId) => {
+    setModalAccountId(accId);
+    if (!accId) {
+      setLocalApiKey("");
+      setLocalSecretKey("");
+      setLocalPassphrase("");
       return;
     }
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-    fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${selectedAccount}&uid=${curUid}`)
+    fetch(`/api/bot/credentials?strategy=${activeBotTab}&account_id=${accId}&uid=${curUid}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) {
-          if (setApiKey && d.api_key !== undefined) setApiKey(d.api_key || "");
-          if (setSecretKey && d.secret_key !== undefined) setSecretKey(d.secret_key || "");
-          if (setPassphrase && d.passphrase !== undefined) setPassphrase(d.passphrase || "");
+          setLocalApiKey(d.api_key || "");
+          setLocalSecretKey(d.secret_key || "");
+          setLocalPassphrase(d.passphrase || "");
         }
       })
       .catch(() => {});
-  }, [isOpen, selectedAccount, activeBotTab]);
+  };
+
+  useEffect(() => {
+    if (modalAccountId && !accounts.some(a => a.id === modalAccountId)) {
+      setModalAccountId("");
+      setLocalApiKey("");
+      setLocalSecretKey("");
+      setLocalPassphrase("");
+    }
+  }, [accounts, modalAccountId]);
 
   if (!isOpen) return null;
 
@@ -287,8 +309,8 @@ export default function ConnectModal({
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
-                {/* 1. OKX App Connect Cards (hỗ trợ hiển thị từng cụm tài khoản đã kết nối) */}
-                {isAuthenticated && accounts.length > 0 ? (
+                {/* 1. OKX App Connect Cards: Có bao nhiêu tài khoản/API Key trong Quản lý tài khoản thì có bấy nhiêu thẻ OKX Connect */}
+                {accounts.length > 0 ? (
                   accounts.map((acc, idx) => (
                     <div
                       key={acc.id || idx}
@@ -343,27 +365,26 @@ export default function ConnectModal({
                             fontWeight: "600",
                           }}
                         >
-                          {`Đã Connect ${acc.name || accountName || "Tài khoản OKX"}`}
+                          {`Đã Connect ${acc.name || "Tài khoản OKX"}`}
                         </div>
                       </div>
 
-                      {/* Connect + text action (hoà trộn nhẹ nhàng vào vùng tổng, bấm để connect thêm tài khoản) */}
+                      {/* Connect + button badge (khung nút giống [sắp ra mắt] với viền màu xanh) */}
                       <span
                         style={{
-                          fontSize: "12px",
+                          fontSize: "10.5px",
                           fontWeight: "600",
-                          color: "#888888",
-                          padding: "4px 8px",
+                          color: "#26a69a",
+                          background: "#181818",
+                          border: "1px solid #26a69a",
+                          padding: "3px 7px",
+                          borderRadius: "4px",
+                          whiteSpace: "nowrap",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "3px",
-                          whiteSpace: "nowrap",
                           userSelect: "none",
-                          cursor: "pointer",
-                          transition: "color 0.18s ease",
                         }}
-                        onMouseOver={(e) => (e.currentTarget.style.color = "#ff9900")}
-                        onMouseOut={(e) => (e.currentTarget.style.color = "#888888")}
                         title="Bấm vào để kết nối thêm tài khoản khác"
                       >
                         Connect +
@@ -380,6 +401,7 @@ export default function ConnectModal({
                     }}
                     className="connect-card"
                     style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? "not-allowed" : "pointer" }}
+                    title="Bấm vào để kết nối tài khoản OKX"
                   >
                     {/* Authentic OKX Logo Box */}
                     <div
@@ -418,22 +440,25 @@ export default function ConnectModal({
                       </div>
                     </div>
 
-                    {/* Action Badge */}
+                    {/* Connect + button badge (khung nút giống [sắp ra mắt] với viền màu xanh) */}
                     <span
-                      className="connect-action-badge"
                       style={{
-                        fontSize: "11px",
-                        fontWeight: "700",
+                        fontSize: "10.5px",
+                        fontWeight: "600",
                         color: "#26a69a",
-                        background: "rgba(38, 166, 154, 0.12)",
-                        border: "1px solid rgba(38, 166, 154, 0.3)",
-                        padding: "4px 8px",
+                        background: "#181818",
+                        border: "1px solid #26a69a",
+                        padding: "3px 7px",
                         borderRadius: "4px",
                         whiteSpace: "nowrap",
-                        transition: "all 0.18s ease",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        userSelect: "none",
                       }}
+                      title="Bấm vào để kết nối tài khoản"
                     >
-                      {t("open_app")}
+                      Connect +
                     </span>
                   </div>
                 )}
@@ -553,16 +578,8 @@ export default function ConnectModal({
                   <select
                     className="styled-select"
                     style={{ minWidth: "160px", maxWidth: "210px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "11.5px" }}
-                    value={selectedAccount || ""}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (onAssignAccount) onAssignAccount(val);
-                      if (!val) {
-                        if (setApiKey) setApiKey("");
-                        if (setSecretKey) setSecretKey("");
-                        if (setPassphrase) setPassphrase("");
-                      }
-                    }}
+                    value={modalAccountId || ""}
+                    onChange={e => handleSelectAccount(e.target.value)}
                   >
                     {accounts.length === 0 ? (
                       <option value="" style={{ color: "#888888" }}>
@@ -602,9 +619,10 @@ export default function ConnectModal({
                   <button
                     type="button"
                     onClick={() => {
-                      if (setApiKey) setApiKey("");
-                      if (setSecretKey) setSecretKey("");
-                      if (setPassphrase) setPassphrase("");
+                      setModalAccountId("");
+                      setLocalApiKey("");
+                      setLocalSecretKey("");
+                      setLocalPassphrase("");
                       if (onCreateAccount) onCreateAccount();
                     }}
                     style={{ backgroundColor: "#28a745", color: "white", fontSize: "15px", fontWeight: "bold", borderRadius: "4px", width: "28px", height: "26px", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -612,22 +630,25 @@ export default function ConnectModal({
                   >+</button>
                   <button
                     type="button"
-                    disabled={!selectedAccount || accounts.length === 0}
-                    onClick={onDeleteAccount}
+                    disabled={!modalAccountId || accounts.length === 0}
+                    onClick={() => {
+                      if (!modalAccountId) return;
+                      if (onDeleteAccount) onDeleteAccount(modalAccountId);
+                    }}
                     style={{
-                      backgroundColor: (!selectedAccount || accounts.length === 0) ? "#444444" : "#dc3545",
-                      color: (!selectedAccount || accounts.length === 0) ? "#888888" : "white",
+                      backgroundColor: (!modalAccountId || accounts.length === 0) ? "#444444" : "#dc3545",
+                      color: (!modalAccountId || accounts.length === 0) ? "#888888" : "white",
                       fontSize: "15px",
                       fontWeight: "bold",
                       borderRadius: "4px",
                       width: "28px",
                       height: "26px",
                       border: "none",
-                      cursor: (!selectedAccount || accounts.length === 0) ? "not-allowed" : "pointer",
+                      cursor: (!modalAccountId || accounts.length === 0) ? "not-allowed" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      opacity: (!selectedAccount || accounts.length === 0) ? 0.5 : 1,
+                      opacity: (!modalAccountId || accounts.length === 0) ? 0.5 : 1,
                     }}
                     title={t("delete_account_tooltip") || "Xoá tài khoản đang chọn"}
                   >−</button>
@@ -648,8 +669,8 @@ export default function ConnectModal({
                       type="text"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={apiKey}
-                      onChange={e => setApiKey && setApiKey(e.target.value)}
+                      value={localApiKey}
+                      onChange={e => setLocalApiKey(e.target.value)}
                       placeholder="Nhập API Key..."
                     />
                   </div>
@@ -661,8 +682,8 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={secretKey}
-                      onChange={e => setSecretKey && setSecretKey(e.target.value)}
+                      value={localSecretKey}
+                      onChange={e => setLocalSecretKey(e.target.value)}
                       placeholder="Nhập Secret Key..."
                     />
                   </div>
@@ -674,8 +695,8 @@ export default function ConnectModal({
                       type="password"
                       className="connect-input"
                       style={{ flex: 1 }}
-                      value={passphrase}
-                      onChange={e => setPassphrase && setPassphrase(e.target.value)}
+                      value={localPassphrase}
+                      onChange={e => setLocalPassphrase(e.target.value)}
                       placeholder="Nhập Passphrase..."
                     />
                   </div>
@@ -686,7 +707,16 @@ export default function ConnectModal({
               <button
                 type="button"
                 disabled={isSavingConfig || isConnecting}
-                onClick={onSaveApiKey}
+                onClick={() => {
+                  if (onSaveApiKey) {
+                    onSaveApiKey({
+                      accountId: modalAccountId,
+                      apiKey: localApiKey,
+                      secretKey: localSecretKey,
+                      passphrase: localPassphrase,
+                    });
+                  }
+                }}
                 style={{
                   width: "100%",
                   padding: "9px 18px",
