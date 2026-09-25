@@ -2079,7 +2079,7 @@ function App() {
             {/* CHARTS & WORKSPACE CONTAINER */}
             <div className="chart-panel-card">
               <main
-                className={`main-workspace ${layoutMode}`}
+                className={`main-workspace ${layoutMode} ${isSplitView ? "is-split-view" : "is-single-view"}`}
                 style={isSplitView ? { '--chart-ratio': `${chartRatio}%` } : {}}
               >
                 {/* 1. TOP SPLIT PANE (KHI BẬT CHẾ ĐỘ ⮃: BIỂU ĐỒ NẰM PHÍA TRÊN) */}

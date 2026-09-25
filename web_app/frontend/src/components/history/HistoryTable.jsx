@@ -4,7 +4,18 @@ export default function HistoryTable({ closedPositions = [] }) {
   return (
     <div
       className="positions-table-wrapper"
-      style={{ flex: 1, overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
+      style={{
+        flex: 1,
+        width: "100%",
+        height: "100%",
+        maxHeight: "100%",
+        minHeight: 0,
+        overflowX: "auto",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        touchAction: "pan-x pan-y",
+        overscrollBehavior: "contain",
+      }}
     >
       <table className="positions-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "right" }}>
         <thead>

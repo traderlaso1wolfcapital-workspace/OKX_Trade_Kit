@@ -1699,7 +1699,8 @@ body.is-resizing iframe {
     overflow: hidden !important;
   }
 
-  .main-workspace .pane-chart {
+  /* Chế độ Chia đôi màn hình (Split View) trên mobile: Biểu đồ ở trên, Bảng tab ở dưới */
+  .main-workspace.is-split-view .pane-chart {
     width: 100% !important;
     flex: 1 1 0% !important;
     height: var(--chart-ratio, auto) !important;
@@ -1711,7 +1712,7 @@ body.is-resizing iframe {
     flex-shrink: 0;
   }
 
-  .main-workspace .pane-tabs {
+  .main-workspace.is-split-view .pane-tabs {
     width: 100% !important;
     flex: var(--tabs-flex, 0 0 168px) !important;
     min-height: 168px !important;
@@ -1720,6 +1721,65 @@ body.is-resizing iframe {
     flex-shrink: 0 !important;
     border: none !important;
     overflow: hidden !important;
+  }
+
+  /* Chế độ Hiện đơn (Single View) trên mobile: Tràn viền FULL KHUNG toàn bộ workspace */
+  .main-workspace.is-single-view .pane-tabs,
+  .main-workspace:not(.is-split-view) .pane-tabs {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    flex-shrink: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .main-workspace.is-single-view .tab-content,
+  .main-workspace:not(.is-split-view) .tab-content {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    height: calc(100% - 32px) !important;
+    max-height: calc(100% - 32px) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-single-view .chart-tab-pane,
+  .main-workspace:not(.is-split-view) .chart-tab-pane,
+  .main-workspace.is-single-view .multi-chart-container,
+  .main-workspace:not(.is-split-view) .multi-chart-container,
+  .main-workspace.is-single-view .single-chart-card,
+  .main-workspace:not(.is-split-view) .single-chart-card {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+  }
+
+  .main-workspace.is-single-view .positions-table-wrapper,
+  .main-workspace:not(.is-split-view) .positions-table-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+  }
+
+  .main-workspace.is-single-view .logs-terminal,
+  .main-workspace:not(.is-split-view) .logs-terminal {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
   }
 
   /* Sidebar controls xuống dưới (order: 2) có đường chỉ dọc 2 bên viền mép màu #333333 dày 2px */
@@ -1839,12 +1899,25 @@ body.is-resizing iframe {
     text-size-adjust: none !important;
   }
 
-  /* Positions table scroll ngang và dọc trên mobile */
+  /* Positions table scroll ngang và dọc trên mobile:
+     - Khóa cứng trục XY: chỉ cho phép chuyển động nội bộ theo phương ngang và dọc
+     - overscroll-behavior: contain ngăn chặn triệt để việc di chuyển / kéo giật cả khung bảng ngoài
+     - touch-action: pan-x pan-y khóa cử chỉ cảm ứng vào đúng 2 trục X và Y
+  */
   .positions-table-wrapper {
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: auto;  /* cho phép kéo dọc/ngang */
-    position: relative;   /* giữ cố định vị trí trong layout */
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    overscroll-behavior: contain !important;
+    overscroll-behavior-x: contain !important;
+    overscroll-behavior-y: contain !important;
+    position: relative !important;
     scrollbar-width: none; /* Ẩn scrollbar Firefox */
     -ms-overflow-style: none; /* Ẩn scrollbar IE/Edge */
   }
@@ -1852,7 +1925,14 @@ body.is-resizing iframe {
   .positions-table-wrapper::-webkit-scrollbar {
     display: none; /* Ẩn scrollbar Chrome/Safari/Webkit */
   }
-  .positions-table { min-width: 600px; }
+  .positions-table {
+    min-width: 600px;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 
   /* Modal full screen tren mobile */
   .modal-content {
@@ -4280,7 +4360,8 @@ div[class*="tradingview-widget-copyright"],
     overflow: hidden !important;
   }
 
-  .main-workspace .pane-chart {
+  /* Chế độ Chia đôi màn hình (Split View) trong PWA Standalone */
+  .main-workspace.is-split-view .pane-chart {
     flex: 1 1 0% !important;
     height: var(--chart-ratio, auto) !important;
     max-height: calc(100% - 177px) !important;
@@ -4288,13 +4369,57 @@ div[class*="tradingview-widget-copyright"],
     flex-shrink: 0;
   }
 
-  .main-workspace .pane-tabs {
+  .main-workspace.is-split-view .pane-tabs {
     flex: var(--tabs-flex, 0 0 168px) !important;
     min-height: 168px !important;
     max-height: var(--tabs-max-h, 168px) !important;
     height: var(--tabs-height, 168px) !important;
     flex-shrink: 0 !important;
     overflow: hidden !important;
+  }
+
+  /* Chế độ Hiện đơn (Single View) trong PWA Standalone: Tràn viền FULL KHUNG */
+  .main-workspace.is-single-view .pane-tabs,
+  .main-workspace:not(.is-split-view) .pane-tabs {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .main-workspace.is-single-view .tab-content,
+  .main-workspace:not(.is-split-view) .tab-content {
+    flex: 1 1 0% !important;
+    width: 100% !important;
+    height: calc(100% - 32px) !important;
+    max-height: calc(100% - 32px) !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  .main-workspace.is-single-view .chart-tab-pane,
+  .main-workspace:not(.is-split-view) .chart-tab-pane,
+  .main-workspace.is-single-view .multi-chart-container,
+  .main-workspace:not(.is-split-view) .multi-chart-container,
+  .main-workspace.is-single-view .single-chart-card,
+  .main-workspace:not(.is-split-view) .single-chart-card,
+  .main-workspace.is-single-view .positions-table-wrapper,
+  .main-workspace:not(.is-split-view) .positions-table-wrapper,
+  .main-workspace.is-single-view .logs-terminal,
+  .main-workspace:not(.is-split-view) .logs-terminal {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    flex: 1 1 0% !important;
   }
 
   .sidebar-left {
@@ -4333,19 +4458,61 @@ div[class*="tradingview-widget-copyright"],
   overflow: hidden !important;
 }
 
-.is-pwa-standalone .main-workspace .pane-chart {
+.is-pwa-standalone .main-workspace.is-split-view .pane-chart {
   flex: 1 1 0% !important;
   height: var(--chart-ratio, auto) !important;
   max-height: calc(100% - 177px) !important;
   min-height: 140px !important;
 }
 
-.is-pwa-standalone .main-workspace .pane-tabs {
+.is-pwa-standalone .main-workspace.is-split-view .pane-tabs {
   flex: var(--tabs-flex, 0 0 168px) !important;
   min-height: 168px !important;
   max-height: var(--tabs-max-h, 168px) !important;
   height: var(--tabs-height, 168px) !important;
   flex-shrink: 0 !important;
+}
+
+.is-pwa-standalone .main-workspace.is-single-view .pane-tabs,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .pane-tabs {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.is-pwa-standalone .main-workspace.is-single-view .tab-content,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .tab-content {
+  flex: 1 1 0% !important;
+  width: 100% !important;
+  height: calc(100% - 32px) !important;
+  max-height: calc(100% - 32px) !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+.is-pwa-standalone .main-workspace.is-single-view .chart-tab-pane,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .chart-tab-pane,
+.is-pwa-standalone .main-workspace.is-single-view .multi-chart-container,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .multi-chart-container,
+.is-pwa-standalone .main-workspace.is-single-view .single-chart-card,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .single-chart-card,
+.is-pwa-standalone .main-workspace.is-single-view .positions-table-wrapper,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .positions-table-wrapper,
+.is-pwa-standalone .main-workspace.is-single-view .logs-terminal,
+.is-pwa-standalone .main-workspace:not(.is-split-view) .logs-terminal {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
 }
 
 .is-pwa-standalone .sidebar-left {
