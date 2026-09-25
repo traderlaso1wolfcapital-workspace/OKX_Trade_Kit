@@ -1018,6 +1018,8 @@ body.is-resizing iframe {
 .tab-content {
   flex: 1;
   overflow: hidden;
+  position: relative;
+  min-width: 0;
 }
 
 .logs-terminal {
@@ -1059,7 +1061,10 @@ body.is-resizing iframe {
 .positions-table-wrapper {
   background-color: #1a1a1a;
   overflow-y: auto;
+  overflow-x: auto;
   height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 .positions-table {
@@ -1770,7 +1775,8 @@ body.is-resizing iframe {
     overscroll-behavior: contain !important;
     overscroll-behavior-x: contain !important;
     overscroll-behavior-y: contain !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
   }
 
   .main-workspace.is-split-view .logs-terminal {
@@ -1847,7 +1853,8 @@ body.is-resizing iframe {
     overscroll-behavior: contain !important;
     overscroll-behavior-x: contain !important;
     overscroll-behavior-y: contain !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
   }
 
   .main-workspace.is-single-view .logs-terminal,
@@ -1996,7 +2003,8 @@ body.is-resizing iframe {
     overscroll-behavior: contain !important;
     overscroll-behavior-x: contain !important;
     overscroll-behavior-y: contain !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
     scrollbar-width: none; /* Ẩn scrollbar Firefox */
     -ms-overflow-style: none; /* Ẩn scrollbar IE/Edge */
   }
@@ -4492,7 +4500,8 @@ div[class*="tradingview-widget-copyright"],
     overscroll-behavior: contain !important;
     overscroll-behavior-x: contain !important;
     overscroll-behavior-y: contain !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
   }
 
   .main-workspace.is-split-view .logs-terminal {
@@ -4569,7 +4578,8 @@ div[class*="tradingview-widget-copyright"],
     overscroll-behavior: contain !important;
     overscroll-behavior-x: contain !important;
     overscroll-behavior-y: contain !important;
-    position: relative !important;
+    position: absolute !important;
+    inset: 0 !important;
   }
 
   .main-workspace.is-single-view .logs-terminal,
