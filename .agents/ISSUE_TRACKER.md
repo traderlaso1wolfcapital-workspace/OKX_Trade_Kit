@@ -18,6 +18,16 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/09/2026]** - Chuyển "chọn tài khoản" Thành Tùy Chọn Khả Dụng & Xóa Trắng Ô Nhập API Key Khi Chọn:
+  - **Mô tả yêu cầu CEO:** Mục `chọn tài khoản` cũng là một lựa chọn, khi người dùng chọn mục này thì toàn bộ phần `THÔNG TIN API KEY` bên dưới lập tức quay về trắng thông tin để có thể nhập tiếp API Key mới.
+  - **Giải pháp thực hiện:**
+    - Trong [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Bỏ thuộc tính `disabled` khỏi `<option value="">chọn tài khoản</option>` và `<option value="">chưa có tài khoản</option>`, cho phép người dùng click chọn mục này bất cứ lúc nào.
+      - Trong `onChange` của select và `useEffect` theo dõi `selectedAccount`, khi giá trị chọn là rỗng (`!val`), lập tức kích hoạt `setApiKey("")`, `setSecretKey("")`, `setPassphrase("")` để làm sạch toàn bộ các ô nhập bên dưới.
+    - Trong [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) và [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):
+      - Đồng bộ bỏ `disabled` cho tùy chọn `(chọn tài khoản)`, hỗ trợ người dùng chuyển về trạng thái chưa gán tài khoản để dọn sạch bảng vị thế và làm mới trường nhập liệu.
+    - Đã build lại production bundle (`npm run build`) và kiểm thử nghiệm thu 100% bằng browser subagent (nhập thử ký tự thành công).
+
 - **[25/09/2026]** - Chặn Hiển Thị Vị Thế Khi Chưa Chọn Tài Khoản & Đồng Bộ Fast Connect Trống Sạch Khi Xoá Hết Tài Khoản:
   - **Mô tả yêu cầu CEO:**
     1. Khi xoá sạch hoặc chưa có tài khoản thì bên Fast Connect cũng trống theo để sẵn sàng kết nối (`OKX Connect` + `Mở App ➔`).

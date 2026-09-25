@@ -35,6 +35,9 @@ export default function ConnectModal({
   useEffect(() => {
     if (!isOpen) return;
     if (!selectedAccount) {
+      if (setApiKey) setApiKey("");
+      if (setSecretKey) setSecretKey("");
+      if (setPassphrase) setPassphrase("");
       return;
     }
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
@@ -551,15 +554,23 @@ export default function ConnectModal({
                     className="styled-select"
                     style={{ minWidth: "160px", maxWidth: "210px", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 8px", borderRadius: "4px", fontSize: "11.5px" }}
                     value={selectedAccount || ""}
-                    onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (onAssignAccount) onAssignAccount(val);
+                      if (!val) {
+                        if (setApiKey) setApiKey("");
+                        if (setSecretKey) setSecretKey("");
+                        if (setPassphrase) setPassphrase("");
+                      }
+                    }}
                   >
                     {accounts.length === 0 ? (
-                      <option value="" disabled style={{ color: "#888888" }}>
+                      <option value="" style={{ color: "#888888" }}>
                         chưa có tài khoản
                       </option>
                     ) : (
                       <>
-                        <option value="" disabled style={{ color: "#888888" }}>
+                        <option value="" style={{ color: "#888888" }}>
                           chọn tài khoản
                         </option>
                         {accounts.map(acc => {

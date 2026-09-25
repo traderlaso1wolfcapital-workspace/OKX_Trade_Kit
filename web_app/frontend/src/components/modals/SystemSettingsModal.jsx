@@ -147,15 +147,23 @@ export default function SystemSettingsModal({
                         className="styled-select"
                         style={{ width: "auto", minWidth: "90px", maxWidth: "100%", background: "#2d2d2d", border: "1px solid #555555", color: "#e0e0e0", padding: "4px 24px 4px 8px", borderRadius: "4px", fontSize: "12px", flexShrink: 1, textOverflow: "ellipsis" }}
                         value={selectedAccount || ""}
-                        onChange={e => onAssignAccount && onAssignAccount(e.target.value)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (onAssignAccount) onAssignAccount(val);
+                          if (!val) {
+                            if (setApiKey) setApiKey("");
+                            if (setSecretKey) setSecretKey("");
+                            if (setPassphrase) setPassphrase("");
+                          }
+                        }}
                       >
                         {accounts.length === 0 ? (
-                          <option value="" disabled style={{ color: "#888888" }}>
+                          <option value="" style={{ color: "#888888" }}>
                             chưa có tài khoản
                           </option>
                         ) : (
                           <>
-                            <option value="" disabled style={{ color: "#888888" }}>
+                            <option value="" style={{ color: "#888888" }}>
                               chọn tài khoản
                             </option>
                             {accounts.map(acc => {
