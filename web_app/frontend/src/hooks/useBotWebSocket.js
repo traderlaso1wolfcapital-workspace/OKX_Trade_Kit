@@ -30,18 +30,18 @@ export function useBotWebSocket(uid, strategy, accountId) {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "bot_data") {
-          if (!accountId) {
-            setPositions([]);
-            setClosedPositions([]);
-            setAvailBal(0);
-            return;
-          }
           if (data.status) {
             setBotStatus(data.status.status || "STOPPED");
             setUptime(data.status.uptime || 0);
             if (data.status.active_accounts) {
               setActiveAccounts(data.status.active_accounts);
             }
+          }
+          if (!accountId) {
+            setPositions([]);
+            setClosedPositions([]);
+            setAvailBal(0);
+            return;
           }
           if (Array.isArray(data.positions)) {
             setPositions(data.positions);

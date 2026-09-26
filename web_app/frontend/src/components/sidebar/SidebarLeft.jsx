@@ -71,14 +71,16 @@ export default function SidebarLeft({
             style={{
               position: "absolute",
               top: "-10px",
-              right: "8px",
+              left: "50%",
+              transform: "translateX(-50%)",
               display: "flex",
               alignItems: "center",
-              gap: "5px",
-              padding: "0 4px",
+              justifyContent: "center",
+              padding: "0 6px",
+              backgroundColor: "var(--sidebar-bg, #252526)",
+              zIndex: 2,
             }}
           >
-            {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
             <button
               type="button"
               className="btn-group-box-collapse"
@@ -112,22 +114,29 @@ export default function SidebarLeft({
                 height: "28px",
                 cursor: isRunning ? "not-allowed" : "pointer",
                 opacity: isRunning ? 0.65 : 1,
-                backgroundColor: isRunning ? "#1a1a1a" : undefined,
-                borderColor: isRunning ? "#444444" : undefined,
+                color: isRunning ? "#a0a5ab" : "#ffffff",
+                WebkitTextFillColor: isRunning ? "#a0a5ab" : "#ffffff",
+                backgroundColor: isRunning ? "#131313" : "#1a1a1a",
+                borderColor: isRunning ? "#2c2c2c" : "#3d3d3d",
+                transition: "all 0.2s ease",
               }}
               value={effectiveAccId}
               onChange={(e) => handleAccountSelect(e.target.value)}
               title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản giao dịch"}
             >
-              {accounts.length === 0 ? (
-                <option value="">{t("no_account")}</option>
-              ) : (
-                <option value="">(Chưa có tài khoản)</option>
+              {!effectiveAccId && (
+                <option value="">{accounts.length === 0 ? t("no_account") : "(Chọn tài khoản)"}</option>
+              )}
+              {effectiveAccId && !accounts.some((a) => a.id === effectiveAccId || a.name === effectiveAccId) && (
+                <option value={effectiveAccId}>
+                  {effectiveAccId} {isRunning ? "🔒" : ""}
+                </option>
               )}
               {accounts.map((acc) => {
-                const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
+                const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
+                const isRunningThisBot = isRunning && (acc.id === effectiveAccId || acc.name === effectiveAccId || runningBotKey === activeBotTab);
                 const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
-                const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
+                const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
 
                 const getTargetBotName = (key) => {
                   if (key === "sub1") return t("bot_ema200");
@@ -136,7 +145,9 @@ export default function SidebarLeft({
                 };
 
                 let labelSuffix = "";
-                if (isRunningOnOtherBot) {
+                if (isRunningThisBot) {
+                  labelSuffix = " 🔒";
+                } else if (isRunningOnOtherBot) {
                   labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
                 } else if (assignedOtherBot) {
                   labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
@@ -144,7 +155,7 @@ export default function SidebarLeft({
 
                 return (
                   <option key={acc.id} value={acc.id} disabled={isRunningOnOtherBot}>
-                    {acc.name} {labelSuffix}
+                    {acc.name}{labelSuffix}
                   </option>
                 );
               })}

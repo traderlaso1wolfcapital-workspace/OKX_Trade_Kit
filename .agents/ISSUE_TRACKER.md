@@ -18,6 +18,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/09/2026]** - Đưa Nút Thu Gọn Cấu Hình Ra Chính Giữa, Di Chuyển Icon Ổ Khóa 🔒 Vào Sau Tên Tài Khoản Đang Chạy, Đồng Bộ Tài Khoản Chạy Bot Đa Thiết Bị/Trình Duyệt:
+  - **Mô tả yêu cầu CEO:**
+    1. Icon ổ khóa `🔒` khi chạy bot phải di chuyển vào sau tài khoản đang chạy bot (trong dropdown chọn tài khoản), không nằm ở góc trên bên phải của khung cấu hình nữa.
+    2. Nút thu gọn cấu hình tài khoản (`▲` / `▼`) đưa ra chính giữa viền trên của khung thay vì nằm ở góc phải.
+    3. Bất kể máy nào khác hay trình duyệt web nào khác khi đăng nhập API vào đúng tab bot đang chạy, ô chọn tài khoản phải hiển thị đúng tài khoản đang chạy bot kèm icon `🔒`, tuyệt đối không được hiển thị chữ "(chưa có tài khoản)" hay "(chọn tài khoản)".
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Vị trí UI: Nút `btn-group-box-collapse` và icon `🔒` được đặt chung trong `.group-box-actions` ở góc phải (`top: -10px, right: 8px`).
+    2. Đồng bộ đa thiết bị: `effectiveAccId` và `selectedAccount` trong `App.jsx` trước đó chỉ đọc từ `botAccountMap` (vốn lấy từ `localStorage` riêng của trình duyệt cục bộ). Khi mở trên máy/trình duyệt mới, `localStorage` rỗng nên `effectiveAccId` trả về `""`, khiến dropdown chọn tài khoản rơi về `(Chưa có tài khoản)` / `(Chọn tài khoản)` dù bot trên server đang chạy phăng phăng.
+    3. Trở ngại WebSocket: Trong `useBotWebSocket.js`, kiểm tra `if (!accountId)` nằm trước đoạn đọc `data.status`, khiến WebSocket ngắt sớm khi `accountId` rỗng và không cập nhật được `active_accounts` từ server về cho thiết bị mới.
+  - **Giải pháp thực hiện:**
+    - [SidebarLeft.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx) & [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      + Đưa `.group-box-actions` ra chính giữa viền trên (`left: 50% !important; transform: translateX(-50%) !important; right: auto !important;`), chỉ chứa duy nhất nút thu gọn `▲` / `▼`.
+      + Gỡ bỏ icon `🔒` khỏi `.group-box-actions`.
+      + Đưa duy nhất 1 icon `🔒` vào ngay sau tên tài khoản đang chạy: nhúng ` 🔒` vào nhãn option `{acc.name} 🔒`, loại bỏ hoàn toàn icon ổ khóa thừa ở đuôi ô chọn (gần mũi tên dropdown).
+      + Hiệu ứng Lock trực quan: Khi bot chạy (`isRunning`), vùng ô và chữ trong ô chọn được làm mờ nhẹ (`opacity: 0.65`, chữ màu `#a0a5ab`, nền xám tối `#131313`, viền `#2c2c2c`) thể hiện trạng thái đã khóa; khi dừng bot (`!isRunning`), ô chuyển sang tone đen trung gian chuẩn (`#1a1a1a`, chữ trắng sáng `#ffffff`, viền `#3d3d3d`, `opacity: 1`), vừa vặn nằm giữa `#111111` và `#222222`, cực kỳ sang và dịu mắt.
+      + Tạo fallback option hiển thị tên tài khoản đang chạy kèm `🔒` ngay cả khi danh sách tài khoản chưa load xong, triệt tiêu hoàn toàn chữ "(chưa có tài khoản)".
+    - [useBotWebSocket.js](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/hooks/useBotWebSocket.js):
+      + Di chuyển logic cập nhật `data.status` và `active_accounts` lên trước điều kiện `if (!accountId)`, đảm bảo thiết bị mới mở web luôn nhận diện ngay tức khắc trạng thái bot và tài khoản đang chạy từ server.
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      + Cập nhật `effectiveAccId`: Ưu tiên 100% tài khoản đang chạy thực tế trên server ở tab hiện tại (`mergedActiveAccounts[activeBotTab]`).
+      + Bổ sung tự động đồng bộ `botAccountMap` và `selectedAccount` khi phát hiện bot đang chạy trên server.
+      + Trong hàm load thông tin ban đầu sau login, gọi ngay `/api/bot/status` để lấy tài khoản đang chạy và tự động gán vào form credentials ngay lập tức.
+
+
 - **[26/09/2026]** - Loại Bỏ Khoảng Đen Chân Trang Dày Trên iOS Standalone, Tràn Viền Sát Mép Đáy:
   - **Mô tả yêu cầu CEO:** Khi đưa web ra màn hình chính (Add to Home Screen) trên iOS, phần chân trang bên dưới cụm tài khoản bị một khoảng đen rất dày, muốn loại bỏ hoàn toàn khoảng trống thừa này để bảng tràn xuống và dính sát mép dưới của app web trình duyệt.
   - **Nguyên nhân cốt lõi phát hiện:**

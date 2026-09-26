@@ -3823,6 +3823,20 @@ div[class*="tradingview-widget-copyright"],
   padding: 1px 7px !important;
 }
 
+.group-box-actions {
+  position: absolute !important;
+  top: -10px !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 6px !important;
+  background-color: var(--sidebar-bg, #252526) !important;
+  z-index: 2 !important;
+}
+
 .theme-glass-pro .group-box-actions {
   background-color: #0b0c11 !important;
   border-radius: 3px !important;

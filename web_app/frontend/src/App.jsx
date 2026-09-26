@@ -86,12 +86,27 @@ function App() {
     return {};
   });
 
+  const [httpActiveAccounts, setHttpActiveAccounts] = useState({});
+  const [wsActiveAccountsState, setWsActiveAccountsState] = useState({});
+
+  const mergedActiveAccounts = useMemo(() => {
+    return { ...(httpActiveAccounts || {}), ...(wsActiveAccountsState || {}) };
+  }, [httpActiveAccounts, wsActiveAccountsState]);
+
   const effectiveAccId = useMemo(() => {
+    // 1. Ưu tiên tài khoản đang chạy thực tế trên server ở tab hiện tại (cho mọi máy / browser)
+    const runningAcc = mergedActiveAccounts[activeBotTab];
+    if (runningAcc) {
+      const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
+      if (matched) return matched.id;
+      return runningAcc;
+    }
+    // 2. Fallback sang tài khoản đã gán trước đó trong botAccountMap
     if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
       return botAccountMap[activeBotTab];
     }
     return "";
-  }, [botAccountMap, activeBotTab, accounts]);
+  }, [mergedActiveAccounts, activeBotTab, accounts, botAccountMap]);
 
   const [selectedAccount, setSelectedAccount] = useState(effectiveAccId);
 
@@ -107,6 +122,12 @@ function App() {
     setClosedPositions,
     refresh: refreshBotData,
   } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
+
+  useEffect(() => {
+    if (wsActiveAccounts && Object.keys(wsActiveAccounts).length > 0) {
+      setWsActiveAccountsState(wsActiveAccounts);
+    }
+  }, [wsActiveAccounts]);
 
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
@@ -140,21 +161,30 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
-    const assigned = botAccountMap[activeBotTab];
-    if (assigned && accounts.some(a => a.id === assigned)) {
-      setSelectedAccount(assigned);
+    const runningAcc = mergedActiveAccounts[activeBotTab];
+    let target = "";
+    if (runningAcc) {
+      const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
+      target = matched ? matched.id : runningAcc;
+    } else if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
+      target = botAccountMap[activeBotTab];
+    }
+
+    if (target) {
+      setSelectedAccount(target);
+      if (runningAcc && botAccountMap[activeBotTab] !== target) {
+        setBotAccountMap(prev => {
+          const next = { ...prev, [activeBotTab]: target };
+          localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+          return next;
+        });
+      }
     } else {
       setSelectedAccount("");
       setPositions([]);
       setClosedPositions([]);
     }
-  }, [activeBotTab, botAccountMap, accounts, setPositions, setClosedPositions]);
-
-  const [httpActiveAccounts, setHttpActiveAccounts] = useState({});
-
-  const mergedActiveAccounts = useMemo(() => {
-    return { ...(httpActiveAccounts || {}), ...(wsActiveAccounts || {}) };
-  }, [wsActiveAccounts, httpActiveAccounts]);
+  }, [activeBotTab, mergedActiveAccounts, botAccountMap, accounts, setPositions, setClosedPositions]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);
@@ -638,11 +668,28 @@ function App() {
 
         let targetAcc = "";
         try {
-          const savedMap = JSON.parse(localStorage.getItem("tls1_bot_accounts") || "{}");
-          if (savedMap[activeBotTab] && accList.some(a => a.id === savedMap[activeBotTab])) {
-            targetAcc = savedMap[activeBotTab];
+          const resStat = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${uidToUse}`);
+          if (resStat.ok) {
+            const statData = await resStat.json();
+            if (statData?.active_accounts) {
+              setHttpActiveAccounts(statData.active_accounts);
+              const serverRunning = statData.active_accounts[activeBotTab];
+              if (serverRunning) {
+                const matched = accList.find(a => a.id === serverRunning || a.name === serverRunning);
+                targetAcc = matched ? matched.id : serverRunning;
+              }
+            }
           }
         } catch { }
+
+        if (!targetAcc) {
+          try {
+            const savedMap = JSON.parse(localStorage.getItem("tls1_bot_accounts") || "{}");
+            if (savedMap[activeBotTab] && accList.some(a => a.id === savedMap[activeBotTab])) {
+              targetAcc = savedMap[activeBotTab];
+            }
+          } catch { }
+        }
 
         if (targetAcc && isMounted) {
           setSelectedAccount(targetAcc);
