@@ -1148,7 +1148,7 @@ body.is-resizing iframe {
 .modal-overlay.settings-modal-overlay {
   align-items: flex-start !important;
   justify-content: center !important;
-  padding-top: max(82px, 9.2vh) !important;
+  padding-top: max(108px, 12vh) !important;
   padding-bottom: 16px !important;
   box-sizing: border-box !important;
 }
@@ -4246,7 +4246,7 @@ div[class*="tradingview-widget-copyright"],
 .theme-glass-pro .modal-overlay.settings-modal-overlay {
   align-items: flex-start !important;
   justify-content: center !important;
-  padding-top: max(82px, 9.2vh) !important;
+  padding-top: max(108px, 12vh) !important;
   padding-bottom: 16px !important;
 }
 

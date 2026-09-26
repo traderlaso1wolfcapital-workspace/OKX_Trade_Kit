@@ -1617,6 +1617,10 @@ def reset_capital(uid: str, strategy: str = "sub1", account_id: str = None):
                 "tang_truong": 0.0,
                 "last_reset_ts": time.time()
             }
+            # 🎯 Reset toàn bộ chỉ số Hiệu suất, Winrate và M/M (MAE/MFE)
+            for k in list(evo_data.keys()):
+                if k != "wallet_stats":
+                    evo_data[k] = {"tong_lenh_dong": 0, "lenh_thang": 0, "lenh_thua": 0, "lich_su_mae": [], "lich_su_mfe": []}
             with open(evo_file, "w", encoding="utf-8") as f:
                 json.dump(evo_data, f, indent=2, ensure_ascii=False)
         except Exception:
@@ -1636,7 +1640,7 @@ def reset_capital(uid: str, strategy: str = "sub1", account_id: str = None):
         "status": "success",
         "total_equity": round(total_equity, 2),
         "account": target_acc,
-        "message": f"✅ Đã Reset Vốn Gốc thành công!\nTổng vốn quét thực tế từ sàn OKX: {total_equity:,.2f} USDT"
+        "message": f"✅ Đã Reset Vốn Gốc & Hiệu suất (Win / MM) thành công!\nTổng vốn quét thực tế từ sàn OKX: {total_equity:,.2f} USDT"
     }
 
 @app.post("/api/bot/reset_nen")

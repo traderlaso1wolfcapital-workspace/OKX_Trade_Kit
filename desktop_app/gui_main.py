@@ -4574,13 +4574,17 @@ class BotInstanceWidget(QtWidgets.QWidget):
                     "tang_truong": 0.0,
                     "last_reset_ts": time.time()
                 }
+                # 🎯 Reset toàn bộ chỉ số Hiệu suất, Winrate và M/M (MAE/MFE)
+                for k in list(evo_data.keys()):
+                    if k != "wallet_stats":
+                        evo_data[k] = {"tong_lenh_dong": 0, "lenh_thang": 0, "lenh_thua": 0, "lich_su_mae": [], "lich_su_mfe": []}
                 try:
                     with open(evo_path, "w", encoding="utf-8") as f:
                         json.dump(evo_data, f, indent=2, ensure_ascii=False)
                 except: pass
 
-                self.append_log(f"\n♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc thành công! Tổng vốn quét từ sàn OKX: {tot_eq:,.2f} USDT")
-                QtWidgets.QMessageBox.information(self, "Thông báo", f"Đã Reset Vốn Gốc (Audit) thành công!\n\nTổng vốn quét thực tế từ sàn OKX: {tot_eq:,.2f} USDT")
+                self.append_log(f"\n♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc & Hiệu suất (Win / MM) thành công! Tổng vốn quét từ sàn OKX: {tot_eq:,.2f} USDT")
+                QtWidgets.QMessageBox.information(self, "Thông báo", f"Đã Reset Vốn Gốc & Hiệu suất (Audit) thành công!\n\nTổng vốn quét thực tế từ sàn OKX: {tot_eq:,.2f} USDT\nĐã đặt lại Winrate và M/M về 0.")
                 return
             else:
                 err_msg = res_data.get("msg", "Lỗi sàn OKX")
