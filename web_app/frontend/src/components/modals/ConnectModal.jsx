@@ -92,7 +92,7 @@ export default function ConnectModal({
 
   return (
     <div
-      className="modal-overlay"
+      className="modal-overlay connect-modal-overlay"
       style={{
         position: "fixed",
         top: 0,
@@ -103,10 +103,11 @@ export default function ConnectModal({
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
         zIndex: 9999,
         padding: "16px",
+        paddingTop: "max(92px, 10.5vh)",
         boxSizing: "border-box",
       }}
       onClick={onClose}
@@ -480,37 +481,37 @@ export default function ConnectModal({
                       </div>
                     </div>
 
-                    {/* Disconnect button badge (viền đỏ #ff4d4f) */}
+                    {/* Delete button badge (viền đỏ #ff4d4f) kích thước gần lớn bằng nút Mở App */}
                     <span
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onDisconnectAccount) onDisconnectAccount(acc.id);
                       }}
                       style={{
-                        fontSize: "10.5px",
-                        fontWeight: "600",
+                        fontSize: "11px",
+                        fontWeight: "700",
                         color: "#ff4d4f",
-                        background: "#181818",
+                        background: "rgba(255, 77, 79, 0.08)",
                         border: "1px solid #ff4d4f",
-                        padding: "3px 7px",
+                        padding: "4px 14px",
                         borderRadius: "4px",
                         whiteSpace: "nowrap",
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: "3px",
+                        justifyContent: "center",
                         userSelect: "none",
                         cursor: "pointer",
-                        transition: "all 0.15s ease",
+                        transition: "all 0.18s ease",
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
+                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.backgroundColor = "#181818";
+                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
                       }}
-                      title="Ngắt kết nối tài khoản này"
+                      title="Xóa tài khoản này (Delete)"
                     >
-                      Disconnect
+                      Delete
                     </span>
                   </div>
                 ))}
@@ -684,7 +685,11 @@ export default function ConnectModal({
                     disabled={!modalAccountId || accounts.length === 0}
                     onClick={() => {
                       if (!modalAccountId) return;
-                      if (onDeleteAccount) onDeleteAccount(modalAccountId);
+                      if (onDisconnectAccount) {
+                        onDisconnectAccount(modalAccountId);
+                      } else if (onDeleteAccount) {
+                        onDeleteAccount(modalAccountId);
+                      }
                     }}
                     style={{
                       backgroundColor: (!modalAccountId || accounts.length === 0) ? "#444444" : "#dc3545",

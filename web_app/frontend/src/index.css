@@ -1145,10 +1145,18 @@ body.is-resizing iframe {
   box-sizing: border-box;
 }
 
+.modal-overlay.settings-modal-overlay {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: max(82px, 9.2vh) !important;
+  padding-bottom: 16px !important;
+  box-sizing: border-box !important;
+}
+
 .modal-content.settings-modal {
   width: 680px;
   max-width: 95vw;
-  max-height: 88vh;
+  max-height: 80vh !important;
   background-color: #1e1e1e;
   border: 1px solid #333333;
   border-radius: 6px;
@@ -1623,9 +1631,9 @@ body.is-resizing iframe {
     flex-direction: column;
     height: 100% !important;
     height: var(--real-app-height, 100dvh) !important;
-    max-height: var(--real-app-height, 100dvh) !important;
+    max-height: 100% !important;
     overflow: hidden;
-    padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 2px) !important;
     padding-bottom: 0px !important;
     padding-left: env(safe-area-inset-left, 0px) !important;
     padding-right: env(safe-area-inset-right, 0px) !important;
@@ -1635,11 +1643,11 @@ body.is-resizing iframe {
 
   @media all and (display-mode: standalone), (display-mode: fullscreen) {
     .app-container {
-      padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+      padding-top: max(env(safe-area-inset-top, 0px), 2px) !important;
       padding-bottom: 0px !important;
       height: 100% !important;
       height: var(--real-app-height, 100vh) !important;
-      max-height: var(--real-app-height, 100vh) !important;
+      max-height: 100% !important;
     }
   }
 
@@ -1696,6 +1704,15 @@ body.is-resizing iframe {
     overflow: hidden !important;
   }
 
+  .chart-panel-card {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
   .main-workspace {
     width: 100% !important;
     max-width: 100% !important;
@@ -1710,14 +1727,19 @@ body.is-resizing iframe {
     overflow: hidden !important;
   }
 
-  /* Thanh kéo resizer giữa Chart và Tabs: Ẩn hoàn toàn trên mobile để cố định trục cứng 168px */
+  /* Thanh kéo resizer giữa Chart và Tabs: Mở khóa để người dùng tự do kéo tỷ lệ */
   .resizer {
-    display: none !important;
-    pointer-events: none !important;
-    height: 0 !important;
-    width: 0 !important;
+    display: flex !important;
+    pointer-events: auto !important;
+    height: 10px !important;
+    min-height: 10px !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    touch-action: none !important;
+    user-select: none !important;
+    z-index: 10 !important;
+    cursor: row-resize !important;
   }
 
   /* Chế độ Chia đôi màn hình (Split View) trên mobile: Biểu đồ ở trên, Bảng tab ở dưới */
@@ -1725,13 +1747,13 @@ body.is-resizing iframe {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    flex: 1 1 0% !important;
-    height: calc(100% - 168px) !important;
-    max-height: calc(100% - 168px) !important;
+    flex: none !important;
+    height: var(--chart-ratio, 52%) !important;
+    max-height: var(--chart-ratio, 52%) !important;
     min-height: 120px !important;
     border-left: none !important;
     border-right: none !important;
-    border-bottom: 1px solid #333333 !important;
+    border-bottom: none !important;
     flex-shrink: 0 !important;
     overflow: hidden !important;
   }
@@ -1740,10 +1762,10 @@ body.is-resizing iframe {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    flex: 0 0 168px !important;
-    min-height: 168px !important;
-    max-height: 168px !important;
-    height: 168px !important;
+    flex: 1 1 0% !important;
+    min-height: 80px !important;
+    max-height: none !important;
+    height: auto !important;
     flex-shrink: 0 !important;
     border: none !important;
     overflow: hidden !important;
@@ -1757,8 +1779,8 @@ body.is-resizing iframe {
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    height: calc(168px - 30px) !important;
-    max-height: calc(168px - 30px) !important;
+    height: auto !important;
+    max-height: none !important;
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -1887,7 +1909,7 @@ body.is-resizing iframe {
     flex-shrink: 0 !important;
     box-sizing: border-box;
     margin-top: 0 !important; /* Neo thẳng mép dưới mà không bị nhảy lơ lửng */
-    margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
+    margin-bottom: 0px !important;
   }
   
   .sidebar-header {
@@ -4207,12 +4229,20 @@ div[class*="tradingview-widget-copyright"],
   -webkit-backdrop-filter: blur(10px) !important;
 }
 
+.theme-glass-pro .modal-overlay.settings-modal-overlay {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: max(82px, 9.2vh) !important;
+  padding-bottom: 16px !important;
+}
+
 .theme-glass-pro .modal-content,
 .theme-glass-pro .modal-content.settings-modal {
   background-color: #12131b !important;
   border: 1px solid #363b50 !important;
   border-radius: 6px !important;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85) !important;
+  max-height: 80vh !important;
 }
 
 .theme-glass-pro .modal-header {
@@ -4414,11 +4444,11 @@ div[class*="tradingview-widget-copyright"],
   }
 
   .app-container {
-    padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+    padding-top: max(env(safe-area-inset-top, 0px), 2px) !important;
     padding-bottom: 0px !important;
     height: 100% !important;
     height: var(--real-app-height, 100vh) !important;
-    max-height: var(--real-app-height, 100vh) !important;
+    max-height: 100% !important;
   }
 
   .content-wrapper {
@@ -4445,6 +4475,15 @@ div[class*="tradingview-widget-copyright"],
     overflow: hidden !important;
   }
 
+  .chart-panel-card {
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
   .main-workspace {
     flex: 1 1 0% !important;
     display: flex !important;
@@ -4455,20 +4494,20 @@ div[class*="tradingview-widget-copyright"],
 
   /* Chế độ Chia đôi màn hình (Split View) trong PWA Standalone */
   .main-workspace.is-split-view .pane-chart {
-    flex: 1 1 0% !important;
-    height: calc(100% - 168px) !important;
-    max-height: calc(100% - 168px) !important;
+    flex: none !important;
+    height: var(--chart-ratio, 52%) !important;
+    max-height: var(--chart-ratio, 52%) !important;
     min-height: 120px !important;
-    border-bottom: 1px solid #333333 !important;
+    border-bottom: none !important;
     flex-shrink: 0 !important;
     overflow: hidden !important;
   }
 
   .main-workspace.is-split-view .pane-tabs {
-    flex: 0 0 168px !important;
-    min-height: 168px !important;
-    max-height: 168px !important;
-    height: 168px !important;
+    flex: 1 1 0% !important;
+    min-height: 80px !important;
+    max-height: none !important;
+    height: auto !important;
     flex-shrink: 0 !important;
     border: none !important;
     overflow: hidden !important;
@@ -4482,8 +4521,8 @@ div[class*="tradingview-widget-copyright"],
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    height: calc(168px - 30px) !important;
-    max-height: calc(168px - 30px) !important;
+    height: auto !important;
+    max-height: none !important;
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
@@ -4601,7 +4640,7 @@ div[class*="tradingview-widget-copyright"],
 
   .sidebar-left {
     margin-top: 0 !important;
-    margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
+    margin-bottom: 0px !important;
     flex-shrink: 0 !important;
   }
 }
@@ -4617,16 +4656,17 @@ div[class*="tradingview-widget-copyright"],
 }
 
 .is-pwa-standalone .app-container {
-  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;
+  padding-top: max(env(safe-area-inset-top, 0px), 2px) !important;
   padding-bottom: 0px !important;
   height: 100% !important;
   height: var(--real-app-height, 100vh) !important;
-  max-height: var(--real-app-height, 100vh) !important;
+  max-height: 100% !important;
 }
 
 .is-pwa-standalone .content-wrapper,
 .is-pwa-standalone .main-section,
 .is-pwa-standalone .bot-panel-card,
+.is-pwa-standalone .chart-panel-card,
 .is-pwa-standalone .main-workspace {
   flex: 1 1 0% !important;
   display: flex !important;
@@ -4636,20 +4676,20 @@ div[class*="tradingview-widget-copyright"],
 }
 
 .is-pwa-standalone .main-workspace.is-split-view .pane-chart {
-  flex: 1 1 0% !important;
-  height: calc(100% - 168px) !important;
-  max-height: calc(100% - 168px) !important;
+  flex: none !important;
+  height: var(--chart-ratio, 52%) !important;
+  max-height: var(--chart-ratio, 52%) !important;
   min-height: 120px !important;
-  border-bottom: 1px solid #333333 !important;
+  border-bottom: none !important;
   flex-shrink: 0 !important;
   overflow: hidden !important;
 }
 
 .is-pwa-standalone .main-workspace.is-split-view .pane-tabs {
-  flex: 0 0 168px !important;
-  min-height: 168px !important;
-  max-height: 168px !important;
-  height: 168px !important;
+  flex: 1 1 0% !important;
+  min-height: 80px !important;
+  max-height: none !important;
+  height: auto !important;
   flex-shrink: 0 !important;
   border: none !important;
   overflow: hidden !important;
@@ -4663,8 +4703,8 @@ div[class*="tradingview-widget-copyright"],
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  height: calc(168px - 30px) !important;
-  max-height: calc(168px - 30px) !important;
+  height: auto !important;
+  max-height: none !important;
   min-height: 0 !important;
   display: flex !important;
   flex-direction: column !important;
@@ -4779,7 +4819,7 @@ div[class*="tradingview-widget-copyright"],
 
 .is-pwa-standalone .sidebar-left {
   margin-top: 0 !important;
-  margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;
+  margin-bottom: 0px !important;
   flex-shrink: 0 !important;
 }
 

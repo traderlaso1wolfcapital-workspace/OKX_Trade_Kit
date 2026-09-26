@@ -55,17 +55,15 @@ export default function SidebarLeft({
           <span
             className="group-box-title"
             style={{
+              display: "none",
               color: "#ffffff",
               fontSize: "12.5px",
               fontWeight: "bold",
               textTransform: "none",
-              display: "flex",
               alignItems: "center",
               gap: "4px",
             }}
           >
-            {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
-            {t("account_label")} ({getBotLabel()})
           </span>
 
           <div
@@ -80,6 +78,7 @@ export default function SidebarLeft({
               padding: "0 4px",
             }}
           >
+            {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
             <button
               type="button"
               className="btn-group-box-collapse"
@@ -123,7 +122,7 @@ export default function SidebarLeft({
               {accounts.length === 0 ? (
                 <option value="">{t("no_account")}</option>
               ) : (
-                <option value="">({t("select_account") || "chọn tài khoản"})</option>
+                <option value="">(Chưa có tài khoản)</option>
               )}
               {accounts.map((acc) => {
                 const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];

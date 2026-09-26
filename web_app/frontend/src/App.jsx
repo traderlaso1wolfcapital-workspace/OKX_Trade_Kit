@@ -263,10 +263,14 @@ function App() {
   // Sync exact viewport height for iOS Safari & Standalone PWA
   useEffect(() => {
     const updateRealHeight = () => {
-      const h = window.innerHeight;
-      document.documentElement.style.setProperty('--real-app-height', `${h}px`);
       const isStandalone = window.navigator.standalone === true ||
         (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+      const h = isStandalone
+        ? Math.max(window.screen.height, window.innerHeight, (document.documentElement ? document.documentElement.clientHeight : 0))
+        : (window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0));
+      if (h && h > 300) {
+        document.documentElement.style.setProperty('--real-app-height', `${h}px`);
+      }
       if (isStandalone) {
         document.documentElement.classList.add('is-pwa-standalone');
         if (document.body) document.body.classList.add('is-pwa-standalone');
@@ -292,9 +296,16 @@ function App() {
 
   // 7. Workspace Resizer & Split View Mode
   const [isSplitView, setIsSplitView] = useState(() => {
-    return localStorage.getItem("tls1_split_view") === "true";
+    return localStorage.getItem("tls1_split_view") !== "false";
   });
-  const [chartRatio, setChartRatio] = useState(70); // Mặc định 30-70 (Biểu đồ 70% - Bảng vị thế 30%)
+  const [chartRatio, setChartRatio] = useState(() => {
+    const saved = localStorage.getItem("tls1_chart_ratio");
+    if (saved) {
+      const num = Number(saved);
+      if (num >= 15 && num <= 85) return num;
+    }
+    return 70;
+  });
   const layoutMode = "vertical";
 
   const toggleSplitView = () => {
@@ -323,9 +334,10 @@ function App() {
       if (!workspace) return;
       const rect = workspace.getBoundingClientRect();
       let newRatio = ((clientY - rect.top) / rect.height) * 100;
-      if (newRatio < 25) newRatio = 25;
-      if (newRatio > 75) newRatio = 75;
+      if (newRatio < 15) newRatio = 15;
+      if (newRatio > 85) newRatio = 85;
       setChartRatio(newRatio);
+      localStorage.setItem("tls1_chart_ratio", String(newRatio));
     };
 
     const stopDrag = () => {
@@ -335,6 +347,7 @@ function App() {
       if (isTouch) {
         document.removeEventListener("touchmove", doDrag);
         document.removeEventListener("touchend", stopDrag);
+        document.removeEventListener("touchcancel", stopDrag);
       } else {
         document.removeEventListener("mousemove", doDrag);
         document.removeEventListener("mouseup", stopDrag);
@@ -344,6 +357,7 @@ function App() {
     if (isTouch) {
       document.addEventListener("touchmove", doDrag, { passive: false });
       document.addEventListener("touchend", stopDrag);
+      document.addEventListener("touchcancel", stopDrag);
     } else {
       document.addEventListener("mousemove", doDrag);
       document.addEventListener("mouseup", stopDrag);
@@ -1331,52 +1345,53 @@ function App() {
     }
     setIsDeletingAccount(true);
 
-    const currentAcc = accounts.find(a => a.id === targetAccountId);
-    const accName = currentAcc?.name || targetAccountId;
-
-    if (selectedAccount === targetAccountId) {
-      setApiKey("");
-      setSecretKey("");
-      setPassphrase("");
-      setSelectedAccount("");
-      setPositions([]);
-      setClosedPositions([]);
-    }
-
-    const remainingAccounts = accounts.filter(a => a.id !== targetAccountId);
-    setAccounts(remainingAccounts);
-    localStorage.setItem("tls1_accounts", JSON.stringify(remainingAccounts));
-
-    setBotAccountMap(prev => {
-      const next = { ...prev };
-      for (const k in next) {
-        if (next[k] === targetAccountId) next[k] = "";
-      }
-      localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-      return next;
-    });
-
-    if (remainingAccounts.length === 0) {
-      localStorage.removeItem("tls1_last_detected_acc");
-      localStorage.removeItem("tls1_account_name");
-      setAccountName("");
-      setIsAuthenticated(false);
-      localStorage.removeItem("tls1_auth");
-      addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản cuối cùng`);
-    } else {
-      addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
-    }
-
-    setShowDeleteAccountModal(false);
-    setIsDeletingAccount(false);
-    setAccountToDelete("");
-
     try {
+      const currentAcc = accounts.find(a => a.id === targetAccountId);
+      const accName = currentAcc?.name || targetAccountId;
+
+      if (selectedAccount === targetAccountId) {
+        setApiKey("");
+        setSecretKey("");
+        setPassphrase("");
+        setSelectedAccount("");
+        setPositions([]);
+        setClosedPositions([]);
+      }
+
+      const remainingAccounts = accounts.filter(a => a.id !== targetAccountId);
+      setAccounts(remainingAccounts);
+      localStorage.setItem("tls1_accounts", JSON.stringify(remainingAccounts));
+
+      setBotAccountMap(prev => {
+        const next = { ...prev };
+        for (const k in next) {
+          if (next[k] === targetAccountId) next[k] = "";
+        }
+        localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+        return next;
+      });
+
+      if (remainingAccounts.length === 0) {
+        localStorage.removeItem("tls1_last_detected_acc");
+        localStorage.removeItem("tls1_account_name");
+        setIsAuthenticated(false);
+        localStorage.removeItem("tls1_auth");
+        addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản cuối cùng`);
+      } else {
+        addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
+      }
+
       const curUid = currentUid || localStorage.getItem("tls1_uid");
       if (curUid && curUid !== "default") {
         await fetch(`/api/bot/accounts/${targetAccountId}?uid=${curUid}`, { method: "DELETE" });
       }
-    } catch { }
+    } catch (err) {
+      console.error("Lỗi khi xóa tài khoản:", err);
+    } finally {
+      setShowDeleteAccountModal(false);
+      setIsDeletingAccount(false);
+      setAccountToDelete("");
+    }
   };
 
   const handleDisconnectSpecificAccount = async (targetAccountId) => {
@@ -1397,7 +1412,7 @@ function App() {
     }
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
-    if (!window.confirm(`Bạn có chắc chắn muốn ngắt kết nối (Disconnect) tài khoản OKX "${accName}" không?\n\n• Toàn bộ API Key liên kết của tài khoản này sẽ được xóa khỏi hệ thống.\n• Các lệnh chờ (Limit) chưa khớp sẽ được quét dọn dẹp.\n• Toàn bộ vị thế và TP/SL đã có trên sàn OKX vẫn được bảo lưu 100% an toàn.`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa (Delete) tài khoản OKX "${accName}" không?\n\n• Toàn bộ API Key liên kết của tài khoản này sẽ được xóa khỏi hệ thống.\n• Các lệnh chờ (Limit) chưa khớp sẽ được dọn dẹp.\n• Toàn bộ vị thế và TP/SL đã có trên sàn OKX vẫn được bảo lưu 100% an toàn.`)) {
       return;
     }
 
@@ -1415,7 +1430,7 @@ function App() {
         localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
         return next;
       });
-      addSystemLog(`🔌 [ACCOUNT] Đã ngắt kết nối tài khoản: "${accName}"`);
+      addSystemLog(`🗑️ [ACCOUNT] Đã xóa tài khoản: "${accName}"`);
     } else {
       setApiKey("");
       setSecretKey("");

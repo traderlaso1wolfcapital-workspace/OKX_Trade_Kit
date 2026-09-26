@@ -63,8 +63,24 @@ export default function SystemSettingsModal({
   const displayUid = okxUid || localStorage.getItem("tls1_uid") || loginUid || "";
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-content settings-modal">
+    <div
+      className="modal-overlay settings-modal-overlay"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        paddingTop: "max(82px, 9.2vh)",
+        paddingBottom: "16px",
+        boxSizing: "border-box",
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="modal-content settings-modal"
+        style={{
+          maxHeight: "80vh",
+        }}
+      >
         <style>{`
           .connect-input {
             width: 100%;

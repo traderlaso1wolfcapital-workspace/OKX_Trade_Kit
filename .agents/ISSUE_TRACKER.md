@@ -18,7 +18,88 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[26/09/2026]** - Tối Ưu Chế Độ Hiện Đơn (Single View) Full Khung & Khóa Cứng Trục XY Cho Bảng Vị Thế Cả Chế Độ Đơn Lẫn Đôi (Split View):
+- **[26/09/2026]** - Loại Bỏ Khoảng Đen Chân Trang Dày Trên iOS Standalone, Tràn Viền Sát Mép Đáy:
+  - **Mô tả yêu cầu CEO:** Khi đưa web ra màn hình chính (Add to Home Screen) trên iOS, phần chân trang bên dưới cụm tài khoản bị một khoảng đen rất dày, muốn loại bỏ hoàn toàn khoảng trống thừa này để bảng tràn xuống và dính sát mép dưới của app web trình duyệt.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Trong `index.html` và `App.jsx`, `setRealAppHeight()` đo `window.innerHeight`. Khi WebKit iOS chạy standalone PWA, `window.innerHeight` bị bug hệ điều hành trả về kích thước nhỏ (~600px) thay vì toàn bộ màn hình (~852px).
+    2. Trong `index.css`, `.app-container` bị kẹp cứng `max-height: var(--real-app-height)` nên toàn bộ giao diện bị bóp nghẹt ở 600px, để lại một khoảng đen trống hoác ~250px ở đáy màn hình.
+    3. Cụm `.sidebar-left` đặt `margin-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 14px), 6px) !important;` gây hở chân thêm 20px.
+    4. `.chart-panel-card` bị thiếu khỏi chuỗi flexbox `flex: 1 1 0%` trên `.is-pwa-standalone`.
+  - **Giải pháp thực hiện:**
+    - [index.html](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/index.html) & [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      + Cập nhật `setRealAppHeight()`: trong chế độ standalone, dùng `Math.max(window.screen.height, window.innerHeight)` để lấy chính xác 100% chiều cao thực tế của màn hình thiết bị (~852px), triệt tiêu hoàn toàn lỗi co rút WebKit.
+    - [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      + Gỡ bỏ `max-height: var(--real-app-height)` bóp nghẹt container, chuyển sang `max-height: 100% !important; height: 100% !important;` cho `.app-container`.
+      + Bổ sung `.chart-panel-card` vào danh sách flex tràn viền `flex: 1 1 0% !important; min-height: 0 !important;`.
+      + Đặt `.sidebar-left` có `margin-bottom: 0px !important;` trên cả mobile, standalone và `.is-pwa-standalone`. Cụm bảng và tài khoản kéo dính sát trọn vẹn 100% mép đáy iOS.
+
+- **[26/09/2026]** - Cố Định Vị Trí Tabs Cài Đặt Dưới Nút CHẠY BOT, Thu Gọn 80%, và Mở Khóa Thanh Kéo Resizer:
+  - **Mô tả yêu cầu CEO:**
+    1. Fix vị trí các thẻ tab khi chuyển các tab (Chiến Thuật <-> Hệ Thống) không bị nhảy giật thay đổi vị trí cao thấp.
+    2. Vị trí đỉnh modal cài đặt neo cố định bên dưới nút "CHẠY BOT".
+    3. Thu gọn tab Chiến Thuật còn 80% chiều cao màn hình (`max-height: 80vh`), nội dung bên trong cuộn mượt bằng con lăn.
+    4. Mở khóa (unlock) nút kéo bar (thanh kéo resizer phân chia Biểu đồ & Bảng vị thế).
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Modal cài đặt nằm trong `.modal-overlay` có `align-items: center`. Khi tab Chiến Thuật cao ~700px và tab Hệ Thống cao ~240px, flexbox tự động căn giữa làm cả tiêu đề và tab bị rơi xuống 250px khi chuyển tab.
+    2. Một bản vá trước đó đã khóa cứng `168px` trên mobile/standalone và ẩn `.resizer` (`display: none !important`), làm vô hiệu hoá hoàn toàn khả năng kéo tỷ lệ giữa biểu đồ và bảng vị thế.
+  - **Giải pháp thực hiện:**
+    - [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) & [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      + Thiết lập `.modal-overlay.settings-modal-overlay`: `align-items: flex-start !important; justify-content: center !important; padding-top: max(82px, 9.2vh) !important;` trên cả theme thường và `.theme-glass-pro`. Đỉnh modal và các thẻ tab luôn cố định 100% ngay dưới nút "CHẠY BOT", chuyển tab không bao giờ bị nhảy vị trí.
+      + Khóa `max-height: 80vh !important;` cho `.modal-content.settings-modal`, nội dung dài cuộn bên trong `.settings-tab-scroll`, các nút lưu/khôi phục ghim chắc chắn ở đáy.
+    - [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css) & [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      + Mở khóa `.resizer` trên mobile và standalone: `display: flex !important; pointer-events: auto !important; height: 10px !important; touch-action: none !important; cursor: row-resize !important;`.
+      + Gỡ bỏ toàn bộ các điểm gán cứng `168px`, chuyển `.pane-chart` sang `height: var(--chart-ratio, 52%) !important;` và `.pane-tabs` sang `flex: 1 1 0% !important; min-height: 80px !important;`.
+      + Trong `App.jsx`, hỗ trợ sự kiện `touchcancel`, tự động lưu và khôi phục tỷ lệ `chartRatio` từ `localStorage`.
+
+- **[26/09/2026]** - Tinh Chỉnh Nút EMA200 Bot Kéo Sát Cạnh Trên 3px:
+  - **Mô tả yêu cầu CEO:** Kéo nút chọn bot "EMA200 Bot" sát cạnh trên cùng của màn hình hơn, chỉ cách đúng 3px.
+  - **Giải pháp:** Thiết lập `padding-top: max(env(safe-area-inset-top, 0px), 0px) !important;` trên `.app-container` và margin-top của `.bot-tabs-bar` thành `3px !important;` trên toàn bộ các chế độ hiển thị (Desktop, Mobile, Standalone, Fullscreen).
+
+- **[26/09/2026]** - Rút Ngắn Chiều Cao Cài Đặt (70vh), Cố Định Tọa Độ Tiêu Đề/Tabs Trên Cao Khi Chuyển Tab Con, và Neo Cụm Tài Khoản Dính Sát Mép Đáy:
+  - **Mô tả yêu cầu CEO:**
+    1. Tab Chiến Thuật trong Cài Đặt quá dài $\rightarrow$ rút ngắn lại còn ~70% chiều cao màn hình (`max-height: 70vh`), phần nội dung dài bên dưới cuộn bằng con lăn chuột.
+    2. Cố định tọa độ tiêu đề và các nút tab con bên trên ở 1 điểm ban đầu. Khi chuyển đổi qua lại giữa các tab con (Chiến Thuật <-> Hệ Thống), chỉ có biên bên dưới co giãn (ngắn lại hoặc dài ra), tuyệt đối không để các nút tab và tiêu đề bị nhảy giật lên xuống mất vị trí ban đầu (xem hình 1 và 2).
+    3. Cụm giao diện "Tài khoản (EMA200 Bot)" luôn luôn tự động kéo dính sát về phía mép dưới của trình duyệt trên mọi trình duyệt, các phần phía trên tự động co dãn theo.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Modal cài đặt trước đó đặt `max-height: 88vh`, bung quá dài chiếm gần trọn màn hình.
+    2. `.modal-overlay` dùng `align-items: center; justify-content: center;`. Khi tab "Chiến Thuật" dài 70vh, modal nằm ở vị trí `top: 15vh`. Khi bấm sang tab "Hệ Thống" có ít nội dung hơn (cao ~260px), Flexbox tự động đẩy cả khối modal xuống giữa màn hình (`top: ~38vh`), làm tiêu đề và nút tab bị rơi xuống dưới hơn 250px!
+    3. `.sidebar-left` đặt `margin-top: 0` và có `margin-bottom: 6px`, không neo dính mép đáy khi không gian dọc có khoảng trống.
+  - **Giải pháp thực hiện:**
+    - [SystemSettingsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) & [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Thêm class overlay chuyên dụng `settings-modal-overlay` và `connect-modal-overlay`.
+    - [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Chuyển `align-items: center` sang `align-items: flex-start; padding-top: max(92px, 10.5vh);`. Khóa cứng tọa độ tiêu đề và các tab con tại đỉnh cố định 100% không đổi, dịch xuống dưới hẳn nút "CHẠY BOT" để không che khuất thanh điều khiển.
+      - Thiết lập `max-height: 80vh !important;` cho `.modal-content.settings-modal` cả theme chuẩn lẫn `.theme-glass-pro` (đặt chuẩn ở mức 80% chiều cao màn hình theo yêu cầu CEO).
+      - Khắc phục triệt để lỗi tràn mép dưới trên iOS và đẩy nút chọn bot `EMA200 Bot` gần sát cạnh trên:
+        + Đẩy nút `EMA200 Bot` sát cạnh trên: Giảm `padding-top` trên `.app-container` xuống `max(env(safe-area-inset-top, 0px), 2px) !important;` và `.bot-tabs-bar` margin `2px 0 2px 0 !important;` để nút chọn bot nằm sát ngay mép trên, giải phóng không gian màn hình tối đa theo yêu cầu CEO.
+        + Khắc phục lỗi mất đáy: Trong [index.html](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/index.html), chuẩn hoá `setRealAppHeight()` dùng `window.innerHeight` (chiều cao hiển thị thực của webview sau khi tách status bar đen của iOS), không dùng `screen.height` gây tràn 54px.
+        + Trong [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Khóa `max-height: var(--real-app-height)` và `100% !important;` trên `.app-container`, gỡ bỏ `min-height: 195px` cưỡng bức trên `.pane-tabs`, thiết lập tỷ lệ chia đôi màn hình mặc định trên mobile là 52% Biểu đồ - 48% Bảng vị thế trong [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx). Toàn bộ nội dung và thẻ Tài khoản hiển thị vừa khít 100% không bị tràn mép đáy.
+        + Bo tròn riêng 2 góc dưới (bottom-left & bottom-right) của cụm "Tài khoản (EMA200 Bot)": Cập nhật `border-radius: 4px 4px 24px 24px !important;` (và `6px 6px 24px 24px !important;` cho theme glass) trên [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css) để 2 góc đáy cong tròn mềm mại 24px chuẩn xác theo nét vẽ CEO.
+
+  - **Mô tả yêu cầu CEO:**
+    1. Khi bot đã dừng, thao tác xoá tài khoản ở modal Connect quay vòng "Đang xóa..." mãi không kết thúc trên cả bản local và web server.
+    2. Nút Disconnect ở thẻ OKX Connect hoạt động tốt và đúng như mong muốn khi xóa/dọn dẹp tài khoản. Gán chức năng này sang cho nút '-' (delete_account), đổi tên nút Disconnect thành Delete.
+    3. Giới hạn tỷ lệ co giãn thanh Resizer trong JavaScript (`App.jsx` dòng 326-328):
+       - Kéo lên trên cùng: Biểu Đồ Min 15%, Bảng Vị Thế Max 85%.
+       - Kéo xuống dưới cùng: Biểu Đồ Max 85%, Bảng Vị Thế Min 15%.
+       - Tỷ lệ mặc định ban đầu: Biểu Đồ 70%, Bảng Vị Thế 30% (vừa vặn 3 dòng XAU, BTC, ETH).
+    4. Ràng buộc CSS (`index.css`): Biểu đồ luôn có `min-height: 120px` (tránh méo nến TradingView), Bảng Vị Thế có `min-height: 195px` trên giao diện thu nhỏ (không bao giờ che mất coin dưới cùng).
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. **Lỗi `ReferenceError: setAccountName is not defined` trong `confirmDeleteAccount`:** Trong `App.jsx`, khi xoá tài khoản cuối cùng (`remainingAccounts.length === 0`), code gọi hàm `setAccountName("")` vốn không hề tồn tại trong component. JavaScript bị crash ngay tại dòng này trước khi kịp gọi `setShowDeleteAccountModal(false)`, `setIsDeletingAccount(false)` và gọi API xóa tài khoản backend. Dẫn đến modal bị kẹt trạng thái `isLoading: true` với chữ "Đang xóa..." vĩnh viễn!
+    2. Nút '-' trước đó chỉ gọi `onDeleteAccount` mà không có fallback an toàn, trong khi nút Disconnect (`handleLogout`) đã dọn dẹp sạch sẽ toàn bộ API key, local storage, huỷ lệnh và bảo lưu vị thế an toàn trên sàn.
+  - **Giải pháp thực hiện:**
+    - [App.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      - Cập nhật tỷ lệ Resizer: `if (newRatio < 15) newRatio = 15; if (newRatio > 85) newRatio = 85;`, mặc định `chartRatio = 70`.
+      - Xóa bỏ lệnh lỗi `setAccountName("")` trong `confirmDeleteAccount`, bọc `try...catch...finally` để luôn đảm bảo tắt loading và đóng modal an toàn.
+    - [ConnectModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx):
+      - Gán hành động `setShowConfirmLogout(true)` cho nút `-` cạnh dropdown tài khoản.
+      - Đổi tên nút ở footer từ `Disconnect` / `Đăng Xuất` thành `Delete`.
+    - [AccountPromptModals.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/AccountPromptModals.jsx):
+      - Cập nhật tiêu đề dialog xác nhận thành "🗑️ Xác Nhận Xóa Tài Khoản (Delete)" và nút bấm "Xác Nhận Xóa (Delete)".
+    - [index.css](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css):
+      - Đặt `min-height: 120px` và fallback `70%` cho `.pane-chart`.
+      - Đảm bảo `.pane-tabs` luôn có `min-height: 195px` trong Split View và màn hình nhỏ/thu gọn.
+
   - **Mô tả yêu cầu CEO:** 
     1. Ở chế độ hiện đơn, sau khi tối ưu thì bảng vị thế đã kéo cuộn ngang hết qua phải để xem trọn vẹn các cột.
     2. Tuy nhiên, ở chế độ hiện đôi (Split View - hiện cả biểu đồ và bảng vị thế), khung bảng vị thế vẫn chưa được cố định trục (khi vuốt tay thì xê dịch/lôi cả khung bảng đi thay vì cuộn nội bộ).

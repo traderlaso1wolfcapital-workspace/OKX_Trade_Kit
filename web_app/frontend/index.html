@@ -13,10 +13,14 @@
     <title>AutoTrader</title>
     <script>
       function setRealAppHeight() {
-        var h = window.innerHeight;
-        document.documentElement.style.setProperty('--real-app-height', h + 'px');
         var isStandalone = window.navigator.standalone === true ||
           (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches));
+        var h = isStandalone
+          ? Math.max(window.screen.height, window.innerHeight, (document.documentElement ? document.documentElement.clientHeight : 0))
+          : (window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 0));
+        if (h && h > 300) {
+          document.documentElement.style.setProperty('--real-app-height', h + 'px');
+        }
         if (isStandalone) {
           document.documentElement.classList.add('is-pwa-standalone');
           if (document.body) document.body.classList.add('is-pwa-standalone');
