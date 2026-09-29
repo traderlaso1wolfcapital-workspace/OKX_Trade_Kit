@@ -588,8 +588,14 @@ def main():
         except Exception as e: 
             print(f"⚠️ Lỗi vận hành Loop Main: {e}")
             time.sleep(2)
+            
+    if hasattr(sys, '_bot_sub1_io_queue'):
+        sys._bot_sub1_io_queue.put(None)
+        if hasattr(sys, '_bot_sub1_io_thread'):
+            sys._bot_sub1_io_thread.join(timeout=3.0)
 
 if __name__ == "__main__": 
     main()
 # z1949 | Handle OKX API error gracefully in sys_bot_sub1 and sys_bot_sub2, fix xGui_main.py EOFError
 # z1950 | Fix UI missing PID check causing multi-instance by removing strict 'python' process name requirement from lock check
+# z1951 | Flush I/O queue and wait for worker thread to finish before process exit to prevent data loss

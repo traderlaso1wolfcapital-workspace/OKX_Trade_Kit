@@ -14,6 +14,16 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 *(Danh sách trống — tất cả lỗi đã được xử lý)*
 
 
+## 📋 GHI CHÚ QUAN TRỌNG TỪ SÀN OKX (OFFICIAL NOTES)
+
+- **[29/09/2026]** - Xác Nhận Chính Thức Từ OKX: Quyền **Trade** Trong API Key **KHÔNG** Bao Gồm Earn, Loan, Transfer:
+  - **Nguồn xác nhận:** Gordon | OKG API (đội ngũ API chính thức của OKX), xác nhận ngày 28/09/2026.
+  - **Nội dung:** Đội FD (Financial Design) của OKX khẳng định rằng trong mô hình phân quyền chi tiết (granular permission model), quyền **Trade** được thiết kế **tách biệt hoàn toàn** với Earn, Loan và Transfer.
+  - **Ý nghĩa bảo mật cho dự án:**
+    - API key chỉ cấp quyền **Trade** → chỉ có thể đặt/huỷ lệnh giao dịch (futures, spot, swap...).
+    - **Không thể** tự ý cho vay (Loan), gửi tiết kiệm/staking (Earn), hay chuyển tiền (Transfer) nếu không được cấp thêm quyền riêng.
+    - Đây là cơ sở an toàn cốt lõi để đảm bảo bot TLS1 chỉ thao tác giao dịch, không bao giờ can thiệp vào tài sản khác của người dùng.
+  - **Trích dẫn gốc:** _"FD team told me that earn/loan/transfer are not included in Trade in the design. So I believe that endpoint excludes Earn, Loan, and Transfer."_ — Gordon | OKG API
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
