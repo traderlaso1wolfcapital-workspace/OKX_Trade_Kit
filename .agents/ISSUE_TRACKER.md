@@ -28,6 +28,65 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[01/10/2026]** - Sửa Lỗi Script `zzPush_To_GitHub.py` Bị Treo/Thất Bại Khi Đẩy Code Lên GitHub và Cập Nhật Đúng Link Repo Workspace:
+  - **Mô tả hiện tượng trên máy CEO:**
+    1. Khi chạy `python zzPush_To_GitHub.py`, script báo lỗi thất bại `❌ THẤT BẠI: Quá trình đẩy code lên GitHub gặp lỗi (Exit code != 0)`.
+    2. URL cập nhật trong `desktop_app/version.json` bị trỏ nhầm sang repo cũ (`traderlaso1wolfcapital-creator/OKX_Trade_Kit`) thay vì repo chuẩn của tổ chức (`traderlaso1wolfcapital-workspace/OKX_Trade_Kit`).
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Lỗi NTFS `fatal: unable to write new index file`: File `.git/index` trên ổ E kế thừa phân quyền từ tài khoản Windows cũ, thiếu quyền `Delete` đối với standard user, khiến `git add .` không thể rename thay thế file index được và bị văng ra với mã lỗi Exit code != 0.
+    2. Lệnh `git reset HEAD ...` tại dòng 51 gọi một loạt file không tồn tại (`TLS1_Trading_Web`, `web_frontend`, `old_index.css`...) khiến git báo lỗi `fatal: pathspec did not match any files`.
+    3. Cấu hình `desktop_app/version.json` ghi nhãn URL release sai tên tổ chức.
+  - **Giải pháp thực hiện:**
+    - [desktop_app/version.json](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/version.json): Sửa toàn bộ các URL `update_url`, `update_url_win`, `update_url_mac` trỏ chính xác về `https://github.com/traderlaso1wolfcapital-workspace/OKX_Trade_Kit/releases/latest`.
+    - [zzPush_To_GitHub.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPush_To_GitHub.py) & [zzPull_From_GitHub.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPull_From_GitHub.py):
+      + Tự động khởi tạo và gán `GIT_INDEX_FILE = .git/index_user`, đồng bộ 2 chiều với `.git/index`, triệt tiêu 100% lỗi phân quyền NTFS `unable to write new index file`.
+      + Kiểm tra `os.path.exists()` trước khi gọi `git reset HEAD` loại trừ file rác, tránh lỗi `pathspec did not match any files`.
+
+
+- **[01/10/2026]** - Tối Ưu Lại Khu Vực Thông Báo "Tình Trạng Vị Thế" Trên Terminal (Chi Tiết Từng TF Khớp Lệnh & Rút Gọn Ký Quỹ):
+  - **Mô tả yêu cầu CEO:**
+    1. Thiết kế lại phần hiển thị `✜ Tình trạng vị thế` trên terminal bot để liệt kê chi tiết giá Entry và mức ký quỹ riêng của từng khung thời gian (TF) đã khớp, tránh tình trạng bot bị nhầm lẫn giữa các lệnh.
+    2. Rút gọn nhãn `| Ký quỹ:` và `| Ký quỹ tổng:`, tạm thời ẩn các nhãn chiến thuật `[TREND]`, `[HEDGE]`, `[PINGPONG]` qua biến cờ `SHOW_STRATEGY_MODE_TAG = False` trong `bot_ui.py` (dễ dàng bật lại bất cứ lúc nào), đưa tỷ lệ `(+ROI% / -MAE%)` lên dòng tiêu đề trạng thái và nối bằng dấu gạch ngang `-` cho trực quan, tinh gọn:
+       ```
+       ETH ╭─ Đã khớp LONG [m5 m15 m30 H1] - 1.78 U (+69.6% / -22.0%)
+           ├─ Entry M5: 2,651.2 - 0.38 U
+           ├─ Entry M15: 2,661.2 - 0.58 U
+           ├─ Entry M30: 2,670.5 - 0.60 U
+           ├─ Entry H1: 2,681.2 - 0.80 U
+           ├─ Chờ DCA H2: 2648.05 - (ký quỹ: 1.2 U)
+           ├─ Chờ DCA H4: 2548.62 - (ký quỹ: 2.0 U)
+           ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0
+       ```
+  - **Giải pháp thực hiện:**
+    - [bot_models.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_models.py): Bổ sung `filled_entry_px_by_tf_long` và `filled_entry_px_by_tf_short` vào `AssetTracker` để lưu vết giá khớp riêng lẻ của từng TF.
+    - [bot_strategy.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py):
+      + Lưu vết `fillPx` từ OKX Fills API trong `reconstruct_filled_tfs_from_volume`.
+      + Ghi nhận giá `placed_entry_px_*_by_tf[tf]` vào `filled_entry_px_by_tf_*[tf]` khi phát hiện lệnh khớp thành công trên sàn hoặc khi lệnh biến mất quá 3 chu kỳ API.
+      + Tự động dọn sạch dictionary giá khớp khi chu kỳ vị thế đóng (`pos_cycle_filled_tfs = []`).
+    - [bot_ui.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py):
+      + Thêm helper `_get_vol_val(tk_obj, tf_name)` và `_fmt_vol_u(val)` định dạng ký quỹ chuẩn `0.38 U`, `1.2 U`, `2.0 U`.
+      + Cập nhật khối `tk.has_long` và `tk.has_short`: Header hiển thị `[m5 m15 m30 H1] - 1.78 U (+ROI% / -MAE%)`, duyệt in chi tiết từng dòng `├─ Entry {TF}: {px} - {vol} U`, và lệnh chờ DCA hiển thị `├─ Chờ DCA {TF}: {px} - (ký quỹ: {vol})`.
+
+
+- **[01/10/2026]** - Sửa Lỗi Logic Mở 2 Vị Thế Long/Short Cùng Giá Khi Tắt Hedge, Bổ Sung Bộ Lọc Sideway Vấp >= 2 & Tích Lũy 60 Nến Cho Lưới Đa Khung, Ẩn Nút Chốt Lời Bám EMA200:
+  - **Mô tả hiện tượng trên tài khoản CEO:**
+    1. Khi bật **"Lưới Đa Khung"** và tắt **"Đồng pha BTC & Lọc Vĩ mô"**, công tắc **"Đánh Sóng Đảo Chiều (Hedge)"** đang **OFF**, bot lại mở cùng lúc cả lệnh **LONG [H1] (Entry: 2,681.2)** và **SHORT [H1] (Entry: 2,678.3)** ngay tại cùng 1 cản EMA200 của ETH.
+    2. Bot bỏ qua điều kiện Sideway khi số nến VẤP $\ge 2$ (ETH `[m5]: ▲ 119-2` và `[m15]: ▼ 395-4`) mà vẫn rải lệnh Limit Short ở các khung m5, m15.
+    3. Giao diện in cứng chữ `Chờ DCA:` thay vì lệnh Limit độc lập của Lưới Đa Khung.
+  - **Nguyên nhân cốt lõi phát hiện:**
+    1. Đánh tráo khái niệm cờ: Tại `bot_strategy.py` dòng 2459, khi tắt đồng pha BTC (`ALTCOIN_FOLLOW_BTC_EMA == False`), code tự ý gán cả `allowed_long = True` và `allowed_short = True` bất chấp công tắc Hedge đang tắt.
+    2. Nhánh Lưới Đa Khung (`bot_strategy.py` dòng 2594 & 2648) duyệt từng TF chỉ so sánh `live_price >= _ema` (hoặc `< _ema`), hoàn toàn không kiểm tra xem bot đã có vị thế ngược chiều hay chưa (`has_long` / `has_short`). Đồng thời bỏ qua 100% các điều kiện lọc cốt lõi: Vấp $\ge 2$ (`st['fail'] >= 2`), tích lũy $\ge 60$ nến (`st['accum'] < 60`), nén biên độ (squeeze), và trạng thái khóa (`locked`).
+  - **Giải pháp thực hiện:**
+    - [bot_strategy.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py):
+      + Khóa cố định 1 chiều tuyệt đối khi `ENABLE_STRATEGY_HEDGE == False`: Có Long thì cấm Short (`target_short_tfs = []`), có Short thì cấm Long (`target_long_tfs = []`). Khi chưa có vị thế, chỉ cho phép duy nhất 1 hướng theo xu hướng nến/EMA của chính coin đó.
+      + Đặt chốt chặn tối thượng trước vòng lặp đặt/hủy lệnh: Nếu Hedge tắt mà đang có vị thế Long thì triệt tiêu 100% Limit Short (và ngược lại), tự động hủy toàn bộ lệnh Limit ngược chiều trên sàn.
+      + Nhánh Lưới Đa Khung: Bổ sung bộ lọc kiểm định nghiêm ngặt: chặn TF có Vấp $\ge 2$ (`fail >= MAX_CYCLE_FAILURES`), chặn TF chưa đủ 60 nến tích lũy (`accum < 60`), chặn TF đang locked/squeeze.
+    - [bot_ui.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py):
+      + Đổi tiền tố hiển thị trên terminal: Khi chạy Lưới Đa Khung, hiển thị `├─ Chờ Limit [Lưới]: ...` thay vì `├─ Chờ DCA: ...`.
+    - [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) & [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py):
+      + Ẩn nút **"Chốt lời bám EMA200"** khỏi khu vực Công Tắc Chiến Thuật.
+      + Chuyển mã nguồn nút này xuống khu vực **"Phòng Thủ Vị Thế Tự Động Hoá AI"** (Tính năng đang phát triển..) để tiện kích hoạt sau này.
+
 - **[26/09/2026]** - Đưa Nút Thu Gọn Cấu Hình Ra Chính Giữa, Di Chuyển Icon Ổ Khóa 🔒 Vào Sau Tên Tài Khoản Đang Chạy, Đồng Bộ Tài Khoản Chạy Bot Đa Thiết Bị/Trình Duyệt:
   - **Mô tả yêu cầu CEO:**
     1. Icon ổ khóa `🔒` khi chạy bot phải di chuyển vào sau tài khoản đang chạy bot (trong dropdown chọn tài khoản), không nằm ở góc trên bên phải của khung cấu hình nữa.

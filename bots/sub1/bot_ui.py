@@ -305,14 +305,23 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         arrow = '▲' if st["side"] == 'above' else ('▼' if st["side"] == 'under' else ('◆' if st["side"] == 'touch' else '■'))
         return f"{arrow} {st['accum']:3}-{st['fail']}"
         
-    def _get_vol_str(tk_obj, tf_name):
+    def _get_vol_val(tk_obj, tf_name):
         target_usdt = target_vol
         _is_xl = getattr(tk_obj, "hedge_tf", getattr(tk_obj, "xole_tf", None))
         if _is_xl:
             v_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf_name, Decimal("1.0"))
         else:
             v_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))
-        vol_val = target_usdt * v_mult
+        return target_usdt * v_mult
+
+    def _fmt_vol_u(val: Decimal) -> str:
+        s2 = f"{val:.2f}"
+        if s2.endswith("0"):
+            s2 = s2[:-1]
+        return f"{s2} U"
+
+    def _get_vol_str(tk_obj, tf_name):
+        vol_val = _get_vol_val(tk_obj, tf_name)
         return f"(VOL: {vol_val:.1f} U)"
     
     for cfg_idx, cfg in enumerate(COIN_PORTFOLIO):
@@ -449,13 +458,17 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             return "·", 2
         return "·", 1
 
+    SHOW_STRATEGY_MODE_TAG = False  # CEO yêu cầu tạm thời ẩn nhãn [TREND] [HEDGE] [PINGPONG], bật lại khi cần
+
     def _get_mode_tag(tk, side):
-        """Trả về nhãn chiến thuật [TREND] hoặc [HEDGE]"""
+        """Trả về nhãn chiến thuật [TREND] hoặc [HEDGE] (nếu bật cờ hiển thị)"""
+        if not SHOW_STRATEGY_MODE_TAG:
+            return ""
         if (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_pos_side", "") == side or getattr(tk, "xole_pos_side", "") == side):
-            return "[HEDGE]"
+            return "[HEDGE] "
         if getattr(tk, "is_ping_pong_pos", False) and getattr(tk, "ping_pong_pos_side", "") == side:
-            return "[PINGPONG]"
-        return "[TREND]"
+            return "[PINGPONG] "
+        return "[TREND] "
 
     def _get_waiting_str(tk):
         is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
@@ -480,14 +493,16 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             # HEDGE luôn rình bắt đỉnh/đáy ở khung nhỏ nhất (M5), bất kể Âm hay Dương
             hedge_entry_tf = enabled_tfs[0] if enabled_tfs else "M5"
             h4_ema = getattr(tk, "h4_ema200", Decimal("0"))
+            tag_h = " [HEDGE]" if SHOW_STRATEGY_MODE_TAG else ""
             if h4_ema > 0 and getattr(tk, "live_price", 0) > h4_ema:
-                return f", chờ SHORT [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
+                return f", chờ SHORT{tag_h} tại {fmt_tf(hedge_entry_tf)}"
             elif h4_ema > 0 and getattr(tk, "live_price", 0) < h4_ema:
-                return f", chờ LONG [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
-            return f", chờ [HEDGE] tại {fmt_tf(hedge_entry_tf)}"
+                return f", chờ LONG{tag_h} tại {fmt_tf(hedge_entry_tf)}"
+            return f", chờ{tag_h} tại {fmt_tf(hedge_entry_tf)}"
             
-        if trend == "UPTREND": return f", chờ LONG [TREND] tại {fmt_tf(entry_tf)}"
-        if trend == "DOWNTREND": return f", chờ SHORT [TREND] tại {fmt_tf(entry_tf)}"
+        tag_t = " [TREND]" if SHOW_STRATEGY_MODE_TAG else ""
+        if trend == "UPTREND": return f", chờ LONG{tag_t} tại {fmt_tf(entry_tf)}"
+        if trend == "DOWNTREND": return f", chờ SHORT{tag_t} tại {fmt_tf(entry_tf)}"
         if trend == "HEDGE": return f", chờ LONG/SHORT tại {fmt_tf(entry_tf)}"
         return f", quan sát Sideway tại {fmt_tf(best_tf)}"
 
@@ -500,7 +515,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         display_streak = max(cur_streak, xole_streak)
         
         last_mode = getattr(tk, "last_closed_mode", "")
-        mode_str = f" [{last_mode}]" if last_mode else ""
+        mode_str = f" [{last_mode}]" if (last_mode and SHOW_STRATEGY_MODE_TAG) else ""
         
         if getattr(tk, "last_closed_side", ""):
             pnl_sign = "+" if tk.last_closed_roi > 0 else ""
@@ -527,59 +542,82 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             has_any = True
             icon, mode = _get_mode_icon(tk, "long")
             mae_lev = tk.mae_max_pct_long * Decimal(str(leverage))
-            entry_px_str = f"{format_with_commas(tk.active_avg_px_long, 1):>8}"
             sl_px_str = f"{format_with_commas(tk.active_sl_px_long, 1):>8}"
             filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
+                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
             else:
-                filled_str = fmt_tf("M5").ljust(18)
+                sorted_tfs = [getattr(tk, "active_pos_tf", "M5")]
+                filled_str = fmt_tf(sorted_tfs[0])
             long_margin_val = (tk.long_pos_vol / Decimal(str(leverage))) if getattr(tk, "long_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
+            total_margin = long_margin_val if long_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "long")
-            line_main = f"    {coin_name} ╭─ Đã khớp LONG {mode_tag} [{filled_str.strip()}] | Ký quỹ: {long_margin_val:.2f} U ({tk.long_pos_vol:.1f} USDT)"
+            line_main = f"    {coin_name} ╭─ {mode_tag} Đã khớp LONG [{filled_str.strip()}] - {total_margin:.2f} U (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
+            for tf in sorted_tfs:
+                px_raw = getattr(tk, "filled_entry_px_by_tf_long", {}).get(tf)
+                if not px_raw or px_raw in ("---", "ERR"):
+                    px_raw = getattr(tk, "placed_entry_px_long_by_tf", {}).get(tf)
+                if not px_raw or px_raw in ("---", "ERR"):
+                    px_raw = tk.active_avg_px_long
+                px_str = format_with_commas(px_raw, 1 if Decimal(str(px_raw)) >= 10 else 4)
+                tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                lines.append(f"{indent_branch}├─ Entry {tf.upper()}: {px_str} - {tf_vol_str}")
+
             placed_long_dict = getattr(tk, "placed_entry_px_long_by_tf", {})
             filled = getattr(tk, "pos_cycle_filled_tfs", [])
             active_dca_tfs = [tf for tf, px in placed_long_dict.items() if px not in ("---", "ERR") and tf not in filled]
-            lines.append(f"{indent_branch}├─ Entry: {entry_px_str.strip()}  (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
+                dca_prefix = "Chờ DCA" if (is_pyramid or is_negative_dca) else "Chờ Limit [Lưới]"
                 for tf in active_dca_tfs_sorted:
-                    vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}├─ Chờ DCA: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
+                    vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                    lines.append(f"{indent_branch}├─ {dca_prefix} {tf.upper()}: {placed_long_dict[tf]} - (ký quỹ: {vol_str})")
             lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
             pos_lines.append((mode, coin_name, lines))
         if tk.has_short:
             has_any = True
             icon, mode = _get_mode_icon(tk, "short")
             mae_lev = tk.mae_max_pct_short * Decimal(str(leverage))
-            entry_px_str = f"{format_with_commas(tk.active_avg_px_short, 1):>8}"
+            sl_px_str = f"{format_with_commas(tk.active_sl_px_short, 1):>8}"
             filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
-                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs]).ljust(18)
+                filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
             else:
-                filled_str = fmt_tf("M5").ljust(18)
+                sorted_tfs = [getattr(tk, "active_pos_tf", "M5")]
+                filled_str = fmt_tf(sorted_tfs[0])
             short_margin_val = (tk.short_pos_vol / Decimal(str(leverage))) if getattr(tk, "short_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
+            total_margin_s = short_margin_val if short_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "short")
-            line_main = f"    {coin_name} ╭─ Đã khớp SHORT {mode_tag} [{filled_str.strip()}] | Ký quỹ: {short_margin_val:.2f} U ({tk.short_pos_vol:.1f} USDT)"
+            line_main = f"    {coin_name} ╭─ {mode_tag} Đã khớp SHORT [{filled_str.strip()}] - {total_margin_s:.2f} U (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
+            for tf in sorted_tfs:
+                px_raw = getattr(tk, "filled_entry_px_by_tf_short", {}).get(tf)
+                if not px_raw or px_raw in ("---", "ERR"):
+                    px_raw = getattr(tk, "placed_entry_px_short_by_tf", {}).get(tf)
+                if not px_raw or px_raw in ("---", "ERR"):
+                    px_raw = tk.active_avg_px_short
+                px_str = format_with_commas(px_raw, 1 if Decimal(str(px_raw)) >= 10 else 4)
+                tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                lines.append(f"{indent_branch}├─ Entry {tf.upper()}: {px_str} - {tf_vol_str}")
+
             placed_short_dict = getattr(tk, "placed_entry_px_short_by_tf", {})
             filled_short = getattr(tk, "pos_cycle_filled_tfs", [])
             active_dca_tfs = [tf for tf, px in placed_short_dict.items() if px not in ("---", "ERR") and tf not in filled_short]
-            lines.append(f"{indent_branch}├─ Entry: {entry_px_str.strip()}  (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)")
 
             if active_dca_tfs:
                 active_dca_tfs_sorted = sorted(active_dca_tfs, key=lambda tf: Decimal(placed_short_dict[tf]))
+                dca_prefix = "Chờ DCA" if (is_pyramid or is_negative_dca) else "Chờ Limit [Lưới]"
                 for tf in active_dca_tfs_sorted:
-                    vol_str = _get_vol_str(tk, tf)
-                    lines.append(f"{indent_branch}├─ Chờ DCA: {fmt_tf(tf)}: {placed_short_dict[tf]} {vol_str}")
+                    vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                    lines.append(f"{indent_branch}├─ {dca_prefix} {tf.upper()}: {placed_short_dict[tf]} - (ký quỹ: {vol_str})")
             lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
             pos_lines.append((mode, coin_name, lines))
         # DCA PENDING (có lệnh chờ nhưng chưa có vị thế mở)
@@ -615,16 +653,16 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                     active_l_sorted = sorted(active_l, key=lambda tf: Decimal(placed_long_dict[tf]), reverse=True)
                     for tf in active_l_sorted:
                         _is_hd = (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_tf", None) == tf or getattr(tk, "xole_tf", None) == tf)
-                        tag = "[HEDGE]" if _is_hd else "[TREND]"
+                        tag = (f" [{'HEDGE' if _is_hd else 'TREND'}]") if SHOW_STRATEGY_MODE_TAG else ""
                         vol_str = _get_vol_str(tk, tf)
-                        lines.append(f"{indent_branch}├─  Đang limit LONG {tag}: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
+                        lines.append(f"{indent_branch}├─  Đang limit LONG{tag}: {fmt_tf(tf)}: {placed_long_dict[tf]} {vol_str}")
                 if active_s:
                     active_s_sorted = sorted(active_s, key=lambda tf: Decimal(placed_short_dict2[tf]))
                     for tf in active_s_sorted:
                         _is_hd = (getattr(tk, "is_hedge_pos", False) or getattr(tk, "is_xole_pos", False)) and (getattr(tk, "hedge_tf", None) == tf or getattr(tk, "xole_tf", None) == tf)
-                        tag = "[HEDGE]" if _is_hd else "[TREND]"
+                        tag = (f" [{'HEDGE' if _is_hd else 'TREND'}]") if SHOW_STRATEGY_MODE_TAG else ""
                         vol_str = _get_vol_str(tk, tf)
-                        lines.append(f"{indent_branch}├─  Đang limit SHORT {tag}: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
+                        lines.append(f"{indent_branch}├─  Đang limit SHORT{tag}: {fmt_tf(tf)}: {placed_short_dict2[tf]} {vol_str}")
                 lines.append(f"{indent_branch}╰─ {_get_last_info_str(tk)}")
                 pos_lines.append((0, coin_name, lines))
             else:

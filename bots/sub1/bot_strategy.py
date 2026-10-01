@@ -1053,6 +1053,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             if tf_cand in cl_id:
                                 if tf_cand not in fills_detected:
                                     fills_detected.append(tf_cand)
+                                fill_px = f.get("fillPx", "")
+                                if fill_px:
+                                    if side_str == "long":
+                                        if not hasattr(tracker, "filled_entry_px_by_tf_long"):
+                                            tracker.filled_entry_px_by_tf_long = {}
+                                        tracker.filled_entry_px_by_tf_long[tf_cand] = str(fill_px)
+                                    else:
+                                        if not hasattr(tracker, "filled_entry_px_by_tf_short"):
+                                            tracker.filled_entry_px_by_tf_short = {}
+                                        tracker.filled_entry_px_by_tf_short[tf_cand] = str(fill_px)
                                 break
             except Exception:
                 pass
@@ -2388,6 +2398,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                     tracker.pos_cycle_filled_tfs.append(tf)
                                     tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                                     print(f"🎯 [LỆNH KHỚP] {coin_name}: Lệnh Limit LONG {tf} đã khớp thành công trên sàn! Khóa cứng TF {tf}.")
+                                if not hasattr(tracker, "filled_entry_px_by_tf_long"):
+                                    tracker.filled_entry_px_by_tf_long = {}
+                                tracker.filled_entry_px_by_tf_long[tf] = str(tracker.placed_entry_px_long_by_tf.get(tf, "---"))
                                 tracker.placed_entry_px_long_by_tf[tf] = "---"
                                 tracker.missing_count["long"][tf] = 0
                                 continue
@@ -2416,6 +2429,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                     tracker.pos_cycle_filled_tfs.append(tf)
                                     tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
                                     print(f"🎯 [LỆNH KHỚP] {coin_name}: Lệnh Limit SHORT {tf} đã khớp thành công trên sàn! Khóa cứng TF {tf}.")
+                                if not hasattr(tracker, "filled_entry_px_by_tf_short"):
+                                    tracker.filled_entry_px_by_tf_short = {}
+                                tracker.filled_entry_px_by_tf_short[tf] = str(tracker.placed_entry_px_short_by_tf.get(tf, "---"))
                                 tracker.placed_entry_px_short_by_tf[tf] = "---"
                                 tracker.missing_count["short"][tf] = 0
                                 continue
@@ -2455,30 +2471,24 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             allowed_short = False
 
             _is_sync = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
-            if not _is_sync:
-                # ⚡ Độc lập TF (Đồng pha OFF): Không bị khóa bởi lệnh ngược chiều, M5 có thể Long & M15 Short (Hedge)
-                allowed_long = True
-                allowed_short = True
-                if not tracker.has_long and not tracker.has_short:
-                    tracker.pos_cycle_filled_tfs = []
-                    tracker.pos_cycle_closed_tfs = []
-            else:
+            _enable_hedge = getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", False))
+
+            if not _enable_hedge:
+                # 🛑 KHI TẮT HEDGE: KHÓA CỐ ĐỊNH 1 CHIỀU TUYỆT ĐỐI (CẤM KẸP VỊ THẾ LONG & SHORT)
                 if tracker.has_long:
                     allowed_long = True
-                if tracker.has_short:
+                    allowed_short = False
+                elif tracker.has_short:
+                    allowed_long = False
                     allowed_short = True
-                
-                if not tracker.has_long and not tracker.has_short:
-                    # Reset filled_tfs khi không còn vị thế nào (chu kỳ mới)
+                else:
+                    # Chu kỳ mới chưa có vị thế: Xác định duy nhất 1 hướng đi (Long HOẶC Short)
                     tracker.pos_cycle_filled_tfs = []
                     tracker.pos_cycle_closed_tfs = []
-                    
-                    # Hướng đi được quyết định bởi BTC (nếu là Altcoin sync) hoặc tín hiệu của bản thân
-                    h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
-                    if coin_name == "BTC" or not _is_alt_synced:
-                        allowed_long = (tracker.trend in ("UPTREND", "HEDGE")) and h4_side != "under"
-                        allowed_short = (tracker.trend in ("DOWNTREND", "HEDGE")) and h4_side != "above"
-                    else:
+                    tracker.filled_entry_px_by_tf_long = {}
+                    tracker.filled_entry_px_by_tf_short = {}
+
+                    if _is_sync and coin_name != "BTC" and _is_alt_synced:
                         btc_tk = state_matrix.get("BTC-USDT-SWAP")
                         if btc_tk:
                             btc_dir = "SIDEWAY"
@@ -2489,8 +2499,26 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             else:
                                 btc_dir = btc_tk.trend
                             btc_h4_side = btc_tk.mtf_states.get("H4", {}).get("side", "none")
-                            allowed_long = (btc_dir in ("UPTREND", "HEDGE")) and btc_h4_side != "under"
-                            allowed_short = (btc_dir in ("DOWNTREND", "HEDGE")) and btc_h4_side != "above"
+                            allowed_long = (btc_dir == "UPTREND") and btc_h4_side != "under"
+                            allowed_short = (btc_dir == "DOWNTREND") and btc_h4_side != "above"
+                    else:
+                        # Đi theo xu hướng nến/EMA độc lập của chính coin đó
+                        h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
+                        allowed_long = (tracker.trend == "UPTREND") and h4_side != "under"
+                        allowed_short = (tracker.trend == "DOWNTREND") and h4_side != "above"
+            else:
+                # ⚡ KHI BẬT HEDGE: Cho phép giao dịch 2 chiều linh hoạt
+                if tracker.has_long:
+                    allowed_long = True
+                if tracker.has_short:
+                    allowed_short = True
+                if not tracker.has_long and not tracker.has_short:
+                    tracker.pos_cycle_filled_tfs = []
+                    tracker.pos_cycle_closed_tfs = []
+                    tracker.filled_entry_px_by_tf_long = {}
+                    tracker.filled_entry_px_by_tf_short = {}
+                    allowed_long = True
+                    allowed_short = True
 
             # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Chỉ khi thực sự là vị thế HEDGE hoặc đang rình HEDGE)
             is_hd_active = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)) or (not tracker.has_long and not tracker.has_short and xl_found)
@@ -2589,14 +2617,23 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 break
                 target_long_tfs = new_target_long_tfs
             else:
-                # ⚡ CHẾ ĐỘ ĐỘC LẬP TẤT CẢ CÁC TF ĐƯỢC CHỌN (KHI CẢ 2 NÚT CÙNG OFF):
-                # Toàn bộ các TF trade được chọn sẽ giao dịch độc lập, có thể một lúc limit tất cả các TF trade đã chọn!
+                # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (ĐỘC LẬP TF - KHI CẢ 2 NÚT DCA CÙNG OFF):
                 target_long_tfs = []
-                for tf in TFS:
-                    if tf in _filled_long: continue
-                    _ema = get_ema200_for_tf(tf)
-                    if _ema > 0 and tracker.live_price >= _ema:
-                        if not getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                if allowed_long and not (not _enable_hedge and tracker.has_short):
+                    for tf in TFS:
+                        if tf in _filled_long: continue
+                        st = tracker.mtf_states.get(tf, {})
+                        # 🛑 BỘ LỌC CỐT LÕI TLS1: Chặn Sideway (Vấp >= 2), Chặn chưa đủ 60 nến tích lũy, Chặn khóa
+                        if st.get("fail", 0) >= globals_ref.MAX_CYCLE_FAILURES:
+                            continue
+                        if st.get("accum", 0) < globals_ref.REQUIRED_ACCUMULATION_CANDLES:
+                            continue
+                        if st.get("locked", False) or st.get("streak_locked", False):
+                            continue
+                        if getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                            continue
+                        _ema = get_ema200_for_tf(tf)
+                        if _ema > 0 and tracker.live_price >= _ema:
                             target_long_tfs.append(tf)
                 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
@@ -2644,13 +2681,23 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 break
                 target_short_tfs = new_target_short_tfs
             else:
-                # ⚡ CHẾ ĐỘ ĐỘC LẬP TẤT CẢ CÁC TF ĐƯỢC CHỌN (KHI CẢ 2 NÚT CÙNG OFF):
+                # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (ĐỘC LẬP TF - KHI CẢ 2 NÚT DCA CÙNG OFF):
                 target_short_tfs = []
-                for tf in TFS:
-                    if tf in _filled_short: continue
-                    _ema = get_ema200_for_tf(tf)
-                    if _ema > 0 and tracker.live_price < _ema:
-                        if not getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                if allowed_short and not (not _enable_hedge and tracker.has_long):
+                    for tf in TFS:
+                        if tf in _filled_short: continue
+                        st = tracker.mtf_states.get(tf, {})
+                        # 🛑 BỘ LỌC CỐT LÕI TLS1: Chặn Sideway (Vấp >= 2), Chặn chưa đủ 60 nến tích lũy, Chặn khóa
+                        if st.get("fail", 0) >= globals_ref.MAX_CYCLE_FAILURES:
+                            continue
+                        if st.get("accum", 0) < globals_ref.REQUIRED_ACCUMULATION_CANDLES:
+                            continue
+                        if st.get("locked", False) or st.get("streak_locked", False):
+                            continue
+                        if getattr(tracker, f"is_{tf.lower()}_squeeze", False):
+                            continue
+                        _ema = get_ema200_for_tf(tf)
+                        if _ema > 0 and tracker.live_price < _ema:
                             target_short_tfs.append(tf)
                 
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
@@ -2766,6 +2813,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         target_short_tfs = [tf for tf in target_short_tfs if tf_weight(tf) <= _max_w_short]
                     else:
                         target_short_tfs = []
+
+            # 🛑 CẦU DAO KHÓA 1 CHIỀU KHI TẮT HEDGE (BẢO VỆ TUYỆT ĐỐI CHỐNG KẸP VỊ THẾ):
+            if not _enable_hedge:
+                if tracker.has_long:
+                    target_short_tfs = []
+                elif tracker.has_short:
+                    target_long_tfs = []
 
             # --- XỬ LÝ LONG ---
             # 1. Hủy lệnh LONG cho các TF không còn nằm trong mục tiêu
@@ -2974,6 +3028,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                     if tf not in tracker.pos_cycle_filled_tfs:
                                         tracker.pos_cycle_filled_tfs.append(tf)
                                         tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    if not hasattr(tracker, "filled_entry_px_by_tf_long"):
+                                        tracker.filled_entry_px_by_tf_long = {}
+                                    if tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR"):
+                                        tracker.filled_entry_px_by_tf_long[tf] = str(tracker.placed_entry_px_long_by_tf[tf])
                                     tracker.placed_entry_px_long_by_tf[tf] = "---"
                                     continue
                         else:
@@ -3234,6 +3292,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                     if tf not in tracker.pos_cycle_filled_tfs:
                                         tracker.pos_cycle_filled_tfs.append(tf)
                                         tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+                                    if not hasattr(tracker, "filled_entry_px_by_tf_short"):
+                                        tracker.filled_entry_px_by_tf_short = {}
+                                    if tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR"):
+                                        tracker.filled_entry_px_by_tf_short[tf] = str(tracker.placed_entry_px_short_by_tf[tf])
                                     tracker.placed_entry_px_short_by_tf[tf] = "---"
                                     continue
                         else:

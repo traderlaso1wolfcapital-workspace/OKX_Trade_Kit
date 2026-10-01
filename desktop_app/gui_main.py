@@ -3271,8 +3271,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
         add_checkbox(l_toggles, 1, 0, "DCA Âm", self.chk_negative_dca, "BẬT: Cho phép trung bình giá DCA khi âm.")
         add_checkbox(l_toggles, 2, 0, "Lưới Đa Khung", self.chk_multi_tf_grid, "BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng.")
         add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều.")
-        add_checkbox(l_toggles, 1, 1, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
-        add_checkbox(l_toggles, 2, 1, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.")
+        add_checkbox(l_toggles, 1, 1, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.")
         
         def on_pyramid_toggled(checked):
             if checked:
@@ -3308,10 +3307,12 @@ class BotInstanceWidget(QtWidgets.QWidget):
         lbl_safeguard_dev.setStyleSheet("color: #888888; font-style: italic; padding: 12px; font-size: 12px;")
         lbl_safeguard_dev.setAlignment(QtCore.Qt.AlignCenter)
         l_safeguard.addWidget(lbl_safeguard_dev, 0, 0, 1, 2)
-        # add_checkbox(l_safeguard, 0, 0, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
-        # add_checkbox(l_safeguard, 0, 1, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
-        # add_checkbox(l_safeguard, 1, 0, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
-        # add_checkbox(l_safeguard, 1, 1, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
+        # 🛡️ Mã nguồn Chốt lời bám EMA200 chuyển xuống Phòng Thủ Vị Thế Tự Động Hoá AI để phát triển tiếp:
+        # add_checkbox(l_safeguard, 1, 0, "Chốt lời bám EMA200", self.chk_dynamic_ema200_tp, "Chốt lời động bám theo trục EMA200 của khung thời gian nhỏ hơn liền kề.")
+        # add_checkbox(l_safeguard, 1, 1, "Thoát hòa vốn khi giá hồi", self.chk_safeguard_entry, "Thoát hòa khi lỗ sâu >70% SL rồi giá hồi về Entry.")
+        # add_checkbox(l_safeguard, 2, 0, "Khóa lời động (Trailing SL)", self.chk_trailing_sl, "Trailing SL động — tự kéo chặn lãi theo sóng khi ROI tăng dần.")
+        # add_checkbox(l_safeguard, 2, 1, "Chốt lời lớn (ROI ≥ 120%)", self.chk_max_roi, "Chốt lời tối đa khi ROI >= 120% (Lợi nhuận Vàng).")
+        # add_checkbox(l_safeguard, 3, 0, "Cắt lệnh khi H4 đảo chiều", self.chk_h4_flip, "Đóng toàn bộ vị thế ngược chiều khi nến H4 đổi hướng (tích lũy >= 60).")
         layout.addWidget(grp_safeguard)
 
         # 3. QUẢN LÝ VỐN

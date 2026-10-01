@@ -396,11 +396,6 @@ export default function SystemSettingsModal({
                             <span className="toggle-name">{t("hedge_reversal")}</span>
                             <button className="btn-help" onClick={() => alert("BẬT (Hedge Reversal): Đánh sóng hồi đảo chiều khi thị trường rướn quá đà. Khi giá chạy cách xa đường EMA200 H4 vượt quá ngưỡng an toàn (> 8%):\n1. Cầu dao bảo vệ tự động kích hoạt: Khóa không rải thêm Limit thuận trend ở các khung nhỏ để tránh đu đỉnh/bắt đáy non.\n2. Mở lệnh Hedge ngược xu hướng nhằm bắt nhịp sóng hồi kỹ thuật hồi quy về vùng cân bằng EMA200 H2/H4.\n\nTẮT: Tắt cơ chế bắt sóng hồi và không tự động khóa lưới theo ngưỡng rướn 8%.")} title="BẬT: Bắt sóng hồi đảo chiều và kích hoạt cầu dao bảo vệ khi giá rướn cách EMA200 H4 > 8%.">[?]</button>
                           </div>
-                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
-                            <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
-                            <span className="toggle-name">{t("dynamic_ema200_tp")}</span>
-                            <button className="btn-help" onClick={() => alert("BẬT (Dynamic EMA200 TP): Điểm chốt lời (TP) không cố định theo % mà liên tục bám động theo đường EMA200 của khung thời gian đối diện hoặc khung lớn hơn liền kề, giúp tối ưu hóa lợi nhuận tối đa theo toàn bộ con sóng hồi quy về cản.\n\nTẮT: Điểm TP cố định theo tỷ lệ % cài đặt ban đầu (nhân với hệ số TF).")} title="BẬT: TP tự động bám động theo đường EMA200 | TẮT: TP cố định theo % cài đặt.">[?]</button>
-                          </div>
                           <div className="toggle-row">
                             <ToggleSwitch checked={entryCfg.altcoinFollowBtc ?? false} onChange={v => setEntryCfg(prev => ({ ...prev, altcoinFollowBtc: v }))} />
                             <span className="toggle-name">{t("btc_macro_sync")}</span>
@@ -412,9 +407,16 @@ export default function SystemSettingsModal({
 
                     <div className="settings-group">
                       <div className="settings-group-title">{t("ai_defense_title")}</div>
-                      <div style={{ padding: "10px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                      <div style={{ padding: "5px 0 10px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
                         {t("under_development")}
                       </div>
+                      {/* 🛡️ Mã nguồn Chốt lời bám EMA200 chuyển xuống khu vực AI Defense để phát triển tiếp
+                      <div className="toggle-row" style={{ opacity: 0.6, pointerEvents: 'none' }}>
+                        <ToggleSwitch checked={strat.dynamicEma200Tp} onChange={v => setStrat(s => ({ ...s, dynamicEma200Tp: v }))} />
+                        <span className="toggle-name">{t("dynamic_ema200_tp")}</span>
+                        <button className="btn-help" onClick={() => alert("BẬT (Dynamic EMA200 TP): Điểm chốt lời (TP) không cố định theo % mà liên tục bám động theo đường EMA200 của khung thời gian đối diện hoặc khung lớn hơn liền kề, giúp tối ưu hóa lợi nhuận tối đa theo toàn bộ con sóng hồi quy về cản.\n\nTẮT: Điểm TP cố định theo tỷ lệ % cài đặt ban đầu (nhân với hệ số TF).")} title="BẬT: TP tự động bám động theo đường EMA200 | TẮT: TP cố định theo % cài đặt.">[?]</button>
+                      </div>
+                      */}
                     </div>
                   </>
                 )}

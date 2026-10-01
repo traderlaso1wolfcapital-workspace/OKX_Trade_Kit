@@ -26,6 +26,17 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 v_path = os.path.join(base_dir, "desktop_app", "version.json")
 g_path = os.path.join(base_dir, "desktop_app", "gui_main.py")
 
+# 0. Thiết lập môi trường Git an toàn trên Windows NTFS (Khắc phục triệt để lỗi 'unable to write new index file')
+index_orig = os.path.join(base_dir, ".git", "index")
+index_user = os.path.join(base_dir, ".git", "index_user")
+if os.path.exists(index_orig):
+    try:
+        with open(index_orig, "rb") as s, open(index_user, "wb") as d:
+            d.write(s.read())
+        os.environ["GIT_INDEX_FILE"] = index_user
+    except Exception:
+        pass
+
 # 1. Update version.json
 with open(v_path, 'r', encoding='utf-8') as f:
     data = json.load(f)
@@ -47,10 +58,22 @@ git = "git"
 print("[2] Đang lưu thay đổi (Commit) dưới danh nghĩa Ẩn danh (TLS1 Admin)...")
 subprocess.run([git, "add", "."], check=False, cwd=base_dir)
 
-print("[2.1] Tạm thời loại bỏ TLS1_Trading_Web và các file dev thọ khỏi commit lần này...")
-subprocess.run([git, "reset", "HEAD", "TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"], check=False, cwd=base_dir)
+# 2.1 Tạm thời loại bỏ TLS1_Trading_Web và các file dev thọ khỏi commit lần này (nếu tồn tại)
+exclude_files = ["TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"]
+existing_excludes = [f for f in exclude_files if os.path.exists(os.path.join(base_dir, f))]
+if existing_excludes:
+    print(f"[2.1] Tạm thời loại bỏ các file ngoại lệ: {existing_excludes}...")
+    subprocess.run([git, "reset", "HEAD"] + existing_excludes, check=False, cwd=base_dir)
 
-subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
+commit_res = subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
+
+# Đồng bộ lại index gốc
+if os.path.exists(index_user) and os.path.exists(index_orig):
+    try:
+        with open(index_user, "rb") as s, open(index_orig, "wb") as d:
+            d.write(s.read())
+    except Exception:
+        pass
 
 print("[2.2] Đồng bộ với remote trước khi push...")
 subprocess.run([git, "pull", "--no-edit", "origin", "main"], check=False, cwd=base_dir)

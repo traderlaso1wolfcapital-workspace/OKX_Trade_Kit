@@ -14,6 +14,17 @@ git = "git"
 def run_cmd(cmd, check=False):
     return subprocess.run(cmd, cwd=base_dir, capture_output=True, text=True, check=check)
 
+# 0. Thiết lập môi trường Git an toàn trên Windows NTFS (Khắc phục triệt để lỗi 'unable to write new index file')
+index_orig = os.path.join(base_dir, ".git", "index")
+index_user = os.path.join(base_dir, ".git", "index_user")
+if os.path.exists(index_orig):
+    try:
+        with open(index_orig, "rb") as s, open(index_user, "wb") as d:
+            d.write(s.read())
+        os.environ["GIT_INDEX_FILE"] = index_user
+    except Exception:
+        pass
+
 # 1. Kiểm tra và bảo lưu toàn bộ thay đổi Local hiện tại của CEO
 print("[1] Kiểm tra và bảo lưu an toàn mã nguồn Local của CEO...")
 status_res = run_cmd([git, "status", "--porcelain"])
@@ -22,8 +33,11 @@ has_uncommitted = bool(status_res.stdout.strip())
 if has_uncommitted:
     print("    -> Phát hiện thay đổi mới trên máy CEO. Đang commit bảo vệ...")
     run_cmd([git, "add", "."])
-    # Tạm loại trừ các file dev/rác như trong zzPush_To_GitHub.py
-    run_cmd([git, "reset", "HEAD", "TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"])
+    # Tạm loại trừ các file dev/rác như trong zzPush_To_GitHub.py nếu tồn tại
+    exclude_files = ["TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"]
+    existing_excludes = [f for f in exclude_files if os.path.exists(os.path.join(base_dir, f))]
+    if existing_excludes:
+        run_cmd([git, "reset", "HEAD"] + existing_excludes)
     run_cmd([
         git,
         "-c", "user.name=TLS1 Admin",
