@@ -14,16 +14,13 @@ git = "git"
 def run_cmd(cmd, check=False):
     return subprocess.run(cmd, cwd=base_dir, capture_output=True, text=True, check=check)
 
-# 0. Thiết lập môi trường Git an toàn trên Windows NTFS (Khắc phục triệt để lỗi 'unable to write new index file')
-index_orig = os.path.join(base_dir, ".git", "index")
-index_user = os.path.join(base_dir, ".git", "index_user")
-if os.path.exists(index_orig):
-    try:
-        with open(index_orig, "rb") as s, open(index_user, "wb") as d:
-            d.write(s.read())
-        os.environ["GIT_INDEX_FILE"] = index_user
-    except Exception:
-        pass
+# 0. Đảm bảo môi trường Git sạch (dọn dẹp các file lock tạm nếu có)
+for lock_file in [os.path.join(base_dir, ".git", f) for f in ["index.lock", "refs/heads/main.lock", "HEAD.lock", "index_user"]]:
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
 
 # 1. Kiểm tra và bảo lưu toàn bộ thay đổi Local hiện tại của CEO
 print("[1] Kiểm tra và bảo lưu an toàn mã nguồn Local của CEO...")

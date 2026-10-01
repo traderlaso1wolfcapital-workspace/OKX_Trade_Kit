@@ -26,16 +26,13 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 v_path = os.path.join(base_dir, "desktop_app", "version.json")
 g_path = os.path.join(base_dir, "desktop_app", "gui_main.py")
 
-# 0. Thiết lập môi trường Git an toàn trên Windows NTFS (Khắc phục triệt để lỗi 'unable to write new index file')
-index_orig = os.path.join(base_dir, ".git", "index")
-index_user = os.path.join(base_dir, ".git", "index_user")
-if os.path.exists(index_orig):
-    try:
-        with open(index_orig, "rb") as s, open(index_user, "wb") as d:
-            d.write(s.read())
-        os.environ["GIT_INDEX_FILE"] = index_user
-    except Exception:
-        pass
+# 0. Đảm bảo môi trường Git sạch (dọn dẹp các file lock tạm nếu có)
+for lock_file in [os.path.join(base_dir, ".git", f) for f in ["index.lock", "refs/heads/main.lock", "HEAD.lock", "index_user"]]:
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
 
 # 1. Update version.json
 with open(v_path, 'r', encoding='utf-8') as f:
@@ -67,13 +64,6 @@ if existing_excludes:
 
 commit_res = subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
 
-# Đồng bộ lại index gốc
-if os.path.exists(index_user) and os.path.exists(index_orig):
-    try:
-        with open(index_user, "rb") as s, open(index_orig, "wb") as d:
-            d.write(s.read())
-    except Exception:
-        pass
 
 print("[2.2] Đồng bộ với remote trước khi push...")
 subprocess.run([git, "pull", "--no-edit", "origin", "main"], check=False, cwd=base_dir)
