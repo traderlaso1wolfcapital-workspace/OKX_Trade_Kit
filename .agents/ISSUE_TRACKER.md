@@ -16,6 +16,11 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## 📋 GHI CHÚ QUAN TRỌNG TỪ SÀN OKX (OFFICIAL NOTES)
 
+- **[30/09/2026]** - Thông báo ngưng hỗ trợ WebSocket Port 8443:
+  - **Nội dung:** Bắt đầu từ 31/10/2026, OKX ngừng hỗ trợ kết nối WebSocket qua port `8443` (`wss://ws.okx.com:8443/...`) trên cả môi trường production và demo. Yêu cầu toàn bộ client chuyển sang dùng port mặc định `443` (hoặc loại bỏ hẳn port khỏi URL). REST API và Colo không bị ảnh hưởng.
+  - **Nguồn:** https://www.okx.com/help/okx-websocket-port-8443-discontinuation-announcement
+  - **Trạng thái:** Đã fix trong source code (chuyển sang `:443` đối với các URL WebSocket kết nối đến OKX).
+
 - **[29/09/2026]** - Xác Nhận Chính Thức Từ OKX: Quyền **Trade** Trong API Key **KHÔNG** Bao Gồm Earn, Loan, Transfer:
   - **Nguồn xác nhận:** Gordon | OKG API (đội ngũ API chính thức của OKX), xác nhận ngày 28/09/2026.
   - **Nội dung:** Đội FD (Financial Design) của OKX khẳng định rằng trong mô hình phân quyền chi tiết (granular permission model), quyền **Trade** được thiết kế **tách biệt hoàn toàn** với Earn, Loan và Transfer.
@@ -27,6 +32,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[30/09/2026]** - Fix Cảnh Báo Ngưng Hỗ Trợ WebSocket Port 8443 Từ OKX:
+  - **Mô tả yêu cầu:** OKX thông báo ngừng hỗ trợ kết nối WebSocket qua port 8443 từ ngày 31/10/2026. Cần rà soát và loại bỏ port 8443 trong toàn bộ source code.
+  - **Nguyên nhân cốt lõi phát hiện:** Hook `useMarketWebSocket.js` đang kết nối cứng với `wss://ws.okx.com:8443/ws/v5/public`.
+  - **Giải pháp thực hiện:**
+    - Cập nhật [useMarketWebSocket.js](file:///Users/tiodev/Desktop/OKX_Trade_Kit/web_app/frontend/src/hooks/useMarketWebSocket.js): Chuyển `:8443` thành `:443` (`wss://ws.okx.com:443/ws/v5/public`) theo đúng tiêu chuẩn yêu cầu mới của OKX để duy trì kết nối ổn định sau ngày 31/10.
 
 - **[26/09/2026]** - Đưa Nút Thu Gọn Cấu Hình Ra Chính Giữa, Di Chuyển Icon Ổ Khóa 🔒 Vào Sau Tên Tài Khoản Đang Chạy, Đồng Bộ Tài Khoản Chạy Bot Đa Thiết Bị/Trình Duyệt:
   - **Mô tả yêu cầu CEO:**

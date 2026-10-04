@@ -38,7 +38,7 @@ export function useMarketWebSocket(instId, tf, onCandleUpdate) {
     const connectOKX = () => {
       if (!isMounted) return;
       try {
-        const ws = new WebSocket("wss://ws.okx.com:8443/ws/v5/public");
+        const ws = new WebSocket("wss://ws.okx.com:443/ws/v5/public");
         wsRef.current = ws;
 
         ws.onopen = () => {

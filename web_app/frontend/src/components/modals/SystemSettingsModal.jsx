@@ -761,6 +761,40 @@ export default function SystemSettingsModal({
                     </button>
                   </div>
                 </div>
+
+                {/* Hướng Dẫn Chuyển Ref OKX */}
+                <div className="settings-group">
+                  <div className="settings-group-title" style={{ color: "#ff9900", display: "flex", alignItems: "center", gap: "6px" }}>
+                    ⭐ Hướng Dẫn Tham Gia Nhóm "Private/VIP - TRADER LÀ SỐ 1"
+                  </div>
+                  <div style={{ marginTop: "8px", fontSize: "12px", color: "#d1d5db", lineHeight: "1.6" }}>
+                    <div style={{ marginBottom: "12px", background: "#1e1e1e", padding: "10px", borderRadius: "6px", border: "1px solid #333" }}>
+                      <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px" }}>Cách 1: Chuyển Ref (Dành cho tài khoản cũ chưa nhập mã mời)</strong>
+                      <div>
+                        1. Truy cập link chuyển Ref: <a href="https://www.okx.com/ul/J6l2R5" target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>https://www.okx.com/ul/J6l2R5</a>
+                      </div>
+                      <div style={{ marginTop: "4px" }}>2. Điền form yêu cầu:</div>
+                      <ul style={{ margin: "4px 0 4px 20px", padding: 0 }}>
+                        <li>Mã mời (Referral code): <strong style={{ color: "#fff", background: "#2a2a2a", padding: "2px 6px", borderRadius: "4px" }}>HoanPhiTLS1</strong></li>
+                        <li>Lý do tham gia: <em style={{ color: "#aaa" }}>"I was invited by an affiliate but forgot to add the code when signing up"</em></li>
+                      </ul>
+                      <div>3. Nhấn Submit và chờ OKX duyệt kết quả.</div>
+                    </div>
+
+                    <div style={{ background: "#1e1e1e", padding: "10px", borderRadius: "6px", border: "1px solid #333" }}>
+                      <strong style={{ color: "#ef4444", display: "block", marginBottom: "6px" }}>Cách 2: Xoá tài khoản cũ, tạo tài khoản mới</strong>
+                      <div>
+                        1. Đóng tài khoản cũ: Vào <strong>Thông tin tài khoản &gt; Bảo mật &gt; Đóng tài khoản</strong>. Chọn lý do: <em>"Tôi đã có tài khoản khác nên muốn đóng tài khoản này."</em>
+                      </div>
+                      <div style={{ marginTop: "6px" }}>
+                        2. Tạo tài khoản mới qua link VIP: <a href="https://www.okx.com/join/HoanPhiTLS1" target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>https://www.okx.com/join/HoanPhiTLS1</a>
+                      </div>
+                      <div style={{ marginTop: "4px", fontStyle: "italic", color: "#888" }}>
+                        (Mã mời: <strong>HoanPhiTLS1</strong>)
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
