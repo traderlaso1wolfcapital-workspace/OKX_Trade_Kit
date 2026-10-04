@@ -193,6 +193,8 @@ class AssetTracker:
         self.active_avg_px_long, self.active_avg_px_short = Decimal("0"), Decimal("0")
         self.active_sl_px_long, self.active_sl_px_short = Decimal("0"), Decimal("0")
         self.placed_entry_px_long, self.placed_entry_px_short = "---", "---"
+        self.filled_entry_px_by_tf_long: dict[str, str] = {}
+        self.filled_entry_px_by_tf_short: dict[str, str] = {}
         
         self.missing_count_long: dict[str, int] = {}
         self.missing_count_short: dict[str, int] = {}

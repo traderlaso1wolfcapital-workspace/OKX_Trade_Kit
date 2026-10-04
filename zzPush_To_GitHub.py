@@ -26,6 +26,14 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 v_path = os.path.join(base_dir, "desktop_app", "version.json")
 g_path = os.path.join(base_dir, "desktop_app", "gui_main.py")
 
+# 0. Đảm bảo môi trường Git sạch (dọn dẹp các file lock tạm nếu có)
+for lock_file in [os.path.join(base_dir, ".git", f) for f in ["index.lock", "refs/heads/main.lock", "HEAD.lock", "index_user"]]:
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
+
 # 1. Update version.json
 with open(v_path, 'r', encoding='utf-8') as f:
     data = json.load(f)
@@ -47,10 +55,15 @@ git = "git"
 print("[2] Đang lưu thay đổi (Commit) dưới danh nghĩa Ẩn danh (TLS1 Admin)...")
 subprocess.run([git, "add", "."], check=False, cwd=base_dir)
 
-print("[2.1] Tạm thời loại bỏ TLS1_Trading_Web và các file dev thọ khỏi commit lần này...")
-subprocess.run([git, "reset", "HEAD", "TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"], check=False, cwd=base_dir)
+# 2.1 Tạm thời loại bỏ TLS1_Trading_Web và các file dev thọ khỏi commit lần này (nếu tồn tại)
+exclude_files = ["TLS1_Trading_Web", "web_frontend", "old_index.css", "old_media.css", "patch_auth.py", "test_limit.py"]
+existing_excludes = [f for f in exclude_files if os.path.exists(os.path.join(base_dir, f))]
+if existing_excludes:
+    print(f"[2.1] Tạm thời loại bỏ các file ngoại lệ: {existing_excludes}...")
+    subprocess.run([git, "reset", "HEAD"] + existing_excludes, check=False, cwd=base_dir)
 
-subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
+commit_res = subprocess.run([git, "-c", "user.name=TLS1 Admin", "-c", "user.email=admin@tls1.com", "commit", "-m", f"Update App v{new_v}"], check=False, cwd=base_dir)
+
 
 print("[2.2] Đồng bộ với remote trước khi push...")
 subprocess.run([git, "pull", "--no-edit", "origin", "main"], check=False, cwd=base_dir)
