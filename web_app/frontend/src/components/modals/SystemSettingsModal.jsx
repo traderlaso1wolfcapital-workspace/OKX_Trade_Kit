@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ToggleSwitch from '../common/ToggleSwitch';
 import NumberSpinBox from '../common/NumberSpinBox';
 import { COIN_LIST } from '../../constants/tradeConfig';
 import { useTranslation } from '../../i18n';
+import ReviewsTab from './ReviewsTab';
 
 export default function SystemSettingsModal({
   isOpen,
@@ -50,6 +51,29 @@ export default function SystemSettingsModal({
   isAuthenticated = false,
 }) {
   const { t } = useTranslation();
+  const [showTransferGuide, setShowTransferGuide] = useState(false);
+  const [copyNotice, setCopyNotice] = useState("");
+
+  const handleCopyText = (text, label) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopyNotice(label);
+      setTimeout(() => setCopyNotice(""), 2500);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -120,6 +144,9 @@ export default function SystemSettingsModal({
           </button>
           <button className={`settings-tab-btn ${settingsTab === "system" ? "active" : ""}`} onClick={() => setSettingsTab("system")}>
             🛠️ {t("tab_system") || "Hệ Thống"}
+          </button>
+          <button className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`} onClick={() => setSettingsTab("reviews")}>
+            ⭐ Đánh Giá
           </button>
         </div>
 
@@ -706,36 +733,280 @@ export default function SystemSettingsModal({
 
           {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG ===== */}
           {settingsTab === "system" && (
-            <div className="settings-tab-content">
-              <div className="settings-tab-scroll">
-                {/* Lệnh Can Thiệp Nhanh */}
-                <div className="settings-group">
-                  <div className="settings-group-title">{t("quick_audit")}</div>
-                  <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "4px" }}>
-                    <button className="btn-audit" onClick={handleResetCapital}>
-                      ♻️ {t("reset_audit_btn")}
+            <div className="settings-tab-content" style={{ position: "relative" }}>
+              {/* POPUP THÔNG BÁO COPY NHẸ NHÀNG */}
+              {copyNotice && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "rgba(22, 27, 34, 0.95)",
+                    border: "1px solid rgba(46, 160, 67, 0.6)",
+                    color: "#f0f6fc",
+                    padding: "5px 16px",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
+                    zIndex: 1000,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    pointerEvents: "none",
+                    backdropFilter: "blur(6px)",
+                    whiteSpace: "nowrap",
+                    animation: "fadeIn 0.15s ease",
+                  }}
+                >
+                  <span style={{ color: "#3fb950", fontSize: "13px" }}>✓</span>
+                  <span>{copyNotice}</span>
+                </div>
+              )}
+
+              <div className="settings-tab-scroll" style={{ padding: "4px 8px 16px 8px" }}>
+
+                {/* 1. ĐIỀU KIỆN ĐỂ SỬ DỤNG APP (BO VIỀN CẢ CỤM, BỎ ICON) */}
+                <div
+                  style={{
+                    border: "1px solid #383838",
+                    borderRadius: "8px",
+                    background: "#1e1e1e",
+                    padding: "14px 16px",
+                    marginBottom: "16px",
+                    textAlign: "left",
+                    fontSize: "12px",
+                    color: "#aaaaaa",
+                    lineHeight: "1.6",
+                  }}
+                >
+                  <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 6px 0", fontSize: "14px" }}>
+                    ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:
+                  </p>
+                  <p style={{ margin: "0 0 6px 0" }}>
+                    1. Đăng ký tài khoản OKX dưới Link giới thiệu của AutoTrader.fun
+                  </p>
+                  <p style={{ margin: "0 0 14px 0" }}>
+                    2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.
+                  </p>
+
+                  {/* 2 Nút giữ lại màu sắc nổi bật */}
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => window.open("https://www.okx.com/join/HoanPhiTLS1", "_blank")}
+                      style={{
+                        flex: 1,
+                        padding: "9px 12px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        border: "1px solid #10b981",
+                        color: "#ffffff",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
+                    >
+                      Đăng ký OKX (VIP)
                     </button>
-                    {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
-                      <button className="btn-audit" onClick={handleResetNen}>
-                        ♻️ {t("reset_nen_btn")}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowTransferGuide(!showTransferGuide)}
+                      style={{
+                        flex: 1,
+                        padding: "9px 12px",
+                        background: showTransferGuide ? "#2d3748" : "#1f2937",
+                        border: "1px solid #3b82f6",
+                        color: "#60a5fa",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: "bold",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        transition: "all 0.15s ease",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "#2d3748"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = showTransferGuide ? "#2d3748" : "#1f2937"; }}
+                    >
+                      Hướng dẫn chuyển Ref {showTransferGuide ? "▲" : "▼"}
+                    </button>
                   </div>
+
+                  {/* Chi tiết hướng dẫn chuyển Ref (Thu gọn / Mở rộng) */}
+                  {showTransferGuide && (
+                    <div
+                      style={{
+                        marginTop: "12px",
+                        background: "#161b22",
+                        border: "1px solid #30363d",
+                        borderRadius: "6px",
+                        padding: "12px 14px",
+                        fontSize: "12px",
+                        color: "#bbb",
+                        lineHeight: "1.6",
+                      }}
+                    >
+                      {/* Cách 1 */}
+                      <div style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #2a2a2a" }}>
+                        <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
+                          Cách 1: Chuyển Ref (Dành cho người dùng đã có tài khoản OKX)
+                        </strong>
+                        <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <div>
+                            1. Truy cập link chuyển Ref:{" "}
+                            <a
+                              href="https://www.okx.com/ul/J6l2R5"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#58a6ff", textDecoration: "none" }}
+                            >
+                              https://www.okx.com/ul/J6l2R5
+                            </a>
+                          </div>
+                          <div>2. Điền form yêu cầu:</div>
+                          <ul style={{ margin: "2px 0 2px 18px", padding: 0 }}>
+                            <li style={{ marginBottom: "4px" }}>
+                              Mã mời (Referral code):{" "}
+                              <strong
+                                style={{
+                                  color: "#00ffff",
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => handleCopyText("HoanPhiTLS1", "Đã copy Mã mời: HoanPhiTLS1")}
+                                onTouchEnd={(e) => { e.preventDefault(); handleCopyText("HoanPhiTLS1", "Đã copy Mã mời: HoanPhiTLS1"); }}
+                                title="Click hoặc chạm để copy Mã mời"
+                              >
+                                HoanPhiTLS1
+                              </strong>
+                            </li>
+                            <li>
+                              Lý do tham gia:{" "}
+                              <span
+                                style={{
+                                  color: "#e6edf3",
+                                  cursor: "pointer",
+                                  fontStyle: "italic",
+                                  display: "inline-block",
+                                  marginTop: "3px",
+                                }}
+                                onClick={() =>
+                                  handleCopyText(
+                                    "I was invited by an affiliate but forgot to add the code when signing up",
+                                    "Đã copy Lý do tham gia!"
+                                  )
+                                }
+                                onTouchEnd={(e) => {
+                                  e.preventDefault();
+                                  handleCopyText(
+                                    "I was invited by an affiliate but forgot to add the code when signing up",
+                                    "Đã copy Lý do tham gia!"
+                                  );
+                                }}
+                                title="Click hoặc chạm để copy Lý do"
+                              >
+                                "I was invited by an affiliate but forgot to add the code when signing up"
+                              </span>
+                            </li>
+                          </ul>
+                          <div>3. Nhấn Submit và chờ OKX duyệt kết quả.</div>
+                        </div>
+                      </div>
+
+                      {/* Cách 2 */}
+                      <div>
+                        <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
+                          Cách 2: Xoá tài khoản cũ, tạo tài khoản mới
+                        </strong>
+                        <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <div>
+                            1. Đóng tài khoản cũ: Vào <strong>Thông tin tài khoản &gt; Bảo mật &gt; Đóng tài khoản</strong>.
+                          </div>
+                          <div>
+                            2. Đăng ký tài khoản mới qua link:{" "}
+                            <a
+                              href="https://www.okx.com/join/HoanPhiTLS1"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#58a6ff", textDecoration: "none" }}
+                            >
+                              https://www.okx.com/join/HoanPhiTLS1
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Mã Máy HWID */}
-                <div className="settings-group">
-                  <div className="settings-group-title">{t("hwid_label")}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
-                    <span style={{ color: "#aaaaaa", fontSize: "12px" }}>{t("your_hwid")}</span>
+                  {/* 2. LIÊN HỆ ADMIN (Y HỆT BẢN CŨ) */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      border: "1px solid #444",
+                      borderRadius: "6px",
+                      background: "#262626",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", fontWeight: "bold", color: "#eee" }}>Liên hệ Admin:</span>
+                    <div style={{ display: "flex", gap: "12px" }}>
+                      <img
+                        src="/media/Telegram.png"
+                        alt="Telegram"
+                        title="Telegram Admin"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
+                      />
+                      <img
+                        src="/media/Messenger.png"
+                        alt="Messenger"
+                        title="Facebook Messenger"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")}
+                      />
+                      <img
+                        src="/media/zalo.png"
+                        alt="Zalo"
+                        title="Zalo Admin"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")}
+                      />
+                      <img
+                        src="/media/Discord.png"
+                        alt="Discord"
+                        title="Discord Community"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")}
+                      />
+                    </div>
+                  </div>
+
+                {/* 3. PHẦN PHỤ KỸ THUẬT & CÔNG CỤ (ĐÁY TAB) */}
+                <div style={{ borderTop: "1px solid #333", paddingTop: "14px" }}>
+                  {/* Mã Máy HWID */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px", flexWrap: "wrap" }}>
+                    <span style={{ color: "#888", fontSize: "12px" }}>{t("your_hwid")}</span>
                     <span
                       className="hwid-value"
                       style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
                       title="Click để copy Mã Máy"
-                      onClick={() => {
-                        navigator.clipboard.writeText(hwid);
-                        alert("✅ " + t("copy_hwid_alert") + hwid);
-                      }}
+                      onClick={() => handleCopyText(hwid, "Đã copy Mã máy thiết bị (HWID)!")}
+                      onTouchEnd={(e) => { e.preventDefault(); handleCopyText(hwid, "Đã copy Mã máy thiết bị (HWID)!"); }}
                     >
                       {hwid}
                     </span>
@@ -753,50 +1024,41 @@ export default function SystemSettingsModal({
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
-                        transition: "all 0.15s ease"
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "#2563eb"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "#1e3a5f"; }}
                       title="Xem video Hướng Dẫn trên YouTube"
                     >
                       {t("guide_btn")}
                     </button>
                   </div>
-                </div>
 
-                {/* Hướng Dẫn Chuyển Ref OKX */}
-                <div className="settings-group">
-                  <div className="settings-group-title" style={{ color: "#ff9900", display: "flex", alignItems: "center", gap: "6px" }}>
-                    ⭐ Hướng Dẫn Tham Gia Nhóm "Private/VIP - TRADER LÀ SỐ 1"
-                  </div>
-                  <div style={{ marginTop: "8px", fontSize: "12px", color: "#d1d5db", lineHeight: "1.6" }}>
-                    <div style={{ marginBottom: "12px", background: "#1e1e1e", padding: "10px", borderRadius: "6px", border: "1px solid #333" }}>
-                      <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px" }}>Cách 1: Chuyển Ref (Dành cho tài khoản cũ chưa nhập mã mời)</strong>
-                      <div>
-                        1. Truy cập link chuyển Ref: <a href="https://www.okx.com/ul/J6l2R5" target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>https://www.okx.com/ul/J6l2R5</a>
-                      </div>
-                      <div style={{ marginTop: "4px" }}>2. Điền form yêu cầu:</div>
-                      <ul style={{ margin: "4px 0 4px 20px", padding: 0 }}>
-                        <li>Mã mời (Referral code): <strong style={{ color: "#fff", background: "#2a2a2a", padding: "2px 6px", borderRadius: "4px" }}>HoanPhiTLS1</strong></li>
-                        <li>Lý do tham gia: <em style={{ color: "#aaa" }}>"I was invited by an affiliate but forgot to add the code when signing up"</em></li>
-                      </ul>
-                      <div>3. Nhấn Submit và chờ OKX duyệt kết quả.</div>
-                    </div>
-
-                    <div style={{ background: "#1e1e1e", padding: "10px", borderRadius: "6px", border: "1px solid #333" }}>
-                      <strong style={{ color: "#ef4444", display: "block", marginBottom: "6px" }}>Cách 2: Xoá tài khoản cũ, tạo tài khoản mới</strong>
-                      <div>
-                        1. Đóng tài khoản cũ: Vào <strong>Thông tin tài khoản &gt; Bảo mật &gt; Đóng tài khoản</strong>. Chọn lý do: <em>"Tôi đã có tài khoản khác nên muốn đóng tài khoản này."</em>
-                      </div>
-                      <div style={{ marginTop: "6px" }}>
-                        2. Tạo tài khoản mới qua link VIP: <a href="https://www.okx.com/join/HoanPhiTLS1" target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>https://www.okx.com/join/HoanPhiTLS1</a>
-                      </div>
-                      <div style={{ marginTop: "4px", fontStyle: "italic", color: "#888" }}>
-                        (Mã mời: <strong>HoanPhiTLS1</strong>)
-                      </div>
-                    </div>
+                  {/* Lệnh Can Thiệp Nhanh */}
+                  <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                    <button className="btn-audit" onClick={handleResetCapital}>
+                      ♻️ {t("reset_audit_btn")}
+                    </button>
+                    {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                      <button className="btn-audit" onClick={handleResetNen}>
+                        ♻️ {t("reset_nen_btn")}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ===== TAB 3: ĐÁNH GIÁ (SHOPEE STYLE) ===== */}
+          {settingsTab === "reviews" && (
+            <div className="settings-tab-content">
+              <div className="settings-tab-scroll" style={{ padding: "12px 14px 20px 14px" }}>
+                <ReviewsTab
+                  apiKey={apiKey}
+                  accounts={accounts}
+                  selectedAccount={selectedAccount}
+                  okxUid={okxUid}
+                  hwid={hwid}
+                />
               </div>
             </div>
           )}

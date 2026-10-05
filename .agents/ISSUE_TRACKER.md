@@ -33,6 +33,34 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/10/2026]** - Đồng Bộ Thứ Tự Chiến Lược (EMA200 - SMC - Liquidation), Màu Chữ Phân Loại (#a5d6ff) & Cập Nhật Ref AutoTrader.fun:
+  - **Mô tả yêu cầu CEO:**
+    1. Sắp xếp lại thứ tự chiến lược trong tab Đánh Giá chuẩn theo ô chọn bot bên ngoài: EMA200 -> SMC -> Liquidation (`Bot 1: Sóng Hồi EMA200 (Pullback)`, `Bot 2: SMC Cấu Trúc Thị Trường (Order Block)`, `Bot 3: Săn Thanh Khoản (Liquidation)`).
+    2. Màu chữ phân loại trong dropdown dùng màu xanh nhạt `#a5d6ff` đồng bộ hoàn toàn với màu phân loại trong thẻ review (Ảnh 2).
+    3. Cập nhật câu hướng dẫn điều kiện sử dụng: `"2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX."` trên toàn bộ hệ thống (Web App & Desktop App).
+  - **Giải pháp thực hiện:**
+    - [LoginModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/LoginModal.jsx) & [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx) & [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py): Sửa câu số 2 thành `"2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX."`.
+    - [ReviewsTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ReviewsTab.jsx):
+      + Sắp xếp lại `BOT_STRATEGIES` chuẩn EMA200 -> SMC -> Liquidation.
+      + Tạo component `StrategyDropdown` tùy biến độc lập hoàn toàn, vượt qua giới hạn popup native của Windows Chromium, hiển thị chính xác mã màu `#a5d6ff` (xanh nhạt) cho tất cả các option phân loại.
+      + Đồng bộ cả dropdown bộ lọc phân loại lẫn dropdown chọn bot khi viết đánh giá.
+    - [user_data/reviews.json](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/user_data/reviews.json) & [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Đồng bộ phân loại 23 đánh giá mẫu theo đúng số hiệu Bot 1, Bot 2, Bot 3.
+
+- **[05/10/2026]** - Chuẩn Hóa Cơ Chế Kiểm Tra Ref (AutoTrader.fun) & Tối Ưu Phản Hồi Tab Đánh Giá:
+  - **Mô tả yêu cầu CEO:**
+    1. Khi Connect API: Cho kết nối bình thường (xem số dư, xem chart, lưu cấu hình), không chặn ở bước connect.
+    2. Khi Bấm Start Bot: Hệ thống quét Master UID của tài khoản đối chiếu bảng Ref Google Sheet của CEO. Nếu chưa đăng ký Ref, lập tức chặn khởi động bot, hiện thông báo: `"UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"` và tự động mở tab **Hệ Thống** để khách đăng ký OKX VIP hoặc xem hướng dẫn chuyển Ref.
+    3. Tab Đánh Giá: Tối ưu các đánh giá mẫu chỉ thi thoảng xuất hiện 1-2 tin phản hồi của TLS1 Team với nội dung chuẩn: `"Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn."`.
+  - **Giải pháp thực hiện:**
+    - [web_app/backend/main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      + Bỏ cơ chế chặn Ref ở `/api/auth/okx/callback` và `/api/bot/credentials` (`update_bot_credentials`). Đồng bộ API key sang cả session UID directory.
+      + Tăng cường `_get_master_uid` quét đa tầng thư mục tài khoản (`bots/{target_acc}`, `accounts/{target_acc}`).
+      + Đặt chốt chặn Ref tại `/api/bot/start`: Quét Master UID, đối chiếu Google Sheets qua `check_uid_active_ref()`, trả về mã 403 nếu chưa có Ref.
+      + Cập nhật `_init_default_reviews()` chỉ giữ duy nhất phản hồi của TLS1 Team tại `rev_1`, các review khác đặt `None`.
+    - [web_app/frontend/src/App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):
+      + Trong `handleStartBot`: Bắt mã 403 / thông báo Ref, hiển thị đúng thông báo: `"UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"`, đồng thời tự động gọi `setShowSettings(true)` và `setSettingsTab("system")`.
+    - [user_data/reviews.json](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/user_data/reviews.json) & [ReviewsTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ReviewsTab.jsx): Đồng bộ dữ liệu review mẫu chỉ có 1 tin phản hồi từ TLS1 Team.
+
 - **[30/09/2026]** - Fix Cảnh Báo Ngưng Hỗ Trợ WebSocket Port 8443 Từ OKX:
   - **Mô tả yêu cầu:** OKX thông báo ngừng hỗ trợ kết nối WebSocket qua port 8443 từ ngày 31/10/2026. Cần rà soát và loại bỏ port 8443 trong toàn bộ source code.
   - **Nguyên nhân cốt lõi phát hiện:** Hook `useMarketWebSocket.js` đang kết nối cứng với `wss://ws.okx.com:8443/ws/v5/public`.

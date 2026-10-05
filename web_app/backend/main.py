@@ -1,5 +1,11 @@
 import os
 import sys
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -148,7 +154,7 @@ def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
                         return True, "ACTIVE"
                     else:
                         return False, f"Tài khoản đang bị khóa ({user_status})"
-        return False, "UID chưa đăng ký dưới link Ref của TLS1!"
+        return False, "UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
     except Exception as e:
         print(f"[REF CHECK ERROR] {e}", flush=True)
         return True, "Bypass on network error"
@@ -546,10 +552,8 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                     target_uid = main_uid
                 uid = target_uid
                 
-                # 3. Kiểm tra xem UID này có đăng ký Ref TLS1 không
-                ref_ok, ref_msg = check_uid_active_ref(uid)
-                if not ref_ok:
-                    return {"status": "error", "message": f"Tài khoản (UID: {uid}) chưa đăng ký dưới link giới thiệu của TLS1 hoặc đang bị khoá ({ref_msg}). Vui lòng liên hệ Admin!"}
+                # 3. Kết nối API OKX thành công: Luôn cho phép kết nối để xem số dư, biểu đồ và lưu cấu hình
+                # (Cơ chế đối chiếu Ref sẽ được kích hoạt chặt chẽ khi người dùng bấm Khởi động Bot)
 
                 # 4. Lưu thông tin API DUY NHẤT vào thư mục của UID này
                 acc = req.account_id if req.account_id else req.strategy
@@ -944,23 +948,31 @@ def _get_master_uid(uid: str = None, target_acc: str = None) -> str:
     """Quét và lấy số UID của tài khoản chính (Master UID) từ các file .api thuộc UID được chỉ định."""
     if not uid or uid in ["default", "guest", "undefined", "null"]:
         return ""
-    if uid.isdigit() and len(uid) >= 10:
-        return uid
     # Tìm trong file .api của chính user data directory đó
     u_dir = get_user_data_dir(uid)
     if os.path.exists(u_dir):
         if target_acc:
-            p = os.path.join(u_dir, f".api_{target_acc}")
-            if os.path.exists(p):
-                c = _parse_env_file(p)
-                if c.get("main_uid"):
-                    return str(c["main_uid"])
+            specific_paths = [
+                os.path.join(u_dir, f".api_{target_acc}"),
+                os.path.join(u_dir, f"bots/{target_acc}", f".api_{target_acc}"),
+                os.path.join(u_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
+                os.path.join(u_dir, f"bots/sub1", f".api_{target_acc}"),
+                os.path.join(u_dir, f"bots/sub2", f".api_{target_acc}"),
+                os.path.join(u_dir, f"bots/sub3", f".api_{target_acc}"),
+            ]
+            for p in specific_paths:
+                if os.path.exists(p):
+                    c = _parse_env_file(p)
+                    if c.get("main_uid"):
+                        return str(c["main_uid"]).strip()
         for root, dirs, files in os.walk(u_dir):
             for f in files:
                 if f.startswith(".api_"):
                     c = _parse_env_file(os.path.join(root, f))
                     if c.get("main_uid"):
-                        return str(c["main_uid"])
+                        return str(c["main_uid"]).strip()
+    if uid.isdigit() and len(uid) >= 8:
+        return uid
     return ""
 
 def _evolution_has_capital(fpath: str) -> bool:
@@ -1429,6 +1441,37 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not (api_key and secret_key and passphrase):
         raise HTTPException(status_code=400, detail=f"Cần cấu hình API Key cho tài khoản '{target_acc}' trước khi khởi động Bot {strategy}!")
+
+    # ── ĐỐI CHIẾU REF GOOGLE SHEETS KHI KHỞI ĐỘNG BOT ──
+    # Miễn trừ đối với Admin (admtls12021); kiểm tra Master UID của tài khoản đối với bảng Ref
+    if not is_admin_uid(uid):
+        master_uid = _get_master_uid(uid, target_acc)
+        if not master_uid or not master_uid.isdigit():
+            try:
+                acc_info = detect_okx_account_info(api_key, secret_key, passphrase, is_demo)
+                if acc_info and acc_info.get("main_uid"):
+                    master_uid = str(acc_info["main_uid"]).strip()
+                    data_dir = get_user_data_dir(uid)
+                    _save_env_file(os.path.join(data_dir, f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo, main_uid=master_uid)
+            except Exception as e:
+                print(f"[START_BOT] Lỗi quét UID từ OKX: {e}", flush=True)
+
+        if not master_uid and uid.isdigit() and len(uid) >= 8:
+            master_uid = uid
+
+        if not master_uid or not is_admin_uid(master_uid):
+            if not master_uid:
+                raise HTTPException(
+                    status_code=403,
+                    detail="UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
+                )
+            is_ref, ref_msg = check_uid_active_ref(master_uid)
+            if not is_ref:
+                print(f"[START_BOT REF BLOCKED] Master UID: {master_uid} chưa đăng ký Ref. Chi tiết: {ref_msg}", flush=True)
+                raise HTTPException(
+                    status_code=403,
+                    detail="UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
+                )
 
     # Đồng bộ API key đã chọn vào các file env của bot
     data_dir = get_user_data_dir(uid)
@@ -2168,12 +2211,8 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                 if not owner_uid:
                     owner_uid = creds.okx_uid.strip() if (creds.okx_uid and creds.okx_uid.strip()) else uid
 
-                # Phân quyền Admin: Miễn trừ kiểm tra khớp UID chủ sở hữu (cho mọi Admin có cú pháp admtls12021_xxx)
-                if not is_admin_uid(uid):
-                    # Tự động kiểm tra xem UID chính có đăng ký dưới Ref TLS1 hay không
-                    is_ref, ref_msg = check_uid_active_ref(owner_uid)
-                    if not is_ref:
-                        raise HTTPException(status_code=400, detail=f"Tài khoản OKX chính (UID: {owner_uid}) chưa đăng ký dưới link giới thiệu (Ref) của TLS1 hoặc đang bị khóa ({ref_msg})! Vui lòng liên hệ Admin để kích hoạt.")
+                # Cho phép kết nối API bình thường (xem số dư, biểu đồ, lưu cấu hình)
+                # Việc chặn và kiểm tra Ref Google Sheet diễn ra khi người dùng bấm Khởi động Bot
 
                 # Quét và nhận diện tên tài khoản từ sàn OKX
                 detected_name = ""
@@ -2216,6 +2255,18 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
     if strategy:
         _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+
+    if uid and uid != owner_uid:
+        session_data_dir = get_user_data_dir(uid)
+        os.makedirs(os.path.join(session_data_dir, f"bots/{target_acc}"), exist_ok=True)
+        os.makedirs(os.path.join(session_data_dir, f"accounts/{target_acc}"), exist_ok=True)
+        _save_env_file(os.path.join(session_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        _save_env_file(os.path.join(session_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        _save_env_file(os.path.join(session_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        if strategy:
+            _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        sync_account_name_in_storage(uid, target_acc, detected_name)
         
     # Đồng bộ tên quét được từ sàn OKX vào accounts.json của riêng UID này
     updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name)
@@ -3147,6 +3198,370 @@ async def websocket_bot_data(websocket: WebSocket, uid: str, strategy: str):
         if not bot_data_connections.get(uid, {}).get(strategy, []):
             task = bot_data_tasks.pop((uid, strategy), None)
             if task: task.cancel()
+
+# --- REVIEW & RATINGS SYSTEM (SHOPEE STYLE) ---
+REVIEWS_FILE = os.path.join(os.path.dirname(__file__), "../../user_data/reviews.json")
+
+def _init_default_reviews():
+    return [
+        {
+            "id": "rev_1",
+            "username": "User ****8912",
+            "user_key": "seed_1",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 5,
+            "date": "12/08/2026",
+            "comment": "Đúng mô tả chất lượng, bot bắt râu quét thanh khoản rất bén. Tỷ lệ hit TP cao, drawdown cực thấp.",
+            "seller_reply": "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+            "likes": 18
+        },
+        {
+            "id": "rev_2",
+            "username": "User ****4a7b",
+            "user_key": "seed_2",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "10/08/2026",
+            "comment": "Bot SMC đánh theo Order Block rất kỷ luật. Tránh được bão giá đợt tin CPI vừa rồi. 5 sao cho team phát triển!",
+            "seller_reply": None,
+            "likes": 12
+        },
+        {
+            "id": "rev_3",
+            "username": "User ****90c1",
+            "user_key": "seed_3",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "08/08/2026",
+            "comment": "Bắt sóng hồi EMA200 nến 15m mượt mà, gồng lãi tự động trailing limit rất thông minh.",
+            "seller_reply": None,
+            "likes": 15
+        },
+        {
+            "id": "rev_4",
+            "username": "User ****123f",
+            "user_key": "seed_4",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 4,
+            "date": "05/08/2026",
+            "comment": "Bot chạy ổn áp, nếu có thêm thông báo Telegram báo râu quét tức thì nữa thì hoàn hảo 10/10.",
+            "seller_reply": "Cảm ơn bạn đã đóng góp ý kiến! Tính năng Webhook Telegram báo khớp lệnh tức thì bên mình đang hoàn thiện để ra mắt sớm nhất nhé.",
+            "likes": 9
+        },
+        {
+            "id": "rev_5",
+            "username": "User ****55d8",
+            "user_key": "seed_5",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "01/08/2026",
+            "comment": "Chạy song song 3 bot thấy bot SMC lợi nhuận ổn định nhất. Anh em nên chia vốn theo tỷ lệ 1-2% rủi ro, đừng tham all-in là ngủ ngon.",
+            "seller_reply": None,
+            "likes": 11
+        },
+        {
+            "id": "rev_6",
+            "username": "User ****77e2",
+            "user_key": "seed_6",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "28/07/2026",
+            "comment": "Giao diện web trực quan, xem được biểu đồ đa khung thời gian và trạng thái lệnh theo thời gian thực rất tiện.",
+            "seller_reply": None,
+            "likes": 8
+        },
+        {
+            "id": "rev_7",
+            "username": "User ****9381",
+            "user_key": "seed_7",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 5,
+            "date": "25/07/2026",
+            "comment": "Hôm qua lúc 2h sáng BTC giật râu quét long short cả 2 đầu, sáng dậy thấy bot cắn đúng đáy râu rồi TP ngọt lịm. Đỡ phải thức đêm canh lệnh bạc cả tóc.",
+            "seller_reply": "Chuẩn luôn bạn ơi! Cơ chế săn thanh khoản thiết kế riêng để trị những pha giật râu bất ngờ lúc anh em đang ngủ. Chúc bạn tiếp tục gặt hái lợi nhuận đều tay nhé!",
+            "likes": 16
+        },
+        {
+            "id": "rev_8",
+            "username": "User ****2204",
+            "user_key": "seed_8",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 4,
+            "date": "22/07/2026",
+            "comment": "Đánh nến H1 rất chắc tay, ít khi bị dính false break. Có điều thị trường sideway biên hẹp thì vào lệnh hơi ít, phải kiên nhẫn.",
+            "seller_reply": None,
+            "likes": 7
+        },
+        {
+            "id": "rev_9",
+            "username": "User ****6619",
+            "user_key": "seed_9",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "19/07/2026",
+            "comment": "Ban đầu nạp test 500u xem thế nào, chạy được 3 tuần thấy R:R toàn 1:2 với 1:3 chuẩn chỉ quá nên quyết định nâng vốn lên 3000u. Quản lý lệnh rất đàng hoàng.",
+            "seller_reply": "Cảm ơn bạn đã tin tưởng nâng vốn đồng hành cùng TLS1! Lưu ý luôn tuân thủ kỷ luật quản lý vốn và cài tỷ lệ rủi ro vừa phải để bot tối ưu hóa lợi nhuận bền vững nhé.",
+            "likes": 21
+        },
+        {
+            "id": "rev_10",
+            "username": "User ****8832",
+            "user_key": "seed_10",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 5,
+            "date": "16/07/2026",
+            "comment": "Cái quả Dynamic Trailing Limit đỉnh thật sự. Giá rướn thêm là bot tự dời điểm chốt lời theo, không bị tình trạng chốt non tức tưởi như mấy bot thông thường.",
+            "seller_reply": None,
+            "likes": 14
+        },
+        {
+            "id": "rev_11",
+            "username": "User ****3105",
+            "user_key": "seed_11",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 4,
+            "date": "14/07/2026",
+            "comment": "Đợt bão tin Non-Farm vừa rồi dính 1 lệnh SL ở khung M5. May mà tỷ lệ rủi ro để 1% nên không xi nhê gì. Khuyên anh em mới chơi nên tắt M5 chỉ để H1 trở lên khi có tin giật mạnh.",
+            "seller_reply": "Chia sẻ rất thực tế và chính xác! Khung nhỏ M5 khi có tin giật mạnh độ nhiễu cao, team luôn khuyến nghị anh em ưu tiên giữ H1/H2 để bộ lọc lọc nhiễu chuẩn nhất.",
+            "likes": 10
+        },
+        {
+            "id": "rev_12",
+            "username": "User ****7048",
+            "user_key": "seed_12",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "11/07/2026",
+            "comment": "Vừa rút lãi tháng đầu tiên về tiêu. Cảm giác không bị tâm lý fomo bấm lệnh tay nó nhẹ đầu hẳn anh em ạ. Tks team hỗ trợ nhiệt tình từ lúc chuyển Ref.",
+            "seller_reply": None,
+            "likes": 13
+        },
+        {
+            "id": "rev_13",
+            "username": "User ****4491",
+            "user_key": "seed_13",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "08/07/2026",
+            "comment": "Khen nhất quả bot tự dọn dẹp lệnh Limit cũ khi bật lại. Không bị rác sàn hay kẹt margin. Cơ chế kiểm soát lệnh rất chặt.",
+            "seller_reply": None,
+            "likes": 6
+        },
+        {
+            "id": "rev_14",
+            "username": "User ****1976",
+            "user_key": "seed_14",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 4,
+            "date": "05/07/2026",
+            "comment": "Bắt altcoin ETH với SOL cực nhạy. Nhưng con PEPE biến động điên quá nhiều khi râu quét dài ngoằng, anh em chơi memecoin nên giảm đòn bẩy xuống x3 x5 thôi.",
+            "seller_reply": None,
+            "likes": 8
+        },
+        {
+            "id": "rev_15",
+            "username": "User ****5820",
+            "user_key": "seed_15",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "02/07/2026",
+            "comment": "Thuật toán tìm vùng Order Block chuẩn phết, chạm đúng mép khối OB là bật lên như lò xo. Tỷ lệ thắng cỡ 70-75% mà R:R đẹp.",
+            "seller_reply": None,
+            "likes": 17
+        },
+        {
+            "id": "rev_16",
+            "username": "User ****6013",
+            "user_key": "seed_16",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 5,
+            "date": "29/06/2026",
+            "comment": "Từ ngày cắm bot này vào OKX thì giải phóng được bao nhiêu thời gian. Vừa làm việc chính vừa để bot tự chạy kiếm thêm tiền cafe bỉm sữa.",
+            "seller_reply": "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+            "likes": 19
+        },
+        {
+            "id": "rev_17",
+            "username": "User ****3728",
+            "user_key": "seed_17",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "26/06/2026",
+            "comment": "Tính năng Macro Sync Altcoin theo BTC hay vãi, BTC đang đâm đầu thì bot tự động khóa không cho Long Altcoin bừa bãi, cứu bao nhiêu bàn thua trông thấy.",
+            "seller_reply": None,
+            "likes": 12
+        },
+        {
+            "id": "rev_18",
+            "username": "User ****9402",
+            "user_key": "seed_18",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 4,
+            "date": "23/06/2026",
+            "comment": "Chạy trên PWA điện thoại mượt, xem biểu đồ tradingview tiện. Mong team ra thêm hướng dẫn chi tiết cách tinh chỉnh hệ số Internal Length cho người mới.",
+            "seller_reply": None,
+            "likes": 5
+        },
+        {
+            "id": "rev_19",
+            "username": "User ****8254",
+            "user_key": "seed_19",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 5,
+            "date": "20/06/2026",
+            "comment": "Đã giới thiệu cho 2 ông bạn cùng hội trade vào ref của TLS1. Cả 2 ông đều khen bot bắt râu khét lẹt. Đáng đồng tiền bát gạo.",
+            "seller_reply": None,
+            "likes": 11
+        },
+        {
+            "id": "rev_20",
+            "username": "User ****1567",
+            "user_key": "seed_20",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "17/06/2026",
+            "comment": "DCA Dương (Pyramid) lúc bắt đúng trend ăn đậm thật. Lệnh trước có lãi mới nhồi lệnh sau, không bao giờ nhồi khi âm nên tài khoản rất an toàn.",
+            "seller_reply": None,
+            "likes": 14
+        },
+        {
+            "id": "rev_21",
+            "username": "User ****4983",
+            "user_key": "seed_21",
+            "bot_strategy": "Bot 3: Săn Thanh Khoản (Liquidation)",
+            "rating": 4,
+            "date": "14/06/2026",
+            "comment": "Hôm đầu cài đặt chưa quen bấm nhầm khối lượng xém tí toát mồ hôi, may mà nhắn hỗ trợ được chỉ lại cách set vốn cố định USDT. Giờ thì chạy mượt rồi.",
+            "seller_reply": None,
+            "likes": 6
+        },
+        {
+            "id": "rev_22",
+            "username": "User ****7639",
+            "user_key": "seed_22",
+            "bot_strategy": "Bot 2: SMC Cấu Trúc Thị Trường (Order Block)",
+            "rating": 5,
+            "date": "11/06/2026",
+            "comment": "Hệ số trượt giá Max Slippage chuẩn giúp lệnh khớp không bị lệch giá nhiều lúc biến động lớn. Rất ưng bụng độ hoàn thiện của hệ thống.",
+            "seller_reply": None,
+            "likes": 9
+        },
+        {
+            "id": "rev_23",
+            "username": "User ****2810",
+            "user_key": "seed_23",
+            "bot_strategy": "Bot 1: Sóng Hồi EMA200 (Pullback)",
+            "rating": 5,
+            "date": "08/06/2026",
+            "comment": "Tổng kết 1 tháng chạy bot: Lãi ròng 18.5%, max drawdown chỉ 4.2%. Quá mỹ mãn cho một con bot chạy tự động 24/7.",
+            "seller_reply": None,
+            "likes": 24
+        }
+    ]
+
+def _load_reviews():
+    try:
+        os.makedirs(os.path.dirname(REVIEWS_FILE), exist_ok=True)
+        if os.path.exists(REVIEWS_FILE):
+            with open(REVIEWS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"[REVIEWS] Error loading reviews: {e}")
+    default_data = _init_default_reviews()
+    try:
+        with open(REVIEWS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return default_data
+
+def _save_reviews(data):
+    try:
+        os.makedirs(os.path.dirname(REVIEWS_FILE), exist_ok=True)
+        with open(REVIEWS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"[REVIEWS] Error saving reviews: {e}")
+        return False
+
+class ReviewSubmitRequest(BaseModel):
+    api_key: Optional[str] = ""
+    user_id: Optional[str] = ""
+    bot_strategy: str
+    rating: int
+    comment: str
+
+@app.get("/api/reviews")
+async def get_reviews():
+    reviews = _load_reviews()
+    return {"status": "success", "data": reviews}
+
+@app.post("/api/reviews")
+async def submit_review(req: ReviewSubmitRequest):
+    api_key_clean = (req.api_key or "").strip()
+    user_id_clean = (req.user_id or "").strip()
+    user_key = api_key_clean or user_id_clean or "guest_anonymous"
+    
+    if req.rating < 1 or req.rating > 5:
+        raise HTTPException(status_code=400, detail="Số sao đánh giá phải từ 1 đến 5 sao.")
+    if not req.comment or len(req.comment.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Nội dung đánh giá cần tối thiểu 5 ký tự.")
+    if not req.bot_strategy:
+        raise HTTPException(status_code=400, detail="Vui lòng chọn chiến lược bot cần đánh giá.")
+        
+    reviews = _load_reviews()
+    
+    # Kiểm tra giới hạn: Mỗi API Key chỉ được đánh giá tối đa 2 lần trên cùng 1 bot
+    user_reviews_for_bot = [
+        r for r in reviews 
+        if r.get("user_key") == user_key and r.get("bot_strategy") == req.bot_strategy
+    ]
+    if len(user_reviews_for_bot) >= 2:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Tài khoản của bạn đã gửi tối đa 2 đánh giá cho '{req.bot_strategy}'."
+        )
+        
+    # Tạo tên viết tắt (masked name) dạng 'User ****1234'
+    if api_key_clean and len(api_key_clean) >= 6:
+        clean_key = "".join(c for c in api_key_clean if c.isalnum())
+        masked_name = f"User ****{clean_key[-4:]}"
+    elif user_id_clean:
+        clean_uid = "".join(c for c in user_id_clean if c.isalnum())
+        masked_name = f"User ****{clean_uid[-4:]}"
+    else:
+        masked_name = f"User ****{str(int(time.time()))[-4:]}"
+        
+    new_rev = {
+        "id": f"rev_{int(time.time() * 1000)}",
+        "username": masked_name,
+        "user_key": user_key,
+        "bot_strategy": req.bot_strategy,
+        "rating": req.rating,
+        "date": datetime.now().strftime("%d/%m/%Y"),
+        "comment": req.comment.strip(),
+        "seller_reply": None,
+        "likes": 0
+    }
+    
+    reviews.insert(0, new_rev)
+    _save_reviews(reviews)
+    return {"status": "success", "message": "Đánh giá thành công!", "data": reviews}
+
+@app.post("/api/reviews/like")
+async def like_review(review_id: str):
+    reviews = _load_reviews()
+    found = False
+    for r in reviews:
+        if r.get("id") == review_id:
+            r["likes"] = r.get("likes", 0) + 1
+            found = True
+            break
+    if found:
+        _save_reviews(reviews)
+        return {"status": "success"}
+    raise HTTPException(status_code=404, detail="Không tìm thấy đánh giá.")
 
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")

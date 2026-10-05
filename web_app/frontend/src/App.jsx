@@ -1273,7 +1273,13 @@ function App() {
         } catch {
           errMsg = await r.text();
         }
-        alert(`❌ Lỗi khởi động bot: ${errMsg || r.statusText}`);
+        if (r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký dưới link") || errMsg.includes("chưa đăng ký")) {
+          alert("UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!");
+          setShowSettings(true);
+          setSettingsTab("system");
+        } else {
+          alert(`❌ Lỗi khởi động bot: ${errMsg || r.statusText}`);
+        }
         setOverrideBotRunning(null);
         setIsStartingBot(false);
       }

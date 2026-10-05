@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  cacheDir: './.vite_cache',
   plugins: [react()],
   server: {
     host: '0.0.0.0',   // Expose ra toan bo mang LAN (de dien thoai truy cap)

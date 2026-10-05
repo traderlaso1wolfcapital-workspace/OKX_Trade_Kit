@@ -6072,7 +6072,7 @@ class LoginDialog(QtWidgets.QDialog):
             "<p style='margin: 0 0 5px 0;'> ✅ ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:</p>"
             "<p style='margin: 0 0 5px 0;'>1. Đăng ký tài khoản OKX dưới Link Ref của cộng đồng TLS1, mã ref: "
             "<a href='copy_ref' style='color: #00ffff; text-decoration: none; font-weight: bold;'>HoanPhiTLS1</a></p>"
-            "<p style='margin: 0;'>2. Hoặc thực hiện chuyển Ref về TLS1 nếu đã có sẵn tài khoản OKX.</p>"
+            "<p style='margin: 0;'>2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.</p>"
         )
         self.lbl_guide.setTextFormat(QtCore.Qt.TextFormat.RichText)
         self.lbl_guide.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextBrowserInteraction)

@@ -237,7 +237,7 @@ export default function LoginModal({
                 HoanPhiTLS1
               </strong>
             </p>
-            <p style={{ margin: "0 0 15px 0" }}>2. Hoặc thực hiện chuyển Ref về TLS1 nếu đã có sẵn tài khoản OKX.</p>
+            <p style={{ margin: "0 0 15px 0" }}>2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.</p>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
               <button
