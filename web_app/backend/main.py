@@ -13,6 +13,7 @@ except ImportError:
     pass
 import json
 import time
+import random
 import asyncio
 import subprocess
 import hmac
@@ -3212,7 +3213,7 @@ def _init_default_reviews():
             "rating": 5,
             "date": "12/08/2026",
             "comment": "Đúng mô tả chất lượng, bot bắt râu quét thanh khoản rất bén. Tỷ lệ hit TP cao, drawdown cực thấp.",
-            "seller_reply": "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+            "seller_reply": None,
             "likes": 18
         },
         {
@@ -3245,7 +3246,7 @@ def _init_default_reviews():
             "rating": 4,
             "date": "05/08/2026",
             "comment": "Bot chạy ổn áp, nếu có thêm thông báo Telegram báo râu quét tức thì nữa thì hoàn hảo 10/10.",
-            "seller_reply": "Cảm ơn bạn đã đóng góp ý kiến! Tính năng Webhook Telegram báo khớp lệnh tức thì bên mình đang hoàn thiện để ra mắt sớm nhất nhé.",
+            "seller_reply": None,
             "likes": 9
         },
         {
@@ -3278,7 +3279,7 @@ def _init_default_reviews():
             "rating": 5,
             "date": "25/07/2026",
             "comment": "Hôm qua lúc 2h sáng BTC giật râu quét long short cả 2 đầu, sáng dậy thấy bot cắn đúng đáy râu rồi TP ngọt lịm. Đỡ phải thức đêm canh lệnh bạc cả tóc.",
-            "seller_reply": "Chuẩn luôn bạn ơi! Cơ chế săn thanh khoản thiết kế riêng để trị những pha giật râu bất ngờ lúc anh em đang ngủ. Chúc bạn tiếp tục gặt hái lợi nhuận đều tay nhé!",
+            "seller_reply": None,
             "likes": 16
         },
         {
@@ -3300,7 +3301,7 @@ def _init_default_reviews():
             "rating": 5,
             "date": "19/07/2026",
             "comment": "Ban đầu nạp test 500u xem thế nào, chạy được 3 tuần thấy R:R toàn 1:2 với 1:3 chuẩn chỉ quá nên quyết định nâng vốn lên 3000u. Quản lý lệnh rất đàng hoàng.",
-            "seller_reply": "Cảm ơn bạn đã tin tưởng nâng vốn đồng hành cùng TLS1! Lưu ý luôn tuân thủ kỷ luật quản lý vốn và cài tỷ lệ rủi ro vừa phải để bot tối ưu hóa lợi nhuận bền vững nhé.",
+            "seller_reply": None,
             "likes": 21
         },
         {
@@ -3322,7 +3323,7 @@ def _init_default_reviews():
             "rating": 4,
             "date": "14/07/2026",
             "comment": "Đợt bão tin Non-Farm vừa rồi dính 1 lệnh SL ở khung M5. May mà tỷ lệ rủi ro để 1% nên không xi nhê gì. Khuyên anh em mới chơi nên tắt M5 chỉ để H1 trở lên khi có tin giật mạnh.",
-            "seller_reply": "Chia sẻ rất thực tế và chính xác! Khung nhỏ M5 khi có tin giật mạnh độ nhiễu cao, team luôn khuyến nghị anh em ưu tiên giữ H1/H2 để bộ lọc lọc nhiễu chuẩn nhất.",
+            "seller_reply": None,
             "likes": 10
         },
         {
@@ -3377,7 +3378,7 @@ def _init_default_reviews():
             "rating": 5,
             "date": "29/06/2026",
             "comment": "Từ ngày cắm bot này vào OKX thì giải phóng được bao nhiêu thời gian. Vừa làm việc chính vừa để bot tự chạy kiếm thêm tiền cafe bỉm sữa.",
-            "seller_reply": "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+            "seller_reply": None,
             "likes": 19
         },
         {
@@ -3485,6 +3486,61 @@ def _save_reviews(data):
         print(f"[REVIEWS] Error saving reviews: {e}")
         return False
 
+def _apply_reviews_buff(reviews: list) -> bool:
+    """
+    Tự động buff lượt 'Hữu ích' (likes) ngẫu nhiên cho các đánh giá:
+    - Tần suất: Mỗi 300 - 500 giây (+1 lượt hữu ích).
+    - Giới hạn tối đa: Không vượt quá 80% tổng số lượng đánh giá hiện có.
+    """
+    if not reviews:
+        return False
+    
+    total_count = len(reviews)
+    max_likes = max(1, int(total_count * 0.8))
+    now = time.time()
+    changed = False
+
+    for rev in reviews:
+        current_likes = rev.get("likes", 0)
+        if current_likes >= max_likes:
+            if "next_buff_ts" in rev:
+                rev.pop("next_buff_ts", None)
+                changed = True
+            continue
+
+        next_ts = rev.get("next_buff_ts")
+        if not next_ts:
+            # Khởi tạo thời điểm buff ngẫu nhiên ban đầu từ 300 đến 500 giây
+            rev["next_buff_ts"] = now + random.randint(300, 500)
+            changed = True
+        elif now >= next_ts:
+            rev["likes"] = current_likes + 1
+            if rev["likes"] < max_likes:
+                rev["next_buff_ts"] = now + random.randint(300, 500)
+            else:
+                rev.pop("next_buff_ts", None)
+            changed = True
+
+    if changed:
+        _save_reviews(reviews)
+    return changed
+
+async def _reviews_buff_worker():
+    """Chạy ngầm định kỳ 60s để kiểm tra và tự động buff lượt hữu ích cho đánh giá."""
+    while True:
+        try:
+            await asyncio.sleep(60)
+            reviews = _load_reviews()
+            _apply_reviews_buff(reviews)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[REVIEWS BUFF WORKER] Error: {e}")
+
+@app.on_event("startup")
+async def startup_reviews_buff():
+    asyncio.create_task(_reviews_buff_worker())
+
 class ReviewSubmitRequest(BaseModel):
     api_key: Optional[str] = ""
     user_id: Optional[str] = ""
@@ -3495,6 +3551,7 @@ class ReviewSubmitRequest(BaseModel):
 @app.get("/api/reviews")
 async def get_reviews():
     reviews = _load_reviews()
+    _apply_reviews_buff(reviews)
     return {"status": "success", "data": reviews}
 
 @app.post("/api/reviews")
@@ -3542,7 +3599,8 @@ async def submit_review(req: ReviewSubmitRequest):
         "date": datetime.now().strftime("%d/%m/%Y"),
         "comment": req.comment.strip(),
         "seller_reply": None,
-        "likes": 0
+        "likes": 0,
+        "next_buff_ts": time.time() + random.randint(300, 500)
     }
     
     reviews.insert(0, new_rev)
@@ -3553,9 +3611,12 @@ async def submit_review(req: ReviewSubmitRequest):
 async def like_review(review_id: str):
     reviews = _load_reviews()
     found = False
+    max_likes = max(1, int(len(reviews) * 0.8))
     for r in reviews:
         if r.get("id") == review_id:
             r["likes"] = r.get("likes", 0) + 1
+            if r["likes"] >= max_likes:
+                r.pop("next_buff_ts", None)
             found = True
             break
     if found:

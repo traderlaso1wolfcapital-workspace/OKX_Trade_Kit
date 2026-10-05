@@ -697,12 +697,12 @@ body {
 }
 
 .btn-chart-settings {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  color: #111827;
-  border: 1px solid #f59e0b;
-  border-radius: 4px;
-  padding: 0 12px;
-  height: 28px;
+  background: #3e424b;
+  color: #ffffff;
+  border: 1px solid #5a5f69;
+  border-radius: 6px;
+  padding: 0 14px;
+  height: 30px;
   font-size: 13px;
   font-weight: 700;
   font-family: "Inter", "Segoe UI", sans-serif;
@@ -712,15 +712,15 @@ body {
   justify-content: center;
   gap: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .btn-chart-settings:hover {
-  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
   border-color: #fcd34d;
-  color: #000000;
+  color: #111827;
 }
 
 .btn-chart-settings:active {
@@ -4141,18 +4141,22 @@ div[class*="tradingview-widget-copyright"],
 }
 
 .theme-glass-pro .btn-chart-settings {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.85) 0%, rgba(217, 119, 6, 0.85) 100%) !important;
-  border: 1px solid rgba(251, 191, 36, 0.5) !important;
+  background: rgba(62, 66, 75, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25) !important;
   backdrop-filter: blur(8px) !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+  text-shadow: none !important;
+  height: 30px !important;
+  padding: 0 14px !important;
+  border-radius: 6px !important;
 }
 
 .theme-glass-pro .btn-chart-settings:hover {
   background: linear-gradient(135deg, rgba(251, 191, 36, 1) 0%, rgba(245, 158, 11, 1) 100%) !important;
   border-color: rgba(252, 211, 77, 0.8) !important;
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4) !important;
+  color: #111827 !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4) !important;
   transform: translateY(-1px) !important;
 }
 

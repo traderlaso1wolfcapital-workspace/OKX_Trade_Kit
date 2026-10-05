@@ -15,7 +15,7 @@ const DEFAULT_REVIEWS = [
     rating: 5,
     date: "12/08/2026",
     comment: "Đúng mô tả chất lượng, bot bắt râu quét thanh khoản rất bén. Tỷ lệ hit TP cao, drawdown cực thấp.",
-    seller_reply: "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+    seller_reply: null,
     likes: 18,
   },
   {
@@ -48,7 +48,7 @@ const DEFAULT_REVIEWS = [
     rating: 4,
     date: "05/08/2026",
     comment: "Bot chạy ổn áp, nếu có thêm thông báo Telegram báo râu quét tức thì nữa thì hoàn hảo 10/10.",
-    seller_reply: "Cảm ơn bạn đã đóng góp ý kiến! Tính năng Webhook Telegram báo khớp lệnh tức thì bên mình đang hoàn thiện để ra mắt sớm nhất nhé.",
+    seller_reply: null,
     likes: 9,
   },
   {
@@ -81,7 +81,7 @@ const DEFAULT_REVIEWS = [
     rating: 5,
     date: "25/07/2026",
     comment: "Hôm qua lúc 2h sáng BTC giật râu quét long short cả 2 đầu, sáng dậy thấy bot cắn đúng đáy râu rồi TP ngọt lịm. Đỡ phải thức đêm canh lệnh bạc cả tóc.",
-    seller_reply: "Chuẩn luôn bạn ơi! Cơ chế săn thanh khoản thiết kế riêng để trị những pha giật râu bất ngờ lúc anh em đang ngủ. Chúc bạn tiếp tục gặt hái lợi nhuận đều tay nhé!",
+    seller_reply: null,
     likes: 16,
   },
   {
@@ -103,7 +103,7 @@ const DEFAULT_REVIEWS = [
     rating: 5,
     date: "19/07/2026",
     comment: "Ban đầu nạp test 500u xem thế nào, chạy được 3 tuần thấy R:R toàn 1:2 với 1:3 chuẩn chỉ quá nên quyết định nâng vốn lên 3000u. Quản lý lệnh rất đàng hoàng.",
-    seller_reply: "Cảm ơn bạn đã tin tưởng nâng vốn đồng hành cùng TLS1! Lưu ý luôn tuân thủ kỷ luật quản lý vốn và cài tỷ lệ rủi ro vừa phải để bot tối ưu hóa lợi nhuận bền vững nhé.",
+    seller_reply: null,
     likes: 21,
   },
   {
@@ -125,7 +125,7 @@ const DEFAULT_REVIEWS = [
     rating: 4,
     date: "14/07/2026",
     comment: "Đợt bão tin Non-Farm vừa rồi dính 1 lệnh SL ở khung M5. May mà tỷ lệ rủi ro để 1% nên không xi nhê gì. Khuyên anh em mới chơi nên tắt M5 chỉ để H1 trở lên khi có tin giật mạnh.",
-    seller_reply: "Chia sẻ rất thực tế và chính xác! Khung nhỏ M5 khi có tin giật mạnh độ nhiễu cao, team luôn khuyến nghị anh em ưu tiên giữ H1/H2 để bộ lọc lọc nhiễu chuẩn nhất.",
+    seller_reply: null,
     likes: 10,
   },
   {
@@ -180,7 +180,7 @@ const DEFAULT_REVIEWS = [
     rating: 5,
     date: "29/06/2026",
     comment: "Từ ngày cắm bot này vào OKX thì giải phóng được bao nhiêu thời gian. Vừa làm việc chính vừa để bot tự chạy kiếm thêm tiền cafe bỉm sữa.",
-    seller_reply: "Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading! Chúc bạn gặt hái nhiều lợi nhuận an toàn.",
+    seller_reply: null,
     likes: 19,
   },
   {
@@ -425,14 +425,15 @@ export default function ReviewsTab({ apiKey = "", accounts = [], selectedAccount
     return `User ****${raw.slice(-4)}`;
   }, [currentUserKey]);
 
-  // Load reviews on mount
+  // Load reviews on mount & poll every 60s
   useEffect(() => {
+    let isMounted = true;
     const fetchReviews = async () => {
       try {
         const res = await fetch("/api/reviews");
         if (res.ok) {
           const json = await res.json();
-          if (json.data && Array.isArray(json.data)) {
+          if (json.data && Array.isArray(json.data) && isMounted) {
             setReviews(json.data);
             localStorage.setItem("tls1_cached_reviews_v3", JSON.stringify(json.data));
             return;
@@ -441,6 +442,7 @@ export default function ReviewsTab({ apiKey = "", accounts = [], selectedAccount
       } catch {
         // Fallback
       }
+      if (!isMounted) return;
       const local = localStorage.getItem("tls1_cached_reviews_v3");
       if (local) {
         try {
@@ -453,6 +455,11 @@ export default function ReviewsTab({ apiKey = "", accounts = [], selectedAccount
       setReviews(DEFAULT_REVIEWS);
     };
     fetchReviews();
+    const interval = setInterval(fetchReviews, 60000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const showToast = (msg) => {

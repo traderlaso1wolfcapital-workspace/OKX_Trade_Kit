@@ -143,7 +143,7 @@ export default function SystemSettingsModal({
             ⚙️ {t("tab_strategy")}
           </button>
           <button className={`settings-tab-btn ${settingsTab === "system" ? "active" : ""}`} onClick={() => setSettingsTab("system")}>
-            🛠️ {t("tab_system") || "Hệ Thống"}
+            🛠️ {t("tab_system") || "Hỗ Trợ"}
           </button>
           <button className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`} onClick={() => setSettingsTab("reviews")}>
             ⭐ Đánh Giá

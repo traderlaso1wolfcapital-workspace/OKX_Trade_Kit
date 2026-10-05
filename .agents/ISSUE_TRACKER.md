@@ -33,6 +33,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/10/2026]** - Tối Ưu Hệ Thống Đánh Giá & Giao Diện Web App:
+  - **Mô tả yêu cầu CEO:**
+    1. Tạm thời xóa hết phản hồi của TLS1 Team (`"Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading!..."`) trên tất cả đánh giá để team tự phản hồi sau.
+    2. Thiết lập cơ chế tự động buff ngẫu nhiên lượt "Hữu ích" (likes) cho mỗi đánh giá mới theo thời gian: mỗi 300 - 500 giây (+1 lượt hữu ích), tổng lượt hữu ích không vượt quá 80% tổng số lượng tất cả tin nhắn.
+    3. Trả nút "Cài Đặt" (`.btn-chart-settings`) về màu xám trắng như bản cũ, chỉ khi di chuột vào (:hover) mới chuyển sang màu vàng gold.
+    4. Đổi tên tab "Hệ Thống" thành "Hỗ Trợ", giữ nguyên icon `🛠️` đầu tab.
+  - **Giải pháp thực hiện:**
+    - [user_data/reviews.json](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/user_data/reviews.json), [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py), [ReviewsTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ReviewsTab.jsx): Đã xóa toàn bộ phản hồi mặc định của TLS1 Team (`seller_reply: null`).
+    - [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py):
+      + Viết hàm `_apply_reviews_buff()` tính toán trần hữu ích `max_likes = max(1, int(len(reviews) * 0.8))`.
+      + Tự động kích hoạt chu kỳ buff ngẫu nhiên từ 300 đến 500 giây (`random.randint(300, 500)`).
+      + Bổ sung background worker `_reviews_buff_worker()` chạy ngầm mỗi 60s và cơ chế tính toán cập nhật ngay khi người dùng gọi `GET /api/reviews`.
+      + Cập nhật `submit_review()` tự động khởi tạo mốc `next_buff_ts` cho đánh giá mới.
+    - [ReviewsTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ReviewsTab.jsx): Thêm cơ chế polling ngầm 60s tự động đồng bộ lượt thích mới mà không làm giật lag giao diện.
+    - [index.css](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css) & [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Cấu hình `.btn-chart-settings` với kích thước chuẩn (`height: 30px`, `padding: 0 14px`, `border-radius: 6px`), màu nền xám chuẩn theo ảnh (`#3e424b`, viền `#5a5f69`, chữ trắng `#ffffff`), khi hover chuyển dải màu vàng gold rực rỡ (`linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)`).
+    - [index.js (i18n)](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js) & [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Cập nhật tên tab thành `"Hỗ Trợ"` kèm icon `🛠️ Hỗ Trợ`.
+    - Đã build lại production bundle (`dist`) thành công.
+
+
 - **[05/10/2026]** - Sửa 2 Cảnh Báo Lỗi Undefined Variable (`threading`) Trong `gui_main.py`:
   - **Mô tả hiện tượng:** Trên cây thư mục Cursor, file `gui_main.py` báo đỏ kèm ký hiệu `2, M` (2 vấn đề và file đã chỉnh sửa).
   - **Nguyên nhân cốt lõi:** `threading` chỉ được import cục bộ ở 2 method bên dưới (dòng 533 và 3158), trong khi hàm `start_bot()` (dòng 4419) và `stop_bot()` (dòng 4499) gọi `threading.Thread(...)` dẫn đến lỗi `reportUndefinedVariable`.

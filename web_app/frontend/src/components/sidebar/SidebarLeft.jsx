@@ -108,10 +108,10 @@ export default function SidebarLeft({
                 flex: 1,
                 minWidth: 0,
                 padding: "4px 8px",
-                borderRadius: "4px",
+                borderRadius: "5px",
                 fontSize: "12px",
                 outline: "none",
-                height: "28px",
+                height: "30px",
                 cursor: isRunning ? "not-allowed" : "pointer",
                 opacity: isRunning ? 0.65 : 1,
                 color: isRunning ? "#a0a5ab" : "#ffffff",
@@ -163,7 +163,7 @@ export default function SidebarLeft({
             <button
               type="button"
               className="btn-chart-settings"
-              style={{ height: "28px", whiteSpace: "nowrap", flexShrink: 0 }}
+              style={{ height: "30px", whiteSpace: "nowrap", flexShrink: 0 }}
               onClick={onOpenSettings}
               title="Cài đặt hệ thống & API Key"
             >

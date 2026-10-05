@@ -2084,7 +2084,7 @@ class BotInstanceWidget(QtWidgets.QWidget):
             self.btn_open_settings.setFont(QtGui.QFont("Segoe UI", 9, QtGui.QFont.Weight.Bold))
             self.btn_open_settings.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.btn_open_settings.setStyleSheet("""
-                QPushButton { background-color: #2d2d2d; color: #ffffff; min-height: 22px; padding: 2px 10px; border: 1px solid #555555; border-radius: 4px; }
+                QPushButton { background-color: #3e424b; color: #ffffff; min-height: 26px; padding: 3px 12px; border: 1px solid #5a5f69; border-radius: 5px; }
                 QPushButton:hover { background-color: #ff9900; color: #000000; font-weight: bold; border-color: #ff9900; }
             """)
 
