@@ -33,6 +33,21 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[05/10/2026]** - Sửa 2 Cảnh Báo Lỗi Undefined Variable (`threading`) Trong `gui_main.py`:
+  - **Mô tả hiện tượng:** Trên cây thư mục Cursor, file `gui_main.py` báo đỏ kèm ký hiệu `2, M` (2 vấn đề và file đã chỉnh sửa).
+  - **Nguyên nhân cốt lõi:** `threading` chỉ được import cục bộ ở 2 method bên dưới (dòng 533 và 3158), trong khi hàm `start_bot()` (dòng 4419) và `stop_bot()` (dòng 4499) gọi `threading.Thread(...)` dẫn đến lỗi `reportUndefinedVariable`.
+  - **Giải pháp:** Bổ sung `import threading` tại phần khai báo thư viện đầu file [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py#L4). Mã nguồn đạt 100% hợp lệ, cảnh báo đỏ tự động biến mất.
+
+- **[05/10/2026]** - Cập Nhật Link Ref OKX (AutoTrader) & Mã Mời (AutoTrader):
+  - **Mô tả yêu cầu CEO:** Thay đổi toàn bộ link `https://www.okx.com/join/HoanPhiTLS1` sang `https://okx.com/join/AutoTrader` và mã mời (Referral code) sang `AutoTrader`.
+  - **Giải pháp thực hiện:**
+    - [LoginModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/LoginModal.jsx): Cập nhật nút đăng ký OKX mở `https://okx.com/join/AutoTrader`, mã mời sao chép thành `AutoTrader`.
+    - [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx):
+      + Cập nhật nút Đăng ký OKX (VIP) mở `https://okx.com/join/AutoTrader`.
+      + Cập nhật nút copy và text Mã mời (Referral code) thành `AutoTrader`.
+      + Cập nhật link hướng dẫn Cách 2 sang `https://okx.com/join/AutoTrader`.
+    - [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py): Cập nhật nút đăng ký mở `https://okx.com/join/AutoTrader`, mã ref hiển thị và click copy là `AutoTrader`.
+
 - **[05/10/2026]** - Đồng Bộ Thứ Tự Chiến Lược (EMA200 - SMC - Liquidation), Màu Chữ Phân Loại (#a5d6ff) & Cập Nhật Ref AutoTrader.fun:
   - **Mô tả yêu cầu CEO:**
     1. Sắp xếp lại thứ tự chiến lược trong tab Đánh Giá chuẩn theo ô chọn bot bên ngoài: EMA200 -> SMC -> Liquidation (`Bot 1: Sóng Hồi EMA200 (Pullback)`, `Bot 2: SMC Cấu Trúc Thị Trường (Order Block)`, `Bot 3: Săn Thanh Khoản (Liquidation)`).

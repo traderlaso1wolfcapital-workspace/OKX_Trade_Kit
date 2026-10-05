@@ -1,6 +1,7 @@
 import sys
 import os
 import multiprocessing
+import threading
 import ssl
 import certifi
 
@@ -6071,7 +6072,7 @@ class LoginDialog(QtWidgets.QDialog):
         self.lbl_guide = QtWidgets.QLabel(
             "<p style='margin: 0 0 5px 0;'> ✅ ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:</p>"
             "<p style='margin: 0 0 5px 0;'>1. Đăng ký tài khoản OKX dưới Link Ref của cộng đồng TLS1, mã ref: "
-            "<a href='copy_ref' style='color: #00ffff; text-decoration: none; font-weight: bold;'>HoanPhiTLS1</a></p>"
+            "<a href='copy_ref' style='color: #00ffff; text-decoration: none; font-weight: bold;'>AutoTrader</a></p>"
             "<p style='margin: 0;'>2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.</p>"
         )
         self.lbl_guide.setTextFormat(QtCore.Qt.TextFormat.RichText)
@@ -6083,7 +6084,7 @@ class LoginDialog(QtWidgets.QDialog):
         def handle_ref_click(link):
             play_ui_sound("ribhavagrawal-hit-by-a-wood-230542.mp3", 0.6)
             if link == "copy_ref":
-                QtWidgets.QApplication.clipboard().setText("HoanPhiTLS1")
+                QtWidgets.QApplication.clipboard().setText("AutoTrader")
                 QtWidgets.QToolTip.showText(QtGui.QCursor.pos(), "✅ Đã Copy Mã Ref!", self.lbl_guide, QtCore.QRect(), 1500)
 
         self.lbl_guide.linkActivated.connect(handle_ref_click)
@@ -6095,7 +6096,7 @@ class LoginDialog(QtWidgets.QDialog):
         self.btn_reg = QtWidgets.QPushButton("Đăng ký OKX (VIP)")
         self.btn_reg.setObjectName("BtnReg")
         self.btn_reg.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        self.btn_reg.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://www.okx.com/join/HoanPhiTLS1")))
+        self.btn_reg.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://okx.com/join/AutoTrader")))
         
         self.btn_ref = QtWidgets.QPushButton("Hướng dẫn chuyển Ref")
         self.btn_ref.setObjectName("BtnRef")

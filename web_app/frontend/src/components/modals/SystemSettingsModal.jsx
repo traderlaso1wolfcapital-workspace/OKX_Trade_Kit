@@ -795,7 +795,7 @@ export default function SystemSettingsModal({
                   <div style={{ display: "flex", gap: "10px" }}>
                     <button
                       type="button"
-                      onClick={() => window.open("https://www.okx.com/join/HoanPhiTLS1", "_blank")}
+                      onClick={() => window.open("https://okx.com/join/AutoTrader", "_blank")}
                       style={{
                         flex: 1,
                         padding: "9px 12px",
@@ -884,11 +884,11 @@ export default function SystemSettingsModal({
                                   color: "#00ffff",
                                   cursor: "pointer",
                                 }}
-                                onClick={() => handleCopyText("HoanPhiTLS1", "Đã copy Mã mời: HoanPhiTLS1")}
-                                onTouchEnd={(e) => { e.preventDefault(); handleCopyText("HoanPhiTLS1", "Đã copy Mã mời: HoanPhiTLS1"); }}
+                                onClick={() => handleCopyText("AutoTrader", "Đã copy Mã mời: AutoTrader")}
+                                onTouchEnd={(e) => { e.preventDefault(); handleCopyText("AutoTrader", "Đã copy Mã mời: AutoTrader"); }}
                                 title="Click hoặc chạm để copy Mã mời"
                               >
-                                HoanPhiTLS1
+                                AutoTrader
                               </strong>
                             </li>
                             <li>
@@ -936,12 +936,12 @@ export default function SystemSettingsModal({
                           <div>
                             2. Đăng ký tài khoản mới qua link:{" "}
                             <a
-                              href="https://www.okx.com/join/HoanPhiTLS1"
+                              href="https://okx.com/join/AutoTrader"
                               target="_blank"
                               rel="noopener noreferrer"
                               style={{ color: "#58a6ff", textDecoration: "none" }}
                             >
-                              https://www.okx.com/join/HoanPhiTLS1
+                              https://okx.com/join/AutoTrader
                             </a>
                           </div>
                         </div>

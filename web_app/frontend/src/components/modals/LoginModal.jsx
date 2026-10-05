@@ -230,18 +230,18 @@ export default function LoginModal({
               <strong
                 style={{ color: "#00ffff", cursor: "pointer" }}
                 onClick={() => {
-                  navigator.clipboard.writeText("HoanPhiTLS1");
+                  navigator.clipboard.writeText("AutoTrader");
                   alert("✅ Đã Copy Mã Ref!");
                 }}
               >
-                HoanPhiTLS1
+                AutoTrader
               </strong>
             </p>
             <p style={{ margin: "0 0 15px 0" }}>2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.</p>
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
               <button
-                onClick={() => window.open("https://www.okx.com/join/HoanPhiTLS1", "_blank")}
+                onClick={() => window.open("https://okx.com/join/AutoTrader", "_blank")}
                 style={{
                   flex: 1,
                   padding: "8px",
