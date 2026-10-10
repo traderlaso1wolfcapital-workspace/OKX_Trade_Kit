@@ -324,6 +324,12 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
         if "51010" in err_str or "51015" in err_str or "current account mode" in err_str:
             print("💡 [HƯỚNG DẪN] OKX báo lỗi 51010 (Sai chế độ vị thế).")
             print("   Bạn vui lòng chuyển sang Chế độ phòng ngừa rủi ro (Hedge Mode), thay vì Chế độ một chiều (One-way Mode) như hiện tại.")
+        elif "50123" in err_str or "trading permission" in err_str.lower():
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 50123 (Thiếu quyền Giao dịch).")
+            print("   Vui lòng kiểm tra 3 nguyên nhân chính sau:")
+            print("   1. API Key chỉ có quyền 'Đọc' (Chưa tick chọn quyền 'Giao dịch' / Trade).")
+            print("   2. Chưa liên kết địa chỉ IP cho API Key (OKX sẽ tự động vô hiệu hóa quyền Giao dịch sau 14 ngày nếu không có IP).")
+            print("   3. Địa chỉ IP của máy đang chạy bot không khớp với IP đã đăng ký trong API Key.")
         hft_logger.error(f"Lỗi place_market_entry: {err_str}", exc_info=True)
         print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
@@ -386,6 +392,12 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
         elif "51010" in err_str or "51015" in err_str or "current account mode" in err_str:
             print("💡 [HƯỚNG DẪN] OKX báo lỗi 51010 (Sai chế độ vị thế).")
             print("   Bạn vui lòng chuyển sang Chế độ phòng ngừa rủi ro (Hedge Mode), thay vì Chế độ một chiều (One-way Mode) như hiện tại.")
+        elif "50123" in err_str or "trading permission" in err_str.lower():
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 50123 (Thiếu quyền Giao dịch).")
+            print("   Vui lòng kiểm tra 3 nguyên nhân chính sau:")
+            print("   1. API Key chỉ có quyền 'Đọc' (Chưa tick chọn quyền 'Giao dịch' / Trade).")
+            print("   2. Chưa liên kết địa chỉ IP cho API Key (OKX sẽ tự động vô hiệu hóa quyền Giao dịch sau 14 ngày nếu không có IP).")
+            print("   3. Địa chỉ IP của máy đang chạy bot không khớp với IP đã đăng ký trong API Key.")
         raise
 
 def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, trigger_px: str, is_tp: bool, cl_id: str, td_mode: str = "cross", dry_run: bool = False):
@@ -425,6 +437,13 @@ def place_algo_tpsl(client, inst_id: str, side: str, pos_side: str, size: str, t
         hft_logger.error(f"Lỗi place_algo_tpsl: {err_str}", exc_info=True)
         print(f"🚨 [ALGO {tp_or_sl}] Lỗi kết nối OKX: {err_str} | instId={inst_id} px={trigger_px}")
         
+        if "50123" in err_str or "trading permission" in err_str.lower():
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 50123 (Thiếu quyền Giao dịch).")
+            print("   Vui lòng kiểm tra 3 nguyên nhân chính sau:")
+            print("   1. API Key chỉ có quyền 'Đọc' (Chưa tick chọn quyền 'Giao dịch' / Trade).")
+            print("   2. Chưa liên kết địa chỉ IP cho API Key (OKX sẽ tự động vô hiệu hóa quyền Giao dịch sau 14 ngày nếu không có IP).")
+            print("   3. Địa chỉ IP của máy đang chạy bot không khớp với IP đã đăng ký trong API Key.")
+
         if any(code in err_str for code in ["51280", "51281", "51282", "51283"]):
             print(f"⚠️ [EMERGENCY] Giá đã vượt qua {tp_or_sl} {trigger_px} trước khi gài lệnh. Đóng {pos_side.upper()} Market ngay lập tức!")
             close_position_market(client, inst_id, pos_side, size, f"{tp_or_sl} bị đâm thủng", td_mode)
@@ -474,6 +493,12 @@ def place_algo_tpsl_pair(client, inst_id: str, side: str, pos_side: str, size: s
                 err_str = str(e2)
         hft_logger.error(f"Lỗi place_algo_tpsl_pair: {err_str}", exc_info=True)
         print(f"🚨 [ALGO TP/SL PAIR] Lỗi kết nối OKX: {err_str} | instId={inst_id} tp={tp_px} sl={sl_px}")
+        if "50123" in err_str or "trading permission" in err_str.lower():
+            print("💡 [HƯỚNG DẪN] OKX báo lỗi 50123 (Thiếu quyền Giao dịch).")
+            print("   Vui lòng kiểm tra 3 nguyên nhân chính sau:")
+            print("   1. API Key chỉ có quyền 'Đọc' (Chưa tick chọn quyền 'Giao dịch' / Trade).")
+            print("   2. Chưa liên kết địa chỉ IP cho API Key (OKX sẽ tự động vô hiệu hóa quyền Giao dịch sau 14 ngày nếu không có IP).")
+            print("   3. Địa chỉ IP của máy đang chạy bot không khớp với IP đã đăng ký trong API Key.")
 
 def check_algo_tpsl_status(client, inst_id: str, pos_side: str, td_mode: str, size: Decimal) -> dict[str, Any]:
     status = {"has_tp": False, "has_sl": False, "tp_px": Decimal("0"), "sl_px": Decimal("0"), "size_matched": True}

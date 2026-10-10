@@ -3758,3 +3758,10 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
   - **Vấn đề 2 (Giao diện PWA bị chìm dưới tai thỏ):** Khi "Thêm vào Màn hình chính" trên iPhone (chế độ Standalone/PWA), thanh công cụ trên cùng (Bot tabs bar) bị đẩy lên và chìm dưới phần tai thỏ / Dynamic Island, gây mờ và khó nhìn do status bar trong suốt `black-translucent`.
   - **Đã fix 2:** Trong `index.css`, phần `@media screen and (max-width: 1024px)` chứa thuộc tính `padding: 0 !important;` ở `.app-container`, làm vô hiệu hóa safe-area-inset. Đã thay thế thành `padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;` (và các cạnh còn lại) để đảm bảo giao diện luôn tự động né vùng tai thỏ trên iOS một cách an toàn.
   *(Mã patch: `z-web-sync-bot-status-and-pwa-safearea`)*
+
+- **[10/10/2026]** - Thêm Hướng dẫn tự động cho lỗi OKX 50123 (Thiếu quyền Giao dịch):
+  - **Vấn đề:** Người dùng báo lỗi API Key báo thiếu quyền giao dịch dù "đã cấp đủ quyền". Thực tế OKX sẽ văng lỗi `50123` không chỉ khi thiếu quyền Trade, mà còn do người dùng quên bind IP (khiến quyền Trade bị sàn tự động thu hồi sau 14 ngày), hoặc do đổi IP VPS khiến IP không khớp với Whitelist.
+  - **Đã fix:**
+    - Bổ sung và cập nhật đoạn mã chặn bắt lỗi `50123` trong tất cả các hàm đặt lệnh tại [bot_orders.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py).
+    - Tự động in ra khối `[HƯỚNG DẪN]` giải thích 3 nguyên nhân cốt lõi để người dùng tự kiểm tra (Chưa chọn quyền Trade, Chưa liên kết IP, hoặc Sai IP).
+  *(Mã patch: `z-bot-orders-50123-guidance-v2`)*
