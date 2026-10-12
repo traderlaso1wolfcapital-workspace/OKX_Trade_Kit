@@ -33,6 +33,15 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/10/2026]** - Sửa Lỗi Chưa Bôi Vàng Bước 7 (Chọn Tài Khoản) & Bước 20 (Tab Hỗ Trợ):
+  - **Mô tả yêu cầu CEO:**
+    1. Bước 7/21 chưa bôi vàng phần chọn tài khoản và số dư.
+    2. Bước 20/21 chưa bôi vàng tab Hỗ Trợ.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Bước 7/21 (Chọn Tài Khoản & Số Dư):** Thuộc tính `data-tour="account-select"` trước đây chỉ đặt trên thẻ `<select>` khi đã có tài khoản, nhưng khi ở nền tảng Quỹ FX và chưa có tài khoản (`propAccounts.length === 0`) thì giao diện render nút `[Kết Nối Quỹ FX]` không có thuộc tính này. Giải pháp: Chuyển `data-tour="account-select"` bao trùm toàn bộ thẻ container `div` của Hàng 2 trong `SidebarLeft.jsx`, giúp viền vàng Spotlight luôn bao trọn vẹn nhãn `Chọn tài khoản:` lẫn ô chọn/số dư/nút kết nối bất kể đang ở trạng thái nào.
+    2. **Bước 20/21 (Tab Hỗ Trợ):** Trong `tourData.js`, bước 20 gọi `setSettingsTab("support")`, trong khi mã định danh tab thực tế trong `SystemSettingsModal.jsx` là `"system"`, dẫn đến tab Hỗ Trợ không được kích hoạt và thẻ nội dung không render. Giải pháp: Sửa `setSettingsTab("system")`, bổ sung `data-tour="settings-support-tab"` vào nút tab `[ 🛠️ Hỗ Trợ ]` và thiết lập target kép bao trùm cả nút tab lẫn khung nội dung tab Hỗ Trợ bên dưới.
+  - **Kiểm tra và nghiệm thu:** `npm run build` thành công trong 239ms, 0 lỗi.
+
 - **[12/10/2026]** - Tối Ưu Viền Spotlight Connect Bao Trùm Tab, Rà Soát Font Chữ & Làm Gọn Nội Dung Tour Hướng Dẫn:
   - **Mô tả yêu cầu CEO:**
     1. Viền vàng Spotlight ở popup Connect phải bao quanh cả nút tab (ví dụ: cụm `[Fast Connect]` ở trên cùng với nội dung thẻ ở dưới) để người dùng dễ nhận biết đang ở tab nào.

@@ -356,6 +356,7 @@ export default function SidebarLeft({
 
           {/* HÀNG 2: CHỌN TÀI KHOẢN (NGANG HÀNG ĐẸP MẮT THEO BẢN VẼ CHIẾN THUẬT - ẢNH 3) */}
           <div
+            data-tour="account-select"
             style={{
               display: "flex",
               alignItems: "center",
@@ -386,7 +387,6 @@ export default function SidebarLeft({
                 /* Luôn hiển thị Dropdown Select tài khoản Quỹ FX */
                 <select
                   className="styled-select"
-                  data-tour="account-select"
                   disabled={isRunning}
                   style={{
                     width: "auto",
@@ -491,7 +491,6 @@ export default function SidebarLeft({
             ) : (
               <select
                 className="styled-select"
-                data-tour="account-select"
                 disabled={isRunning}
                 style={{
                   width: "auto",

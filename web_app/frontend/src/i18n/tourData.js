@@ -967,19 +967,19 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 20: settings-support-tab-content
+    // 20: settings-support-tab-content bao gồm cả nút tab Hỗ Trợ
     {
-      target: '[data-tour="settings-support-tab-content"]',
+      target: '[data-tour="settings-support-tab"], [data-tour="settings-support-tab-content"]',
       placement: "top",
       preStep: () => {
         setShowConnectModal(false);
         setShowSettings(true);
-        setSettingsTab("support");
+        setSettingsTab("system");
       },
     },
-    // 21: settings-reviews-tab-content
+    // 21: settings-reviews-tab-content bao gồm cả nút tab Đánh Giá
     {
-      target: '[data-tour="settings-reviews-tab-content"]',
+      target: '[data-tour="settings-reviews-tab"], [data-tour="settings-reviews-tab-content"]',
       placement: "top",
       preStep: () => {
         setShowConnectModal(false);

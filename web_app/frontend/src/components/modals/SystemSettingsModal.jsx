@@ -173,13 +173,25 @@ export default function SystemSettingsModal({
 
         {/* Tab Bar (InnerTabs) */}
         <div className="settings-tab-bar">
-          <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
+          <button
+            className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`}
+            onClick={() => setSettingsTab("strategy")}
+            data-tour="settings-strategy-tab"
+          >
             ⚙️ {t("tab_strategy", "Chiến Thuật")}
           </button>
-          <button className={`settings-tab-btn ${settingsTab === "system" ? "active" : ""}`} onClick={() => setSettingsTab("system")}>
+          <button
+            className={`settings-tab-btn ${settingsTab === "system" || settingsTab === "support" ? "active" : ""}`}
+            onClick={() => setSettingsTab("system")}
+            data-tour="settings-support-tab"
+          >
             🛠️ {t("tab_system", "Hỗ Trợ")}
           </button>
-          <button className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`} onClick={() => setSettingsTab("reviews")}>
+          <button
+            className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`}
+            onClick={() => setSettingsTab("reviews")}
+            data-tour="settings-reviews-tab"
+          >
             ⭐ {t("tab_reviews", "Đánh Giá")}
           </button>
         </div>
@@ -580,8 +592,8 @@ export default function SystemSettingsModal({
             </div>
           )}
 
-          {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG ===== */}
-          {settingsTab === "system" && (
+          {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG / HỖ TRỢ ===== */}
+          {(settingsTab === "system" || settingsTab === "support") && (
             <div className="settings-tab-content" data-tour="settings-support-tab-content" style={{ position: "relative" }}>
               {/* POPUP THÔNG BÁO COPY NHẸ NHÀNG */}
               {copyNotice && (
