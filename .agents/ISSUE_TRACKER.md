@@ -33,6 +33,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/10/2026]** - Khắc Phục Lỗi `tradelocker_service.py`, Khử Lỗi `logger` `main.py`, & Nâng Cấp Toàn Diện Tour Hướng Dẫn Sử Dụng (22 Bước Chi Tiết):
+  - **Mô tả yêu cầu CEO:**
+    1. Sửa triệt để 2 lỗi cảnh báo trong `tradelocker_service.py`.
+    2. Kiểm tra và khắc phục lỗi `logger` trong `main.py` (tại block connect TradeLocker).
+    3. Cập nhật và làm lại toàn diện Tour Hướng Dẫn người mới cho đầy đủ các nút bấm, tính năng mới (Quỹ FX Connect, Chọn nền tảng Sàn/Quỹ, Khóa ký quỹ an toàn khi Bot chạy, Mức TP/SL chuẩn M5 0.6%, Chế độ chia đôi màn hình Split View ⮃, v.v.).
+    4. Chạy script `zzPush_To_GitHub.py` theo lệnh trực tiếp của CEO.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Khắc phục `tradelocker_service.py`:** Tại line 459, sử dụng `datetime.now(timezone.utc)` nhưng thiếu khai báo import `from datetime import datetime, timezone`. Đã bổ sung import ở đầu file, kiểm tra AST xác nhận 0 lỗi.
+    2. **Khắc phục `main.py`:** Tại line 3761 gọi `logger.error` nhưng module `logging` và biến `logger` chưa được import/khởi tạo toàn cục trong file. Đã bổ sung `import logging` và `logger = logging.getLogger("tls1_app")`, đồng thời bổ sung `print()` xuất log chuẩn console.
+    3. **Nâng cấp Tour Hướng Dẫn 22 Bước (tourData.js):**
+       - Mở rộng từ 19 bước lên 22 bước tuần tự, logic và trực quan.
+       - Tích hợp các bước mới: Bước 4 (Quỹ FX Connect TradeLocker), Bước 5 (Dropdown Chọn Nền Tảng Sàn/Quỹ), Bước 12 (Bảng Điều Khiển Dưới & Nút Chia Đôi Màn Hình Split View ⮃).
+       - Bổ sung `data-tour="platform-select"` trên `SidebarLeft.jsx`, `data-tour="connect-tradelocker-tab"` & `connect-tradelocker-content` trên `ConnectModal.jsx`, `data-tour="bottom-tabs-bar"` trên `App.jsx`.
+       - Đồng bộ `tourInitialStep` trong `handleStartSettingsTour` sang index 13 (Bước 14: Thêm Mã Giao Dịch).
+       - Cập nhật số liệu chuẩn mới: Mức chốt lời gốc M5 0.6% & cắt lỗ gốc M5 0.6%, cơ chế khóa cứng ký quỹ khi bot đang chạy (`LOCKED 🔒`).
+       - Đồng bộ 6 ngôn ngữ (`vi`, `en`, `zh`, `ko`, `fr`, `es`).
+  - **Kiểm tra và nghiệm thu:**
+    - `npm run build` thành công trong 212ms, 0 lỗi.
+    - AST linter kiểm tra `main.py` và `tradelocker_service.py` sạch 100%.
+
 - **[12/10/2026]** - Khắc Phục Lỗi Bấm CHẠY BOT Bị Mở Lại Bảng Connect, Chuyển Sàn/Quỹ Thành Dropdown Gọn Gàng & Triệt Tiêu Cấu Hình Nhập Trùng Lặp:
   - **Mô tả yêu cầu CEO:**
     1. Khi đã kết nối Quỹ E8 và bấm "CHẠY BOT", web app lại hiện ra bảng Quỹ FX Connect thay vì khởi động bot.

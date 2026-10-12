@@ -421,7 +421,7 @@ function App() {
     setShowConnectModal(false);
     setShowSettings(true);
     setSettingsTab("strategy");
-    setTourInitialStep(10); // Bắt đầu từ Bước 11 (index 10: [data-tour="settings-watchlist"])
+    setTourInitialStep(13); // Bắt đầu từ Bước 14 (index 13: [data-tour="settings-watchlist"])
     setShowOnboardingTour(true);
   }, []);
 
@@ -2583,7 +2583,7 @@ function App() {
 
                 {/* 2. PANE TABS (BẢNG VỊ THẾ - LOGS - BIỂU ĐỒ) */}
                 <section className="pane-tabs">
-                  <div className="tab-bar-header">
+                  <div className="tab-bar-header" data-tour="bottom-tabs-bar">
                     <div className="tab-buttons">
                       <button
                         className={`tab-btn ${activeTab === "positions" ? "active" : ""}`}

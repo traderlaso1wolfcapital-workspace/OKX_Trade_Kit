@@ -373,6 +373,7 @@ export default function ConnectModal({
             type="button"
             className={`connect-tab-btn ${connectTab === "tradelocker" ? "active" : ""}`}
             onClick={() => handleTabSwitch("tradelocker")}
+            data-tour="connect-tradelocker-tab"
             style={connectTab === "tradelocker" ? { borderTopColor: "#00e676", color: "#00e676" } : {}}
           >
             Quỹ FX Connect
@@ -1204,12 +1205,14 @@ export default function ConnectModal({
 
           {/* TAB 3: TRADELOCKER / E8 MARKETS PROP FIRM */}
           {connectTab === "tradelocker" && (
-            <TradeLockerTab
-              currentUid={effectiveUid}
-              t={t}
-              initialSelectedId={selectedPropId}
-              onAccountsUpdated={fetchPropAccounts}
-            />
+            <div data-tour="connect-tradelocker-content" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+              <TradeLockerTab
+                currentUid={effectiveUid}
+                t={t}
+                initialSelectedId={selectedPropId}
+                onAccountsUpdated={fetchPropAccounts}
+              />
+            </div>
           )}
 
           {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT */}

@@ -1,8 +1,16 @@
 import json
 import re
 import os
+import sys
 import subprocess
 from datetime import datetime
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # ⚠️ CỜ BẬT/TẮT CHỨC NĂNG BUILD ACTION .EXE (Theo lệnh CEO)
 # Khi đặt False: Chỉ đẩy code lên GitHub, không tăng Version, không tạo Tag -> Không kích hoạt Action Build .exe

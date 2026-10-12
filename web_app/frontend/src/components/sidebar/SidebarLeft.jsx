@@ -245,6 +245,7 @@ export default function SidebarLeft({
           <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
             {/* Dropdown Nền Tảng: SÀN OKX / QUỸ E8 */}
             <select
+              data-tour="platform-select"
               value={tradingPlatform}
               onChange={(e) => handlePlatformSwitch(e.target.value)}
               disabled={isRunning}
