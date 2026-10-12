@@ -112,10 +112,29 @@ def decrypt_value(val: str) -> str:
             return ""
     return val
 
+ADMIN_UID = "admtls12021"
+
 def is_admin_uid(uid: str) -> bool:
     if not uid: return False
     clean = str(uid).strip().lower()
-    return clean == "admtls12021"
+    return clean == ADMIN_UID
+
+def kill_pid(pid: int):
+    if not pid or pid <= 0:
+        return
+    try:
+        import psutil
+        parent = psutil.Process(pid)
+        for child in parent.children(recursive=True):
+            try: child.kill()
+            except Exception: pass
+        parent.kill()
+    except Exception:
+        try:
+            import os, signal
+            os.kill(pid, signal.SIGTERM)
+        except Exception:
+            pass
 
 def verify_jwt(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     if not credentials or not credentials.credentials:
@@ -137,7 +156,8 @@ def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
     now = time.time()
     if clean in uid_cache and now - uid_cache[clean]["time"] < 300: # 5 minutes
         res = uid_cache[clean]["result"]
-        return (res.get("status") == "success"), res.get("message", "")
+        if res.get("status") == "success":
+            return True, "ACTIVE"
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
         resp = requests.get(url, timeout=10)
@@ -146,15 +166,16 @@ def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
         reader = csv.reader(content.splitlines())
         next(reader, None) # skip header
         for row in reader:
-            if row and len(row) >= 6 and row[0].strip().isdigit():
+            if row and len(row) >= 1 and row[0].strip().isdigit():
                 if row[0].strip() == clean:
-                    user_status = row[5].strip().upper()
+                    user_status = row[5].strip().upper() if len(row) > 5 else ""
                     if user_status in ["ACTIVE", "ON"]:
                         result = {"status": "success", "uid": clean}
                         uid_cache[clean] = {"time": now, "result": result}
                         return True, "ACTIVE"
                     else:
-                        return False, f"Tài khoản đang bị khóa ({user_status})"
+                        # Đã có UID trong bảng (đã đăng ký ref) nhưng chưa được bật ON
+                        return False, "Vui lòng liên hệ Admin để kích hoạt."
         return False, "UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
     except Exception as e:
         print(f"[REF CHECK ERROR] {e}", flush=True)
@@ -362,17 +383,17 @@ def login_with_password(request: Request, req: LoginRequest):
         is_valid = False
         user_status = ""
         for row in reader:
-            if row and len(row) >= 6 and row[0].strip().isdigit():
+            if row and len(row) >= 1 and row[0].strip().isdigit():
                 if row[0].strip() == uid:
-                    user_status = row[5].strip().upper()
+                    user_status = row[5].strip().upper() if len(row) > 5 else ""
                     is_valid = True
                     break
                     
         if not is_valid:
-            return {"status": "error", "message": "UID không tồn tại hoặc chưa đăng ký!"}
+            return {"status": "error", "message": "UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"}
             
         if user_status not in ["ACTIVE", "ON"]:
-            return {"status": "error", "message": f"Tài khoản đang bị khóa ({user_status})"}
+            return {"status": "error", "message": "Vui lòng liên hệ Admin để kích hoạt."}
             
         # Xác thực hoặc thiết lập mật khẩu bảo vệ tài khoản User
         res = check_or_set_account_password(uid, req.password, is_admin=False)
@@ -1468,10 +1489,10 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
                 )
             is_ref, ref_msg = check_uid_active_ref(master_uid)
             if not is_ref:
-                print(f"[START_BOT REF BLOCKED] Master UID: {master_uid} chưa đăng ký Ref. Chi tiết: {ref_msg}", flush=True)
+                print(f"[START_BOT REF BLOCKED] Master UID: {master_uid}. Chi tiết: {ref_msg}", flush=True)
                 raise HTTPException(
                     status_code=403,
-                    detail="UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
+                    detail=ref_msg or "Vui lòng liên hệ Admin để kích hoạt."
                 )
 
     # Đồng bộ API key đã chọn vào các file env của bot
@@ -2708,7 +2729,7 @@ def get_closed_positions(uid: str, strategy: str = "sub1", account_id: str = Non
     # Nếu chưa nhập API Key, trả về rỗng (tránh hiển thị tín hiệu từ trade_markers cũ sau khi xoá API)
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     api_key, secret_key, passphrase, _ = _get_okx_creds(uid, strategy, target_acc)
-    if not (api_key and secret_key and passphrase) and uid != ADMIN_UID:
+    if not (api_key and secret_key and passphrase) and not is_admin_uid(uid):
         return []
 
     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")

@@ -33,6 +33,198 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/10/2026]** - Tăng Kích Thước Nút Timeframe Trong Cột "TF Trade" (PositionsTable):
+  - **Mô tả yêu cầu CEO:** Các nút chọn khung thời gian (5, 15, 30, H1, H2, H4) trong cột `TF trade` hơi nhỏ, yêu cầu làm lớn hơn một chút để thao tác bấm thuận tiện và hiển thị rõ ràng hơn.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+       - Tăng chiều rộng nút từ `24px` ➔ `29px` (tăng ~21%).
+       - Tăng chiều cao nút từ `19px` ➔ `24px` (tăng ~26%).
+       - Tăng cỡ chữ từ `12px` ➔ `12.5px` rõ nét hơn, độ bo góc `borderRadius: 5px`.
+       - Tăng khoảng cách `gap` giữa các nút từ `5px` ➔ `6px`.
+       - Đồng bộ áp dụng trên cả hàng vị thế rỗng và hàng vị thế đang mở.
+    2. [index.css](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/index.css): Cập nhật `border-radius: 5px !important` cho class `.tf-badge` trong theme glass.
+    3. Đã chạy `npm run build` kiểm chứng thành công (0 lỗi).
+
+- **[12/10/2026]** - Khắc Phục Lỗi Xuống Dòng Chữ "Waiting for signal..." Khi Đổi Ngôn Ngữ:
+  - **Mô tả yêu cầu CEO:** Khi chuyển sang ngôn ngữ khác (ví dụ: tiếng Anh "Waiting for signal..."), chữ bị rớt xuống thành 2 dòng làm lệch chiều cao hàng. Yêu cầu giữ chữ luôn nằm gọn trên đúng 1 dòng như bản tiếng Việt ("Chờ tín hiệu...").
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):
+       - Bổ sung `whiteSpace: "nowrap"` cho thẻ `<th>` của cột cặp vị thế (`th_pair`).
+       - Bổ sung `whiteSpace: "nowrap"` cho thẻ `<td>` của dòng trạng thái rỗng và thẻ `<span>` chứa chuỗi `{t("waiting_signal")}`.
+       - Đảm bảo toàn bộ các ngôn ngữ (kể cả ngôn ngữ dài như tiếng Anh, tiếng Pháp, tiếng Tây Ban Nha) luôn hiển thị thẳng hàng trên 1 dòng duy nhất, không bao giờ bị ngắt dòng.
+    2. Chạy `npm run build` kiểm chứng thành công (0 lỗi).
+
+- **[12/10/2026]** - Đồng Bộ Tên Nút "Hướng Dẫn" & Đa Ngôn Ngữ Hóa Nút Tour Và Tab Cài Đặt (6 Ngôn Ngữ):
+  - **Mô tả yêu cầu CEO:** Nút "Người Mới" và "Hướng Dẫn" khi đổi ngôn ngữ vẫn chưa đổi text theo, vẫn giữ tiếng Việt. Đồng thời đổi tên nút "Người Mới" thành "Hướng Dẫn" cho đồng bộ toàn hệ thống.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Đổi tên nút từ `Người Mới` thành `{t("guide_btn", "Hướng Dẫn")}`, gán `title` bằng `{t("guide_tooltip", ...)}`.
+    2. [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Nút "Hướng Dẫn" trên header được chuyển sang `{t("guide_btn", "Hướng Dẫn")}`, tooltip động `{t("guide_settings_tooltip", ...)}`. Các tab thanh điều hướng cài đặt được đa ngôn ngữ hóa đầy đủ: `⚙️ {t("tab_strategy")}`, `🛠️ {t("tab_system")}`, `⭐ {t("tab_reviews")}`.
+    3. [i18n/index.js](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js): Bổ sung đồng bộ các translation keys (`guide_btn`, `guide_tooltip`, `guide_settings_tooltip`, `tab_system`, `tab_reviews`) cho toàn bộ 6 ngôn ngữ (`vi`, `en`, `zh`, `ko`, `fr`, `es`).
+    4. Đã chạy `npm run build` kiểm chứng thành công (0 lỗi).
+
+- **[12/10/2026]** - Phân Tách Trực Quan Hàng FX và COIN Trên Bảng Watchlist Coins (Không Gắn Chữ Nhãn):
+  - **Mô tả yêu cầu CEO:** Trong khung `WATCHLIST COINS` (Cài Đặt Chiến Thuật), tách riêng 2 phần: trên là danh sách FX/Hàng hóa (XAU, XAG, CL), dưới là danh sách Crypto Coins (BTC, ETH, SOL, XRP...). Không cần ghi chữ "FX" và "COIN" mà chỉ cần xuống dòng cách một khoảng đệm/vạch nhẹ tinh tế là người dùng nhìn vào tự khắc hiểu ngay.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [tradeConfig.js](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/constants/tradeConfig.js): Bổ sung thuộc tính `assetClass: "forex"` cho `XAU-USDT`, `XAG-USDT`, `CL-USDT`.
+    2. [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Phân chia lưới `coin-select-grid` thành 2 cụm:
+       - Hàng trên: Liệt kê các cặp Forex / Hàng hóa / Kim loại (`XAU`, `XAG`, `CL`).
+       - Dải phân cách nhẹ tinh tế (`height: 1px`, `background: rgba(255, 255, 255, 0.08)`, `margin: 8px 0`).
+       - Lưới bên dưới: Liệt kê toàn bộ các cặp Crypto Coins (`BTC`, `ETH`, `SOL`, `XRP`, `DOGE`, `SUI`, `NEAR`, `ADA`, `LTC`, `TRX`, `HYPE`, `ZEC`).
+    3. Đã chạy `npm run build` kiểm chứng thành công (0 lỗi).
+
+- **[12/10/2026]** - Khắc Phục Lỗi Hiển Thị Volume Nhánh Entry/Limit Theo Hệ Số Nhân Dù Cấu Hình "Cố Định":
+  - **Mô tả yêu cầu CEO:** Người dùng cài đặt mức ký quỹ "Cố định" (4 USDT), nhưng trên bảng `✜ Tình trạng vị thế` các nhánh con lại hiển thị theo hệ số nhân (`Entry M15: ... - 4.8 U`, `Entry M30: ... - 6.0 U`, `Entry H1: ... - 8.0 U`, `Entry H2: ... - 12.0 U`, `Chờ Limit H4: ... - 20.0 U`). Kiểm tra xem bot có bị đặt sai khối lượng lên sàn không và khắc phục hiển thị.
+  - **Kết quả điều tra:**
+    - Lệnh thực tế trên sàn OKX **KHÔNG BỊ SAI**: Bot đã đặt đúng theo mức vốn cố định cơ sở (~4 USDT mỗi lệnh) do `bot_strategy.py` kiểm tra cờ `ENABLE_TF_VOLUME_MULTIPLIER`. Vị thế BTC trên sàn ghi nhận tổng ký quỹ thực tế là `15.81 U` (5 khung x ~4 U), ETH là `15.87 U` (4 khung x ~4 U). Dòng tiêu đề hiển thị đúng ký quỹ thực tế từ sàn.
+    - **Nguyên nhân lỗi hiển thị:** Tại hàm `_get_vol_val` trong [bot_ui.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py), mã nguồn trước đó luôn nhân `v_mult = TF_VOLUME_MULTIPLIERS.get(tf)` mà không kiểm tra cờ cấu hình `ENABLE_TF_VOLUME_MULTIPLIER`.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    - [bot_ui.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py): Đọc cờ `is_tf_vol_mult = bool(_cfg.get("ENABLE_TF_VOLUME_MULTIPLIER", getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)))`. Nếu cờ TẮT (Chế độ "Cố định"), ép cứng `v_mult = Decimal("1.0")` cho tất cả các nhánh Entry và lệnh chờ Limit. Khi cờ BẬT (Chế độ "Nhân TF"), mới nhân theo hệ số.
+
+- **[12/10/2026]** - Đa Ngôn Ngữ Hóa Toàn Diện Tour Hướng Dẫn 19 Bước & Nhật Ký Terminal (6 Ngôn Ngữ):
+  - **Mô tả yêu cầu CEO:** Khi người dùng đổi sang ngôn ngữ khác (Anh, Trung, Hàn, Pháp, Tây Ban Nha...), toàn bộ Tour hướng dẫn người mới và các thông báo trong Logs Terminal cũng phải tự động chuyển đổi theo ngôn ngữ đang chọn.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. Tạo mới file [tourData.js](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/tourData.js): Cung cấp dữ liệu dịch thuật chuyên sâu chuẩn thuật ngữ tài chính cho toàn bộ 19 bước của Onboarding Tour bằng 6 ngôn ngữ (`vi`, `en`, `zh`, `ko`, `fr`, `es`).
+    2. Cập nhật [OnboardingTour.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/OnboardingTour.jsx): Tích hợp hook `useTranslation()` để dịch các nút điều hướng (Bỏ qua / Skip / 跳过 / 건너뛰기 / Passer / Omitir, Trước / Back, Tiếp theo / Next, Hoàn tất / Finish).
+    3. Cập nhật [LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx): Tích hợp `useTranslation()` và bộ dịch dòng nhật ký động `formatLogLine()` cho các trạng thái kết nối server, thông báo kết nối OKX, cảnh báo algo TP/SL, đặt/hủy lệnh limit. Dịch các tiêu đề và thông báo sao chép clipboard theo ngôn ngữ đang chọn.
+    4. Cập nhật [i18n/index.js](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/i18n/index.js): Bổ sung đầy đủ translation keys cho nút tour và nhật ký terminal cho cả 6 ngôn ngữ.
+    5. Cập nhật [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Sử dụng `getTourSteps(lang, ...)` tự động phản hồi ngay khi người dùng chọn ngôn ngữ mới trên thanh `LanguageSelector`.
+    6. Kiểm thử: Chạy `npm run build` thành công xuất sắc (mã thoát 0).
+
+- **[12/10/2026]** - Miễn Nhiễm Tuyệt Đối Cho Vàng (XAU), Dầu (CL), Bạc (XAG) & Các Cặp Forex Khỏi Cơ Chế Đồng Pha BTC:
+  - **Mô tả yêu cầu CEO:** Kiểm tra và loại bỏ hoàn toàn cơ chế "Đồng pha BTC & Lọc Vĩ mô" khỏi các cặp tài sản Forex, Kim loại, Hàng hóa (Vàng XAU, Dầu CL, Bạc XAG, v.v.) vì thị trường Forex/Hàng hóa có chu kỳ kinh tế và quy luật vận động hoàn toàn độc lập với Crypto.
+  - **Kết quả rà soát mã nguồn:**
+    - Cấu hình gốc đã có phân loại `asset_class: "forex"` cho XAU và CL, do đó trong ảnh chụp của CEO, XAU đã tự động nhận diện và **chờ SHORT tại H4** theo đúng trend kỹ thuật của Vàng (trong khi BTC đang là UPTREND và Long).
+    - Tuy nhiên, tồn tại 2 lỗ hổng tiềm ẩn:
+      1. Nếu người dùng cấu hình Bạc (XAG) hoặc các cặp Forex mới chưa khai báo trường `asset_class`, mã nguồn sẽ fallback về `"crypto"`.
+      2. Bộ lọc `is_btc_h4_squeeze` (chặn lệnh khi BTC bị nén Bollinger/Keltner) trước đó chưa kiểm tra cờ `_asset_class == "crypto"`.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [bot_strategy.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py):
+       - Bổ sung bộ lọc cứng danh sách tài sản phi-crypto `NON_CRYPTO_SYMBOLS = {"XAU", "XAG", "CL", "OIL", "BRENT", "NG", "COPPER", "SILVER", "GOLD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "USD", "DXY", "CNH", "SPX", "NDX", "DJI", "US30", "NAS100"}`. Bất kỳ cặp nào thuộc danh sách này hoặc có `asset_class` là forex/commodity sẽ bị ép cứng `_asset_class = "forex"`, triệt để vô hiệu hóa cờ `_is_alt_synced = False`.
+       - Khóa `is_btc_h4_squeeze` chỉ chạy khi `_asset_class == "crypto"`. Vàng/Dầu/Bạc hoàn toàn miễn nhiễm với biến động nén H4 của BTC.
+    2. [bot_config.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_config.py): Bổ sung cặp Bạc `XAG` (`XAG-USDT-SWAP`) với `asset_class: "forex"`.
+    3. [tradeConfig.js](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/constants/tradeConfig.js): Bổ sung `XAG-USDT` vào danh sách coin hỗ trợ. Đã build frontend production thành công.
+
+- **[12/10/2026]** - Chuẩn Hóa Nhãn "ký quỹ: X U" Trên Dòng Trạng Thái Vị Thế Đã Khớp (Dashboard Terminal):
+  - **Mô tả yêu cầu CEO:** Trên bảng Terminal trạng thái vị thế, dòng tiêu đề `Đã khớp LONG [m5 m15 m30 H1 H2] - 15.81 U (+123.2% / -0.0%)` chưa có nhãn "ký quỹ" nên người dùng dễ nhầm lẫn hoặc khó phân biệt với các dòng nhánh con (như `Chờ Limit H4: ... - (ký quỹ: 20.0 U)`).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    - [bot_ui.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_ui.py): Cập nhật định dạng cả lệnh LONG và SHORT thành `Đã khớp LONG/SHORT [{filled_tfs}] - ký quỹ: {total_margin:.2f} U (+{roi}% / -{mae}%)`.
+    - Cú pháp AST Python đã kiểm chứng 100% hợp lệ (`SYNTAX OK`).
+
+- **[12/10/2026]** - Tích Hợp Hướng Dẫn Chi Tiết Popup Connect (Fast Connect & Nhập API Key Thủ Công) Nâng Cấp Tour 19 Bước:
+  - **Mô tả yêu cầu CEO:**
+    1. Khi người dùng bấm tour, cần có các bước mở trực tiếp popup Connect để hướng dẫn cặn kẽ 2 phương thức kết nối tài khoản OKX:
+       - Phương thức 1: Fast Connect (OAuth 2.0 cấp phép 1-click an toàn).
+       - Phương thức 2: Tự nhập API Key thủ công (Quản lý tài khoản, điền Key/Secret/Passphrase).
+    2. Nhấn mạnh nguyên tắc an toàn tuyệt đối: Chỉ cấp quyền 'Trade' (Giao dịch), tuyệt đối KHÔNG cấp quyền 'Withdraw' (Rút tiền).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [ConnectModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx): Hỗ trợ điều khiển tab từ bên ngoài (`activeTab`, `onTabChange`), gắn các thuộc tính `data-tour="connect-fast-content"` và `data-tour="connect-apikey-content"`.
+    2. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Nâng cấp lộ trình Tour lên 19 bước liền mạch:
+       - Bước 1: Nút Connect ngoài màn hình chính.
+       - Bước 2: Popup Connect mở ➔ Hướng dẫn Fast Connect (1-click an toàn qua OAuth 2.0).
+       - Bước 3: Chuyển Tab API Key ➔ Hướng dẫn tự nhập API Key chủ động (+ tạo, - xóa, lưu cấu hình) kèm cảnh báo an toàn KHÔNG cấp quyền rút tiền.
+       - Bước 4 - 10: Trở lại màn hình chính (Bộ 3 bot, Tài khoản áp dụng, Quản lý vốn, TP/SL, Watchlist, Chạy Bot, Cầu nối Cài Đặt).
+       - Bước 11 - 19: Bên trong Bảng Cài Đặt (Watchlist -> Quản Lý Vốn -> Bộ 3 DCA -> Cầu Dao -> Điểm Vào Lệnh -> Hệ Số Đa Khung -> Lưu Cấu Hình -> Hỗ Trợ -> Đánh Giá).
+    3. [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Cập nhật tooltip nút "Người Mới" lên 19 bước chuẩn A - Z.
+    4. Đã build production bundle (`dist`) thành công (216ms).
+
+- **[12/10/2026]** - Tối Ưu Bảng Logs (Double Buffering Chống Giật Lag) & Tách Biệt Nút Chạy Bot Ở Bước 7 Tour:
+  - **Mô tả hiện tượng & Yêu cầu:**
+    1. Ở Bước 7 Tour (Kích Hoạt Vận Hành Bot): Viền bo vàng trước đó bọc cả thanh Action Bar (chứa cả nút Connect và icon địa cầu), gây hiểu nhầm rằng tour đang trỏ cả vào nút Connect.
+    2. Bảng Logs bị chớp nháy và xô lệch vị trí liên tục khi nhận frame mới hoặc khi có thông báo `[TP/SL SCAN BUFFER]`, `[LIMIT]`, `[CANCEL]` chèn lên đầu.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): 
+       - Tách riêng `data-tour="action-bot"` xuống chỉ bọc duy nhất nút `▶ CHẠY BOT` / `⏹ DỪNG BOT`. Loại trừ hoàn toàn nút Connect và icon quả địa cầu khỏi Bước 7.
+       - Triển khai cơ chế **Double Buffering** cho Logs: Dữ liệu dashboard terminal được gom ngầm trong buffer và chỉ commit hiển thị một lần khi kết thúc frame (`===`), triệt tiêu 100% hiện tượng chớp nháy.
+       - Tách luồng sự kiện tức thời (`⏳ [TP/SL SCAN BUFFER]`, `[LIMIT]`, `[CANCEL]`, `[SYSTEM]`) vào mảng `eventLogs` riêng.
+    2. [LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx):
+       - Tích hợp trọn vẹn cả 2 phần trong cùng 1 Tab Logs duy nhất: Bảng Dashboard cố định ở trên, Nhật ký sự kiện tức thời ở dưới với dải phân cách thẩm mỹ. Bảng dashboard luôn đứng im cố định, không bị xô lệch vị trí.
+    3. Đã build lại production bundle (`dist`) thành công.
+
+- **[12/10/2026]** - Sửa Lỗi Viền Bo Vàng Spotlight Đè Lên Tiêu Đề Group Trong Bảng Cài Đặt:
+  - **Nguyên nhân cốt lõi:** Các thẻ `.settings-group` được thiết kế theo phong cách QGroupBox với tiêu đề `.settings-group-title` định vị tuyệt đối `position: absolute; top: -10px`. Hàm đo tọa độ trước đây chỉ lấy `el.getBoundingClientRect()` của khung container gốc cộng padding 6px, dẫn đến viền trên bị đặt thấp hơn vị trí chữ tiêu đề nổi (cắt ngang thân chữ).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    - [OnboardingTour.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/OnboardingTour.jsx): Nâng cấp thuật toán tính bounding rect: Tự động phát hiện phần tử con `.settings-group-title` nhô lên ngoài khung, tính toán lại biên `top` bao trọn cả chữ tiêu đề, đồng thời cộng thêm 12px đệm (`padTop`). Viền bo vàng spotlight giờ đây bao phủ trọn vẹn cả chữ tiêu đề với khoảng cách thẩm mỹ rộng rãi, không bị đè chữ.
+    - Đã build lại production bundle (`dist`) thành công (204ms).
+
+
+- **[12/10/2026]** - Chuẩn Hóa Lộ Trình Tour 17 Bước Tuần Tự (Từ Ngoài Vào Trong, Từ Trên Xuống Dưới) & Bổ Sung Bảng Hệ Số TP/SL Đa Khung:
+  - **Mô tả yêu cầu CEO:**
+    1. Hệ thống lại lộ trình Onboarding Tour tuần tự có bắt đầu và kết thúc rõ ràng, từ trên xuống dưới, từ ngoài vào trong:
+       - Bên ngoài màn hình chính: Header (Connect OKX, Bộ 3 Bot) -> Sidebar (Tài khoản, Quản lý vốn, TP/SL với bảng hệ số chi tiết) -> Bảng Chọn Coin & TF -> Action Bar (Bắt đầu/Dừng bot) -> Cầu nối vào Cài Đặt.
+       - Bên trong Cài Đặt: Tuần tự đúng theo thứ tự giao diện từ trên xuống dưới:
+         1. THÊM MÃ GIAO DỊCH (Watchlist Coin)
+         2. Tài khoản (EMA200 Bot) & Quản Lý Vốn
+         3. Công Tắc Chiến Thuật (Bộ 3 DCA: DCA Dương / DCA Âm / Lưới Đa Khung)
+         4. Cầu Dao Bảo Vệ Vốn (Hedge Reversal) & Đồng Pha BTC
+         5. Điểm Vào Lệnh (Entry Setup) & Nến Tích Lũy
+         6. Hệ Số Nhân Đa Khung (TF Multipliers)
+         7. Nút Lưu Cấu Hình & Khôi Phục Mặc Định
+         8. Tab HỖ TRỢ (Điều kiện dùng, API Key, HWID, Bảo trì)
+         9. Tab ĐÁNH GIÁ (Phản hồi cộng đồng, gửi review, hoàn tất)
+    2. Tại Bước 5 (Thiết Lập Chốt Lời TP & Cắt Lỗ SL): Bổ sung bảng hệ số cụ thể tính toán từ gốc M5 (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) kèm lời giải thích bản chất toán học để người dùng hiểu rõ tại sao khung lớn cần biên độ TP/SL rộng hơn.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Cập nhật `tourSteps` thành 17 bước trọn vẹn. Bước 5 tích hợp đầy đủ bảng hệ số trực quan và diễn giải bản chất gồng sóng / chống quét râu.
+    2. [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Định vị chính xác các `data-tour` tương ứng với từng nhóm chức năng từ trên xuống dưới: `settings-watchlist`, `settings-account-capital`, `settings-dca`, `settings-circuit-breaker`, `settings-entry-filters`, `settings-tf-multipliers`, `settings-actions`, `settings-support-tab-content`, `settings-reviews-tab-content`.
+    3. [OnboardingTour.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/OnboardingTour.jsx): Bổ sung timer 4 nhịp đo vị trí (40ms, 180ms, 380ms, 580ms) và tối ưu bắt trọn tọa độ khi chuyển tab Hỗ Trợ và Đánh Giá.
+    4. [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Cập nhật tooltip nút "Người Mới" lên 17 bước chuẩn từ A - Z.
+    5. Đã build bundle production (`dist`) thành công không lỗi (0 errors, 208ms).
+
+- **[12/10/2026]** - Sửa Lỗi ReferenceError `setShowSettings` & Nâng Cấp Hệ Thống Tour 13 Bước Giải Thích Bản Chất Điểm Vào Lệnh & Hệ Số Nhân Đa Khung:
+  - **Mô tả hiện tượng:** Khi mở web, màn hình báo đỏ `React App Crashed! ReferenceError: Cannot access 'setShowSettings' before initialization tại App.jsx`.
+  - **Nguyên nhân cốt lõi:** State `const [showSettings, setShowSettings]` và `[settingsTab, setSettingsTab]` được khai báo ở dòng 718 của [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), nhưng mảng `tourSteps` và các hàm `handleStartSettingsTour` lại gọi sử dụng chúng từ dòng 410 (Temporal Dead Zone).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Đưa khai báo `showSettings` và `settingsTab` lên trước `tourSteps` (dòng 400), triệt tiêu hoàn toàn lỗi ReferenceError (0 errors).
+    2. [SystemSettingsModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/SystemSettingsModal.jsx): Gắn `data-tour="settings-tf-multipliers"` cho bảng Hệ Số Nhân Đa Khung (`tf_multipliers_title`).
+    3. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Nâng cấp tour thành 13 bước hoàn chỉnh, giải thích cặn kẽ bản chất toán học:
+       - **Bước 11:** Điểm Vào Lệnh (Entry Setup) & Nến Tích Lũy: Giải thích rõ Độ lệch đệm đón trước (Base Offset % để đón trước cản EMA200), Khoảng cách an toàn tối thiểu (Base Gap %), và Bộ lọc 60 nến tích lũy (Accum Candles) để loại bỏ 100% bẫy sideway.
+       - **Bước 12:** Bản Chất Hệ Số Nhân Đa Khung (TF Multipliers): Giải thích bản chất cột Vốn (Margin Factor nhân vốn và TP/SL ở khung lớn M5 x1.0 -> H4 x5.0) và cột Vào Lệnh (Entry Factor nhân vùng đệm và khoảng cách DCA M5 x1.0 -> H4 x6.8) giúp bắt trọn sóng lớn mà an toàn vốn tuyệt đối.
+       - **Bước 13:** Lưu Cấu Hình & Hoàn Tất (tự động đóng modal Cài Đặt).
+    4. Đã build lại production bundle (`dist`) thành công (207ms). Cả hai cổng `5173` và `8080` phản hồi HTTP 200 OK mượt mà.
+
+- **[12/10/2026]** - Tích Hợp Hệ Thống Hướng Dẫn Tương Tác Toàn Diện Cho Người Mới (Spotlight Onboarding Tour) & Fix 2 Lỗi Đỏ Trong `main.py`:
+  - **Mô tả yêu cầu CEO:**
+    1. Người mới truy cập `autotrader.fun` chưa nắm rõ cách sử dụng, nhiệm vụ của từng nút, từng dòng thiết lập. Yêu cầu tạo tour hướng dẫn toàn bộ một lượt dạng Spotlight (làm mờ nền, viền phát sáng trỏ trực tiếp vào từng thành phần kèm tooltip giải thích, có nút Bỏ qua / Tiếp tục / Quay lại).
+    2. Đặt nút kích hoạt lại Tour bất kỳ lúc nào tại thanh Sidebar bên trái (cạnh nút Cài Đặt ⚙).
+    3. Fix triệt để 2 lỗi đỏ trong `web_app/backend/main.py`.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. [OnboardingTour.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/common/OnboardingTour.jsx): Thiết kế component Tour tương tác cao cấp theo chuẩn Rich Aesthetics:
+       - Tự động đo đạc tọa độ `getBoundingClientRect()` và cuộn mượt mà phần tử vào tầm mắt.
+       - Viền Spotlight phát sáng neon vàng (`#f59e0b`) cùng hiệu ứng làm mờ nền tối.
+       - Card giải thích dạng glassmorphism chống tràn màn hình, hỗ trợ đầy đủ phím tắt (`Esc`, `Mũi tên`, `Enter`).
+       - Tự động lưu `localStorage` để không làm phiền người dùng cũ, đồng thời tự động kích hoạt sau 1.2s khi người mới ghé thăm lần đầu.
+    2. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Xây dựng lộ trình 8 bước hướng dẫn chuẩn súc tích:
+       - Bước 1: Nút Connect OKX (Liên kết tài khoản & API Key).
+       - Bước 2: Bộ ba chiến thuật bot (EMA200 / SMC / Liquidation).
+       - Bước 3: Chọn tài khoản OKX áp dụng.
+       - Bước 4: Nút Cài Đặt chuyên sâu ⚙ (Cầu dao, DCA, Lưới Đa Khung).
+       - Bước 5: Quản lý Vốn & Ký quỹ mỗi lệnh (USDT / % Vốn, Cố định / Nhân TF).
+       - Bước 6: Tỷ lệ Chốt lời (TP) & Cắt lỗ (SL) an toàn.
+       - Bước 7: Bảng chọn Cặp Coin & Khung thời gian (TF trade).
+       - Bước 8: Nút BẮT ĐẦU CHẠY BOT & DỪNG BOT.
+    3. [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx): Thêm nút `💡 Tour` cạnh nút `⚙ Cài Đặt`, tích hợp đầy đủ `data-tour`.
+    4. [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Khắc phục dứt điểm lỗi biến chưa khai báo `kill_pid` và `ADMIN_UID` (0 errors).
+
+- **[12/10/2026]** - Sửa Lỗi Thông Báo Ref Khi Cột Status Trong Google Sheets Chưa Bật ON ("Vui lòng liên hệ Admin để kích hoạt"):
+  - **Mô tả hiện tượng:** Người dùng đã đăng ký tài khoản OKX dưới Link Ref và đã được thêm UID vào Google Sheets (`CheckVolume`), nhưng cột `Status` (Cột F) chưa được Admin gạt sang `ON`. Khi khởi động bot hoặc đăng nhập, hệ thống hiển thị thông báo nhầm lẫn: *"UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"*.
+  - **Nguyên nhân cốt lõi:**
+    1. Trong [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py) (`check_uid_active_ref` và `login_with_password`) và [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py), điều kiện duyệt dòng CSV yêu cầu cứng `len(row) >= 6`. Khi dòng mới thêm có ô Status để trống hoặc file CSV không đủ 6 cột, UID bị bỏ qua và nhảy thẳng xuống return thông báo chưa đăng ký Ref.
+    2. Trong `main.py` route `/api/bot/start`, khi `check_uid_active_ref` trả về `False`, route ném `HTTPException(403)` với chuỗi detail bị gán cứng thành `"UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"` thay vì dùng thông báo `ref_msg`.
+    3. Trong [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), khối xử lý lỗi `handleStartBot` bắt mọi mã `r.status === 403` và luôn `alert("UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!")`.
+  - **Giải pháp:**
+    1. [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Cho phép duyệt `len(row) >= 1` và lấy an toàn `row[5]`. Nếu UID đã có trong bảng nhưng status chưa phải `ON`/`ACTIVE`, trả về thông báo: `"Vui lòng liên hệ Admin để kích hoạt."`. Chỉ trả về thông báo chưa đăng ký Ref khi UID hoàn toàn không tồn tại trong sheet. Chuyển đúng `detail=ref_msg` trong `/api/bot/start`. Chỉ cache `uid_cache` khi thành công để admin bật ON là ăn ngay.
+    2. [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Ưu tiên kiểm tra `errMsg` chứa `"liên hệ Admin"` / `"kích hoạt"` để `alert("Vui lòng liên hệ Admin để kích hoạt.")`, không mở nhầm tab cài đặt ref.
+    3. [gui_main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/desktop_app/gui_main.py): Đồng bộ logic đọc an toàn `row[5]` và cảnh báo chuẩn `"Vui lòng liên hệ Admin để kích hoạt."` khi chưa tích ON.
+
+- **[12/10/2026]** - Sửa Lỗi OKX 51051 (Stop loss trigger price should be lower than primary order price) & Nâng Cấp Fallback TP/SL:
+  - **Mô tả hiện tượng:** Khi bot EMA200 (hoặc SMC) đặt lệnh Limit kèm `attachAlgoOrds` (ví dụ `ETH-USDT-SWAP buy@2572.85`), sàn OKX trả về lỗi `51051` do giá cắt lỗ (SL) tính ra bị sàn coi là không hợp lệ so với giá thị trường tức thời (best ask). Lệnh Limit bị sàn từ chối và văng lỗi đỏ `[LIMIT] Lỗi kết nối: OKX Error [1]: All operations failed Details: (51051...)`.
+  - **Nguyên nhân cốt lõi:**
+    1. Trong [bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py) và [sub2/bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py), danh sách mã lỗi kích hoạt Fallback đặt Limit trơn (lột bỏ `attachAlgoOrds`) chỉ lọc `[51046, 51047, 51048, 51049]` mà sót mã `51050, 51051, 51052, 51053, 51054`.
+    2. Trong [bot_strategy.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py), thiếu bước Sanity Check so sánh giá TP/SL với giá live trước khi đính kèm `attachAlgoOrds`.
+  - **Giải pháp:**
+    1. [sub1/bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py) & [sub2/bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py): Mở rộng toàn diện các mã lỗi fallback `51046-51054` cùng các chuỗi `primary order price`, `trigger price`, `stop loss`, `take profit`. Khi gặp lỗi, bot tự động lột bỏ `attachAlgoOrds` và đặt thành công lệnh Limit trơn 100%. Watchdog 15s chạy ngầm sẽ tự bù cặp TP/SL chuẩn ngay sau khi khớp vị thế.
+    2. [sub1/bot_strategy.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_strategy.py): Bổ sung Sanity Check trực tiếp trước khi gửi lệnh cho cả nhánh Long và Short, triệt tiêu lỗi `51051` ngay từ đầu.
+
+
 - **[05/10/2026]** - Tối Ưu Hệ Thống Đánh Giá & Giao Diện Web App:
   - **Mô tả yêu cầu CEO:**
     1. Tạm thời xóa hết phản hồi của TLS1 Team (`"Cảm ơn bạn đã tin tưởng và đồng hành cùng TLS1 Trading!..."`) trên tất cả đánh giá để team tự phản hồi sau.

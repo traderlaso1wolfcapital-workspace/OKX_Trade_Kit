@@ -131,8 +131,13 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
                     err_msg = s_msg
                     break
 
-        # Fallback 1: Nếu lỗi liên quan attachAlgoOrds (51046, 51047, 51048, 51049), đặt lại Limit trơn
-        if "attachAlgoOrds" in body_limit and any(k in err_msg for k in ["attachAlgoOrds", "51046", "51047", "51048", "51049", "tpTriggerPx", "slTriggerPx"]):
+        # Fallback 1: Nếu lỗi liên quan attachAlgoOrds (51046-51054, TP/SL trigger price), đặt lại Limit trơn
+        algo_err_keys = [
+            "attachalgoords", "tptriggerpx", "sltriggerpx",
+            "51046", "51047", "51048", "51049", "51050", "51051", "51052", "51053", "51054",
+            "primary order price", "trigger price", "stop loss", "take profit", "stop-loss", "take-profit"
+        ]
+        if "attachAlgoOrds" in body_limit and any(k in err_msg.lower() for k in algo_err_keys):
             body_no_algo = dict(body_limit)
             body_no_algo.pop("attachAlgoOrds", None)
             resp_fallback = client.request("POST", "/api/v5/trade/order", body=body_no_algo)

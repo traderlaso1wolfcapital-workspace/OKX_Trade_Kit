@@ -1,6 +1,7 @@
 export const COIN_LIST = [
-  { label: "XAU-USDT", value: "XAU-USDT-SWAP", maxLever: 100 },
-  { label: "CL-USDT", value: "CL-USDT-SWAP", maxLever: 50 },
+  { label: "XAU-USDT", value: "XAU-USDT-SWAP", maxLever: 100, assetClass: "forex" },
+  { label: "XAG-USDT", value: "XAG-USDT-SWAP", maxLever: 50, assetClass: "forex" },
+  { label: "CL-USDT", value: "CL-USDT-SWAP", maxLever: 50, assetClass: "forex" },
   { label: "BTC-USDT", value: "BTC-USDT-SWAP", maxLever: 100 },
   { label: "ETH-USDT", value: "ETH-USDT-SWAP", maxLever: 100 },
   { label: "SOL-USDT", value: "SOL-USDT-SWAP", maxLever: 100 },

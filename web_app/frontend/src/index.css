@@ -4126,14 +4126,14 @@ div[class*="tradingview-widget-copyright"],
   background: #161824 !important;
   border: 1px solid #363b50 !important;
   color: #70768c !important;
-  border-radius: 3px !important;
+  border-radius: 5px !important;
 }
 
 .theme-glass-pro .tf-badge.on {
   background: rgba(245, 158, 11, 0.16) !important;
   border: 1px solid #f59e0b !important;
   color: #f59e0b !important;
-  border-radius: 3px !important;
+  border-radius: 5px !important;
 }
 
 .theme-glass-pro .tf-badge:hover {
@@ -4836,6 +4836,25 @@ div[class*="tradingview-widget-copyright"],
   margin-top: 0 !important;
   margin-bottom: 0px !important;
   flex-shrink: 0 !important;
+}
+
+/* ============= ONBOARDING TOUR ============= */
+@keyframes tourFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.btn-tour-guide:hover {
+  background: linear-gradient(180deg, #353846 0%, #20222b 100%) !important;
+  border-color: #f59e0b !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.35) !important;
 }
 
 

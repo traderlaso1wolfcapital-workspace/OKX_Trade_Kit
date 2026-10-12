@@ -4776,27 +4776,26 @@ class MainWindow(QtWidgets.QMainWindow):
             
             user_info = None
             for row in reader:
-                if row and len(row) >= 6 and row[0].strip().isdigit():
+                if row and len(row) >= 1 and row[0].strip().isdigit():
                     if row[0].strip() == CURRENT_UID:
                         user_info = {
-                            "hwid": row[4].strip(),
-                            "status": row[5].strip().upper()
+                            "hwid": row[4].strip() if len(row) > 4 else "",
+                            "status": row[5].strip().upper() if len(row) > 5 else ""
                         }
                         break
             
             if user_info is None:
                 QtWidgets.QMessageBox.warning(self, "⚠️ Không tìm thấy tài khoản",
-                    "Tài khoản của bạn không tồn tại trong hệ thống.\n"
+                    "UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!\n"
                     "Vui lòng liên hệ Admin TLS1 để được hỗ trợ.")
                 self.force_logout_to_login()
                 return
                     
-            status = user_info.get('status', 'ON')
+            status = user_info.get('status', '')
             
-            if status == 'LOCK':
-                QtWidgets.QMessageBox.warning(self, "🔒 Tài Khoản Bị Khóa",
-                    "Tài khoản của bạn đã bị khóa.\n"
-                    "Vui lòng liên hệ Admin TLS1 để được hỗ trợ.")
+            if status not in ['ON', 'ACTIVE']:
+                QtWidgets.QMessageBox.warning(self, "🔒 Chưa kích hoạt tài khoản",
+                    "Vui lòng liên hệ Admin để kích hoạt.")
                 self.force_logout_to_login()
                 return
                     
@@ -6236,12 +6235,12 @@ class LoginDialog(QtWidgets.QDialog):
             
             valid_uids = {}
             for row in reader:
-                if row and len(row) >= 6 and row[0].strip().isdigit():
+                if row and len(row) >= 1 and row[0].strip().isdigit():
                     uid_str = row[0].strip()
-                    discord_id = row[1].strip()
-                    nickname = row[2].strip()
-                    hwid = row[4].strip() # Cột E
-                    status = row[5].strip().upper() # Cột F
+                    discord_id = row[1].strip() if len(row) > 1 else ""
+                    nickname = row[2].strip() if len(row) > 2 else ""
+                    hwid = row[4].strip() if len(row) > 4 else "" # Cột E
+                    status = row[5].strip().upper() if len(row) > 5 else "" # Cột F
                     valid_uids[uid_str] = {
                         "discord_id": discord_id,
                         "nickname": nickname,
@@ -6252,10 +6251,10 @@ class LoginDialog(QtWidgets.QDialog):
             user_info = valid_uids.get(uid)
 
             if user_info is not None:
-                status = user_info.get('status', 'ON')
-                if status == 'LOCK':
+                status = user_info.get('status', '')
+                if status not in ['ON', 'ACTIVE']:
                     play_ui_sound("shelvis_makes_games-sus-meme-sound-181271.mp3", 0.7)
-                    QtWidgets.QMessageBox.critical(self, "Tài khoản bị khóa", "Tài khoản UID này đã bị Admin khóa.\n\nVui lòng nhắn tin Admin để yêu cầu kiểm tra lại UID.")
+                    QtWidgets.QMessageBox.warning(self, "Chưa kích hoạt tài khoản", "Vui lòng liên hệ Admin để kích hoạt.")
                     self.btn_login.setText("Đăng Nhập")
                     self.btn_login.setEnabled(True)
                     return

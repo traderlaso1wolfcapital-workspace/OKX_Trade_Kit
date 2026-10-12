@@ -11,6 +11,7 @@ export default function SidebarLeft({
   onAssignAccount,
   handleAssignAccountToActiveBot,
   onOpenSettings,
+  onStartTour,
   isRiskCollapsed = false,
   setIsRiskCollapsed,
   onToggleRiskCollapse,
@@ -103,6 +104,7 @@ export default function SidebarLeft({
           <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
             <select
               className="styled-select"
+              data-tour="account-select"
               disabled={isRunning}
               style={{
                 flex: 1,
@@ -160,9 +162,58 @@ export default function SidebarLeft({
                 );
               })}
             </select>
+            {/* 1. Nút Hướng Dẫn (nổi bật, đặt trước Cài Đặt) */}
+            <button
+              type="button"
+              className="btn-tour-guide"
+              data-tour="tour-btn"
+              onClick={onStartTour}
+              style={{
+                height: "30px",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "0 9px",
+                fontSize: "12px",
+                fontWeight: 700,
+                borderRadius: "5px",
+                cursor: "pointer",
+                background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                border: "1px solid #6366f1",
+                color: "#ffffff",
+                boxShadow: "0 2px 8px rgba(79, 70, 229, 0.4)",
+                transition: "all 0.18s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.filter = "brightness(1.15)";
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.filter = "brightness(1.0)";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+              title={t("guide_tooltip", "Khám phá toàn bộ hệ thống bot cho người mới (19 bước từ A đến Z)")}
+            >
+              <span>{t("guide_btn", "Hướng Dẫn")}</span>
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: "#34d399",
+                  boxShadow: "0 0 6px #34d399",
+                  display: "inline-block",
+                }}
+              />
+            </button>
+
+            {/* 2. Nút Cài Đặt */}
             <button
               type="button"
               className="btn-chart-settings"
+              data-tour="settings-btn"
               style={{ height: "30px", whiteSpace: "nowrap", flexShrink: 0 }}
               onClick={onOpenSettings}
               title="Cài đặt hệ thống & API Key"
@@ -175,6 +226,7 @@ export default function SidebarLeft({
             <div className="risk-grid">
               <div
                 className="risk-row"
+                data-tour="margin-config"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -306,81 +358,85 @@ export default function SidebarLeft({
                   width="84px"
                 />
               </div>
-              {activeBotTab === "sub1" ? (
-                <>
-                  <div className="risk-row">
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <label style={{ margin: 0 }}>{t("tp_m5_label")}</label>
-                      <button
-                        type="button"
-                        className="btn-help"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          alert("Tỷ lệ % chốt lời cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn (M15, H1, H4...), mức chốt lời sẽ tự động nhân với Hệ số Ký Quỹ của khung đó (ví dụ M5 0.5% * H1 x2.0 = TP 1.0%).");
-                        }}
-                        title="Tỷ lệ % chốt lời cơ sở M5 (nhân hệ số TF ở các khung lớn)."
-                      >
-                        [?]
-                      </button>
+              <div data-tour="tpsl-config" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {activeBotTab === "sub1" ? (
+                  <>
+                    <div className="risk-row">
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <label style={{ margin: 0 }}>{t("tp_m5_label")}</label>
+                        <button
+                          type="button"
+                          className="btn-help"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert("Tỷ lệ % chốt lời cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn (M15, H1, H4...), mức chốt lời sẽ tự động nhân với Hệ số Ký Quỹ của khung đó (ví dụ M5 0.5% * H1 x2.0 = TP 1.0%).");
+                          }}
+                          title="Tỷ lệ % chốt lời cơ sở M5 (nhân hệ số TF ở các khung lớn)."
+                        >
+                          [?]
+                        </button>
+                      </div>
+                      <NumberSpinBox
+                        value={risk.tpPct}
+                        onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
+                        min={0.1}
+                        step={0.05}
+                        suffix="%"
+                        width="84px"
+                      />
                     </div>
-                    <NumberSpinBox
-                      value={risk.tpPct}
-                      onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
-                      min={0.1}
-                      step={0.05}
-                      suffix="%"
-                      width="84px"
-                    />
-                  </div>
-                  <div className="risk-row">
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <label style={{ margin: 0 }}>{t("sl_m5_label")}</label>
-                      <button
-                        type="button"
-                        className="btn-help"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          alert("Tỷ lệ % cắt lỗ an toàn cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn, mức cắt lỗ sẽ tự động nhân với Hệ số Ký Quỹ tương ứng để tương thích với biên độ nến khung lớn.");
-                        }}
-                        title="Tỷ lệ % cắt lỗ cơ sở M5 (nhân hệ số TF ở các khung lớn)."
-                      >
-                        [?]
-                      </button>
+                    <div className="risk-row">
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <label style={{ margin: 0 }}>{t("sl_m5_label")}</label>
+                        <button
+                          type="button"
+                          className="btn-help"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert("Tỷ lệ % cắt lỗ an toàn cơ sở tính trên khung M5. Khi khớp lệnh ở các khung lớn hơn, mức cắt lỗ sẽ tự động nhân với Hệ số Ký Quỹ tương ứng để tương thích với biên độ nến khung lớn.");
+                          }}
+                          title="Tỷ lệ % cắt lỗ cơ sở M5 (nhân hệ số TF ở các khung lớn)."
+                        >
+                          [?]
+                        </button>
+                      </div>
+                      <NumberSpinBox
+                        value={risk.slPct}
+                        onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}
+                        min={0.1}
+                        step={0.05}
+                        suffix="%"
+                        width="84px"
+                      />
                     </div>
-                    <NumberSpinBox
-                      value={risk.slPct}
-                      onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}
-                      min={0.1}
-                      step={0.05}
-                      suffix="%"
-                      width="84px"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="risk-row">
-                    <label>Tỷ lệ chốt lời Thuận Trend:</label>
-                    <NumberSpinBox
-                      value={risk.tpPct}
-                      onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
-                      min={0.1}
-                      step={0.5}
-                      suffix="R"
-                    />
-                  </div>
-                  <div className="risk-row">
-                    <label>Tỷ lệ chốt lời Ngược Trend:</label>
-                    <NumberSpinBox
-                      value={risk.slPct}
-                      onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}
-                      min={0.1}
-                      step={0.5}
-                      suffix="R"
-                    />
-                  </div>
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <div className="risk-row">
+                      <label>Tỷ lệ chốt lời Thuận Trend:</label>
+                      <NumberSpinBox
+                        value={risk.tpPct}
+                        onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
+                        min={0.1}
+                        step={0.5}
+                        suffix="R"
+                        width="84px"
+                      />
+                    </div>
+                    <div className="risk-row">
+                      <label>Tỷ lệ chốt lời Ngược Trend:</label>
+                      <NumberSpinBox
+                        value={risk.slPct}
+                        onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}
+                        min={0.1}
+                        step={0.5}
+                        suffix="R"
+                        width="84px"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

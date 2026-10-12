@@ -29,9 +29,18 @@ export default function ConnectModal({
   accountName = "",
   onDisconnectAccount,
   onLogout,
+  activeTab: externalTab,
+  onTabChange: externalOnTabChange,
 }) {
   const { t } = useTranslation();
-  const [connectTab, setConnectTab] = useState("fast"); // 'fast' | 'apikey'
+  const [internalTab, setInternalTab] = useState("fast"); // 'fast' | 'apikey'
+  const connectTab = externalTab !== undefined ? externalTab : internalTab;
+
+  const handleTabSwitch = (newTab) => {
+    setInternalTab(newTab);
+    if (externalOnTabChange) externalOnTabChange(newTab);
+  };
+
   const [modalAccountId, setModalAccountId] = useState("");
   const [localApiKey, setLocalApiKey] = useState("");
   const [localSecretKey, setLocalSecretKey] = useState("");
@@ -307,14 +316,16 @@ export default function ConnectModal({
           <button
             type="button"
             className={`connect-tab-btn ${connectTab === "fast" ? "active" : ""}`}
-            onClick={() => setConnectTab("fast")}
+            onClick={() => handleTabSwitch("fast")}
+            data-tour="connect-fast-tab"
           >
             {t("fast_connect")}
           </button>
           <button
             type="button"
             className={`connect-tab-btn ${connectTab === "apikey" ? "active" : ""}`}
-            onClick={() => setConnectTab("apikey")}
+            onClick={() => handleTabSwitch("apikey")}
+            data-tour="connect-apikey-tab"
           >
             {t("apikey_connect")}
           </button>
@@ -335,7 +346,7 @@ export default function ConnectModal({
         >
           {/* TAB 1: FAST CONNECT */}
           {connectTab === "fast" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div data-tour="connect-fast-content" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <p style={{ color: "#aaaaaa", fontSize: "12px", margin: 0, lineHeight: "1.5" }}>
                 {t("fast_connect_desc")}
               </p>
@@ -620,7 +631,7 @@ export default function ConnectModal({
 
           {/* TAB 2: CẤU HÌNH API KEY (Tài khoản gán cho bot & Cụm Thông Tin API OKX) */}
           {connectTab === "apikey" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div data-tour="connect-apikey-content" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {/* Chọn tài khoản gán cho bot */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                 <label style={{ color: "#e0e0e0", fontSize: "11.5px", fontWeight: "bold", whiteSpace: "nowrap" }}>

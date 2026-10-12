@@ -86,6 +86,7 @@ export default function PositionsTable({
   return (
     <div
       className="positions-table-wrapper"
+      data-tour="watchlist-pairs"
       style={{
         flex: 1,
         width: "100%",
@@ -104,7 +105,7 @@ export default function PositionsTable({
       <table className="positions-table">
         <thead>
           <tr style={{ background: "#252526" }}>
-            <th style={{ textAlign: "left" }}>{t("th_pair")}</th>
+            <th style={{ textAlign: "left", whiteSpace: "nowrap" }}>{t("th_pair")}</th>
             <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>{t("th_margin")}</th>
             <th style={{ textAlign: "center", minWidth: "130px" }}>{t("th_pnl")}</th>
             <th style={{ textAlign: "center" }}>{t("th_tf_trade")}</th>
@@ -126,7 +127,7 @@ export default function PositionsTable({
             if (posList.length === 0) {
               return (
                 <tr key={`${coin.value}-empty`} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.03)" }}>
-                  <td style={{ textAlign: "left", padding: "4px 6px" }}>
+                  <td style={{ textAlign: "left", padding: "4px 6px", whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: "2px", margin: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <img
@@ -151,7 +152,7 @@ export default function PositionsTable({
                           {coin.label.replace("-SWAP", "")}
                         </span>
                       </div>
-                      <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px" }}>{t("waiting_signal")}</span>
+                      <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px", whiteSpace: "nowrap" }}>{t("waiting_signal")}</span>
                     </div>
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center" }}>
@@ -161,7 +162,7 @@ export default function PositionsTable({
                     <span className="empty-dash" style={{ color: "#555", fontSize: "13px" }}>--</span>
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
-                    <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                       {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
                         const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
                         const isOn = coinTfs.includes(tf);
@@ -174,18 +175,19 @@ export default function PositionsTable({
                             style={{
                               cursor: "pointer",
                               padding: "0px",
-                              borderRadius: "4px",
-                              fontSize: "12px",
+                              borderRadius: "5px",
+                              fontSize: "12.5px",
                               fontWeight: "bold",
                               background: isOn ? "#1d766b" : "#222222",
                               color: isOn ? "#f0f0f0" : "#aaaaaa",
                               border: isOn ? "1px solid #1d766b" : "1px solid #444444",
-                              width: "24px",
-                              height: "19px",
+                              width: "29px",
+                              height: "24px",
                               textAlign: "center",
                               display: "inline-flex",
                               alignItems: "center",
                               justifyContent: "center",
+                              transition: "all 0.15s ease",
                             }}
                           >
                             {label}
@@ -352,7 +354,7 @@ export default function PositionsTable({
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
                     {!isChild && ticketIndex === 0 && (
-                      <div style={{ display: "flex", gap: "5px", justifyContent: "center" }}>
+                      <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                         {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
                           const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
                           const isOn = coinTfs.includes(tf);
@@ -365,18 +367,19 @@ export default function PositionsTable({
                               style={{
                                 cursor: "pointer",
                                 padding: "0px",
-                                borderRadius: "4px",
-                                fontSize: "12px",
+                                borderRadius: "5px",
+                                fontSize: "12.5px",
                                 fontWeight: "bold",
                                 background: isOn ? "#1d766b" : "#222222",
                                 color: isOn ? "#f0f0f0" : "#aaaaaa",
                                 border: isOn ? "1px solid #1d766b" : "1px solid #444444",
-                                width: "24px",
-                                height: "19px",
+                                width: "29px",
+                                height: "24px",
                                 textAlign: "center",
                                 display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: "center",
+                                transition: "all 0.15s ease",
                               }}
                             >
                               {label}

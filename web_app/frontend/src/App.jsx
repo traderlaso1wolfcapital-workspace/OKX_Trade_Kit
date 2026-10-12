@@ -9,8 +9,10 @@ import LogsTerminal from "./components/terminal/LogsTerminal";
 import HistoryTable from "./components/history/HistoryTable";
 import SystemSettingsModal from "./components/modals/SystemSettingsModal";
 import ConnectModal from "./components/modals/ConnectModal";
+import OnboardingTour from "./components/common/OnboardingTour";
 import LanguageSelector from "./components/common/LanguageSelector";
 import { useTranslation } from "./i18n";
+import { getTourSteps } from "./i18n/tourData";
 import { AddAccountModal, DeleteAccountModal, ConfirmStopBotModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
 import "./App.css";
@@ -30,7 +32,7 @@ const dedupeAccounts = (accList) => {
 };
 
 function App() {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   // 1. Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(localStorage.getItem("tls1_auth") === "true");
   const [loginUid, setLoginUid] = useState("");
@@ -41,6 +43,7 @@ function App() {
   const [loginPassphrase, setLoginPassphrase] = useState("");
   const [lockMessage, setLockMessage] = useState("");
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [connectModalTab, setConnectModalTab] = useState("fast");
   const [fastConnectStatus, setFastConnectStatus] = useState(null);
   const audioRef = useRef(null);
   const isHandlingCallbackRef = useRef(false);
@@ -396,9 +399,65 @@ function App() {
 
   // 8. Bottom Tabs (positions | logs | history)
   const [activeTab, setActiveTab] = useState("positions");
-  const [logs, setLogs] = useState(["Đang kết nối với TLS1 Trading Web Terminal Server..."]);
-  const logBlockIdRef = useRef(0);
-  const lastLogTimeRef = useRef(0);
+
+  // System Settings Modal State (Khai báo trước để tourSteps và tour handlers truy cập an toàn)
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("strategy");
+
+  // Tour Hướng Dẫn cho Người Mới (19 bước liên tục từ ngoài vào trong Cài Đặt)
+  const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const [tourInitialStep, setTourInitialStep] = useState(0);
+
+  const handleStartFullTour = useCallback(() => {
+    setShowSettings(false);
+    setShowConnectModal(false);
+    setTourInitialStep(0);
+    setShowOnboardingTour(true);
+  }, []);
+
+  const handleStartSettingsTour = useCallback(() => {
+    setShowConnectModal(false);
+    setShowSettings(true);
+    setSettingsTab("strategy");
+    setTourInitialStep(10); // Bắt đầu từ Bước 11 (index 10: [data-tour="settings-watchlist"])
+    setShowOnboardingTour(true);
+  }, []);
+
+  const handleCloseTour = useCallback(() => {
+    setShowOnboardingTour(false);
+    setShowSettings(false);
+    setShowConnectModal(false);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const hasCompleted = localStorage.getItem("autotrader_tour_completed_v1");
+      if (!hasCompleted) {
+        const timer = setTimeout(() => {
+          handleStartFullTour();
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, [handleStartFullTour]);
+
+  const tourSteps = useMemo(() => {
+    return getTourSteps(lang, {
+      setShowConnectModal,
+      setShowSettings,
+      setConnectModalTab,
+      setSettingsTab,
+      setActiveTab,
+    });
+  }, [lang, setShowConnectModal, setShowSettings, setConnectModalTab, setSettingsTab, setActiveTab]);
+
+  const [logs, setLogs] = useState({
+    dashboardLines: [],
+    eventLogs: ["Đang kết nối với TLS1 Trading Web Terminal Server..."],
+  });
+  const stagingDashboardRef = useRef([]);
+  const stagingTimerRef = useRef(null);
+  const isStagingRef = useRef(false);
   const wsRef = useRef(null);
 
   // Watchlist Coins & Active Pairs & TFs
@@ -548,8 +607,6 @@ function App() {
     maxSlippage: 0.8,
   });
 
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("strategy");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [secretKey, setSecretKey] = useState("");
@@ -565,10 +622,12 @@ function App() {
 
   const addSystemLog = (msg) => {
     setLogs(prev => {
-      let newBlocks = [...prev];
-      newBlocks.unshift({ id: Date.now() + Math.random(), lines: [msg] });
-      if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
-      return newBlocks;
+      const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+      const updatedEvents = [...currentEvents, msg];
+      return {
+        dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+        eventLogs: updatedEvents.length > 60 ? updatedEvents.slice(-60) : updatedEvents,
+      };
     });
   };
 
@@ -867,7 +926,7 @@ function App() {
     fetch(`/api/bot/shadow/start?uid=${currentUid}&strategy=${activeBotTab}`, { method: 'POST' }).catch(() => { });
   }, [isAuthenticated, activeBotTab, currentUid]);
 
-  // 10. WebSocket Logs Terminal stream (with full multi-bot buffer, no line clipping!)
+  // 10. WebSocket Logs Terminal stream (Double-buffered Dashboard + Bottom Event Stream)
   useEffect(() => {
     let isMounted = true;
     let ws = null;
@@ -876,7 +935,10 @@ function App() {
       if (!isMounted) return;
       const safeUid = currentUid || localStorage.getItem('tls1_uid');
       if (!safeUid || safeUid === 'default') {
-        setLogs([{ id: Date.now(), lines: ["ℹ️ Vui lòng kết nối tài khoản OKX để bắt đầu sử dụng và xem logs bot."] }]);
+        setLogs({
+          dashboardLines: [],
+          eventLogs: ["ℹ️ Vui lòng kết nối tài khoản OKX để bắt đầu sử dụng và xem logs bot."],
+        });
         return;
       }
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -885,40 +947,121 @@ function App() {
 
       ws.onopen = () => {
         setLogs(prev => {
-          if (prev.length <= 1 && (prev.length === 0 || prev[0] === "Đang kết nối với TLS1 Trading Web Terminal Server..." || prev[0]?.lines?.[0]?.includes("Vui lòng kết nối tài khoản"))) {
-            return [{ id: Date.now(), lines: [`✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`] }];
-          }
-          return prev;
+          const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+          return {
+            dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+            eventLogs: [...currentEvents, `✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`].slice(-60),
+          };
         });
       };
 
       ws.onmessage = (e) => {
         const text = e.data;
         if (typeof text !== 'string') return;
-        const now = Date.now();
+        const line = text.trimEnd();
+        if (!line) return;
 
-        setLogs(prev => {
-          // New bot dashboard cycle detected: start fresh block
-          if (text.includes("bot_sub1.py") || text.includes("bot_sub2.py") || text.includes("bot_sub3.py") || text.includes("sys_bot_sub")) {
-            logBlockIdRef.current += 1;
-            return [{ id: logBlockIdRef.current, lines: [text] }];
-          }
+        const isHeader = line.includes("bot_sub1.py") || line.includes("bot_sub2.py") || line.includes("bot_sub3.py") || line.includes("sys_bot_sub") || line.includes("bot_core");
 
-          let newBlocks = [...prev];
-          if (newBlocks.length === 0 || now - lastLogTimeRef.current > 1500) {
-            logBlockIdRef.current += 1;
-            newBlocks.unshift({ id: logBlockIdRef.current, lines: [text] });
-          } else {
-            newBlocks[0] = { ...newBlocks[0], lines: [...newBlocks[0].lines, text] };
-            // Allow up to 350 lines in current block to preserve account balance & all coins!
-            if (newBlocks[0].lines.length > 350) {
-              newBlocks[0].lines = newBlocks[0].lines.slice(-350);
+        // Nhận diện dòng sự kiện (Event log tức thời)
+        const isEventLog = 
+          line.startsWith("⏳") || 
+          line.startsWith("🔒") || 
+          line.startsWith("🚨") || 
+          line.startsWith("🧹") || 
+          line.startsWith("✅") || 
+          line.startsWith("🚀") || 
+          line.startsWith("💡") || 
+          line.startsWith("⚠️") || 
+          line.startsWith("🌑") || 
+          line.startsWith("⚙️") || 
+          line.startsWith("🔑") || 
+          line.startsWith("🛑") || 
+          line.startsWith("➕") || 
+          line.startsWith("🗑️") || 
+          line.startsWith("♻️") || 
+          line.startsWith("🔄") || 
+          line.startsWith("✧") ||
+          line.startsWith("[TP/SL") || 
+          line.startsWith("[LIMIT") || 
+          line.startsWith("[CANCEL") || 
+          line.startsWith("[ORDER") || 
+          line.startsWith("[CLOSE") || 
+          line.startsWith("[ERROR") || 
+          line.startsWith("[INFO") || 
+          line.startsWith("[SYSTEM") || 
+          line.startsWith("[OKX") || 
+          line.startsWith("[DRY-RUN") ||
+          line.startsWith("[ATTACH");
+
+        if (isHeader) {
+          // Khởi động chu kỳ gom Snapshot Dashboard mới (bộ đệm ngầm, KHÔNG xóa bảng đang hiển thị)
+          isStagingRef.current = true;
+          stagingDashboardRef.current = [line];
+
+          if (stagingTimerRef.current) clearTimeout(stagingTimerRef.current);
+          stagingTimerRef.current = setTimeout(() => {
+            if (stagingDashboardRef.current.length >= 8) {
+              setLogs(prev => ({
+                dashboardLines: [...stagingDashboardRef.current],
+                eventLogs: (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [],
+              }));
             }
+            stagingDashboardRef.current = [];
+            isStagingRef.current = false;
+          }, 1200);
+          return;
+        }
+
+        if (isStagingRef.current && !isEventLog) {
+          stagingDashboardRef.current.push(line);
+
+          // Nhận diện vạch kết thúc của Dashboard: dòng ============ (độ dài >= 40) sau khi đã có nội dung bảng/vị thế
+          const hasTableContent = stagingDashboardRef.current.some(l => l.includes("Coin") || l.includes("Price") || l.includes("Tình trạng vị thế") || l.includes("Chiến thuật") || l.includes("CHIẾN THUẬT"));
+          const isBottomBar = line.startsWith("===") && line.length >= 40 && stagingDashboardRef.current.length >= 10 && hasTableContent;
+
+          if (isBottomBar) {
+            if (stagingTimerRef.current) clearTimeout(stagingTimerRef.current);
+            const completedFrame = [...stagingDashboardRef.current];
+            stagingDashboardRef.current = [];
+            isStagingRef.current = false;
+
+            // Cập nhật đè toàn bộ frame mới trong 1 tick duy nhất, triệt tiêu 100% nhấp nhả
+            setLogs(prev => ({
+              dashboardLines: completedFrame,
+              eventLogs: (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [],
+            }));
+            return;
           }
-          if (newBlocks.length > 20) newBlocks = newBlocks.slice(0, 20);
-          return newBlocks;
+
+          if (stagingTimerRef.current) clearTimeout(stagingTimerRef.current);
+          stagingTimerRef.current = setTimeout(() => {
+            if (stagingDashboardRef.current.length >= 8) {
+              setLogs(prev => ({
+                dashboardLines: [...stagingDashboardRef.current],
+                eventLogs: (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [],
+              }));
+            }
+            stagingDashboardRef.current = [];
+            isStagingRef.current = false;
+          }, 1200);
+          return;
+        }
+
+        // Dòng sự kiện hoặc log phát sinh ngoài chu kỳ -> Nạp vào dải Event Logs ở đáy
+        setLogs(prev => {
+          const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+          const nowStr = new Date().toLocaleTimeString("vi-VN", { hour12: false });
+          const formattedLine = (line.startsWith("[") || line.startsWith("⏳") || line.startsWith("⚙️"))
+            ? line 
+            : `[${nowStr}] ${line}`;
+
+          const updatedEvents = [...currentEvents, formattedLine];
+          return {
+            dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+            eventLogs: updatedEvents.length > 60 ? updatedEvents.slice(-60) : updatedEvents,
+          };
         });
-        lastLogTimeRef.current = now;
       };
 
       ws.onclose = () => {
@@ -928,9 +1071,11 @@ function App() {
       };
     };
 
-    setLogs([]);
-    lastLogTimeRef.current = 0;
-    logBlockIdRef.current = 0;
+    setLogs({ dashboardLines: [], eventLogs: [] });
+    stagingDashboardRef.current = [];
+    isStagingRef.current = false;
+    if (stagingTimerRef.current) clearTimeout(stagingTimerRef.current);
+
     if (wsRef.current) {
       wsRef.current.onclose = null;
       wsRef.current.close();
@@ -939,6 +1084,7 @@ function App() {
 
     return () => {
       isMounted = false;
+      if (stagingTimerRef.current) clearTimeout(stagingTimerRef.current);
       if (ws) {
         ws.onclose = null;
         ws.close();
@@ -1273,7 +1419,9 @@ function App() {
         } catch {
           errMsg = await r.text();
         }
-        if (r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký dưới link") || errMsg.includes("chưa đăng ký")) {
+        if (errMsg.includes("liên hệ Admin") || errMsg.includes("kích hoạt") || errMsg.includes("bị khóa")) {
+          alert("Vui lòng liên hệ Admin để kích hoạt.");
+        } else if (r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký dưới link") || errMsg.includes("chưa đăng ký")) {
           alert("UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!");
           setShowSettings(true);
           setSettingsTab("system");
@@ -1869,6 +2017,8 @@ function App() {
           setLockMessage(data.message || "⛔ Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Admin.");
         } else if (data.status === "pending") {
           setLockMessage(data.message || "⏳ Tài khoản đang chờ duyệt.");
+        } else if (data.status === "error" && data.message && (data.message.includes("kích hoạt") || data.message.includes("Admin"))) {
+          setLockMessage("⚠️ " + data.message);
         } else {
           setLockMessage("");
         }
@@ -2008,6 +2158,8 @@ function App() {
       <ConnectModal
         isOpen={showConnectModal}
         onClose={() => setShowConnectModal(false)}
+        activeTab={connectModalTab}
+        onTabChange={setConnectModalTab}
         handleFastConnectClick={handleFastConnectClick}
         okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleSaveApiKey}
@@ -2068,6 +2220,7 @@ function App() {
           activeAccounts={mergedActiveAccounts}
           onAssignAccount={handleAssignAccountToActiveBot}
           onOpenSettings={() => { setShowSettings(true); setSettingsTab("strategy"); }}
+          onStartTour={handleStartFullTour}
           isRiskCollapsed={isRiskCollapsed}
           setIsRiskCollapsed={setIsRiskCollapsed}
           onToggleRiskCollapse={() => setIsRiskCollapsed(!isRiskCollapsed)}
@@ -2091,51 +2244,54 @@ function App() {
           <div className="bot-panel-card">
             {/* ACTION BAR: START / STOP BOT */}
             <div className="bot-action-bar" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px', boxSizing: 'border-box' }}>
-              {isStartingBot ? (
-                <button
-                  disabled
-                  className="btn-action-start btn-action-loading"
-                  style={{ width: "fit-content" }}
-                >
-                  <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
-                  {t("starting_bot")}
-                </button>
-              ) : isStoppingBot ? (
-                <button
-                  disabled
-                  className="btn-action-stop btn-action-loading"
-                  style={{ width: "fit-content" }}
-                >
-                  <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
-                  {t("stopping_bot")}
-                </button>
-              ) : isRunning ? (
-                <button
-                  onClick={() => setShowStopBotModal(true)}
-                  className="btn-action-stop"
-                  style={{ width: "fit-content" }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
-                    <rect x="1" y="1" width="10" height="10" rx="1.5" />
-                  </svg>
-                  <span>{t("stop_bot")}</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleStartBotClick}
-                  className="btn-action-start"
-                  style={{ width: "fit-content" }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
-                    <path d="M 2.5 1.5 C 2.5 0.9 3.2 0.5 3.7 0.8 L 10.5 5.3 C 11.0 5.6 11.0 6.4 10.5 6.7 L 3.7 11.2 C 3.2 11.5 2.5 11.1 2.5 10.5 Z" />
-                  </svg>
-                  <span>{t("start_bot")}</span>
-                </button>
-              )}
+              <div data-tour="action-bot" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                {isStartingBot ? (
+                  <button
+                    disabled
+                    className="btn-action-start btn-action-loading"
+                    style={{ width: "fit-content" }}
+                  >
+                    <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
+                    {t("starting_bot")}
+                  </button>
+                ) : isStoppingBot ? (
+                  <button
+                    disabled
+                    className="btn-action-stop btn-action-loading"
+                    style={{ width: "fit-content" }}
+                  >
+                    <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
+                    {t("stopping_bot")}
+                  </button>
+                ) : isRunning ? (
+                  <button
+                    onClick={() => setShowStopBotModal(true)}
+                    className="btn-action-stop"
+                    style={{ width: "fit-content" }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
+                      <rect x="1" y="1" width="10" height="10" rx="1.5" />
+                    </svg>
+                    <span>{t("stop_bot")}</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleStartBotClick}
+                    className="btn-action-start"
+                    style={{ width: "fit-content" }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="#ffffff" style={{ flexShrink: 0 }}>
+                      <path d="M 2.5 1.5 C 2.5 0.9 3.2 0.5 3.7 0.8 L 10.5 5.3 C 11.0 5.6 11.0 6.4 10.5 6.7 L 3.7 11.2 C 3.2 11.5 2.5 11.1 2.5 10.5 Z" />
+                    </svg>
+                    <span>{t("start_bot")}</span>
+                  </button>
+                )}
+              </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   onClick={() => setShowConnectModal(true)}
                   className="btn-connect-okx"
+                  data-tour="connect-okx"
                   title="Connect"
                 >
                   <span>Connect</span>
@@ -2562,6 +2718,7 @@ function App() {
         onLogout={handleLogout}
         onToggleMultiplyVolume={handleToggleMultiplyVolume}
         isAuthenticated={isAuthenticated}
+        onStartSettingsTour={handleStartSettingsTour}
       />
 
 
@@ -2738,6 +2895,14 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* ONBOARDING TOUR CHO NGƯỜI MỚI (17 BƯỚC LIÊN TỤC TỪ NGOÀI VÀO TRONG CÀI ĐẶT) */}
+      <OnboardingTour
+        isOpen={showOnboardingTour}
+        onClose={handleCloseTour}
+        steps={tourSteps}
+        initialStep={tourInitialStep}
+      />
 
     </div>
   );

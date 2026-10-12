@@ -49,6 +49,7 @@ export default function SystemSettingsModal({
   onLogout,
   onToggleMultiplyVolume,
   isAuthenticated = false,
+  onStartSettingsTour,
 }) {
   const { t } = useTranslation();
   const [showTransferGuide, setShowTransferGuide] = useState(false);
@@ -134,19 +135,52 @@ export default function SystemSettingsModal({
         {/* Header Dialog */}
         <div className="modal-header">
           <h3>⚙️ {t("system_settings_title")} - {botTitle}</h3>
-          <button className="close-btn" onClick={onClose} title={t("close_btn")}>×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {typeof onStartSettingsTour === "function" && (
+              <button
+                type="button"
+                className="btn-tour-settings"
+                onClick={onStartSettingsTour}
+                style={{
+                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                  border: "1px solid #6366f1",
+                  color: "#ffffff",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "3px 9px",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  boxShadow: "0 1px 6px rgba(79, 70, 229, 0.4)",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = "brightness(1.0)";
+                }}
+                title={t("guide_settings_tooltip", "Xem hướng dẫn chi tiết các cơ chế trong Cài Đặt (DCA, Cầu dao, Nến tích lũy)")}
+              >
+                {t("guide_btn", "Hướng Dẫn")}
+              </button>
+            )}
+            <button className="close-btn" onClick={onClose} title={t("close_btn")}>×</button>
+          </div>
         </div>
 
         {/* Tab Bar (InnerTabs) */}
         <div className="settings-tab-bar">
           <button className={`settings-tab-btn ${settingsTab === "strategy" ? "active" : ""}`} onClick={() => setSettingsTab("strategy")}>
-            ⚙️ {t("tab_strategy")}
+            ⚙️ {t("tab_strategy", "Chiến Thuật")}
           </button>
           <button className={`settings-tab-btn ${settingsTab === "system" ? "active" : ""}`} onClick={() => setSettingsTab("system")}>
-            🛠️ {t("tab_system") || "Hỗ Trợ"}
+            🛠️ {t("tab_system", "Hỗ Trợ")}
           </button>
           <button className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`} onClick={() => setSettingsTab("reviews")}>
-            ⭐ Đánh Giá
+            ⭐ {t("tab_reviews", "Đánh Giá")}
           </button>
         </div>
 
@@ -155,11 +189,35 @@ export default function SystemSettingsModal({
           {settingsTab === "strategy" && (
             <div className="settings-tab-content">
               <div className="settings-tab-scroll">
-                {/* 1. THÊM MÃ GIAO DỊCH */}
-                <div className="settings-group">
+                {/* 1. THÊM MÃ GIAO DỊCH (Tách 2 phần: Trên là FX, Dưới là COIN, đệm tách dòng nhẹ) */}
+                <div className="settings-group" data-tour="settings-watchlist">
                   <div className="settings-group-title" style={{ margin: 0 }}>{t("watchlist_title")}</div>
-                  <div className="coin-select-grid">
-                    {COIN_LIST.filter(c => c.value !== "USDT.D").map(coin => {
+                  
+                  {/* Nhóm FX / Kim loại / Hàng hóa (XAU, XAG, CL...) */}
+                  <div className="coin-select-grid" style={{ marginTop: "8px" }}>
+                    {COIN_LIST.filter(c => c.value !== "USDT.D" && (c.assetClass === "forex" || ["XAU", "XAG", "CL"].includes(c.label.replace("-USDT", "").replace("-SWAP", "")))).map(coin => {
+                      const isSelected = watchlistCoins.includes(coin.value);
+                      const hasPos = safePos.some(p => p.instId === coin.value);
+                      const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
+                      return (
+                        <div
+                          key={coin.value}
+                          className={`coin-select-card ${isSelected ? "selected" : ""}`}
+                          onClick={() => onToggleWatchlistCoin(coin.value)}
+                          title={hasPos ? `${coinSymbol}: Đang có vị thế mở (bắt buộc đóng lệnh trước khi bỏ chọn)` : isSelected ? `Click để bỏ chọn ${coinSymbol}` : `Click để thêm ${coinSymbol} ra ngoài Bảng Vị Thế`}
+                        >
+                          <span className="coin-select-symbol">{coinSymbol}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Khoảng đệm tách dòng nhẹ tinh tế giữa FX và Coin */}
+                  <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.08)", margin: "8px 0" }} />
+
+                  {/* Nhóm Crypto Coins (BTC, ETH, SOL, XRP...) */}
+                  <div className="coin-select-grid" style={{ marginTop: 0 }}>
+                    {COIN_LIST.filter(c => c.value !== "USDT.D" && !(c.assetClass === "forex" || ["XAU", "XAG", "CL"].includes(c.label.replace("-USDT", "").replace("-SWAP", "")))).map(coin => {
                       const isSelected = watchlistCoins.includes(coin.value);
                       const hasPos = safePos.some(p => p.instId === coin.value);
                       const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
@@ -178,7 +236,7 @@ export default function SystemSettingsModal({
                 </div>
 
                 {/* 2. TÀI KHOẢN & QUẢN LÝ VỐN */}
-                <div className="settings-group">
+                <div className="settings-group" data-tour="settings-account-capital">
                   <div className="settings-group-title">Tài khoản ({botTitle})</div>
                   <div className="entry-setup-list">
                     {/* Chọn tài khoản trade */}
@@ -393,7 +451,7 @@ export default function SystemSettingsModal({
                   <>
                     <div className="settings-group">
                       <div className="settings-group-title">{t("tactics_title")}</div>
-                      <div className="tactics-toggles-layout">
+                      <div className="tactics-toggles-layout" data-tour="settings-dca">
                         <div className="tactics-left-col">
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.pyramidDca ?? false} onChange={v => setStrat(s => ({ ...s, pyramidDca: v, negativeDca: false, multiTfGrid: v ? false : s.multiTfGrid }))} />
@@ -417,7 +475,7 @@ export default function SystemSettingsModal({
                             <button className="btn-help" onClick={() => alert("BẬT (Multi-TF Split Grid): Đặt đồng thời các lệnh Limit độc lập cho tất cả các khung thời gian được tích chọn (M5, M15, M30, H1, H2, H4). Mỗi lệnh được gán TP/SL riêng độc lập theo chế độ 'Chia' (Split Position) của OKX. Khớp lệnh ở khung nào thì chỉ đóng đúng khối lượng của khung đó khi chạm TP/SL, hoàn toàn không gộp vị thế.\n\n* Khi bật Lưới Đa Khung, bot sẽ tự động tắt DCA Dương và DCA Âm.")} title="BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng biệt.">[?]</button>
                           </div>
                         </div>
-                        <div className="tactics-right-col">
+                        <div className="tactics-right-col" data-tour="settings-circuit-breaker">
                           <div className="toggle-row" style={{ marginBottom: '10px' }}>
                             <ToggleSwitch checked={strat.hedge ?? strat.xole} onChange={v => setStrat(s => ({ ...s, hedge: v, xole: v }))} />
                             <span className="toggle-name">{t("hedge_reversal")}</span>
@@ -592,7 +650,7 @@ export default function SystemSettingsModal({
                 )}
 
                 {/* 3. Điểm Vào Lệnh (Entry Setup) */}
-                <div className="settings-group">
+                <div className="settings-group" data-tour="settings-entry-filters">
                   <div className="settings-group-title">{t("entry_setup_title")}</div>
                   <div className="entry-setup-list">
                     <div className="entry-setup-row">
@@ -664,7 +722,7 @@ export default function SystemSettingsModal({
                 </div>
 
                 {/* 4. Hệ Số Nhân Đa Khung (TF Multipliers) */}
-                <div className="settings-group">
+                <div className="settings-group" data-tour="settings-tf-multipliers">
                   <div className="settings-group-title">{t("tf_multipliers_title")}</div>
                   <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
                     <thead>
@@ -715,7 +773,7 @@ export default function SystemSettingsModal({
               </div>
 
               {/* Hàng nút điều khiển Tab 2 */}
-              <div className="strat-actions-row">
+              <div className="strat-actions-row" data-tour="settings-actions">
                 <button type="button" className="btn-reset-strat" onClick={onResetDefaultStrat}>
                   {t("reset_default_btn")}
                 </button>
@@ -733,7 +791,7 @@ export default function SystemSettingsModal({
 
           {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG ===== */}
           {settingsTab === "system" && (
-            <div className="settings-tab-content" style={{ position: "relative" }}>
+            <div className="settings-tab-content" data-tour="settings-support-tab-content" style={{ position: "relative" }}>
               {/* POPUP THÔNG BÁO COPY NHẸ NHÀNG */}
               {copyNotice && (
                 <div
@@ -1050,7 +1108,7 @@ export default function SystemSettingsModal({
 
           {/* ===== TAB 3: ĐÁNH GIÁ (SHOPEE STYLE) ===== */}
           {settingsTab === "reviews" && (
-            <div className="settings-tab-content">
+            <div className="settings-tab-content" data-tour="settings-reviews-tab-content">
               <div className="settings-tab-scroll" style={{ padding: "12px 14px 20px 14px" }}>
                 <ReviewsTab
                   apiKey={apiKey}

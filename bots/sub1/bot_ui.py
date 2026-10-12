@@ -292,6 +292,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
     }
     
     target_vol = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("200"))
+    is_tf_vol_mult = bool(getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False))
     try:
         cfg_path = env_paths.get("FILE_GLOBAL_CONFIG", "") if isinstance(env_paths, dict) else ""
         if cfg_path and os.path.exists(cfg_path):
@@ -299,6 +300,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 _cfg = json.load(_f)
                 if "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
                     target_vol = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
+                if "ENABLE_TF_VOLUME_MULTIPLIER" in _cfg:
+                    is_tf_vol_mult = bool(_cfg["ENABLE_TF_VOLUME_MULTIPLIER"])
     except: pass
     
     def fmt_tf_state(st):
@@ -310,8 +313,10 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         _is_xl = getattr(tk_obj, "hedge_tf", getattr(tk_obj, "xole_tf", None))
         if _is_xl:
             v_mult = getattr(globals_ref, "HEDGE_TF_VOLUME_MULTIPLIERS", getattr(globals_ref, "XOLE_TF_VOLUME_MULTIPLIERS", {})).get(tf_name, Decimal("1.0"))
-        else:
+        elif is_tf_vol_mult:
             v_mult = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {}).get(tf_name, Decimal("1.0"))
+        else:
+            v_mult = Decimal("1.0")
         return target_usdt * v_mult
 
     def _fmt_vol_u(val: Decimal) -> str:
@@ -553,7 +558,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             long_margin_val = (tk.long_pos_vol / Decimal(str(leverage))) if getattr(tk, "long_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
             total_margin = long_margin_val if long_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "long")
-            line_main = f"    {coin_name} ╭─ {mode_tag} Đã khớp LONG [{filled_str.strip()}] - {total_margin:.2f} U (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
+            line_main = f"    {coin_name} ╭─ {mode_tag}Đã khớp LONG [{filled_str.strip()}] - ký quỹ: {total_margin:.2f} U (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             
@@ -594,7 +599,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             short_margin_val = (tk.short_pos_vol / Decimal(str(leverage))) if getattr(tk, "short_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
             total_margin_s = short_margin_val if short_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "short")
-            line_main = f"    {coin_name} ╭─ {mode_tag} Đã khớp SHORT [{filled_str.strip()}] - {total_margin_s:.2f} U (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
+            line_main = f"    {coin_name} ╭─ {mode_tag}Đã khớp SHORT [{filled_str.strip()}] - ký quỹ: {total_margin_s:.2f} U (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
             lines = [line_main]
             

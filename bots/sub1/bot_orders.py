@@ -365,17 +365,23 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
             except Exception as e2:
                 err_str = str(e2)
 
-        # Fallback nếu OKX từ chối attachAlgoOrds (ví dụ lỗi 51046, 51047, 51048, 51049 hoặc liên quan TP/SL)
-        if attach_algo_ords and any(k in err_str for k in ["attachAlgoOrds", "51046", "51047", "51048", "51049", "tpTriggerPx", "slTriggerPx"]):
+        # Fallback nếu OKX từ chối attachAlgoOrds (ví dụ lỗi 51046-51054 hoặc liên quan TP/SL trigger price)
+        algo_err_keys = [
+            "attachalgoords", "tptriggerpx", "sltriggerpx",
+            "51046", "51047", "51048", "51049", "51050", "51051", "51052", "51053", "51054",
+            "primary order price", "trigger price", "stop loss", "take profit", "stop-loss", "take-profit"
+        ]
+        if attach_algo_ords and any(k in err_str.lower() for k in algo_err_keys):
             print(f"⚠️ [ATTACH ALGO WARNING] OKX từ chối attachAlgoOrds ({err_str}), fallback đặt Limit trơn...")
             body_no_algo = dict(body)
             body_no_algo.pop("attachAlgoOrds", None)
             try:
                 resp = client.request("POST", "/api/v5/trade/order", body=body_no_algo)
                 if resp and resp.get("code") == "0":
+                    print(f"✅ [ATTACH ALGO FALLBACK OK] Đã đặt thành công Limit trơn {inst_id} {side.upper()} @{price}. Watchdog sẽ tự bù TP/SL sau khi khớp.")
                     return resp
-            except Exception:
-                pass
+            except Exception as e_fallback:
+                err_str = f"{err_str} | Fallback plain limit failed: {e_fallback}"
 
         if "51006" in err_str or "Order price is not within the price limit" in err_str:
             print(f"⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!")

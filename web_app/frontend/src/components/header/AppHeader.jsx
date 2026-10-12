@@ -82,7 +82,7 @@ export default function AppHeader({
 
   return (
     <header className="bot-tabs-bar">
-      <div className="bot-tabs-group" ref={dropdownRef} style={{ position: "relative" }}>
+      <div className="bot-tabs-group" data-tour="bot-selector" ref={dropdownRef} style={{ position: "relative" }}>
         {/* Command Capsule Button */}
         <button
           type="button"

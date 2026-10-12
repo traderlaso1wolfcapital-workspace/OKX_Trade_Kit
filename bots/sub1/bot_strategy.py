@@ -448,8 +448,17 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         pass
     dry_run: bool = bool(system_config.get("DRY_RUN", False))
     
-    # Phân nhóm tài sản: crypto (neo BTC nếu ON) | forex (kim loại, cổ phiếu, cặp tiền - giao dịch độc lập)
-    _asset_class = cfg.get("asset_class", "crypto")
+    # Phân nhóm tài sản: crypto (neo BTC nếu ON) | forex (kim loại, hàng hóa, cổ phiếu, cặp tiền - giao dịch độc lập tuyệt đối)
+    NON_CRYPTO_SYMBOLS = {
+        "XAU", "XAG", "CL", "OIL", "BRENT", "NG", "COPPER", "SILVER", "GOLD",
+        "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "USD", "DXY", "CNH",
+        "SPX", "NDX", "DJI", "US30", "NAS100"
+    }
+    _raw_asset_class = cfg.get("asset_class", "")
+    if coin_name.upper() in NON_CRYPTO_SYMBOLS or _raw_asset_class in ("forex", "commodity", "metals", "energy", "indices"):
+        _asset_class = "forex"
+    else:
+        _asset_class = _raw_asset_class or "crypto"
     _is_alt_synced = (coin_name != "BTC" and _asset_class == "crypto" and getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True))
     
     # ⚡ EARLY EXIT: Bỏ qua hoàn toàn coin không được kích hoạt và không có vị thế
@@ -2205,7 +2214,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ==============================
     # ==============================
     is_btc_h4_squeeze = False
-    if "BTC" in state_matrix:
+    if _asset_class == "crypto" and "BTC" in state_matrix:
         is_btc_h4_squeeze = getattr(state_matrix["BTC"], "is_h4_squeeze", False)
         
     if is_btc_h4_squeeze:
@@ -3056,17 +3065,29 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
                             _calc_tp = round_to_tick(px_tf * (Decimal("1") + _tp_pct), spec["tickSz"])
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") - _sl_pct), spec["tickSz"])
-                            attach_algo_long = [
-                                {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
-                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                    "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last",
-                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                    "slOrdPx": "-1",
-                                    "slTriggerPxType": "last"
-                                }
-                            ]
+
+                            # 🛡️ SANITY CHECK: Bắt buộc TP > px_tf và SL < px_tf
+                            # Nếu giá limit cao hơn giá live (lệnh market-able), sàn OKX yêu cầu SL phải nhỏ hơn cả giá live (best ask)
+                            _is_valid_tp = _calc_tp > px_tf
+                            _is_valid_sl = _calc_sl < px_tf
+                            if tracker.live_price > 0 and px_tf >= tracker.live_price:
+                                if _calc_sl >= tracker.live_price:
+                                    _is_valid_sl = False
+
+                            if _is_valid_tp and _is_valid_sl:
+                                attach_algo_long = [
+                                    {
+                                        "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
+                                        "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                        "tpOrdPx": "-1",
+                                        "tpTriggerPxType": "last",
+                                        "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                        "slOrdPx": "-1",
+                                        "slTriggerPxType": "last"
+                                    }
+                                ]
+                            else:
+                                attach_algo_long = None
                         except Exception:
                             attach_algo_long = None
 
@@ -3319,17 +3340,29 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             _sl_pct = getattr(globals_ref, "SCALPING_SL_PCT", Decimal("0.015")) * _tp_tf_mult
                             _calc_tp = round_to_tick(px_tf * (Decimal("1") - _tp_pct), spec["tickSz"])
                             _calc_sl = round_to_tick(px_tf * (Decimal("1") + _sl_pct), spec["tickSz"])
-                            attach_algo_short = [
-                                {
-                                    "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
-                                    "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
-                                    "tpOrdPx": "-1",
-                                    "tpTriggerPxType": "last",
-                                    "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
-                                    "slOrdPx": "-1",
-                                    "slTriggerPxType": "last"
-                                }
-                            ]
+
+                            # 🛡️ SANITY CHECK: Bắt buộc TP < px_tf và SL > px_tf
+                            # Nếu giá limit thấp hơn giá live (lệnh market-able), sàn OKX yêu cầu SL phải lớn hơn cả giá live (best bid)
+                            _is_valid_tp = _calc_tp < px_tf
+                            _is_valid_sl = _calc_sl > px_tf
+                            if tracker.live_price > 0 and px_tf <= tracker.live_price:
+                                if _calc_sl <= tracker.live_price:
+                                    _is_valid_sl = False
+
+                            if _is_valid_tp and _is_valid_sl:
+                                attach_algo_short = [
+                                    {
+                                        "attachAlgoClOrdId": f"{CL_ORD_PREFIX}TPSL{tf}{int(time.time() * 1000)}"[:32],
+                                        "tpTriggerPx": f"{_calc_tp:.{dec_places}f}",
+                                        "tpOrdPx": "-1",
+                                        "tpTriggerPxType": "last",
+                                        "slTriggerPx": f"{_calc_sl:.{dec_places}f}",
+                                        "slOrdPx": "-1",
+                                        "slTriggerPxType": "last"
+                                    }
+                                ]
+                            else:
+                                attach_algo_short = None
                         except Exception:
                             attach_algo_short = None
 
