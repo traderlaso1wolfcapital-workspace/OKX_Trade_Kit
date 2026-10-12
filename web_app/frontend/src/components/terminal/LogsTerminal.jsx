@@ -143,7 +143,7 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
           const fmt = (line.startsWith("[") || line.startsWith("⏳") || line.startsWith("⚙️")) ? line : `[${nowStr}] ${line}`;
           return {
             dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
-            eventLogs: [...cur, fmt].slice(-60),
+            eventLogs: [fmt, ...cur].slice(0, 60),
           };
         });
       };
@@ -305,7 +305,7 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
                   >
                     <span>{t("log_events_title", "⚡ NHẬT KÝ SỰ KIỆN TỨC THỜI")} ({eventLogs.length})</span>
                     <span style={{ fontSize: "10px", color: "#888", fontWeight: "normal" }}>
-                      {t("log_events_desc", "(Tự động cập nhật ở đáy • Không làm nhảy bảng trên)")}
+                      {t("log_events_desc", "(Tin mới nhất ở trên cùng • Không làm nhảy bảng trên)")}
                     </span>
                   </div>
                 )}

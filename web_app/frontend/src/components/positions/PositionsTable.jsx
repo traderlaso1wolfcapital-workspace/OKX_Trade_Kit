@@ -149,7 +149,9 @@ export default function PositionsTable({
                           onClick={() => handleCoinClick(coin.value, "1H")}
                           title={t("click_to_view_chart")}
                         >
-                          {coin.label.replace("-SWAP", "")}
+                          {(localStorage.getItem("tls1_trading_platform") || "okx") === "e8"
+                            ? coin.label.replace("-SWAP", "").replace("-USDT", "/USD")
+                            : coin.label.replace("-SWAP", "")}
                         </span>
                       </div>
                       <span style={{ color: "#666", fontSize: "11px", marginLeft: "24px", whiteSpace: "nowrap" }}>{t("waiting_signal")}</span>
@@ -275,7 +277,9 @@ export default function PositionsTable({
                           }}
                           title={t("click_to_view_chart")}
                         >
-                          {coin.label.replace("-SWAP", "")}
+                          {(localStorage.getItem("tls1_trading_platform") || "okx") === "e8"
+                            ? (pos.displayPair || coin.label.replace("-SWAP", "").replace("-USDT", "/USD"))
+                            : coin.label.replace("-SWAP", "")}
                         </span>
 
                         {!isChild && (

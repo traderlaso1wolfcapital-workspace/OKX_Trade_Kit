@@ -11,6 +11,8 @@ try:
     load_dotenv()
 except ImportError:
     pass
+import logging
+logger = logging.getLogger("tls1_app")
 import json
 import time
 import random
@@ -1461,12 +1463,24 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
 
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
+
+    # ── HỖ TRỢ CHẾ ĐỘ QUỸ PROP FIRM (TRADELOCKER / E8) ──
+    tradelocker_cfg = TradeLockerManager.load_user_config(uid, get_user_base_dir, fernet)
+    is_prop_mode = bool(tradelocker_cfg and tradelocker_cfg.get("account_id"))
+
+    if not (api_key and secret_key and passphrase) and is_prop_mode:
+        fallback_path = os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}", f".api_{strategy}")
+        if os.path.exists(fallback_path):
+            fb_c = _parse_env_file(fallback_path)
+            if fb_c.get("api_key") and fb_c.get("secret_key") and fb_c.get("passphrase"):
+                api_key, secret_key, passphrase, is_demo = fb_c["api_key"], fb_c["secret_key"], fb_c["passphrase"], fb_c.get("is_demo", False)
+
     if not (api_key and secret_key and passphrase):
         raise HTTPException(status_code=400, detail=f"Cần cấu hình API Key cho tài khoản '{target_acc}' trước khi khởi động Bot {strategy}!")
 
     # ── ĐỐI CHIẾU REF GOOGLE SHEETS KHI KHỞI ĐỘNG BOT ──
-    # Miễn trừ đối với Admin (admtls12021); kiểm tra Master UID của tài khoản đối với bảng Ref
-    if not is_admin_uid(uid):
+    # Miễn trừ đối với Admin (admtls12021) và chế độ Quỹ FX (đánh Quỹ độc lập)
+    if not is_admin_uid(uid) and not is_prop_mode:
         master_uid = _get_master_uid(uid, target_acc)
         if not master_uid or not master_uid.isdigit():
             try:
@@ -1508,7 +1522,7 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     acc_name = strategy
 
     # 🧹 Dọn sạch toàn bộ lệnh Limit cũ chưa khớp trên OKX để bot đặt lại theo logic mới (bảo lưu 100% TP/SL)
-    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="START BOT")
+    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="START BOT") if not is_prop_mode else 0
 
     proc = get_nested(bot_processes, uid, strategy)
     pid = get_running_pid(uid, strategy)
@@ -1837,8 +1851,8 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             "POSITION_VOLUME_PCT": 0.1,
             "USE_DYNAMIC_RISK": False,
             "DYNAMIC_RISK_PCT": 0.001,
-            "SCALPING_TP_PCT": 0.008,
-            "SCALPING_SL_PCT": 0.008,
+            "SCALPING_TP_PCT": 0.006,
+            "SCALPING_SL_PCT": 0.006,
             "ENABLE_TF_VOLUME_MULTIPLIER": False,
             "ENABLE_STRATEGY_MAIN": True,
             "ENABLE_PYRAMID_DCA": False,
@@ -1882,10 +1896,10 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
             cfg["POSITION_VOLUME_PCT"] = 0.1
             dirty = True
         if "SCALPING_TP_PCT" not in cfg:
-            cfg["SCALPING_TP_PCT"] = 0.008
+            cfg["SCALPING_TP_PCT"] = 0.006
             dirty = True
         if "SCALPING_SL_PCT" not in cfg:
-            cfg["SCALPING_SL_PCT"] = 0.008
+            cfg["SCALPING_SL_PCT"] = 0.006
             dirty = True
         if "ENABLE_TF_VOLUME_MULTIPLIER" not in cfg:
             cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = False
@@ -1964,7 +1978,7 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
             
     if strategy == "sub1":
         cfg["ENABLE_STRATEGY_MAIN"] = True
-    cfg["SL_TARGET_OPTIMAL"] = str(update_data.scalping_sl_pct) if update_data.scalping_sl_pct is not None else cfg.get("SL_TARGET_OPTIMAL", "0.008")
+    cfg["SL_TARGET_OPTIMAL"] = str(update_data.scalping_sl_pct) if update_data.scalping_sl_pct is not None else cfg.get("SL_TARGET_OPTIMAL", "0.006")
     if update_data.enable_pyramid_dca is not None:
         cfg["ENABLE_PYRAMID_DCA"] = update_data.enable_pyramid_dca
     if update_data.enable_negative_dca is not None:
@@ -3645,6 +3659,394 @@ async def like_review(review_id: str):
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Không tìm thấy đánh giá.")
 
+
+# ==============================================================================
+# TRADELOCKER / E8 MARKETS PROP FIRM INTEGRATION
+# ==============================================================================
+from tradelocker_service import TradeLockerManager, TradeLockerClient
+
+class TradeLockerConnectReq(BaseModel):
+    uid: str
+    email: str
+    password: str
+    server: str = "E8"
+    environment: str = "https://demo.tradelocker.com"
+    fund_size: Optional[float] = 5000.0
+    risk_per_trade: Optional[float] = 25.0
+    daily_drawdown_limit: Optional[float] = 125.0
+    daily_profit_cap: Optional[float] = 100.0
+    enabled_symbols: Optional[List[str]] = ["XAU", "BTC", "ETH"]
+    is_enabled: Optional[bool] = True
+
+class TradeLockerConfigReq(BaseModel):
+    uid: str
+    account_id: Optional[str] = None
+    fund_size: Optional[float] = 5000.0
+    risk_per_trade: Optional[float] = 25.0
+    daily_drawdown_limit: Optional[float] = 125.0
+    daily_profit_cap: Optional[float] = 100.0
+    enabled_symbols: Optional[List[str]] = ["XAU", "BTC", "ETH"]
+    is_enabled: Optional[bool] = True
+
+class TradeLockerSelectReq(BaseModel):
+    uid: str
+    account_id: str
+
+@app.post("/api/tradelocker/connect")
+def tradelocker_connect(req: TradeLockerConnectReq, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = req.uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    try:
+        client = TradeLockerClient(
+            email=req.email,
+            password=req.password,
+            server=req.server,
+            environment=req.environment
+        )
+        ok, msg = client.authenticate()
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
+
+        ok, accounts, acc_msg = client.get_accounts()
+        if not ok or not accounts:
+            raise HTTPException(status_code=400, detail=f"Không tìm thấy tài khoản TradeLocker nào ({acc_msg})")
+
+        ok_state, state_data, _ = client.get_account_state()
+        try:
+            client.load_instruments()
+        except Exception:
+            pass
+
+        # Xác định tên Quỹ chuẩn
+        srv_up = (req.server or "").upper()
+        firm_label = "E8" if "E8" in srv_up else ("The5ers" if "5" in srv_up else ("FTMO" if "FTMO" in srv_up else req.server))
+
+        config = {
+            "email": req.email,
+            "password": req.password,
+            "server": req.server,
+            "firm": firm_label,
+            "name": f"{firm_label} Demo #{client.account_id}",
+            "environment": req.environment,
+            "fund_size": req.fund_size or 5000.0,
+            "risk_per_trade": req.risk_per_trade or 25.0,
+            "daily_drawdown_limit": req.daily_drawdown_limit or 125.0,
+            "daily_profit_cap": req.daily_profit_cap or 100.0,
+            "enabled_symbols": req.enabled_symbols or ["XAU", "BTC", "ETH"],
+            "is_enabled": req.is_enabled if req.is_enabled is not None else True,
+            "account_id": client.account_id,
+            "acc_num": client.acc_num,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        acc_id = TradeLockerManager.upsert_account(clean_uid, config, get_user_base_dir, fernet)
+
+        return {
+            "status": "success",
+            "message": f"Kết nối tài khoản Quỹ {firm_label} (#{client.account_id}) thành công!",
+            "id": acc_id,
+            "account_id": client.account_id,
+            "acc_num": client.acc_num,
+            "name": config["name"],
+            "server": req.server,
+            "firm": firm_label,
+            "balance": (state_data or {}).get("balance", client.account_balance),
+            "equity": (state_data or {}).get("equity", client.account_balance),
+            "currency": "USD"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[TradeLocker] Error in connect: {e}")
+        logger.error(f"[TradeLocker] Error in connect: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Lỗi khi kết nối Quỹ: {str(e)}")
+
+@app.get("/api/tradelocker/accounts")
+def tradelocker_get_all_accounts(uid: str, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    accounts, active_id = TradeLockerManager.load_raw_data(clean_uid, get_user_base_dir, fernet)
+    safe_list = []
+    for a in accounts:
+        # Lấy số dư live nếu có client
+        bal = a.get("fund_size", 5000.0)
+        eq = bal
+        try:
+            cl = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=a.get("id"))
+            if cl and cl.account_balance:
+                bal = cl.account_balance
+                eq = cl.account_balance
+        except Exception:
+            pass
+
+        safe_list.append({
+            "id": a.get("id"),
+            "name": a.get("name", f"{a.get('server')} Demo #{a.get('account_id')}"),
+            "server": a.get("server", "E8"),
+            "firm": a.get("firm", a.get("server", "E8")),
+            "account_id": a.get("account_id"),
+            "acc_num": a.get("acc_num", a.get("account_id")),
+            "email": a.get("email"),
+            "balance": bal,
+            "equity": eq,
+            "fund_size": a.get("fund_size", 5000.0),
+            "risk_per_trade": a.get("risk_per_trade", 25.0),
+            "daily_loss_limit": a.get("daily_drawdown_limit", 125.0),
+            "daily_profit_cap": a.get("daily_profit_cap", 100.0),
+            "enabled_symbols": a.get("enabled_symbols", ["XAU", "BTC", "ETH"]),
+            "is_enabled": a.get("is_enabled", True),
+            "is_active": a.get("id") == active_id
+        })
+    return {"status": "success", "accounts": safe_list, "active_id": active_id}
+
+@app.post("/api/tradelocker/select_account")
+def tradelocker_select_account(req: TradeLockerSelectReq, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = req.uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    ok = TradeLockerManager.select_active_account(clean_uid, req.account_id, get_user_base_dir, fernet)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Không tìm thấy tài khoản Quỹ")
+    return {"status": "success", "active_id": req.account_id}
+
+@app.get("/api/tradelocker/account")
+def tradelocker_get_account(uid: str, account_id: Optional[str] = None, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    cfg = TradeLockerManager.load_user_config(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    if not cfg:
+        return {"status": "not_connected", "is_connected": False}
+
+    client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    if not client:
+        return {"status": "not_connected", "is_connected": False}
+
+    ok, state, msg = client.get_account_state()
+    if not ok:
+        return {
+            "status": "error",
+            "is_connected": True,
+            "message": msg,
+            "id": cfg.get("id"),
+            "name": cfg.get("name"),
+            "account_id": cfg.get("account_id"),
+            "email": cfg.get("email")
+        }
+
+    fund_size = float(cfg.get("fund_size", 5000.0))
+    balance = float(state.get("balance", fund_size))
+    equity = float(state.get("equity", fund_size))
+    profit = equity - fund_size
+
+    profit_target = fund_size * 0.08
+    static_loss_limit = fund_size * 0.08
+    loss_level = fund_size - static_loss_limit
+    daily_loss_limit = float(cfg.get("daily_drawdown_limit", 125.0))
+    daily_profit_cap = float(cfg.get("daily_profit_cap", 100.0))
+
+    return {
+        "status": "success",
+        "is_connected": True,
+        "id": cfg.get("id"),
+        "name": cfg.get("name", f"{cfg.get('server', 'E8')} Demo #{client.account_id}"),
+        "account_id": client.account_id,
+        "acc_num": client.acc_num,
+        "email": cfg.get("email"),
+        "server": cfg.get("server", "E8"),
+        "firm": cfg.get("firm", cfg.get("server", "E8")),
+        "environment": cfg.get("environment"),
+        "balance": balance,
+        "equity": equity,
+        "free_margin": state.get("free_margin", balance),
+        "pnl": state.get("pnl", 0.0),
+        "profit": profit,
+        "profit_target": profit_target,
+        "fund_size": fund_size,
+        "loss_level": loss_level,
+        "static_loss_limit": static_loss_limit,
+        "daily_loss_limit": daily_loss_limit,
+        "daily_profit_cap": daily_profit_cap,
+        "risk_per_trade": cfg.get("risk_per_trade", 25.0),
+        "enabled_symbols": cfg.get("enabled_symbols", ["XAU", "BTC", "ETH"]),
+        "is_enabled": cfg.get("is_enabled", True)
+    }
+
+@app.post("/api/tradelocker/config")
+def tradelocker_update_config(req: TradeLockerConfigReq, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = req.uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    cfg = TradeLockerManager.load_user_config(clean_uid, get_user_base_dir, fernet, account_id=req.account_id)
+    if not cfg:
+        raise HTTPException(status_code=400, detail="Chưa có cấu hình Quỹ TradeLocker. Vui lòng kết nối tài khoản trước.")
+
+    if req.fund_size is not None: cfg["fund_size"] = req.fund_size
+    if req.risk_per_trade is not None: cfg["risk_per_trade"] = req.risk_per_trade
+    if req.daily_drawdown_limit is not None: cfg["daily_drawdown_limit"] = req.daily_drawdown_limit
+    if req.daily_profit_cap is not None: cfg["daily_profit_cap"] = req.daily_profit_cap
+    if req.enabled_symbols is not None: cfg["enabled_symbols"] = req.enabled_symbols
+    if req.is_enabled is not None: cfg["is_enabled"] = req.is_enabled
+    cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    TradeLockerManager.save_user_config(clean_uid, cfg, get_user_base_dir, fernet, account_id=req.account_id)
+    return {"status": "success", "message": "Đã lưu cài đặt Quỹ thành công!"}
+
+@app.post("/api/tradelocker/disconnect")
+def tradelocker_disconnect(uid: str, account_id: Optional[str] = None, jwt_data: Optional[dict] = Depends(verify_jwt)):
+    clean_uid = uid.strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="UID không được để trống")
+    if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if account_id:
+        TradeLockerManager.delete_account(clean_uid, account_id, get_user_base_dir, fernet)
+        return {"status": "success", "message": f"Đã xóa tài khoản Quỹ {account_id}."}
+    else:
+        file_path = TradeLockerManager.get_user_creds_file(clean_uid, get_user_base_dir)
+        if os.path.exists(file_path):
+            try: os.remove(file_path)
+            except Exception: pass
+        TradeLockerManager.remove_client(clean_uid)
+        return {"status": "success", "message": "Đã ngắt kết nối toàn bộ tài khoản Quỹ."}
+
+class TradeLockerCloseReq(BaseModel):
+    position_id: str
+    uid: Optional[str] = "default"
+    qty: Optional[float] = None
+    account_id: Optional[str] = None
+
+@app.get("/api/tradelocker/debug_positions")
+def tradelocker_debug_positions(uid: str = "default", account_id: Optional[str] = None):
+    clean_uid = uid.strip() if uid else "default"
+    client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    if not client:
+        return {"error": "no client"}
+    if not client.account_id or not client.acc_num:
+        client.get_accounts()
+    url = f"{client.base_url}/trade/accounts/{client.account_id}/positions"
+    import requests
+    resp = requests.get(url, headers=client._get_headers(include_acc_num=True), timeout=10)
+    return {"status_code": resp.status_code, "text": resp.text, "account_id": client.account_id, "acc_num": client.acc_num}
+
+@app.get("/api/tradelocker/positions")
+def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = None):
+    try:
+        clean_uid = uid.strip() if uid else "default"
+        client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+        if not client:
+            return []
+
+        if not client.account_id or not client.acc_num:
+            client.get_accounts()
+
+        ok, raw_positions, msg = client.get_positions()
+        if not ok:
+            print(f"[TradeLocker] Get positions error for {clean_uid}: {msg}")
+            return []
+
+        print(f"[TradeLocker] Raw positions for {clean_uid}: {raw_positions}")
+
+        inst_cache = client.instruments_cache
+        if not inst_cache:
+            client.load_instruments()
+            inst_cache = client.instruments_cache
+
+        id_to_name = {}
+        for name, item in (inst_cache or {}).items():
+            tid = item.get("tradableInstrumentId")
+            if tid:
+                id_to_name[tid] = name
+                id_to_name[str(tid)] = name
+
+        mapped_list = []
+        for p in raw_positions:
+            if isinstance(p, list):
+                continue
+            pos_id = str(p.get("id") or p.get("positionId") or "")
+            tradable_id = p.get("tradableInstrumentId")
+            raw_sym = id_to_name.get(tradable_id) or id_to_name.get(str(tradable_id)) or p.get("symbol") or "BTCUSD+"
+            
+            clean_name = raw_sym.upper().replace("+", "")
+            if "BTC" in clean_name:
+                inst_id = "BTC-USDT-SWAP"
+                display_pair = "BTC-USDT"
+            elif "ETH" in clean_name:
+                inst_id = "ETH-USDT-SWAP"
+                display_pair = "ETH-USDT"
+            elif "XAU" in clean_name or "GOLD" in clean_name:
+                inst_id = "XAU-USDT-SWAP"
+                display_pair = "XAU-USDT"
+            else:
+                inst_id = f"{clean_name}-SWAP"
+                display_pair = clean_name
+
+            raw_side = str(p.get("side", "buy")).lower()
+            pos_side = "long" if raw_side in ("buy", "long") else "short"
+            qty = float(p.get("qty") or p.get("openQty") or 0.0)
+            avg_px = float(p.get("avgPrice") or p.get("openPrice") or p.get("price") or 0.0)
+            cur_px = float(p.get("lastPrice") or p.get("currentPrice") or avg_px)
+            upl = float(p.get("unrealizedPl") or p.get("pnl") or 0.0)
+            
+            margin = float(p.get("margin") or p.get("initialMargin") or (avg_px * qty if qty > 0 else 1.0))
+            roi = round((upl / margin * 100.0), 2) if margin > 0 else 0.0
+
+            mapped_list.append({
+                "ticket_id": pos_id,
+                "position_id": pos_id,
+                "instId": inst_id,
+                "coin": display_pair,
+                "posSide": pos_side,
+                "side": pos_side,
+                "pos": str(qty),
+                "lots": qty,
+                "avgPx": str(avg_px),
+                "lastPx": str(cur_px),
+                "upl": str(round(upl, 2)),
+                "uplRatio": f"{roi:+.2f}%",
+                "roi": roi,
+                "margin": str(round(margin, 2)),
+                "stopLoss": p.get("stopLoss"),
+                "takeProfit": p.get("takeProfit"),
+                "platform": "tradelocker",
+                "is_prop": True,
+                "is_child": False
+            })
+        return mapped_list
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[TradeLocker] Exception in tradelocker_get_positions: {e}")
+        return []
+
+@app.post("/api/tradelocker/positions/close")
+def tradelocker_close_position(req: TradeLockerCloseReq):
+    clean_uid = req.uid.strip() if req.uid else "default"
+    client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet)
+    if not client:
+        raise HTTPException(status_code=400, detail="Chưa kết nối Quỹ TradeLocker")
+    ok, msg = client.close_position(req.position_id, qty=req.qty)
+    if ok:
+        return {"status": "success", "message": msg}
+    raise HTTPException(status_code=400, detail=msg)
+
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
 if os.path.exists(frontend_dist_path):
@@ -3679,3 +4081,4 @@ if __name__ == "__main__":
 # z7728 | Optimize Uvicorn reload parameter for production by checking NODE_ENV
 # z7729 | Khắc phục triệt để lỗi rò rỉ và điều khiển chéo tài khoản giữa các user: cô lập 100% data, credentials, positions, logs và websocket theo OKX main_uid; loại bỏ hoàn toàn fallback default và hardcoded UID.
 # z7730 | Tự động chuyển đổi session sang OKX Master UID khi người dùng Fast Connect / thêm API Key thành công, loại bỏ lỗi chặn nhầm session cũ không khớp UID.
+# z7731 | Tích hợp toàn diện TradeLocker API cho quỹ E8 Markets: module tradelocker_service, các endpoint kết nối, quản lý số dư, tính toán Lot size và giám sát Drawdown/Profit Cap.

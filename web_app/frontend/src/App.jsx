@@ -194,6 +194,8 @@ function App() {
   const [isStoppingBot, setIsStoppingBot] = useState(false);
   const [overrideBotRunning, setOverrideBotRunning] = useState(null);
 
+  const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
+
   // Tự động giải phóng cờ ép trạng thái khi WebSocket hoặc Server đã xác nhận đồng bộ
   useEffect(() => {
     if (overrideBotRunning === true && botStatus === "RUNNING") {
@@ -551,9 +553,30 @@ function App() {
 
   // Close Position Handler
   const handleClosePosition = async (pos, coin) => {
-    const coinName = coin.label.replace("-SWAP", "");
+    const coinName = (coin && coin.label) ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
     if (!window.confirm(`Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`)) return;
     try {
+      if (pos.platform === "tradelocker" || pos.is_prop) {
+        const curUid = localStorage.getItem('tls1_uid') || currentUid || "default";
+        const res = await fetch("/api/tradelocker/positions/close", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            position_id: pos.position_id || pos.ticket_id,
+            uid: curUid,
+            qty: pos.lots || parseFloat(pos.pos)
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`✅ Đã đóng vị thế Quỹ ${coinName} thành công!`);
+          fetchPositions();
+        } else {
+          alert(`❌ Lỗi khi đóng vị thế Quỹ: ` + (data.detail || data.message || "Lỗi máy chủ"));
+        }
+        return;
+      }
+
       const strat = selectedAccount || "sub1";
       const res = await fetch(`/api/bot/positions/close_ticket?uid=${currentUid}&strategy=${strat}`, {
         method: "POST",
@@ -579,8 +602,19 @@ function App() {
     }
   };
 
-  // 9. Risk & Strategy Settings State
-  const [risk, setRisk] = useState({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false });
+  // 9. Risk & Strategy Settings State (Ưu tiên nạp từ localStorage để không bị giật về 1$)
+  const [risk, setRisk] = useState(() => {
+    try {
+      const active = localStorage.getItem("tls1_active_bot_tab") || "sub1";
+      const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}`));
+      const initVol = (savedVol && savedVol > 0) ? savedVol : 1;
+      return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 0.60, slPct: 0.60, volUnit: "USDT", multiplyVolumeByTf: false };
+    } catch {
+      return { posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.60, slPct: 0.60, volUnit: "USDT", multiplyVolumeByTf: false };
+    }
+  });
+  const hasLoadedConfigFromBackendRef = useRef(false);
+  const prevRiskRef = useRef(null);
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const [strat, setStrat] = useState({
     main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
@@ -623,10 +657,10 @@ function App() {
   const addSystemLog = (msg) => {
     setLogs(prev => {
       const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
-      const updatedEvents = [...currentEvents, msg];
+      const updatedEvents = [msg, ...currentEvents];
       return {
         dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
-        eventLogs: updatedEvents.length > 60 ? updatedEvents.slice(-60) : updatedEvents,
+        eventLogs: updatedEvents.slice(0, 60),
       };
     });
   };
@@ -636,8 +670,20 @@ function App() {
     setFadeClass("");
     setTimeout(() => setFadeClass("tab-fade"), 10);
 
+    const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${activeBotTab}`));
+
     if (activeBotTab === "sub1") {
-      setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT" });
+      setRisk((r) => {
+        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
+        return {
+          ...r,
+          posVol: curVol,
+          volUsdt: curVol,
+          tpPct: r.tpPct || 0.60,
+          slPct: r.slPct || 0.60,
+          volUnit: r.volUnit || "USDT",
+        };
+      });
       setStrat({
         main: true, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -645,7 +691,17 @@ function App() {
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
       });
     } else if (activeBotTab === "sub2") {
-      setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT" });
+      setRisk((r) => {
+        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
+        return {
+          ...r,
+          posVol: curVol,
+          volUsdt: curVol,
+          tpPct: r.tpPct || 1.5,
+          slPct: r.slPct || 1.5,
+          volUnit: r.volUnit || "USDT",
+        };
+      });
       setStrat({
         main: true, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false, altcoinFollowBtc: true,
@@ -654,38 +710,47 @@ function App() {
         timeframeBase: "1H",
       });
     } else {
-      setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
+      setRisk((r) => {
+        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
+        return {
+          ...r,
+          posVol: curVol,
+          volUsdt: curVol,
+          tpPct: r.tpPct || 1.0,
+          slPct: r.slPct || 1.0,
+          volUnit: r.volUnit || "USDT",
+        };
+      });
       setStrat({ main: true, timeframeBase: "1H" });
     }
   }, [activeBotTab]);
 
-  // Sync Risk settings to backend (debounced)
-  const isInitialRiskRender = useRef(true);
+  // Sync Risk settings to backend (chỉ sync khi đã nạp xong từ backend và bot KHÔNG chạy)
   useEffect(() => {
-    if (isInitialRiskRender.current) {
-      isInitialRiskRender.current = false;
-      return;
-    }
+    if (!hasLoadedConfigFromBackendRef.current || isRunning) return;
+    if (prevRiskRef.current && JSON.stringify(prevRiskRef.current) === JSON.stringify(risk)) return;
+    prevRiskRef.current = risk;
+
     const timer = setTimeout(() => {
       try {
-        if (!currentUid) return;
-        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+        const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             position_volume: Number(risk.posVol),
             scalping_tp_pct: Number(risk.tpPct) / 100,
-            scalping_sl_pct: Number(risk.slPct) / 100
+            scalping_sl_pct: Number(risk.slPct) / 100,
           }),
-        }).then(res => {
+        }).then((res) => {
           if (res.ok) {
             addSystemLog(`⚙️ [SYSTEM] Cập nhật cấu hình: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
           }
         });
-      } catch { }
-    }, 500);
+      } catch {}
+    }, 600);
     return () => clearTimeout(timer);
-  }, [risk, activeBotTab, currentUid]);
+  }, [risk, isRunning, activeBotTab, currentUid]);
 
   // Bootstrap accounts & credentials unconditionally on mount
   useEffect(() => {
@@ -840,22 +905,30 @@ function App() {
 
   // Load bot configuration (enabled TFs, coins)
   useEffect(() => {
-    if (!isAuthenticated) return;
-    fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`)
+    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) return;
         if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
         if (d.ENABLED_COINS) setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
         if (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) {
-          setRisk(r => ({
+          const bVol = Number(d.POSITION_VOLUME_HIGH_CONFIDENCE);
+          if (bVol > 0) {
+            try {
+              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(bVol));
+            } catch {}
+          }
+          setRisk((r) => ({
             ...r,
-            posVol: Number(d.POSITION_VOLUME_HIGH_CONFIDENCE),
+            posVol: bVol > 0 ? bVol : r.posVol,
+            volUsdt: bVol > 0 ? bVol : r.volUsdt,
             tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
             slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct,
-            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : r.multiplyVolumeByTf
+            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : r.multiplyVolumeByTf,
           }));
         }
+        hasLoadedConfigFromBackendRef.current = true;
         if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined || d.ENABLE_MULTITF_GRID !== undefined) {
           setStrat(s => ({
             ...s,
@@ -950,7 +1023,7 @@ function App() {
           const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
           return {
             dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
-            eventLogs: [...currentEvents, `✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`].slice(-60),
+            eventLogs: [`✅ Đã kết nối với TLS1 Trading Web Terminal Server [${activeBotTab.toUpperCase()}]`, ...currentEvents].slice(0, 60),
           };
         });
       };
@@ -1056,10 +1129,10 @@ function App() {
             ? line 
             : `[${nowStr}] ${line}`;
 
-          const updatedEvents = [...currentEvents, formattedLine];
+          const updatedEvents = [formattedLine, ...currentEvents];
           return {
             dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
-            eventLogs: updatedEvents.length > 60 ? updatedEvents.slice(-60) : updatedEvents,
+            eventLogs: updatedEvents.slice(0, 60),
           };
         });
       };
@@ -1343,8 +1416,35 @@ function App() {
   };
 
   // Bot Start / Stop Handlers
-  const handleStartBotClick = () => {
+  const handleStartBotClick = async () => {
+    const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
+    if (currentPlatform === "e8") {
+      // Kiểm tra trạng thái kết nối Quỹ FX
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const token = localStorage.getItem("tls1_jwt_token");
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      let isPropConn = false;
+      try {
+        const res = await fetch(`/api/tradelocker/account?uid=${encodeURIComponent(curUid)}`, { headers });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && d.is_connected && d.status === "success") {
+            isPropConn = true;
+          }
+        }
+      } catch { }
+
+      if (!isPropConn) {
+        setConnectModalTab("tradelocker");
+        setShowConnectModal(true);
+      } else {
+        handleStartBot();
+      }
+      return;
+    }
+
     if (!isAuthenticated || !apiKey || !secretKey || !passphrase) {
+      setConnectModalTab("fast");
       setShowConnectModal(true);
     } else {
       handleStartBot();
@@ -1353,49 +1453,74 @@ function App() {
 
   const handleStartBot = async () => {
     if (isStartingBot || isStoppingBot) return;
-    const currentAcc = effectiveAccId;
-    if (!currentAcc || accounts.length === 0) {
-      alert("⚠️ Vui lòng cấu hình API Key OKX trong phần Cài Đặt (hoặc Connect) trước khi chạy bot!");
-      setShowSettings(true);
-      setSettingsTab("api");
-      return;
+    const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
+    const isE8 = (currentPlatform === "e8");
+    let currentAcc = effectiveAccId;
+
+    if (!isE8) {
+      if (!currentAcc || accounts.length === 0) {
+        alert("⚠️ Vui lòng cấu hình API Key OKX trong phần Cài Đặt (hoặc Connect) trước khi chạy bot!");
+        setShowSettings(true);
+        setSettingsTab("api");
+        return;
+      }
+      if (!apiKey || !secretKey || !passphrase) {
+        alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
+        setShowSettings(true);
+        setSettingsTab("api");
+        return;
+      }
+    } else {
+      if (!currentAcc) {
+        currentAcc = "e8_prop";
+      }
     }
-    if (!apiKey || !secretKey || !passphrase) {
-      alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
-      setShowSettings(true);
-      setSettingsTab("api");
-      return;
-    }
+
     // Kiểm tra xem đã có ít nhất 1 cặp giao dịch nào được cấu hình TF trade hay chưa
-    const pairsWithTf = (activePairs || []).filter(pair => {
-      const tfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[pair] || []) : [];
+    let effectiveTfs = enabledTfs;
+    let pairsWithTf = (activePairs || []).filter(pair => {
+      const tfs = (effectiveTfs && typeof effectiveTfs === "object" && !Array.isArray(effectiveTfs)) ? (effectiveTfs[pair] || []) : [];
       return Array.isArray(tfs) && tfs.length > 0;
     });
 
     if (pairsWithTf.length === 0) {
-      alert("⚠️ Vui lòng chọn ít nhất 1 khung thời gian (TF trade) để bắt đầu chạy bot!");
-      return;
+      if (isE8) {
+        // Tự động gán mặc định TF 5m cho các cặp Quỹ FX nếu chưa kích hoạt
+        const fallbackTfs = {};
+        (activePairs || []).forEach(p => { fallbackTfs[p] = ["5m"]; });
+        setEnabledTfs(fallbackTfs);
+        effectiveTfs = fallbackTfs;
+        pairsWithTf = activePairs || [];
+      } else {
+        alert("⚠️ Vui lòng chọn ít nhất 1 khung thời gian (TF trade) để bắt đầu chạy bot!");
+        return;
+      }
     }
 
     try {
       setIsStartingBot(true);
-      // Tự động đồng bộ Ký quỹ cơ sở và Hệ số nhân trước khi Start bot
+      const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+
+      // Tự động đồng bộ Ký quỹ cơ sở và Hệ số nhân trước khi Start bot (lưu chặt vào localStorage)
       try {
-        await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+        try {
+          localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(risk.posVol));
+        } catch {}
+        await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${botUid}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            position_volume: risk.posVol,
+            position_volume: Number(risk.posVol),
             strategy_config: {
-              ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf)
-            }
-          })
+              ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf),
+            },
+          }),
         });
       } catch (e) {
         console.error("Lỗi đồng bộ cấu hình trước khi Start:", e);
       }
 
-      const r = await fetch(`/api/bot/start?uid=${currentUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
+      const r = await fetch(`/api/bot/start?uid=${botUid}&strategy=${activeBotTab}&account_id=${currentAcc}`, { method: "POST" });
       if (r.ok) {
         let cleanMsg = "";
         try {
@@ -1406,7 +1531,8 @@ function App() {
         } catch { }
         setOverrideBotRunning(true);
         if (setBotStatus) setBotStatus("RUNNING");
-        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accounts.find(a => a.id === currentAcc)?.name || currentAcc}${cleanMsg}`);
+        const accLabel = isE8 ? "Quỹ E8 Markets" : (accounts.find(a => a.id === currentAcc)?.name || currentAcc);
+        addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accLabel}${cleanMsg}`);
         refreshBotData();
         // Giữ hiệu ứng loading tối thiểu 600ms mượt mà, sau đó khi tắt loading thì giao diện chuyển thẳng sang nút DỪNG BOT
         await new Promise(resolve => setTimeout(resolve, 600));
@@ -1661,7 +1787,7 @@ function App() {
 
     if (activeBotTab === "sub1") {
       // Defaults for Bot EMA200
-      setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80 });
+      setRisk({ posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.60, slPct: 0.60 });
       setStrat({
         main: true, pyramidDca: false, negativeDca: false, hedge: false, xole: false, dynamicEma200Tp: false,
         dynamicPingpongTp: false,
@@ -1821,8 +1947,8 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           position_volume: risk.posVol,
-          scalping_tp_pct: (risk.tpPct || 0.8) / 100,
-          scalping_sl_pct: (risk.slPct || 0.8) / 100,
+          scalping_tp_pct: (risk.tpPct || 0.6) / 100,
+          scalping_sl_pct: (risk.slPct || 0.6) / 100,
           strategy_config: strategyConfig
         })
       });
@@ -1860,7 +1986,7 @@ function App() {
     try {
       const targetAcc = selectedAccount || effectiveAccId || "";
       if (activeBotTab === "sub1") {
-        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80, multiplyVolumeByTf: false };
+        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.60, slPct: 0.60, multiplyVolumeByTf: false };
         const defaultStrat = {
           main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false,
@@ -1919,8 +2045,8 @@ function App() {
           body: JSON.stringify({
             enabled_coins: defaultCoins,
             position_volume: 1,
-            scalping_tp_pct: 0.008,
-            scalping_sl_pct: 0.008,
+            scalping_tp_pct: 0.006,
+            scalping_sl_pct: 0.006,
             strategy_config: strategyConfig
           })
         });
@@ -2043,6 +2169,17 @@ function App() {
 
   const fetchPositions = useCallback(async () => {
     try {
+      const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
+      if (currentPlatform === "e8") {
+        const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
+        const rProp = await fetch(`/api/tradelocker/positions?uid=${encodeURIComponent(curUid)}`);
+        if (rProp.ok) {
+          const propPos = await rProp.json();
+          setPositions(Array.isArray(propPos) ? propPos : []);
+        }
+        return;
+      }
+
       const acc = effectiveAccId;
       if (!acc) {
         setPositions([]);
@@ -2065,9 +2202,19 @@ function App() {
     } catch { }
   }, [effectiveAccId, activeBotTab, loginUid, setPositions, setClosedPositions]);
 
+  // Listener khi chuyển đổi giữa SÀN OKX và QUỸ E8
+  useEffect(() => {
+    const onPlatformChanged = () => {
+      fetchPositions();
+    };
+    window.addEventListener("tls1_platform_changed", onPlatformChanged);
+    return () => window.removeEventListener("tls1_platform_changed", onPlatformChanged);
+  }, [fetchPositions]);
+
   // Periodic polling
   useEffect(() => {
-    if (!isAuthenticated) return;
+    const isE8 = (localStorage.getItem("tls1_trading_platform") === "e8");
+    if (!isAuthenticated && !isE8) return;
     const fetchStatus = async () => {
       try {
         const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
@@ -2087,13 +2234,21 @@ function App() {
           if (d.ENABLED_COINS && Array.isArray(d.ENABLED_COINS) && d.ENABLED_COINS.length > 0) {
             setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
           }
-          setRisk(r => ({
+          const bVol = (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : null;
+          if (bVol !== null && bVol > 0) {
+            try {
+              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(bVol));
+            } catch {}
+          }
+          setRisk((r) => ({
             ...r,
-            posVol: (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : r.posVol,
+            posVol: (bVol !== null && bVol > 0) ? bVol : r.posVol,
+            volUsdt: (bVol !== null && bVol > 0) ? bVol : r.volUsdt,
             tpPct: d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct,
             slPct: d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct,
             multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? false),
           }));
+          hasLoadedConfigFromBackendRef.current = true;
         }
       } catch { }
     };
@@ -2144,8 +2299,6 @@ function App() {
 
 
   // Render main UI directly instead of blocking with LoginModal
-
-  const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
 
   return (
     <div className="app-container">
@@ -2228,6 +2381,7 @@ function App() {
           setRisk={setRisk}
           isRunning={isRunning}
           onToggleMultiplyVolume={handleToggleMultiplyVolume}
+          onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
         />
 
         {/* MAIN SECTION */}

@@ -1,7 +1,19 @@
-import React from "react";
+import React, { useRef } from "react";
 
-export default function NumberSpinBox({ value, onChange, min = 0, max, step = 1, suffix = "", width = "84px" }) {
+export default function NumberSpinBox({
+  value,
+  onChange,
+  min = 0,
+  max,
+  step = 1,
+  suffix = "",
+  width = "84px",
+  disabled = false,
+}) {
+  const inputRef = useRef(null);
+
   const handleStep = (delta) => {
+    if (disabled) return;
     const cur = parseFloat(value || 0);
     const stepStr = step.toString();
     const decimals = stepStr.includes(".") ? stepStr.split(".")[1].length : 0;
@@ -12,10 +24,12 @@ export default function NumberSpinBox({ value, onChange, min = 0, max, step = 1,
   };
 
   const handleChange = (e) => {
+    if (disabled) return;
     onChange(e.target.value);
   };
 
   const handleBlur = (e) => {
+    if (disabled) return;
     let val = parseFloat(e.target.value);
     if (isNaN(val)) val = min !== undefined ? min : 0;
     const stepStr = step.toString();
@@ -25,32 +39,76 @@ export default function NumberSpinBox({ value, onChange, min = 0, max, step = 1,
     onChange(parseFloat(val.toFixed(decimals)).toString());
   };
 
+  const handleContainerClick = (e) => {
+    if (disabled) return;
+    if (e.target.closest(".spinbox-stepper")) return;
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   return (
-    <div className="spinbox-container" style={{ width }}>
+    <div
+      className={`spinbox-container ${disabled ? "disabled" : ""}`}
+      onClick={handleContainerClick}
+      style={{
+        width,
+        opacity: disabled ? 0.65 : 1,
+        pointerEvents: disabled ? "none" : "auto",
+        cursor: disabled ? "not-allowed" : "text",
+      }}
+      title={disabled ? "Bot đang chạy - Dừng bot để chỉnh sửa ký quỹ" : ""}
+    >
       <input
+        ref={inputRef}
         type="number"
         className="spinbox-input"
         value={value}
+        disabled={disabled}
         onChange={handleChange}
         onBlur={handleBlur}
         min={min}
         max={max}
         step={step}
-        onKeyDown={e => {
+        onKeyDown={(e) => {
+          if (disabled) return;
           if (e.key === "ArrowUp") { e.preventDefault(); handleStep(step); }
           if (e.key === "ArrowDown") { e.preventDefault(); handleStep(-step); }
         }}
       />
       <span
         className="spinbox-suffix"
-        style={{ visibility: suffix ? "visible" : "hidden" }}
+        style={{
+          visibility: suffix ? "visible" : "hidden",
+          pointerEvents: "none",
+          userSelect: "none",
+          cursor: "text",
+        }}
         aria-hidden={!suffix}
       >
         {suffix || "%"}
       </span>
-      <div className="spinbox-stepper">
-        <button type="button" tabIndex={-1} className="spinbox-btn" onClick={() => handleStep(step)} title="Tăng">▲</button>
-        <button type="button" tabIndex={-1} className="spinbox-btn" onClick={() => handleStep(-step)} title="Giảm">▼</button>
+      <div className="spinbox-stepper" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          tabIndex={-1}
+          className="spinbox-btn"
+          disabled={disabled}
+          onClick={() => handleStep(step)}
+          title={disabled ? "" : "Tăng"}
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          className="spinbox-btn"
+          disabled={disabled}
+          onClick={() => handleStep(-step)}
+          title={disabled ? "" : "Giảm"}
+        >
+          ▼
+        </button>
       </div>
     </div>
   );

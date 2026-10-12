@@ -1,6 +1,18 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import NumberSpinBox from "../common/NumberSpinBox";
 import { useTranslation } from "../../i18n";
+
+const getTextWidth = (text, font = "600 12px 'Segoe UI', sans-serif") => {
+  if (!text) return 60;
+  try {
+    const canvas = getTextWidth.canvas || (getTextWidth.canvas = document.createElement("canvas"));
+    const context = canvas.getContext("2d");
+    context.font = font;
+    return Math.ceil(context.measureText(text).width);
+  } catch {
+    return text.length * 7.5;
+  }
+};
 
 export default function SidebarLeft({
   activeBotTab,
@@ -19,8 +31,136 @@ export default function SidebarLeft({
   setRisk,
   isRunning = false,
   onToggleMultiplyVolume,
+  onOpenConnectModal,
 }) {
   const { t } = useTranslation();
+  const [tradingPlatform, setTradingPlatform] = useState(() => localStorage.getItem("tls1_trading_platform") || "okx");
+  const [e8Account, setE8Account] = useState(null);
+  const [propAccounts, setPropAccounts] = useState([]);
+  const [activePropId, setActivePropId] = useState("");
+  const [e8Lot, setE8Lot] = useState(() => Number(localStorage.getItem("tls1_e8_lot")) || 0.03);
+  const [e8RiskUsd, setE8RiskUsd] = useState(() => Number(localStorage.getItem("tls1_e8_risk_usd")) || 25);
+  const [e8DailyLoss, setE8DailyLoss] = useState(() => Number(localStorage.getItem("tls1_e8_daily_loss")) || 125);
+
+  const updateE8Config = (newRisk, newDailyLoss) => {
+    const rVal = newRisk !== undefined ? newRisk : e8RiskUsd;
+    const dlVal = newDailyLoss !== undefined ? newDailyLoss : e8DailyLoss;
+    const curUid = localStorage.getItem("tls1_uid") || "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    fetch("/api/tradelocker/config", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        uid: curUid,
+        account_id: activePropId || undefined,
+        risk_per_trade: Number(rVal),
+        daily_drawdown_limit: Number(dlVal),
+        fund_size: e8Account?.fund_size || 5000,
+        daily_profit_cap: e8Account?.daily_profit_cap || 100,
+        is_enabled: true
+      })
+    }).catch(() => {});
+  };
+
+  const fetchE8Account = () => {
+    const rawUid = localStorage.getItem("tls1_uid");
+    const curUid = (rawUid && rawUid !== "undefined" && rawUid !== "null") ? rawUid : "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    // 1. Tải danh sách tất cả các tài khoản Quỹ đã kết nối
+    fetch(`/api/tradelocker/accounts?uid=${encodeURIComponent(curUid)}`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.status === "success" && Array.isArray(d.accounts) && d.accounts.length > 0) {
+          setPropAccounts(d.accounts);
+          if (d.active_id) {
+            setActivePropId(d.active_id);
+          }
+        }
+      })
+      .catch(() => {});
+
+    // 2. Tải chi tiết tài khoản Quỹ đang active
+    fetch(`/api/tradelocker/account?uid=${encodeURIComponent(curUid)}`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.is_connected && d.status === "success") {
+          setE8Account(d);
+          setPropAccounts((prev) => {
+            if (!prev || prev.length === 0) {
+              return [{
+                id: d.account_id ? `prop_${(d.server || 'e8').toLowerCase()}_${d.account_id}` : 'default',
+                account_id: d.account_id,
+                name: d.name || `${d.server || 'E8'} Demo #${d.account_id}`,
+                firm: d.server || 'E8',
+                server: d.server || 'E8',
+                balance: d.balance || 5000,
+                equity: d.equity || 5000
+              }];
+            }
+            return prev;
+          });
+          if (d.risk_per_trade) {
+            setE8RiskUsd(Number(d.risk_per_trade));
+            localStorage.setItem("tls1_e8_risk_usd", d.risk_per_trade);
+          }
+          if (d.daily_loss_limit) {
+            setE8DailyLoss(Number(d.daily_loss_limit));
+            localStorage.setItem("tls1_e8_daily_loss", d.daily_loss_limit);
+          }
+        }
+      })
+      .catch(() => {});
+  };
+
+  const handleSelectPropAccount = (accId) => {
+    if (accId === "__connect__") {
+      onOpenConnectModal && onOpenConnectModal("tradelocker");
+      return;
+    }
+    const curUid = localStorage.getItem("tls1_uid") || "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    fetch("/api/tradelocker/select_account", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ uid: curUid, account_id: accId })
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.status === "success") {
+          setActivePropId(accId);
+          fetchE8Account();
+          window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: accId }));
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchE8Account();
+    const handleAccountChange = () => fetchE8Account();
+    window.addEventListener("tls1_prop_account_changed", handleAccountChange);
+    const interval = setInterval(fetchE8Account, 15000);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("tls1_prop_account_changed", handleAccountChange);
+    };
+  }, []);
+
+  const handlePlatformSwitch = (platform) => {
+    setTradingPlatform(platform);
+    localStorage.setItem("tls1_trading_platform", platform);
+    window.dispatchEvent(new CustomEvent("tls1_platform_changed", { detail: platform }));
+  };
 
   const handleToggle = () => {
     if (typeof onToggleRiskCollapse === "function") {
@@ -101,68 +241,36 @@ export default function SidebarLeft({
             </button>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px" }}>
+          {/* HÀNG 1: NGANG HÀNG NÚT SÀN/QUỸ, HƯỚNG DẪN VÀ CÀI ĐẶT */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
+            {/* Dropdown Nền Tảng: SÀN OKX / QUỸ E8 */}
             <select
-              className="styled-select"
-              data-tour="account-select"
+              value={tradingPlatform}
+              onChange={(e) => handlePlatformSwitch(e.target.value)}
               disabled={isRunning}
+              className="styled-select"
               style={{
                 flex: 1,
                 minWidth: 0,
-                padding: "4px 8px",
-                borderRadius: "5px",
-                fontSize: "12px",
-                outline: "none",
                 height: "30px",
+                backgroundColor: "#181818",
+                border: "1px solid #383838",
+                borderRadius: "5px",
+                padding: "4px 8px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                color: "#ffffff",
                 cursor: isRunning ? "not-allowed" : "pointer",
-                opacity: isRunning ? 0.65 : 1,
-                color: isRunning ? "#a0a5ab" : "#ffffff",
-                WebkitTextFillColor: isRunning ? "#a0a5ab" : "#ffffff",
-                backgroundColor: isRunning ? "#131313" : "#1a1a1a",
-                borderColor: isRunning ? "#2c2c2c" : "#3d3d3d",
-                transition: "all 0.2s ease",
+                outline: "none",
+                transition: "all 0.15s ease",
               }}
-              value={effectiveAccId}
-              onChange={(e) => handleAccountSelect(e.target.value)}
-              title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản giao dịch"}
+              title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi sàn!" : "Chọn nền tảng giao dịch"}
             >
-              {!effectiveAccId && (
-                <option value="">{accounts.length === 0 ? t("no_account") : "(Chọn tài khoản)"}</option>
-              )}
-              {effectiveAccId && !accounts.some((a) => a.id === effectiveAccId || a.name === effectiveAccId) && (
-                <option value={effectiveAccId}>
-                  {effectiveAccId} {isRunning ? "🔒" : ""}
-                </option>
-              )}
-              {accounts.map((acc) => {
-                const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
-                const isRunningThisBot = isRunning && (acc.id === effectiveAccId || acc.name === effectiveAccId || runningBotKey === activeBotTab);
-                const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
-                const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
-
-                const getTargetBotName = (key) => {
-                  if (key === "sub1") return t("bot_ema200");
-                  if (key === "sub2") return t("bot_smc");
-                  return t("bot_liquidation");
-                };
-
-                let labelSuffix = "";
-                if (isRunningThisBot) {
-                  labelSuffix = " 🔒";
-                } else if (isRunningOnOtherBot) {
-                  labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
-                } else if (assignedOtherBot) {
-                  labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
-                }
-
-                return (
-                  <option key={acc.id} value={acc.id} disabled={isRunningOnOtherBot}>
-                    {acc.name}{labelSuffix}
-                  </option>
-                );
-              })}
+              <option value="okx" style={{ background: "#1e1e1e", color: "#ffffff" }}>Sàn OKX</option>
+              <option value="e8" style={{ background: "#1e1e1e", color: "#ffffff" }}>Quỹ FX</option>
             </select>
-            {/* 1. Nút Hướng Dẫn (nổi bật, đặt trước Cài Đặt) */}
+
+            {/* 1. Nút Hướng Dẫn (nổi bật, đặt trước Cài Đặt, kích thước chuẩn bằng nút Cài Đặt) */}
             <button
               type="button"
               className="btn-tour-guide"
@@ -174,11 +282,12 @@ export default function SidebarLeft({
                 flexShrink: 0,
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: "5px",
-                padding: "0 9px",
-                fontSize: "12px",
+                padding: "0 14px",
+                fontSize: "13px",
                 fontWeight: 700,
-                borderRadius: "5px",
+                borderRadius: "6px",
                 cursor: "pointer",
                 background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
                 border: "1px solid #6366f1",
@@ -214,7 +323,16 @@ export default function SidebarLeft({
               type="button"
               className="btn-chart-settings"
               data-tour="settings-btn"
-              style={{ height: "30px", whiteSpace: "nowrap", flexShrink: 0 }}
+              style={{
+                height: "30px",
+                padding: "0 14px",
+                fontSize: "13px",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
               onClick={onOpenSettings}
               title="Cài đặt hệ thống & API Key"
             >
@@ -222,8 +340,228 @@ export default function SidebarLeft({
             </button>
           </div>
 
+          {/* HÀNG 2: CHỌN TÀI KHOẢN (NGANG HÀNG ĐẸP MẮT THEO BẢN VẼ CHIẾN THUẬT - ẢNH 3) */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+              marginBottom: "10px",
+              flexWrap: "nowrap",
+            }}
+          >
+            <span
+              style={{
+                color: "#e0e0e0",
+                fontSize: "12px",
+                fontWeight: "bold",
+                whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                flexShrink: 0,
+              }}
+            >
+              {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
+              Chọn tài khoản:
+            </span>
+
+            {tradingPlatform === "e8" ? (
+              propAccounts.length > 0 ? (
+                /* Luôn hiển thị Dropdown Select tài khoản Quỹ FX */
+                <select
+                  className="styled-select"
+                  data-tour="account-select"
+                  disabled={isRunning}
+                  style={{
+                    width: "auto",
+                    maxWidth: "100%",
+                    flexShrink: 0,
+                    background: isRunning ? "#1a1a1a" : "#2d2d2d",
+                    border: isRunning ? "1px solid #444444" : "1px solid #555555",
+                    color: isRunning ? "#888888" : "#ffffff",
+                    padding: "4px 22px 4px 8px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    height: "30px",
+                    outline: "none",
+                    cursor: isRunning ? "not-allowed" : "pointer",
+                    opacity: isRunning ? 0.65 : 1,
+                    transition: "all 0.2s ease",
+                    textAlign: "right",
+                    textAlignLast: "right",
+                    direction: "ltr",
+                  }}
+                  value={activePropId || (propAccounts[0] && propAccounts[0].id) || ""}
+                  onChange={(e) => {
+                    if (e.target.value === "__connect__") {
+                      onOpenConnectModal && onOpenConnectModal("tradelocker");
+                    } else {
+                      handleSelectPropAccount(e.target.value);
+                    }
+                  }}
+                  title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi Quỹ!" : "Chọn tài khoản Quỹ để giao dịch"}
+                >
+                  {propAccounts.map((acc) => (
+                    <option
+                      key={acc.id}
+                      value={acc.id}
+                      style={{
+                        background: "#1e1e1e",
+                        color: "#ffffff",
+                        textAlign: "right",
+                        padding: "6px 18px 6px 10px",
+                      }}
+                    >
+                      {acc.name || `Quỹ ${acc.firm} #${acc.account_id}`} (${Number(acc.balance || 0).toLocaleString()})
+                    </option>
+                  ))}
+                  <option
+                    value="__connect__"
+                    style={{
+                      background: "#1e1e1e",
+                      color: "#00e676",
+                      textAlign: "right",
+                      padding: "6px 18px 6px 10px",
+                    }}
+                  >
+                    + Kết nối thêm Quỹ mới...
+                  </option>
+                </select>
+              ) : (
+                /* Chưa có tài khoản Quỹ */
+                <div
+                  onClick={() => onOpenConnectModal && onOpenConnectModal("tradelocker")}
+                  style={{
+                    width: "auto",
+                    minWidth: "140px",
+                    height: "30px",
+                    borderRadius: "4px",
+                    border: "1px solid #3a3a3a",
+                    backgroundColor: "#202020",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 10px",
+                    fontSize: "11.5px",
+                    color: "#cccccc",
+                    fontWeight: "bold",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
+                    transition: "all 0.18s ease",
+                    gap: "5px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#2a2a2a";
+                    e.currentTarget.style.borderColor = "#555555";
+                    e.currentTarget.style.color = "#ffffff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#202020";
+                    e.currentTarget.style.borderColor = "#3a3a3a";
+                    e.currentTarget.style.color = "#cccccc";
+                  }}
+                  title="Nhấp để kết nối tài khoản Quỹ FX (E8, The 5%ers, FTMO...)"
+                >
+                  <span style={{ fontSize: "12px", color: "#888888" }}>🔗</span>
+                  <span>+ Kết Nối Quỹ FX</span>
+                </div>
+              )
+            ) : (
+              <select
+                className="styled-select"
+                data-tour="account-select"
+                disabled={isRunning}
+                style={{
+                  width: "auto",
+                  maxWidth: "100%",
+                  flexShrink: 0,
+                  background: isRunning ? "#1a1a1a" : "#2d2d2d",
+                  border: isRunning ? "1px solid #444444" : "1px solid #555555",
+                  color: isRunning ? "#888888" : "#e0e0e0",
+                  padding: "4px 22px 4px 8px",
+                  borderRadius: "4px",
+                  fontSize: "12px",
+                  height: "30px",
+                  outline: "none",
+                  cursor: isRunning ? "not-allowed" : "pointer",
+                  opacity: isRunning ? 0.65 : 1,
+                  transition: "all 0.2s ease",
+                  textAlign: "right",
+                  textAlignLast: "right",
+                  direction: "ltr",
+                }}
+                value={effectiveAccId}
+                onChange={(e) => handleAccountSelect(e.target.value)}
+                title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản giao dịch"}
+              >
+                {!effectiveAccId && (
+                  <option
+                    value=""
+                    style={{
+                      color: "#888888",
+                      textAlign: "right",
+                      padding: "6px 18px 6px 10px",
+                    }}
+                  >
+                    {accounts.length === 0 ? "chưa có tài khoản" : "chọn tài khoản"}
+                  </option>
+                )}
+                {effectiveAccId && !accounts.some((a) => a.id === effectiveAccId || a.name === effectiveAccId) && (
+                  <option
+                    value={effectiveAccId}
+                    style={{
+                      textAlign: "right",
+                      padding: "6px 18px 6px 10px",
+                    }}
+                  >
+                    {effectiveAccId} {isRunning ? "🔒" : ""}
+                  </option>
+                )}
+                {accounts.map((acc) => {
+                  const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
+                  const isRunningThisBot = isRunning && (acc.id === effectiveAccId || acc.name === effectiveAccId || runningBotKey === activeBotTab);
+                  const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
+                  const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
+
+                  const getTargetBotName = (key) => {
+                    if (key === "sub1") return t("bot_ema200");
+                    if (key === "sub2") return t("bot_smc");
+                    return t("bot_liquidation");
+                  };
+
+                  let labelSuffix = "";
+                  if (isRunningThisBot) {
+                    labelSuffix = " 🔒";
+                  } else if (isRunningOnOtherBot) {
+                    labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                  } else if (assignedOtherBot) {
+                    labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                  }
+
+                  return (
+                    <option
+                      key={acc.id}
+                      value={acc.id}
+                      disabled={isRunningOnOtherBot}
+                      style={{
+                        textAlign: "right",
+                        padding: "6px 18px 6px 10px",
+                      }}
+                    >
+                      {acc.name}{labelSuffix}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+          </div>
+
           {!isRiskCollapsed && (
             <div className="risk-grid">
+              {/* 1. HÀNG KÝ QUỸ */}
               <div
                 className="risk-row"
                 data-tour="margin-config"
@@ -235,52 +573,88 @@ export default function SidebarLeft({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
-                  <label style={{ margin: 0, whiteSpace: "nowrap", fontSize: "11.5px", color: "#fff", fontWeight: "bold" }}>{t("margin_label")}</label>
+                  <label style={{ margin: 0, whiteSpace: "nowrap", fontSize: "11.5px", color: "#fff", fontWeight: "bold" }}>
+                    {tradingPlatform === "e8" ? "Khối lượng:" : t("margin_label")}
+                  </label>
                   <div style={{ display: "flex", gap: "2px" }}>
-                    <button
-                      type="button"
-                      className={`risk-unit-btn ${risk.volUnit === "USDT" ? "active" : ""}`}
-                      onClick={() => setRisk((r) => {
-                        const currentVal = r.posVol;
-                        const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
-                        return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
-                      })}
-                      style={{
-                        padding: "1px 5px",
-                        fontSize: "10px",
-                        fontWeight: "bold",
-                        lineHeight: "1.1",
-                        borderRadius: "4px",
-                        border: "1px solid #444",
-                        background: risk.volUnit === "USDT" ? "#26a69a" : "#222",
-                        color: risk.volUnit === "USDT" ? "#fff" : "#888",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ display: "inline-block", transform: "translateY(1px)" }}>USDT</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
-                      onClick={() => setRisk((r) => {
-                        const currentVal = r.posVol;
-                        const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
-                        return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
-                      })}
-                      style={{
-                        padding: "1px 5px",
-                        fontSize: "10px",
-                        fontWeight: "bold",
-                        lineHeight: "1.1",
-                        borderRadius: "4px",
-                        border: "1px solid #444",
-                        background: risk.volUnit === "LOT" ? "#26a69a" : "#222",
-                        color: risk.volUnit === "LOT" ? "#fff" : "#888",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ display: "inline-block", transform: "translateY(1px)" }}>{t("capital_percent")}</span>
-                    </button>
+                    {tradingPlatform === "e8" ? (
+                      <button
+                        type="button"
+                        className="risk-unit-btn active"
+                        style={{
+                          padding: "1px 5px",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          lineHeight: "1.1",
+                          borderRadius: "4px",
+                          border: "1px solid #444",
+                          background: "#26a69a",
+                          color: "#fff",
+                          cursor: "default",
+                        }}
+                      >
+                        <span style={{ display: "inline-block", transform: "translateY(1px)" }}>LOT</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          className={`risk-unit-btn ${risk.volUnit === "USDT" ? "active" : ""}`}
+                          onClick={() => {
+                            if (isRunning) return;
+                            setRisk((r) => {
+                              const currentVal = r.posVol;
+                              const savedPct = r.volUnit === "LOT" ? currentVal : r.volPct;
+                              return { ...r, volUnit: "USDT", volPct: savedPct, posVol: r.volUsdt || 1 };
+                            });
+                          }}
+                          style={{
+                            padding: "1px 5px",
+                            fontSize: "10px",
+                            fontWeight: "bold",
+                            lineHeight: "1.1",
+                            borderRadius: "4px",
+                            border: "1px solid #444",
+                            background: risk.volUnit === "USDT" ? "#26a69a" : "#222",
+                            color: risk.volUnit === "USDT" ? "#fff" : "#888",
+                            cursor: isRunning ? "not-allowed" : "pointer",
+                            opacity: isRunning ? 0.7 : 1,
+                          }}
+                          title={isRunning ? "Bot đang chạy - Dừng bot để đổi loại ký quỹ" : ""}
+                        >
+                          <span style={{ display: "inline-block", transform: "translateY(1px)" }}>USDT</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          className={`risk-unit-btn ${risk.volUnit === "LOT" ? "active" : ""}`}
+                          onClick={() => {
+                            if (isRunning) return;
+                            setRisk((r) => {
+                              const currentVal = r.posVol;
+                              const savedUsdt = r.volUnit === "USDT" ? currentVal : r.volUsdt;
+                              return { ...r, volUnit: "LOT", volUsdt: savedUsdt, posVol: r.volPct || 0.1 };
+                            });
+                          }}
+                          style={{
+                            padding: "1px 5px",
+                            fontSize: "10px",
+                            fontWeight: "bold",
+                            lineHeight: "1.1",
+                            borderRadius: "4px",
+                            border: "1px solid #444",
+                            background: risk.volUnit === "LOT" ? "#26a69a" : "#222",
+                            color: risk.volUnit === "LOT" ? "#fff" : "#888",
+                            cursor: isRunning ? "not-allowed" : "pointer",
+                            opacity: isRunning ? 0.7 : 1,
+                          }}
+                          title={isRunning ? "Bot đang chạy - Dừng bot để đổi loại ký quỹ" : ""}
+                        >
+                          <span style={{ display: "inline-block", transform: "translateY(1px)" }}>{t("capital_percent")}</span>
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) */}
@@ -346,18 +720,45 @@ export default function SidebarLeft({
                   </div>
                 </div>
 
-                <NumberSpinBox
-                  value={risk.posVol}
-                  onChange={(val) => setRisk((r) => {
-                    if (r.volUnit === "USDT") return { ...r, posVol: val, volUsdt: val };
-                    return { ...r, posVol: val, volPct: val };
-                  })}
-                  min={risk.volUnit === "LOT" ? 0.05 : 0.1}
-                  step={risk.volUnit === "LOT" ? 0.05 : 0.1}
-                  suffix={risk.volUnit === "USDT" ? "$" : "%"}
-                  width="84px"
-                />
+                {tradingPlatform === "e8" ? (
+                  <NumberSpinBox
+                    value={e8Lot}
+                    disabled={isRunning}
+                    onChange={(val) => {
+                      if (isRunning) return;
+                      setE8Lot(val);
+                      localStorage.setItem("tls1_e8_lot", val);
+                    }}
+                    min={0.01}
+                    max={10.0}
+                    step={0.01}
+                    suffix="L"
+                    width="84px"
+                  />
+                ) : (
+                  <NumberSpinBox
+                    value={risk.posVol}
+                    disabled={isRunning}
+                    onChange={(val) => {
+                      if (isRunning) return;
+                      setRisk((r) => {
+                        const numVal = Number(val) || val;
+                        const updated = (r.volUnit === "USDT") ? { ...r, posVol: numVal, volUsdt: numVal } : { ...r, posVol: numVal, volPct: numVal };
+                        try {
+                          localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(numVal));
+                        } catch {}
+                        return updated;
+                      });
+                    }}
+                    min={risk.volUnit === "LOT" ? 0.05 : 0.1}
+                    step={risk.volUnit === "LOT" ? 0.05 : 0.1}
+                    suffix={risk.volUnit === "USDT" ? "$" : "%"}
+                    width="84px"
+                  />
+                )}
               </div>
+
+              {/* 2. HÀNG TP & SL GỐC M5 (DÙNG CHUNG CẢ OKX VÀ E8) */}
               <div data-tour="tpsl-config" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {activeBotTab === "sub1" ? (
                   <>
@@ -436,6 +837,8 @@ export default function SidebarLeft({
                     </div>
                   </>
                 )}
+
+
               </div>
             </div>
           )}

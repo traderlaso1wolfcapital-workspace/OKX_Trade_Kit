@@ -167,7 +167,7 @@ export const translations = {
     // Logs & Terminal UI
     log_waiting: "Đang đợi dữ liệu console từ bot {name}...",
     log_events_title: "⚡ NHẬT KÝ SỰ KIỆN TỨC THỜI",
-    log_events_desc: "(Tự động cập nhật ở đáy • Không làm nhảy bảng trên)",
+    log_events_desc: "(Tin mới nhất ở trên cùng • Không làm nhảy bảng trên)",
     log_copied: "Đã sao chép toàn bộ logs vào Clipboard!",
     log_connecting_server: "Đang kết nối với TLS1 Trading Web Terminal Server...",
     log_connect_okx_prompt: "ℹ️ Vui lòng kết nối tài khoản OKX để bắt đầu sử dụng và xem logs bot.",
@@ -345,7 +345,7 @@ export const translations = {
     // Logs & Terminal UI
     log_waiting: "Waiting for console stream from bot {name}...",
     log_events_title: "⚡ REAL-TIME EVENT LOGS",
-    log_events_desc: "(Auto-updated at bottom • Dashboard pinned above)",
+    log_events_desc: "(Newest on top • Dashboard pinned above)",
     log_copied: "Copied all logs to clipboard!",
     log_connecting_server: "Connecting to TLS1 Trading Web Terminal Server...",
     log_connect_okx_prompt: "ℹ️ Please connect OKX account to start using and view bot logs.",

@@ -33,6 +33,121 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/10/2026]** - Khắc Phục Lỗi Bấm CHẠY BOT Bị Mở Lại Bảng Connect, Chuyển Sàn/Quỹ Thành Dropdown Gọn Gàng & Triệt Tiêu Cấu Hình Nhập Trùng Lặp:
+  - **Mô tả yêu cầu CEO:**
+    1. Khi đã kết nối Quỹ E8 và bấm "CHẠY BOT", web app lại hiện ra bảng Quỹ FX Connect thay vì khởi động bot.
+    2. Chuyển nút chuyển sàn `[SÀN OKX | QUỸ E8]` thành 1 ô Dropdown select tinh gọn, đẹp mắt.
+    3. Nút `+ Kết Nối Quỹ FX`: Bỏ đường viền nét đứt màu xanh ngoài, chuyển sang viền xám đồng nhất với các nút khác trong hệ thống.
+    4. Bỏ phần `CẤU HÌNH VỐN & BOT ĐÁNH QUỸ` (Rủi ro mỗi lệnh $25, Ngắt lỗ ngày $125) trong Connect modal vì `TIẾN ĐỘ THI QUỸ E8` đã tự động tính toán các mốc này; dùng trực tiếp số liệu đó làm mặc định cho bot.
+    5. Bỏ danh sách checkbox cặp giao dịch trong Quỹ Connect vì đã dùng chung 100% với `THÊM MÃ GIAO DỊCH` trong Chiến Thuật.
+    6. Bỏ nút gạt "Tự động bắn lệnh sang Quỹ": Khi ở nền tảng Quỹ và CEO bấm nút "CHẠY BOT" ở ngoài, bot bắt đầu giao dịch trên Quỹ, bấm "DỪNG BOT" thì bot dừng, hoàn toàn đồng nhất với quy trình của OKX.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Nguyên nhân lỗi bấm CHẠY BOT hiện Connect:** `handleStartBotClick` và `handleStartBot` trong `App.jsx` trước đó kiểm tra cứng API key OKX (`!isAuthenticated || !apiKey || ...`). Khi ở chế độ Quỹ E8, CEO dùng TradeLocker chứ không nhập API OKX, dẫn đến điều kiện kích hoạt `setShowConnectModal(true)`. Ngoài ra backend `/api/bot/start` cũng chặn nếu thiếu key OKX.
+    2. **Khắc phục xử lý Khởi động Bot Quỹ:**
+       - `App.jsx`: Nhận diện nền tảng `e8`. Nếu Quỹ đã kết nối thì cho phép gọi `handleStartBot()` trực tiếp, không mở Connect modal và không báo lỗi thiếu API Key OKX.
+       - `main.py`: Khi ở chế độ Quỹ (`is_prop_mode`), tự động nạp fallback credentials từ `bots/{strategy}/.api_{strategy}` làm data feed nến OKX tính chỉ báo (EMA200, SMC) và miễn trừ điều kiện Ref OKX. Bot khởi động thành công và chuyển trạng thái sang `RUNNING`.
+    3. **Chuyển Sàn/Quỹ thành Dropdown (SidebarLeft.jsx):**
+       - Thay thế cụm 2 nút bấm bằng dropdown `<select>` chuẩn UI nền đen viền xám `#383838`, hiển thị màu cam `#ff9900` cho OKX và teal `#26a69a` cho Quỹ FX.
+    4. **Chuẩn hóa nút Kết Nối Quỹ (SidebarLeft.jsx):**
+       - Thay đổi `1px dashed #00e676` thành viền liền xám tinh gọn `1px solid #3a3a3a`, nền `#202020`, chữ `#cccccc`, hover sáng `#ffffff`. Đồng thời trong `fetchE8Account`, tự động bổ sung tài khoản active vào danh sách nếu danh sách đa tài khoản chưa kịp load, giúp luôn hiển thị thẻ tài khoản thay vì nút kết nối.
+    5. **Triệt tiêu toàn bộ cấu hình thừa (TradeLockerTab.jsx):**
+       - Xóa bỏ hoàn toàn khối `CẤU HÌNH VỐN & BOT ĐÁNH QUỸ`, các ô input $25 / $125, cụm checkbox cặp tiền và nút gạt bắn lệnh.
+       - Bot tự động sử dụng `fund_size` để quản trị an toàn (Static DD 8%, Daily DD 2.5%, Daily Profit Cap 2%) và dùng chung danh sách coin từ Chiến Thuật.
+    6. **Cập nhật nhãn Footer ConnectModal:** Khi ở tab `Quỹ FX Connect`, hiển thị trạng thái `Quỹ FX: [Tên Quỹ] (Đã kết nối)` thay vì báo đỏ `UID: Đã ngắt kết nối`.
+  - **Kiểm tra và nghiệm thu:** `npm run build` đạt 241ms (0 lỗi), backend API `/api/bot/start` và `/api/tradelocker/account` phản hồi `status: success` trơn tru.
+
+- **[12/10/2026]** - Nâng Cấp Kiến Trúc Multi-Prop Firm (Đa Quỹ Song Song), Đồng Bộ Mã Giao Dịch & Tinh Gọn Hàng Chọn Tài Khoản Ngang Chuẩn Chiến Thuật:
+  - **Mô tả yêu cầu CEO:**
+    1. Chuẩn hóa cặp vị thế giữa OKX và Quỹ FX (XAU-USDT sang XAU/USD). Thống nhất mục `THÊM MÃ GIAO DỊCH` dùng chung 100% cho tất cả các sàn từ OKX đến mọi Quỹ FX.
+    2. Ẩn phần `Tài khoản (EMA200 Bot)` trong tab Chiến Thuật của Cài Đặt (vì bên ngoài đã có đầy đủ).
+    3. Đưa layout `Chọn tài khoản:` dạng hàng ngang có Dropdown gọn gàng bên phải giống ảnh 3 ra Sidebar ngoài thay cho mục chọn tài khoản dài ngoằng trước đây.
+    4. Đổi tên tab thứ 3 thành `Quỹ FX Connect`, bỏ logo icon ở đầu tab.
+    5. Tab `Fast Connect` bổ sung đầy đủ các thẻ connect độc lập cho E8, The 5%ers, FTMO.
+    6. Bỏ 2 dòng Rủi ro mỗi lệnh & Ngắt lỗ ngày ở ngoài Sidebar để tinh gọn. Cân bằng kích thước nút Hướng Dẫn bằng chuẩn nút Cài Đặt.
+    7. Hoàn thiện kiến trúc backend/frontend Multi-Prop Firm hỗ trợ kết nối, lưu trữ song song và chuyển đổi mượt mà giữa nhiều tài khoản Quỹ FX.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Đồng bộ hóa Mã Giao Dịch & Vị Thế (PositionsTable.jsx & tradelocker_service.py):**
+       - Danh sách `THÊM MÃ GIAO DỊCH` (XAU, BTC, ETH...) dùng chung 100%. Khi chuyển sang tab Quỹ FX, hệ thống tự động đổi nhãn từ cặp Crypto (`XAU-USDT`) sang chuẩn FX (`XAU/USD`, `BTC/USD`).
+       - Bot tự động map các tín hiệu chuẩn sang mã TradeLocker tương ứng (`XAUUSD+`, `BTCUSD+`).
+    2. **Ẩn cấu hình thừa & đồng bộ Chiến Thuật (SystemSettingsModal.jsx):**
+       - Ẩn hoàn toàn khối `Tài khoản (${botTitle})` trong tab Chiến Thuật để tránh trùng lặp.
+    3. **Hàng Chọn Tài Khoản Ngang Tinh Gọn (SidebarLeft.jsx):**
+       - Thiết kế lại Hàng 2 theo đúng tỷ lệ ảnh 3: Nhãn `Chọn tài khoản:` bên trái, dropdown `<select>` hoặc thẻ Quỹ thu nhỏ bên phải. Cả OKX và Quỹ FX đều đồng bộ bố cục này.
+       - Cân bằng kích thước: Nút Hướng Dẫn và Cài Đặt đồng bộ `height: 30px`, `padding: 0 14px`, `fontSize: 13px`, `borderRadius: 6px`.
+       - Bỏ 2 dòng cấu hình rủi ro thừa ở ngoài Sidebar.
+       - Khi ở chế độ Quỹ FX: Đổi nhãn thành `Khối lượng:` (thay vì Ký quỹ), style nút `[LOT]` nền teal `#26a69a` chữ trắng đồng bộ 100% với nút `[USDT]` của OKX.
+    4. **Tab Quỹ FX Connect & Thẻ Fast Connect (ConnectModal.jsx):**
+       - Đổi tên tab 3 thành `Quỹ FX Connect`, bỏ logo icon ở đầu tab.
+       - Fast Connect hiển thị đủ 3 Quỹ lớn: `E8 Markets`, `The 5%ers`, `FTMO`. Khi tài khoản đã kết nối hiển thị trạng thái `🟢 Đã Connect` + `Cài đặt ⚙` + `✕`. Khi chưa kết nối hiển thị nút `Kết Nối ➔`.
+    5. **Kiến Trúc Multi-Prop Firm (tradelocker_service.py & TradeLockerTab.jsx):**
+       - Backend nâng cấp cấu trúc đa tài khoản `{ active_id: "...", accounts: [...] }`, tự động migrate không làm mất tài khoản cũ (#2534591 của CEO được giữ nguyên 100%).
+       - Các API `/api/tradelocker/accounts`, `/select_account`, `/account`, `/positions`, `/config`, `/disconnect` hỗ trợ đa tài khoản trơn tru.
+    6. **Kiểm tra và nghiệm thu:** `npm run build` hoàn thành trong 218ms (0 lỗi), backend daemon chạy ổn định trên port 8080.
+
+
+- **[12/10/2026]** - Tích Hợp Logo Chính Thức E8, Bố Cục Tab Sàn/Quỹ Trực Quan, Input Rủi Ro Đồng Bộ & Loại Bỏ Emojis Rườm Rà:
+  - **Mô tả yêu cầu CEO:**
+    1. Thay logo chính thức Quỹ E8 vào Connect và Sidebar.
+    2. Bỏ hàng 4 nút preset Lot (0.01, 0.03, 0.05, 0.1 L), người dùng chủ động nhập Lot trực tiếp.
+    3. Đưa cấu hình Rủi ro mỗi lệnh (USD) và Ngắt lỗ ngày (USD) thành input trực tiếp ở Sidebar ngoài thay vì phải vào tận tab Quỹ trong Connect. Đồng bộ cùng tone với Mức chốt lời gốc M5 và Mức cắt lỗ gốc M5.
+    4. Đưa ô chọn tài khoản (OKX / E8 Demo) xuống dưới tab Sàn OKX / Quỹ E8 để nằm gọn gàng bên trong tab tương ứng.
+    5. Bỏ hết các icon emoji 📊 🎯 🛡️ ⚠️ ⏳ ⚙️ trong tab Quỹ E8 cho gọn gàng, tinh tế, không bị rườm rà.
+  - **Phân tích & Giải pháp kỹ thuật:**
+    1. **Logo Quỹ E8:** Lưu file logo chính thức tại `frontend/public/e8_logo.png`, hiển thị trên tab Quỹ trong ConnectModal, trên card Fast Connect, trong header TradeLockerTab và trên thẻ tài khoản Quỹ tại SidebarLeft.
+    2. **Thứ tự hàng Sidebar (SidebarLeft.jsx):**
+       - Hàng 1: Switch `[SÀN OKX | QUỸ E8]` --- `[Hướng Dẫn]` --- `[⚙ Cài Đặt]`.
+       - Hàng 2: Nằm ngay dưới Hàng 1, hiển thị linh hoạt dropdown chọn tài khoản OKX hoặc thẻ tài khoản `E8 Demo #2534591` kèm logo E8 và số dư live.
+    3. **Đồng bộ Tone Cấu Hình Rủi Ro (SidebarLeft.jsx):**
+       - Xóa bỏ hàng 4 nút preset Lot.
+       - Xóa khung box rời có viền riêng. Đưa 2 dòng `Rủi ro mỗi lệnh (USD)` và `Ngắt lỗ ngày (USD)` về chuẩn `.risk-row` với nhãn `<label>`, phần trăm mờ `(~0.5%)`, `(-2.5%)`, nút trợ giúp `[?]` và `NumberSpinBox` đồng bộ 100% cùng tone với M5 TP và SL.
+    4. **Loại bỏ Emojis (TradeLockerTab.jsx):**
+       - Loại bỏ hoàn toàn các icon 📊, 🎯, 🛡️, ⚠️, ⏳, ⚙️ khỏi tiêu đề các mục và nhãn thông số tiến độ thi quỹ E8.
+    5. **Kiểm tra và nghiệm thu:** `npm run build` thành công trong 212ms, giao diện tinh gọn, đồng bộ và chuyên nghiệp.
+
+- **[12/10/2026]** - Tối Ưu Bố Cục Nút Nền Tảng, Thẻ Connect Quỹ Prop Firm & Tái Sử Dụng 100% Logic Bot Cho Quỹ E8/FX:
+  - **Mô tả yêu cầu CEO:**
+    1. Vị trí 2 nút SÀN OKX và QUỸ E8 không để tách biệt ở trên; đưa vào nằm ngang hàng với nút Hướng Dẫn và Cài Đặt.
+    2. Logic bot phát tín hiệu đẩy lệnh lên OKX và Quỹ fx ngang hàng: Quỹ fx dùng lại toàn bộ setting và tài nguyên của bot (Ký quỹ thay USDT = LOT, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5 dùng chung 100%, bổ sung 2 dòng Rủi ro mỗi lệnh & Cầu dao ngắt lỗ ngày).
+    3. Đưa các Quỹ fx thành thẻ Connect trong tab Fast Connect (ảnh 3) giống OKX Connect, bấm vào hiện bảng thông tin liên kết (ảnh 4).
+    4. Khắc phục nguyên nhân lệnh E8 khớp trên TradeLocker nhưng chưa quét hiển thị lên Bảng Vị Thế.
+  - **Phân tích & Giải pháp kỹ thuật:**
+    1. **Bố cục Sidebar (SidebarLeft.jsx):**
+       - Bỏ hàng nút độc lập phía trên. Hàng 1 dành trọn vẹn cho chọn tài khoản giao dịch (rộng rãi, thoáng mắt).
+       - Hàng 2: Đặt ngang hàng 3 cụm: Segmented Toggle `[ SÀN OKX | QUỸ E8 ]` --- `[ Hướng Dẫn ]` --- `[ ⚙ Cài Đặt ]`.
+    2. **Hợp nhất Bảng Cấu Hình Bot (SidebarLeft.jsx):**
+       - Dùng chung 100% bảng setting cho cả OKX và Quỹ.
+       - Ký quỹ: Ở OKX là `[USDT] [% VỐN] [$]`, ở Quỹ là `[LOT] [% VỐN] [L]` (có preset nhanh `0.01`, `0.03`, `0.05`, `0.1` L).
+       - Chốt lời gốc M5 và Cắt lỗ gốc M5 dùng chung 100% cho cả 2 nền tảng.
+       - Khi ở chế độ Quỹ, bổ sung 2 dòng thông số an toàn: Rủi ro mỗi lệnh (~$25) và Cầu dao ngắt lỗ ngày (-$125).
+    3. **Thẻ Kết Nối Quỹ trong ConnectModal.jsx:**
+       - Tích hợp Thẻ `🏆 Quỹ Prop Firm (E8, The5ers, FTMO...)` trực tiếp trong danh sách `Fast Connect`.
+       - Nhấp vào thẻ chuyển thẳng tới form cấu hình Quỹ (chọn Quỹ, Server, Email, Pass, Quy mô gói Quỹ). Khi đã kết nối, hiển thị trạng thái live `🟢 Đã Connect`.
+    4. **Bảng Vị Thế Live (App.jsx & backend main.py):**
+       - Sửa `fetchPositions()` trong `App.jsx` để tự động gọi `/api/tradelocker/positions` khi ở chế độ Quỹ E8.
+       - Xử lý polling độc lập không bị chặn bởi `isAuthenticated` của OKX.
+       - Sửa backend `main.py` thay `get_tradelocker_manager` bằng `TradeLockerManager.get_client`, load `account_id` và map đúng `BTC-USDT-SWAP` vào Bảng Vị Thế.
+       - Hỗ trợ đóng vị thế Quỹ trực tiếp từ nút [Cắt lệnh] trên Bảng Vị Thế qua `/api/tradelocker/positions/close`.
+       - **Giải thích hiện tượng lệnh 15:41:** Kiểm tra số liệu Init Margin `$1,254.88 (1.27%)` trên ảnh điện thoại cho thấy tài khoản đó là tài khoản Demo $100,000 mặc định của app TradeLocker, khác với tài khoản E8 `#2534591` ($5,000) của gói thi. Khi trade trên đúng tài khoản `#2534591`, hệ thống quét và đưa lên bảng vị thế ngay lập tức.
+    5. **Kiểm tra và nghiệm thu:** `npm run build` thành công trong 231ms, backend khởi động live ổn định trên port 8080.
+
+- **[12/10/2026]** - Chỉnh Nút "Cài Đặt" (Viền Vàng Khi Hover, Không Nền Vàng), Tối Giản Viền/Icon & Tách Biệt Tuyệt Đối Giao Dịch OKX và Quỹ Prop Firms (E8, The5ers, FTMO):
+  - **Mô tả yêu cầu CEO:** 
+    1. Đưa nút Cài Đặt về màu nền như bản cũ (xám đen `#2a2e39`), khi hover chỉ sáng viền vàng như nút Hướng Dẫn, không chuyển nền sang màu vàng.
+    2. Bỏ icon trước SÀN OKX và QUỸ E8. Đưa viền ô `E8 Demo` về viền chuẩn `#3d3d3d` trung tính như ô `(Chưa có tài khoản)` của OKX, bỏ viền màu mè.
+    3. Hỗ trợ mở rộng chọn chung các Quỹ lớn khác như The 5%ers, FTMO, FunderPro trong cùng 1 tab Connect.
+    4. Làm rõ luồng vận hành sau khi kết nối (không mất thông tin khi tắt bảng) và mối liên hệ giữa Quỹ với Chiến Thuật / Mã giao dịch.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Nút Cài Đặt (index.css):** Khôi phục nền `#2a2e39`, viền `#434855`, chữ trắng `#ffffff`. Khi `:hover` giữ nguyên nền `#2a2e39`, chỉ sáng viền vàng `#f59e0b` kèm `box-shadow` phát quang viền y hệt nút Hướng Dẫn.
+    2. **Tối giản giao diện Sidebar (SidebarLeft.jsx):**
+       - Bỏ icon `🌐` và `🏆`, chỉ để chữ `SÀN OKX` và `QUỸ E8` sắc nét.
+       - Ô `E8 Demo` đưa về viền `#3d3d3d` nền `#1a1a1a` đồng bộ hoàn hảo với ô tài khoản OKX.
+       - Badge `LOTS` và nút chọn Lot nhanh đưa về tông teal/xám dịu mắt, nút `Bảng Điều Khiển Quỹ` làm nền đen viền `#3d3d3d` tinh giản, không màu mè.
+    3. **Hỗ trợ Đa Quỹ trong 1 Tab (TradeLockerTab.jsx & ConnectModal.jsx):**
+       - Đổi tên tab thành `🏆 Quỹ Prop Firm (E8, The5ers...)`.
+       - Bổ sung menu chọn Quỹ & Server phong phú: E8 Markets, The 5%ers, FTMO, FunderPro, Funding Pips (TradeLocker Demo & Live).
+       - Backend xử lý tự động làm sạch tên máy chủ (`clean_server`) tương thích 100% với TradeLocker JWT API.
+    4. **Kiểm tra và đóng gói:** `npm run build` thành công trong 213ms (0 lỗi), AST backend pass 100%, endpoint `/api/tradelocker/account` duy trì phiên live ổn định.
+
 - **[12/10/2026]** - Tăng Kích Thước Nút Timeframe Trong Cột "TF Trade" (PositionsTable):
   - **Mô tả yêu cầu CEO:** Các nút chọn khung thời gian (5, 15, 30, H1, H2, H4) trong cột `TF trade` hơi nhỏ, yêu cầu làm lớn hơn một chút để thao tác bấm thuận tiện và hiển thị rõ ràng hơn.
   - **Giải pháp kỹ thuật đã triển khai:**
@@ -3957,3 +4072,24 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Bổ sung và cập nhật đoạn mã chặn bắt lỗi `50123` trong tất cả các hàm đặt lệnh tại [bot_orders.py](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py).
     - Tự động in ra khối `[HƯỚNG DẪN]` giải thích 3 nguyên nhân cốt lõi để người dùng tự kiểm tra (Chưa chọn quyền Trade, Chưa liên kết IP, hoặc Sai IP).
   *(Mã patch: `z-bot-orders-50123-guidance-v2`)*
+
+- **[12/10/2026]** - Tích hợp toàn diện TradeLocker API cho Quỹ E8 Markets vào hệ sinh thái AutoTrader.fun:
+  - **Yêu cầu CEO:** Kết nối tài khoản thi quỹ E8 Markets ($5,000) trên TradeLocker (`demo.tradelocker.com`) vào hệ thống `autotrader.fun`. Sử dụng chung 100% bộ não tín hiệu chiến lược có sẵn (SMC, EMA200), tự động quy đổi khối lượng Lot theo mức Ký quỹ / Rủi ro người dùng nhập. Bảo đảm tính bảo mật đa người dùng (khách hàng tự nhập tài khoản quỹ riêng của họ).
+  - **Đã xử lý triệt để:**
+    1. **Module `tradelocker_service.py`:**
+       - Tích hợp chuẩn REST API TradeLocker: Xác thực JWT token (`/auth/jwt/token`), lấy danh sách tài khoản (`/auth/jwt/all-accounts`), truy vấn chi tiết số dư & equity (`/trade/accounts/{accId}/state`).
+       - Tự động nhận diện và ánh xạ mã giao dịch: `XAU` ⭢ `XAUUSD+` (ID 6713, Route 948735), `BTC` ⭢ `BTCUSD+` (ID 6753), `ETH` ⭢ `ETHUSD+` (ID 6751).
+       - Tự động tính Lot size: Tính chính xác số Lot chuẩn theo khoảng cách Stop Loss và số tiền rủi ro USD (Ví dụ $25 risk trên Vàng SL 5$ ⭢ 0.05 Lot).
+       - Tích hợp **Cầu dao bảo vệ tài khoản Quỹ (Circuit Breaker):** Chặn vi phạm Static Drawdown (Equity < $4,600), tự động ngắt bot sớm nếu mức lỗ ngày tiệm cận ngưỡng Daily Drawdown ($125), và chốt lời bảo toàn khi đạt trần lãi ngày Daily Profit Cap ($100).
+    2. **Backend REST API (`web_app/backend/main.py`):**
+       - Thêm 4 endpoints: `/api/tradelocker/connect`, `/api/tradelocker/account`, `/api/tradelocker/config`, `/api/tradelocker/disconnect`.
+       - Toàn bộ mật khẩu và thông tin tài khoản quỹ được mã hóa AES Fernet, lưu độc lập theo từng `uid` của user (`TLS1_Trading_Users/{uid}/tradelocker_config.json`), cô lập tuyệt đối dữ liệu.
+    3. **Giao diện Frontend (`ConnectModal.jsx` & `TradeLockerTab.jsx`):**
+       - Thêm tab thứ 3 **"🏆 Quỹ E8 / TradeLocker"** vào hộp thoại Kết nối.
+       - Tích hợp bảng giám sát tiến độ thi quỹ E8 trực quan (Mục tiêu lãi, Ngưỡng lỗ ngày, Ngưỡng lỗ tổng, Trần lãi ngày).
+       - Form cấu hình nhanh: Chọn quy mô quỹ, nhập rủi ro mỗi lệnh, chọn cặp giao dịch (Vàng XAU, BTC, ETH) và công tắc BẬT/TẮT tự động đánh quỹ.
+  - **Kiểm chứng:**
+    - Test kết nối thực tế với tài khoản E8 $5,000 (ID `2534591`) đạt `ACTIVE`, số dư `5000.00 USD`.
+    - Python AST Syntax đạt 100%.
+    - Frontend Vite build production thành công (`✓ built in 221ms`).
+  *(Mã patch: `z-tradelocker-e8-prop-firm-integration`)*

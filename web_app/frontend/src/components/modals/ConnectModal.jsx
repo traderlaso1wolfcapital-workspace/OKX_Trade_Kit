@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "../../i18n";
 import { ConfirmLogoutModal } from "./AccountPromptModals";
+import TradeLockerTab from "./TradeLockerTab";
 
 export default function ConnectModal({
   isOpen,
@@ -47,15 +48,51 @@ export default function ConnectModal({
   const [localPassphrase, setLocalPassphrase] = useState("");
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [propAccounts, setPropAccounts] = useState([]);
+  const [activePropId, setActivePropId] = useState("");
+  const [selectedPropId, setSelectedPropId] = useState(null);
 
-  // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập
+  const fetchPropAccounts = () => {
+    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch(`/api/tradelocker/accounts?uid=${encodeURIComponent(curUid)}`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.status === "success" && Array.isArray(d.accounts)) {
+          setPropAccounts(d.accounts);
+          setActivePropId(d.active_id || "");
+        } else {
+          setPropAccounts([]);
+        }
+      })
+      .catch(() => {});
+  };
+
+  const handleDeletePropAccount = (accId) => {
+    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch(`/api/tradelocker/disconnect?uid=${encodeURIComponent(curUid)}&account_id=${encodeURIComponent(accId)}`, {
+      method: "POST",
+      headers,
+    })
+      .then(() => {
+        setPropAccounts((prev) => prev.filter((a) => a.id !== accId));
+        window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: "" }));
+      })
+      .catch(() => {});
+  };
+
+  // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập, đồng thời tải trạng thái các Quỹ
   useEffect(() => {
     if (!isOpen) return;
     setModalAccountId("");
     setLocalApiKey("");
     setLocalSecretKey("");
     setLocalPassphrase("");
-  }, [isOpen]);
+    fetchPropAccounts();
+  }, [isOpen, currentUid, connectTab]);
 
   const handleSelectAccount = (accId) => {
     setModalAccountId(accId);
@@ -98,6 +135,9 @@ export default function ConnectModal({
   const botTitle = getBotTitle();
   const effectiveUid = isAuthenticated ? (currentUid || localStorage.getItem("tls1_uid") || "") : "";
   const isConnected = !!(isAuthenticated && effectiveUid);
+  const isPropTab = connectTab === "tradelocker";
+  const activePropAcc = propAccounts.find(a => a.id === activePropId) || (propAccounts.length > 0 ? propAccounts[0] : null);
+  const isPropConnected = Boolean(activePropAcc || propAccounts.length > 0);
 
   return (
     <div
@@ -329,6 +369,14 @@ export default function ConnectModal({
           >
             {t("apikey_connect")}
           </button>
+          <button
+            type="button"
+            className={`connect-tab-btn ${connectTab === "tradelocker" ? "active" : ""}`}
+            onClick={() => handleTabSwitch("tradelocker")}
+            style={connectTab === "tradelocker" ? { borderTopColor: "#00e676", color: "#00e676" } : {}}
+          >
+            Quỹ FX Connect
+          </button>
         </div>
 
         {/* Modal Body */}
@@ -527,6 +575,313 @@ export default function ConnectModal({
                   </div>
                 ))}
 
+                {/* 2b. THẺ QUỸ FX & PROP FIRM (E8 Markets, FTMO...) */}
+                {[
+                  { key: "e8", name: "Quỹ E8 Markets (TradeLocker)", defaultServer: "E8" },
+                  { key: "ftmo", name: "Quỹ FTMO (TradeLocker)", defaultServer: "FTMO" },
+                ].map((firm) => {
+                  const connectedAccs = (propAccounts || []).filter((a) =>
+                    (a.firm || a.server || "").toLowerCase().includes(firm.key)
+                  );
+
+                  if (connectedAccs.length > 0) {
+                    return connectedAccs.map((pAcc) => {
+                      const isActive = pAcc.id === activePropId;
+                      return (
+                        <div
+                          key={pAcc.id}
+                          className="connect-card"
+                          style={{
+                            cursor: "pointer",
+                            borderColor: isActive ? "rgba(0, 230, 118, 0.4)" : "#333333",
+                            background: isActive ? "rgba(0, 230, 118, 0.04)" : "#161616",
+                          }}
+                          onClick={() => {
+                            setSelectedPropId(pAcc.id);
+                            handleTabSwitch("tradelocker");
+                          }}
+                          title="Nhấp để xem bảng điều khiển và thiết lập Quỹ"
+                        >
+                          <div
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              background: "#000000",
+                              border: isActive ? "1px solid #00e676" : "1px solid #333333",
+                              borderRadius: "6px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {firm.key === "e8" ? (
+                              <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                            ) : firm.key === "the5ers" ? (
+                              <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "28px", height: "28px", objectFit: "contain", borderRadius: "3px" }} />
+                            ) : (
+                              <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
+                            )}
+                          </div>
+
+                          <div style={{ flex: 1, textAlign: "left" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                                {pAcc.name || `${firm.name} #${pAcc.account_id}`}
+                              </span>
+                              {isActive && (
+                                <span style={{
+                                  fontSize: "9px",
+                                  fontWeight: "bold",
+                                  background: "#00e676",
+                                  color: "#000000",
+                                  padding: "1px 5px",
+                                  borderRadius: "3px",
+                                  letterSpacing: "0.5px"
+                                }}>
+                                  BOT ACTIVE
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "10.5px",
+                                fontStyle: "italic",
+                                color: "#00e676",
+                                marginTop: "2px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              {`🟢 Đã Connect #${pAcc.account_id} - $${Number(pAcc.balance || 0).toLocaleString()} USD`}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPropId(pAcc.id);
+                                handleTabSwitch("tradelocker");
+                              }}
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: "700",
+                                color: "#00e676",
+                                background: "rgba(0, 230, 118, 0.1)",
+                                border: "1px solid #00e676",
+                                padding: "4px 10px",
+                                borderRadius: "4px",
+                                whiteSpace: "nowrap",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                cursor: "pointer",
+                              }}
+                              title="Mở cấu hình Quỹ"
+                            >
+                              Cài đặt ⚙
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePropAccount(pAcc.id);
+                              }}
+                              style={{
+                                background: "transparent",
+                                border: "1px solid #444",
+                                color: "#888",
+                                borderRadius: "4px",
+                                padding: "4px 8px",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                              }}
+                              title="Xóa tài khoản Quỹ này"
+                              onMouseOver={(e) => { e.currentTarget.style.color = "#ff5252"; e.currentTarget.style.borderColor = "#ff5252"; }}
+                              onMouseOut={(e) => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "#444"; }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  }
+
+                  // Chưa kết nối Quỹ này
+                  return (
+                    <div
+                      key={firm.key}
+                      onClick={() => {
+                        setSelectedPropId("__new__");
+                        handleTabSwitch("tradelocker");
+                      }}
+                      className="connect-card"
+                      style={{ cursor: "pointer" }}
+                      title={`Bấm vào để kết nối ${firm.name}`}
+                    >
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          background: "#000000",
+                          border: "1px solid #333333",
+                          borderRadius: "6px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {firm.key === "e8" ? (
+                          <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                        ) : firm.key === "the5ers" ? (
+                          <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "28px", height: "28px", objectFit: "contain", borderRadius: "3px" }} />
+                        ) : (
+                          <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
+                        )}
+                      </div>
+
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                          {firm.name}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
+                          TradeLocker API • Tự động tính Lots & Cầu dao
+                        </div>
+                      </div>
+
+                      <span
+                        className="connect-action-badge"
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          color: "#00e676",
+                          background: "rgba(0, 230, 118, 0.12)",
+                          border: "1px solid rgba(0, 230, 118, 0.3)",
+                          padding: "4px 9px",
+                          borderRadius: "4px",
+                          whiteSpace: "nowrap",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        Kết Nối ➔
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Các Quỹ khác ngoài E8, The 5%ers, FTMO (nếu có kết nối) */}
+                {(propAccounts || [])
+                  .filter((a) => {
+                    const firmLower = (a.firm || a.server || "").toLowerCase();
+                    return !firmLower.includes("e8") && !firmLower.includes("the5ers") && !firmLower.includes("ftmo");
+                  })
+                  .map((pAcc) => {
+                    const isActive = pAcc.id === activePropId;
+                    return (
+                      <div
+                        key={pAcc.id}
+                        className="connect-card"
+                        style={{
+                          cursor: "pointer",
+                          borderColor: isActive ? "rgba(0, 230, 118, 0.4)" : "#333333",
+                          background: isActive ? "rgba(0, 230, 118, 0.04)" : "#161616",
+                        }}
+                        onClick={() => {
+                          setSelectedPropId(pAcc.id);
+                          handleTabSwitch("tradelocker");
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            background: "#000000",
+                            border: isActive ? "1px solid #00e676" : "1px solid #333333",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <span style={{ fontSize: "12px", fontWeight: "bold", color: "#00e676" }}>FX</span>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                            {pAcc.name || `Quỹ ${pAcc.firm} #${pAcc.account_id}`}
+                          </div>
+                          <div style={{ fontSize: "10.5px", fontStyle: "italic", color: "#00e676", marginTop: "2px", fontWeight: "600" }}>
+                            {`🟢 Đã Connect #${pAcc.account_id} - $${Number(pAcc.balance || 0).toLocaleString()} USD`}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPropId(pAcc.id);
+                              handleTabSwitch("tradelocker");
+                            }}
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: "700",
+                              color: "#00e676",
+                              background: "rgba(0, 230, 118, 0.1)",
+                              border: "1px solid #00e676",
+                              padding: "4px 10px",
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Cài đặt ⚙
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePropAccount(pAcc.id);
+                            }}
+                            style={{
+                              background: "transparent",
+                              border: "1px solid #444",
+                              color: "#888",
+                              borderRadius: "4px",
+                              padding: "4px 8px",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Nút thêm Quỹ mới */}
+                <div
+                  onClick={() => {
+                    setSelectedPropId("__new__");
+                    handleTabSwitch("tradelocker");
+                  }}
+                  className="connect-card"
+                  style={{
+                    cursor: "pointer",
+                    border: "1px dashed #444444",
+                    background: "rgba(255, 255, 255, 0.02)",
+                    justifyContent: "center",
+                    padding: "10px",
+                  }}
+                  title="Kết nối thêm tài khoản Quỹ khác (E8, The5ers, FTMO...)"
+                >
+                  <span style={{ fontSize: "12px", color: "#00e676", fontWeight: "600" }}>
+                    + Kết Nối Thêm Tài Khoản Quỹ Mới (E8 Markets, FTMO...)
+                  </span>
+                </div>
+
                 {/* Divider for Multi-exchange & Web3 ready */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "4px 0" }}>
                   <div style={{ flex: 1, height: "1px", background: "#333333" }}></div>
@@ -534,6 +889,36 @@ export default function ConnectModal({
                     {t("coming_soon_section")}
                   </span>
                   <div style={{ flex: 1, height: "1px", background: "#333333" }}></div>
+                </div>
+
+                {/* Quỹ The 5%ers (Sắp hỗ trợ) */}
+                <div className="connect-card disabled" title="Tính năng đang được tích hợp thêm">
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      background: "#000000",
+                      border: "1px solid #333333",
+                      borderRadius: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src="/the5ers_logo.png"
+                      alt="The 5%ers"
+                      style={{ width: "26px", height: "26px", objectFit: "contain", borderRadius: "4px", opacity: 0.75 }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontSize: "13px", fontWeight: "600", color: "#cccccc" }}>Quỹ The 5%ers (TradeLocker)</div>
+                    <div style={{ fontSize: "11px", color: "#666666" }}>TradeLocker API • Tự động tính Lots & Cầu dao</div>
+                  </div>
+                  <span style={{ fontSize: "10.5px", color: "#777777", background: "#181818", border: "1px solid #2a2a2a", padding: "3px 7px", borderRadius: "4px" }}>
+                    {t("coming_soon")}
+                  </span>
                 </div>
 
                 {/* 3. Binance Connect Card (Coming Soon) */}
@@ -817,6 +1202,16 @@ export default function ConnectModal({
             </div>
           )}
 
+          {/* TAB 3: TRADELOCKER / E8 MARKETS PROP FIRM */}
+          {connectTab === "tradelocker" && (
+            <TradeLockerTab
+              currentUid={effectiveUid}
+              t={t}
+              initialSelectedId={selectedPropId}
+              onAccountsUpdated={fetchPropAccounts}
+            />
+          )}
+
           {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT */}
           <div
             style={{
@@ -834,22 +1229,43 @@ export default function ConnectModal({
                   width: "9px",
                   height: "9px",
                   borderRadius: "50%",
-                  background: isConnected ? "#26a69a" : "#ff4d4f",
+                  background: (isPropTab ? isPropConnected : isConnected) ? "#26a69a" : "#ff4d4f",
                   display: "inline-block",
-                  boxShadow: isConnected ? "0 0 10px #26a69a, 0 0 4px #26a69a" : "0 0 10px #ff4d4f, 0 0 4px #ff4d4f",
+                  boxShadow: (isPropTab ? isPropConnected : isConnected) ? "0 0 10px #26a69a, 0 0 4px #26a69a" : "0 0 10px #ff4d4f, 0 0 4px #ff4d4f",
                   transition: "all 0.3s ease",
                 }}
               ></span>
               <span>
-                UID:{" "}
-                {isConnected ? (
-                  <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>{effectiveUid}</strong>
+                {isPropTab ? (
+                  isPropConnected ? (
+                    <>
+                      Quỹ FX:{" "}
+                      <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>
+                        {activePropAcc ? `${activePropAcc.name || (activePropAcc.server + " Demo #" + activePropAcc.account_id)}` : "Đã kết nối"}
+                      </strong>
+                    </>
+                  ) : (
+                    <>
+                      Quỹ FX:{" "}
+                      <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Chưa kết nối</strong>
+                      <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
+                        (Vui lòng kết nối để kích hoạt)
+                      </span>
+                    </>
+                  )
                 ) : (
                   <>
-                    <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Đã ngắt kết nối</strong>
-                    <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
-                      (Vui lòng kết nối để kích hoạt)
-                    </span>
+                    UID:{" "}
+                    {isConnected ? (
+                      <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>{effectiveUid}</strong>
+                    ) : (
+                      <>
+                        <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Đã ngắt kết nối</strong>
+                        <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
+                          (Vui lòng kết nối để kích hoạt)
+                        </span>
+                      </>
+                    )}
                   </>
                 )}
               </span>

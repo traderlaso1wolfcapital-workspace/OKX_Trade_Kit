@@ -48,8 +48,8 @@ BASE_ENTRY_OFFSET_PCT = Decimal("0.0005")          # Đệm 0.05% đón lõm Ent
 DCA_GAP_THRESHOLD_PCT = Decimal("0.0020")          # Ngưỡng khoảng cách tối thiểu (Base Gap = 0.20%) để rải limit. Sẽ nhân với TF_MULTIPLIERS cho các khung lớn.
 
 # --- Lợi nhuận (TP) & Cắt lỗ (SL) cơ sở ---
-SCALPING_TP_PCT = Decimal("0.0080")               # TP (M5 base = 0.80%)
-SCALPING_SL_PCT = Decimal("0.0080")               # SL (M5 base = 0.80%)
+SCALPING_TP_PCT = Decimal("0.0060")               # TP (M5 base = 0.60%)
+SCALPING_SL_PCT = Decimal("0.0060")               # SL (M5 base = 0.60%)
 
 # --- Cấu trúc xu hướng (Nến tích lũy) ---
 REQUIRED_ACCUMULATION_CANDLES = 60      
