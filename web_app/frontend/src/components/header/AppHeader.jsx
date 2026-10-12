@@ -129,7 +129,7 @@ export default function AppHeader({
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={isOpen ? "#f59e0b" : "#8e9297"}
+            stroke={isOpen ? "#f59e0b" : "#ffffff"}
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"

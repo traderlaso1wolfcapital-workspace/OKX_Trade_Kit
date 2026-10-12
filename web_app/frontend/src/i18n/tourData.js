@@ -1,811 +1,775 @@
 /**
- * Multilingual Onboarding Tour Data for TLS1 Trading Bot (22 Comprehensive Steps)
+ * Multilingual Onboarding Tour Data for TLS1 Trading Bot (21 Comprehensive Steps)
  * Supported languages: vi (Tiếng Việt), en (English), zh (简体中文), ko (한국어), fr (Français), es (Español)
  */
 
 export const TOUR_CONTENT = {
   vi: [
     {
-        "badge": "Màn Hình Chính • Bước 1 / 22",
-        "title": "1. Nút Kết Nối Sàn & Quỹ Cấp Vốn (Connect)",
-        "content": "Cửa ngõ liên kết tài khoản giao dịch với hệ thống bot. Hỗ trợ toàn diện:\n• Sàn OKX: Kết nối Fast Connect 1-click hoặc nhập API Key chủ động.\n• Quỹ FX Quốc Tế: Kết nối tài khoản Quỹ thi (E8 Markets, FTMO, Funding Pips...) qua giao thức TradeLocker API.\n\n• Nhấn 'Tiếp theo ▶' để mở cửa sổ Kết Nối và cùng khám phá chi tiết từng phương thức!",
+        "badge": "Màn Hình Chính • Bước 1 / 21",
+        "title": "1. Nút Kết Nối (Connect)",
+        "content": "Liên kết tài khoản giao dịch với hệ thống bot:\n• Sàn OKX: Kết nối 1-click qua Fast Connect hoặc nhập API Key.\n• Quỹ FX: Kết nối tài khoản Quỹ thi (E8, FTMO...) qua TradeLocker.\n\nNhấn 'Tiếp theo ▶' để mở cửa sổ Kết Nối.",
         "actionHint": "💡 Nhấn 'Tiếp theo ▶' để mở popup Kết Nối."
     },
     {
-        "badge": "Kết Nối • Bước 2 / 22",
-        "title": "2. Phương Thức 1: Fast Connect (OAuth 2.0)",
-        "content": "Kết nối 1-click an toàn tuyệt đối được OKX cấp phép chính thức:\n• Nhấn 'Mở App ➔': Tự động mở App OKX trên điện thoại hoặc trình duyệt để xác thực cấp quyền OAuth 2.0.\n• An toàn 100%: Tự động mã hóa và đồng bộ API Key vào hệ thống, không lo lộ mã bí mật, không mất công copy-paste thủ công.\n• Hỗ trợ kết nối và quản lý nhiều tài khoản Sub-Account độc lập cho từng bot.\n• Sắp tới mở rộng thêm Binance Connect, Bybit Connect và Ví Web3.",
-        "actionHint": "💡 Khuyên dùng cho người mới vì kết nối siêu tốc chỉ trong 3 giây và loại bỏ hoàn toàn rủi ro copy nhầm mã."
+        "badge": "Kết Nối • Bước 2 / 21",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "Kết nối 1-click an toàn tuyệt đối từ OKX:\n• Nhấn 'Mở App ➔': Tự động mở App OKX để cấp quyền OAuth.\n• An toàn 100%: Hệ thống tự đồng bộ API Key, không lo lộ mã bí mật, không cần copy thủ công.\n• Hỗ trợ quản lý độc lập từng tài khoản con (Sub-Account).",
+        "actionHint": "💡 Khuyên dùng cho người mới vì kết nối siêu tốc chỉ trong 3 giây."
     },
     {
-        "badge": "Kết Nối • Bước 3 / 22",
-        "title": "3. Phương Thức 2: Tự Nhập API Key OKX (Chủ Động)",
-        "content": "Dành cho người dùng muốn chủ động tạo và quản lý API Key thủ công trên sàn OKX:\n• Quản Lý Tài Khoản: Bấm (+) màu xanh để tạo tài khoản mới, chọn tài khoản từ danh sách, hoặc bấm (-) để xóa.\n• Cụm Nhập Key: Điền chính xác API Key, Secret Key và Passphrase tạo từ sàn OKX rồi nhấn 'Lưu Cấu Hình'.\n\n🛡️ NGUYÊN TẮC AN TOÀN SỐNG CÒN:\n• Khi tạo API Key trên sàn OKX, bạn CHỈ CẦN CẤP QUYỀN 'Trade' (Giao dịch).\n• TUYỆT ĐỐI KHÔNG CẤP QUYỀN 'Withdraw' (Rút tiền). Bot TLS1 không bao giờ yêu cầu quyền rút tiền, đảm bảo 100% an toàn tuyệt đối cho tài sản của bạn.",
-        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để khám phá tính năng Kết nối Quỹ FX TradeLocker mới nhất!"
+        "badge": "Kết Nối • Bước 3 / 21",
+        "title": "3. API Key OKX (Nhập Thủ Công)",
+        "content": "Tự nhập API Key tạo từ sàn OKX:\n• Quản lý tài khoản: Nhấn (+) tạo mới, chọn tài khoản từ danh sách, hoặc (-) để xóa.\n• Cụm Nhập Key: Điền API Key, Secret Key và Passphrase rồi nhấn 'Lưu Cấu Hình'.\n\n🛡️ LƯU Ý AN TOÀN:\n• Chỉ cấp quyền 'Trade' (Giao dịch).\n• Tuyệt đối KHÔNG cấp quyền 'Withdraw' (Rút tiền).",
+        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để xem Kết Nối Quỹ FX."
     },
     {
-        "badge": "Kết Nối • Bước 4 / 22",
-        "title": "4. Phương Thức 3: Kết Nối Quỹ FX (TradeLocker)",
-        "content": "Giải pháp tự động hóa giao dịch cho các tài khoản Quỹ Cấp Vốn (Prop Firm) hàng đầu thế giới:\n• Nền tảng hỗ trợ: E8 Markets, FTMO, The 5%ers, Funding Pips... thông qua giao thức TradeLocker API.\n• Kết nối an toàn: Nhập Email, Password, Server Quỹ (E8, Demo, Live). Mật khẩu được mã hóa Fernet đa tầng trên máy cục bộ.\n• Tự động Quản Lý Quỹ: Thiết lập Kích thước Quỹ ($5.000, $100.000, $200.000...), giới hạn rủi ro mỗi lệnh, trần sụt giảm ngày (Daily Drawdown) và mục tiêu chốt lời ngày.\n• Tự động tính Lots: Bot tự tính toán khối lượng Lots tối ưu theo biên độ SL, tuyệt đối không vi phạm luật sụt giảm vốn của Quỹ!",
-        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để hoàn tất phần Kết Nối và ra ngoài giao diện điều hành chính!"
+        "badge": "Kết Nối • Bước 4 / 21",
+        "title": "4. Kết Nối Quỹ FX (TradeLocker)",
+        "content": "Giao dịch tài khoản Quỹ Cấp Vốn (Prop Firm):\n• Hỗ trợ: E8 Markets, FTMO, Funding Pips... qua TradeLocker API.\n• Đăng nhập: Nhập Email, Mật khẩu và Server Quỹ.\n• Quản trị rủi ro: Cài đặt quy mô Quỹ ($5.000, $100.000...), trần sụt giảm ngày (Daily Drawdown) và mức rủi ro mỗi lệnh.\n• Tự tính Lot: Bot tự tính khối lượng Lot chuẩn theo khoảng cách SL, tuyệt đối không vi phạm luật Quỹ.",
+        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để hoàn tất kết nối và ra màn hình chính."
     },
     {
-        "badge": "Màn Hình Chính • Bước 5 / 22",
-        "title": "5. Chọn Nền Tảng Giao Dịch (Sàn OKX / Quỹ FX)",
-        "content": "Thanh chuyển đổi nhanh môi trường giao dịch trực tiếp ngay trên Sidebar:\n• Sàn OKX: Giao dịch Crypto Phái sinh (USDT Swap) trên sàn OKX.\n• Quỹ FX: Giao dịch tài khoản Quỹ quốc tế (Vàng XAU, Forex, Crypto) qua nền tảng TradeLocker.\n• Tự động đồng bộ: Khi bạn chuyển nền tảng, danh sách tài khoản và các cặp giao dịch sẽ tự động điều chỉnh phù hợp với môi trường tương ứng.\n• Khóa an toàn 🔒: Khi bot đang chạy, lựa chọn này sẽ tự động khóa để bảo vệ trạng thái lệnh.",
-        "actionHint": "💡 Tiện lợi chuyển đổi giữa tài khoản cá nhân và tài khoản thi Quỹ chỉ trong 1 thao tác."
+        "badge": "Màn Hình Chính • Bước 5 / 21",
+        "title": "5. Nền Tảng (Sàn OKX / Quỹ FX)",
+        "content": "Chuyển đổi môi trường giao dịch trên Sidebar:\n• Sàn OKX: Giao dịch Crypto Phái sinh (USDT Swap).\n• Quỹ FX: Giao dịch Vàng XAU, Forex, Crypto qua TradeLocker.\n• Tự động đồng bộ: Khi đổi nền tảng, danh sách tài khoản và các cặp coin sẽ tự cập nhật tương ứng.\n• Khóa an toàn 🔒: Tự động khóa khi bot đang chạy.",
+        "actionHint": "💡 Dễ dàng chuyển giữa tài khoản cá nhân và tài khoản Quỹ chỉ trong 1 click."
     },
     {
-        "badge": "Màn Hình Chính • Bước 6 / 22",
-        "title": "6. Chọn Chiến Thuật Bot (Command Capsule)",
-        "content": "Hệ thống tích hợp sẵn 3 thuật toán cao cấp với huy hiệu nhận diện trực quan:\n• EMA200 Bot: Bắt sóng hồi quy xu hướng theo cản động EMA200 đa khung thời gian.\n• SMC Bot: Săn vùng thanh khoản & Order Block phản ứng đảo chiều giá trị.\n• Liquidation Bot: Bắt nhịp quét râu thanh khoản của Market Maker khi thị trường biến động dữ dội.\n\n• Nhấp vào nút Capsule này để mở dropdown chuyển đổi nhanh giữa các chiến thuật.",
-        "actionHint": "💡 Mỗi bot có thể chạy độc lập với cấu hình và tài khoản riêng biệt."
+        "badge": "Màn Hình Chính • Bước 6 / 21",
+        "title": "6. Chọn Chiến Thuật Bot",
+        "content": "Tích hợp sẵn 3 thuật toán giao dịch:\n• EMA200 Bot: Bắt sóng hồi quy theo cản động EMA200.\n• SMC Bot: Săn vùng thanh khoản & Order Block đảo chiều.\n• Liquidation Bot: Bắt nhịp quét râu thanh khoản khi thị trường biến động mạnh.\n\nNhấp vào nút này để mở menu chuyển đổi chiến thuật.",
+        "actionHint": "💡 Mỗi bot có thể chạy độc lập với cài đặt và tài khoản riêng."
     },
     {
-        "badge": "Màn Hình Chính • Bước 7 / 22",
-        "title": "7. Chọn Tài Khoản & Theo Dõi Số Dư Live",
-        "content": "Lựa chọn tài khoản áp dụng cho chiến thuật bot đang chọn:\n• Hỗ trợ đầy đủ: Tài khoản Sàn OKX (Sub-Account) và Tài khoản Quỹ FX (E8 Demo, E8 Live).\n• Hiển thị số dư thực tế: Tự động cập nhật và hiển thị đầy đủ số dư vốn ($5.000, $200.000...) giúp bạn kiểm soát rủi ro tức thời.\n• Khóa bảo vệ 🔒: Khi bot đang chạy, ô chọn tài khoản sẽ tự động khóa chặt để tránh nhầm lẫn đảo lộn vị thế.",
-        "actionHint": "💡 Căn phải tinh tế, hiển thị trọn vẹn số dư không bị che khuất."
+        "badge": "Màn Hình Chính • Bước 7 / 21",
+        "title": "7. Chọn Tài Khoản & Số Dư",
+        "content": "Chọn tài khoản giao dịch cho bot đang chọn:\n• Sàn OKX: Chọn Sub-Account tương ứng.\n• Quỹ FX: Chọn tài khoản E8 Demo hoặc Live.\n• Hiển thị số dư live: Thấy ngay số dư vốn ($5.000, $200.000...) để quản trị rủi ro kịp thời.\n• Khóa bảo vệ 🔒: Ô tài khoản tự động khóa khi bot đang chạy.",
+        "actionHint": "💡 Hiển thị số dư thực tế theo thời gian thực rõ ràng, không bị che khuất."
     },
     {
-        "badge": "Màn Hình Chính • Bước 8 / 22",
-        "title": "8. Quản Lý Vốn, Ký Quỹ & Khóa An Toàn 🔒",
-        "content": "• Đơn vị: Nhập số tiền cố định bằng USDT ($) hoặc tính theo % Vốn tài khoản.\n• Chế độ Hệ số TF: Chọn 'Cố định' để mọi khung dùng chung 1 mức vốn, hoặc 'Nhân TF' để tự động nhân khối lượng theo khung thời gian (H1 x2.0, H4 x5.0).\n\n🔒 CƠ CHẾ KHÓA AN TOÀN TUYỆT ĐỐI:\n• Sau khi bạn nhấn 'BẮT ĐẦU CHẠY BOT', ô ký quỹ này sẽ tự động KHÓA CHẶT 🔒 không cho sửa đổi, ngăn chặn triệt để lỗi nhảy vốn hoặc người dùng vô tình bấm nhầm.\n• Muốn điều chỉnh mức vốn, bạn chỉ cần nhấn 'DỪNG BOT', sau đó chỉnh sửa và bật lại.",
-        "actionHint": "💡 Khuyến nghị cho người mới: Cài đặt ký quỹ nhỏ (1$ - 5$) để quan sát nhịp chạy thực tế trước."
+        "badge": "Màn Hình Chính • Bước 8 / 21",
+        "title": "8. Ký Quỹ & Khối Lượng Lệnh",
+        "content": "Thiết lập mức vốn cho mỗi lệnh:\n• Sàn OKX: Ký quỹ theo USDT ($) hoặc % Vốn.\n• Quỹ FX: Khối lượng tính theo Lot (mặc định 0.01 L).\n• Chế độ: 'Cố định' (mọi khung chung mức vốn) hoặc 'Nhân TF' (khung lớn tự nhân vốn H1 x2.0, H4 x5.0).\n\n🔒 Khi bot đang chạy, ô này tự khóa chặt để tránh bấm nhầm.",
+        "actionHint": "💡 Người mới nên đặt ký quỹ nhỏ (1$ - 5$ hoặc 0.01 Lot) để quan sát nhịp chạy thực tế."
     },
     {
-        "badge": "Màn Hình Chính • Bước 9 / 22",
-        "title": "9. Chốt Lời (TP) & Cắt Lỗ (SL) M5 Chuẩn 0.6%",
-        "content": "Cài đặt tỷ lệ TP và SL an toàn. Mức TP/SL thiết lập ở đây là mức CƠ SỞ trên khung M5 (mặc định tối ưu 0.6% TP và 0.6% SL). Khi bot khớp lệnh ở các khung lớn hơn, hệ thống tự động nhân biên độ theo Hệ Số Vốn (Margin Factor):\n\n📊 BẢNG HỆ SỐ NHÂN TP/SL ĐA KHUNG (Chuẩn M5 0.6%):\n• M5 : x1.0 ➔ TP 0,60% | SL 0,60% (Khung gốc)\n• M15: x1.2 ➔ TP 0,72% | SL 0,72%\n• M30: x1.5 ➔ TP 0,90% | SL 0,90%\n• H1 : x2.0 ➔ TP 1,20% | SL 1,20%\n• H2 : x3.0 ➔ TP 1,80% | SL 1,80%\n• H4 : x5.0 ➔ TP 3,00% | SL 3,00%\n\n🔍 Bản chất tính toán: Khung nến càng lớn thì biên độ sóng dao động càng mạnh. Bot tự động nới rộng biên độ TP/SL tương ứng để gồng trọn con sóng dài, tránh bị quét râu cắt lỗ non.\n🛡️ Watchdog 15s: Quét ngầm liên tục, tự động đặt bổ sung cặp TP/SL bảo vệ vị thế 24/7.",
-        "actionHint": "💡 Tỷ lệ 0.6% M5 đã được tối ưu hóa thực chiến để chốt lời nhanh gọn và an toàn vốn."
+        "badge": "Màn Hình Chính • Bước 9 / 21",
+        "title": "9. Chốt Lời (TP) & Cắt Lỗ (SL) M5 Gốc",
+        "content": "Cài đặt tỷ lệ TP và SL gốc trên khung M5 (mặc định chuẩn: 0.6% TP | 0.6% SL):\n• Tự động nhân đa khung: Khung lớn có biên độ sóng rộng hơn, bot tự nhân theo Hệ Số Vốn:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• Watchdog 15s: Quét liên tục, tự đặt TP/SL bảo vệ vị thế 24/7.",
+        "actionHint": "💡 Tỷ lệ gốc 0.6% đã tối ưu thực chiến giúp chốt lời nhanh và bảo toàn vốn."
     },
     {
-        "badge": "Màn Hình Chính • Bước 10 / 22",
-        "title": "10. Chọn Cặp Coin & Khung Nến Giao Dịch",
-        "content": "• Cột Cặp Coin: Tích chọn các đồng coin bạn muốn bot theo dõi (XAU, BTC, ETH, SOL...).\n• Cột Khung Trade: Tích chọn các khung nến (M5, M15, M30, H1, H2, H4) mà bot được phép rải lệnh Limit.\n• Tương tác nhanh: Nhấp vào tên coin bất kỳ trên bảng để chuyển nhanh biểu đồ TradingView sang coin đó.",
-        "actionHint": "💡 Bạn có thể bật nhiều khung cùng lúc, bot sẽ phân bổ lệnh đa khung tự động."
+        "badge": "Màn Hình Chính • Bước 10 / 21",
+        "title": "10. Cặp Coin & Khung Nến Giao Dịch",
+        "content": "Quản lý danh sách coin và khung rải lệnh:\n• Cột Cặp vị thế: Tích chọn coin muốn trade (XAU, BTC, ETH...). Nhấp tên coin để mở biểu đồ TradingView.\n• Cột Khung trade: Tích chọn các khung (5, 15, 30, H1, H2, H4) bot được phép đặt lệnh.\n• Bật nhiều khung: Bot tự động phân bổ lệnh đa khung song song.",
+        "actionHint": "💡 Bật/tắt linh hoạt từng cặp coin và khung nến theo nhu cầu."
     },
     {
-        "badge": "Màn Hình Chính • Bước 11 / 22",
-        "title": "11. Kích Hoạt Vận Hành Bot Tự Động",
-        "content": "• Nhấn 'BẮT ĐẦU CHẠY BOT': Bot sẽ kích hoạt tiến trình quét tín hiệu thị trường và tự động vào/đóng lệnh 24/7 trên sàn hoặc Quỹ.\n• Khi cần ngưng: Nhấn 'DỪNG BOT' để hủy toàn bộ lệnh Limit đang chờ khớp và bảo toàn vị thế hiện có.\n• Hiệu ứng an toàn: Trạng thái bot được hiển thị rõ ràng với màu sắc sinh động (Xanh: Đang chạy, Đỏ/Xám: Đang dừng).",
-        "actionHint": "💡 Sau khi kích hoạt, bạn có thể tắt trình duyệt; bot chạy nền ổn định trên máy chủ."
+        "badge": "Màn Hình Chính • Bước 11 / 21",
+        "title": "11. Bật / Dừng Chạy Bot",
+        "content": "Kích hoạt hoặc dừng vận hành bot:\n• 'CHẠY BOT': Bot quét tín hiệu và tự vào/đóng lệnh 24/7 trên sàn hoặc Quỹ.\n• 'DỪNG BOT': Hủy toàn bộ lệnh Limit đang chờ khớp và bảo toàn vị thế hiện có.\n• Sau khi bật bot, bạn có thể tắt trình duyệt; bot chạy nền ổn định trên máy chủ.",
+        "actionHint": "💡 Trạng thái nút hiển thị trực quan (Xanh: Đang chạy, Xám: Đang dừng)."
     },
     {
-        "badge": "Màn Hình Chính • Bước 12 / 22",
-        "title": "12. Bảng Điều Khiển Dưới & Chế Độ Chia Đôi (Split View)",
-        "content": "Khu vực điều hành và giám sát chi tiết:\n• Tab Vị Thế (Positions): Xem danh sách lệnh đang mở, số dư PnL live, đòn bẩy, giá vào lệnh, giá thanh lý và nút đóng lệnh khẩn cấp.\n• Tab Nhật Ký (Logs): Giám sát toàn bộ dòng log tín hiệu, lệnh quét và phản hồi từ sàn thời gian thực.\n• Tab Biểu Đồ (Charts): Biểu đồ kỹ thuật TradingView tích hợp đa khung.\n• Nút ⮃ Chia Đôi Màn Hình (Split View): Nhấn nút này để tách Biểu Đồ lên trên và Bảng Vị Thế xuống dưới cùng lúc, tiện theo dõi trực quan không cần bấm chuyển qua lại!",
-        "actionHint": "💡 Nhấn thử nút ⮃ để trải nghiệm chế độ xem kép Biểu Đồ + Vị Thế chuyên nghiệp."
+        "badge": "Màn Hình Chính • Bước 12 / 21",
+        "title": "12. Vị Thế, Logs & Chia Đôi Màn Hình",
+        "content": "Khu vực giám sát tổng quan:\n• Bảng Vị Thế: Xem lệnh đang mở, PnL live, giá vào, SL/TP và nút đóng lệnh nhanh.\n• Logs: Xem lịch sử quét tín hiệu và phản hồi từ sàn thời gian thực.\n• Biểu Đồ: Xem chart TradingView.\n• Nút ⮃ Chia Đôi: Xem đồng thời Biểu Đồ ở trên và Bảng Vị Thế ở dưới mà không cần chuyển tab.",
+        "actionHint": "💡 Nhấn nút ⮃ ở góc phải để trải nghiệm chế độ xem chia đôi tiện lợi."
     },
     {
-        "badge": "Màn Hình Chính • Bước 13 / 22",
-        "title": "13. Khám Phá Bảng Cài Đặt Chuyên Sâu ⚙",
-        "content": "Hai nút chức năng quan trọng cạnh nhau:\n• Nút 'Hướng Dẫn' 💡: Mở lại tour hướng dẫn bất kỳ lúc nào để tra cứu cách sử dụng.\n• Nút 'Cài Đặt' ⚙: Mở Bảng Cài Đặt Chuyên Sâu để tinh chỉnh toàn bộ các tham số thuật toán: Watchlist Coin, Quản Lý Vốn, Bộ 3 DCA, Cầu Dao, Điểm Vào Lệnh, Hệ Số Đa Khung, Tab Hỗ Trợ và Đánh Giá.\n\n• Nhấn 'Tiếp theo ▶' để tự động mở Bảng Cài Đặt và cùng khám phá từng cơ chế!",
-        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để bước vào bên trong Bảng Cài Đặt."
+        "badge": "Màn Hình Chính • Bước 13 / 21",
+        "title": "13. Hướng Dẫn & Cài Đặt ⚙",
+        "content": "Hai nút chức năng trên Sidebar:\n• 'Hướng Dẫn': Mở lại tour hướng dẫn bất kỳ lúc nào.\n• 'Cài Đặt' ⚙: Mở bảng cài đặt chuyên sâu để tinh chỉnh Watchlist, Bộ 3 DCA, Cầu Dao, Điểm Vào Lệnh và Hệ Số Đa Khung.\n\nNhấn 'Tiếp theo ▶' để mở bảng Cài Đặt.",
+        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để vào bảng Cài Đặt chi tiết."
     },
     {
-        "badge": "Cài Đặt • Bước 14 / 22",
-        "title": "14. Thêm Mã Giao Dịch (Watchlist Coin)",
-        "content": "Tùy biến danh mục coin giao dịch cho bot:\n• Nhấp chọn/bỏ chọn từng thẻ coin (XAU, BTC, ETH, SOL, DOGE...).\n• Thẻ coin sáng màu: Đang được bật hiển thị ra ngoài màn hình chính.\n• Khóa bảo vệ: Các coin đang có vị thế mở sẽ tự động khóa an toàn, bạn cần đóng lệnh trước khi bỏ chọn.",
-        "actionHint": "💡 Bạn có thể bật bao nhiêu đồng coin tùy ý phù hợp với quy mô vốn của mình."
+        "badge": "Cài Đặt • Bước 14 / 21",
+        "title": "14. Watchlist Coin",
+        "content": "Tùy chọn danh mục coin hiển thị ra màn hình chính:\n• Nhấp chọn/bỏ chọn từng coin (XAU, BTC, ETH, SOL, DOGE...).\n• Thẻ sáng: Đang hiển thị ở màn hình chính.\n• Khóa an toàn: Coin đang có vị thế mở sẽ tự khóa, cần đóng lệnh trước khi bỏ chọn.",
+        "actionHint": "💡 Chỉ bật những coin phù hợp với quy mô vốn của bạn."
     },
     {
-        "badge": "Cài Đặt • Bước 15 / 22",
-        "title": "15. Tài Khoản & Quản Lý Vốn Chuyên Sâu",
-        "content": "Thiết lập tài khoản và tỷ lệ phân bổ vốn chuyên sâu cho bot đang chọn:\n• Chọn tài khoản: Gán bot với tài khoản OKX hoặc Quỹ tương ứng.\n• Ký quỹ mỗi lệnh: Nhập số tiền cố định ($) hoặc % vốn tài khoản.\n• Đơn vị & Nhân TF: Chọn 'Cố định' hoặc 'Nhân TF' để khối lượng tự động co giãn theo khung thời gian.\n• Đòn bẩy (Leverage): Cài đặt mức đòn bẩy an toàn cho vị thế.",
-        "actionHint": "💡 Khi bot đang chạy, các mục tài khoản và ký quỹ sẽ tự động khóa 🔒 để bảo vệ các lệnh đang hoạt động."
+        "badge": "Cài Đặt • Bước 15 / 21",
+        "title": "15. Bộ 3 Cơ Chế DCA",
+        "content": "Chọn 1 trong 3 cơ chế xử lý lệnh nâng cao:\n• DCA Dương: Nhồi thêm lệnh khi vị thế đang có lãi theo bậc thang xu hướng (H4 -> M5).\n• DCA Âm: Trung bình giá khi gồng lỗ và tự động nâng biên độ TP/SL theo khung lớn.\n• Split Grid: Chia lệnh Limit độc lập cho từng khung, khớp khung nào chốt lời riêng khung đó.\n\n💡 Lưu ý: Hệ thống chỉ cho phép bật 1 trong 3 chế độ (bật chế độ này thì 2 chế độ kia tự tắt).",
+        "actionHint": "💡 Khuyên dùng Split Grid hoặc DCA Dương để quản trị vốn an toàn."
     },
     {
-        "badge": "Cài Đặt • Bước 16 / 22",
-        "title": "16. Công Tắc Chiến Thuật (Bộ 3 DCA Nâng Cao)",
-        "content": "Hệ thống hỗ trợ 3 cơ chế xử lý lệnh nâng cao:\n• Pyramid DCA (DCA Dương): Nhồi thêm lệnh khi vị thế đang có lãi theo bậc thang xu hướng (H4 -> M5).\n• Negative DCA (DCA Âm): Trung bình giá khi gồng lỗ và tự động nâng cấp biên độ TP/SL theo khung lớn.\n• Multi-TF Split Grid: Chia lệnh Limit độc lập cho từng khung thời gian, khớp khung nào chốt lời riêng khung đó.\n\n💡 Lưu ý: Hệ thống chỉ cho phép kích hoạt 1 trong 3 cơ chế (bật chế độ này thì 2 chế độ còn lại tự động tắt).",
-        "actionHint": "💡 Người mới khuyên dùng Multi-TF Split Grid hoặc Pyramid DCA để đảm bảo an toàn vốn tối đa."
+        "badge": "Cài Đặt • Bước 16 / 21",
+        "title": "16. Cầu Dao & Đồng Pha BTC",
+        "content": "Bảo vệ tài khoản trước biến động mạnh:\n• Cầu Dao Đảo Chiều: Khi giá rướn quá xa EMA200 H4 (> 8%), bot ngưng rải Limit thuận trend để tránh đu đỉnh/bắt đáy, đồng thời mở lệnh phòng hộ bắt sóng hồi.\n• Đồng Pha BTC: Ép Altcoin chỉ tìm điểm vào lệnh cùng hướng với xu hướng BTC.",
+        "actionHint": "💡 Nên luôn BẬT Cầu Dao để tài khoản được bảo vệ tự động 24/7."
     },
     {
-        "badge": "Cài Đặt • Bước 17 / 22",
-        "title": "17. Cầu Dao Bảo Vệ Vốn & Đồng Pha BTC",
-        "content": "• Cầu Dao Đảo Chiều (Hedge Reversal): Khi giá rướn quá đà cách xa EMA200 H4 (> 8%), bot tự động khóa không rải thêm Limit thuận trend để tránh đu đỉnh/bắt đáy, đồng thời mở lệnh phòng hộ bắt sóng hồi.\n• Đồng Pha BTC: Ép Altcoin (ETH, SOL...) chỉ được tìm điểm vào lệnh cùng hướng với xu hướng của BTC (Đầu tàu thị trường).",
-        "actionHint": "💡 Khuyến nghị: Luôn BẬT Cầu Dao để tài khoản được bảo vệ tự động 24/7 trước các đợt biến động mạnh."
+        "badge": "Cài Đặt • Bước 17 / 21",
+        "title": "17. Điểm Vào Lệnh & Nến Tích Lũy",
+        "content": "Cấu hình tín hiệu vào lệnh an toàn:\n• Độ Lệch Đệm (%): Đặt Limit đón trước cản EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi giá bật lại.\n• Khoảng Cách An Toàn (%): Khoảng cách tối thiểu giữa 2 đường EMA liền kề để tránh rải lệnh quá dày.\n• Nến Tích Lũy: Yêu cầu 60 nến đóng cửa liên tục cùng 1 phía EMA200 mới mở lệnh, giúp lọc sạch sideway.",
+        "actionHint": "💡 Cài đặt mặc định đã được tối ưu, người mới nên giữ nguyên chuẩn Admin."
     },
     {
-        "badge": "Cài Đặt • Bước 18 / 22",
-        "title": "18. Điểm Vào Lệnh (Entry Setup) & 60 Nến Tích Lũy",
-        "content": "Cơ chế tính toán điểm vào lệnh an toàn:\n• Độ Lệch Đệm (Base Offset %): Đặt Limit đón sớm trước khi giá chạm đúng vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Khung càng lớn tự động nhân theo Hệ số Vào Lệnh (ví dụ H4 x6.8 -> đệm 0.34%).\n• Khoảng Cách An Toàn (Base Gap %): Cách biệt tối thiểu giữa 2 đường EMA liền kề để tránh rải lệnh quá dày rủi ro.\n• Nến Tích Lũy (Accum Candles): Mặc định 60 nến đóng cửa liên tục nằm cùng 1 phía EMA200 mới mở lệnh, xác nhận xu hướng vững chắc, loại bỏ hoàn toàn bẫy sideway.",
-        "actionHint": "💡 Cài đặt mặc định của Admin đã được kiểm chứng thực chiến, người mới có thể an tâm giữ nguyên thông số chuẩn."
+        "badge": "Cài Đặt • Bước 18 / 21",
+        "title": "18. Hệ Số Nhân Đa Khung",
+        "content": "Bản chất điều phối lệnh theo khung thời gian:\n• Cột Vốn: Khung nến càng lớn thì khối lượng ký quỹ và biên độ TP/SL tự nhân rộng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) để thích ứng với biên độ sóng lớn.\n• Cột Vào Lệnh: Nhân tỷ lệ đệm đón trước cản cho khung lớn (M5 x1.0, H4 x6.8) để lệnh không bị trượt.",
+        "actionHint": "💡 Công thức toán học giúp bot bắt trọn sóng lớn khung H1/H4 mà vẫn an toàn ở khung M5."
     },
     {
-        "badge": "Cài Đặt • Bước 19 / 22",
-        "title": "19. Bản Chất Hệ Số Nhân Đa Khung (TF Multipliers)",
-        "content": "Bản chất tính toán của bot trên từng khung thời gian:\n• Cột Vốn (Margin Factor): Khung nến càng lớn thì khối lượng ký quỹ và biên độ TP/SL càng được tự động nhân rộng tương ứng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) để thích ứng với biên độ sóng lớn và tối ưu lợi nhuận.\n• Cột Vào Lệnh (Entry Factor): Dùng để nhân tỷ lệ với 'Đón trước cản' (Base Offset %) và 'Khoảng cách nhồi DCA' (Base Gap %). Khung càng lớn thì vùng đệm đón cản càng rộng (M5 x1.0, H4 x6.8), lệnh không bị trượt khi nến khung lớn dao động mạnh.",
-        "actionHint": "💡 Đây là công thức toán học cốt lõi giúp bot vừa bắt trọn sóng lớn khung H1/H4 vừa tối ưu an toàn vốn ở khung nhỏ M5/M15."
+        "badge": "Cài Đặt • Bước 19 / 21",
+        "title": "19. Lưu Cài Đặt & Mặc Định",
+        "content": "Quản lý cấu hình bot:\n• 'Lưu Cài Đặt': Áp dụng ngay toàn bộ thông số vừa thiết lập.\n• 'Khôi Phục Mặc Định': Đưa toàn bộ cấu hình về chuẩn an toàn ban đầu của Admin bất cứ lúc nào.",
+        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để khám phá Tab Hỗ Trợ và Đánh Giá."
     },
     {
-        "badge": "Cài Đặt • Bước 20 / 22",
-        "title": "20. Lưu Cấu Hình & Khôi Phục Mặc Định",
-        "content": "• Lưu Cài Đặt: Áp dụng toàn bộ thông số vừa thiết lập cho bot.\n• Khôi Phục Mặc Định: Trở về cấu hình an toàn gốc của Admin bất kỳ lúc nào nếu bạn thử nghiệm chưa ưng ý.",
-        "actionHint": "💡 Nhấn 'Tiếp theo ▶' để cùng tìm hiểu Tab Hỗ Trợ và Tab Đánh Giá tiếp theo!"
+        "badge": "Hỗ Trợ • Bước 20 / 21",
+        "title": "20. Tab Hỗ Trợ",
+        "content": "Bản quyền và hỗ trợ kỹ thuật:\n• Điều Kiện Sử Dụng: Hướng dẫn đăng ký tài khoản sàn liên kết mã giới thiệu TLS1 để mở khóa bot miễn phí trọn đời.\n• Kiểm Tra API & HWID: Nơi nhập API Key và lấy mã HWID máy tính để kích hoạt bản quyền.\n• Đổi IP Máy Chủ & Dọn Dẹp: Cấu hình Proxy IP và các công cụ Reset vốn, dọn cache nến khi cần.",
+        "actionHint": "💡 Nhấp nút 'Sao chép' để copy nhanh HWID hoặc mã giới thiệu gửi đội ngũ hỗ trợ."
     },
     {
-        "badge": "Hỗ Trợ • Bước 21 / 22",
-        "title": "21. Tab Hỗ Trợ & Quản Trị Hệ Thống",
-        "content": "Nơi quản lý bản quyền và hỗ trợ kỹ thuật 24/7:\n• Điều Kiện Sử Dụng: Hướng dẫn đăng ký tài khoản sàn OKX liên kết mã giới thiệu TLS1 để mở khóa toàn bộ quyền sử dụng bot miễn phí trọn đời.\n• Kiểm Tra API & HWID: Nơi nhập API Key, Secret Key, Passphrase và lấy mã HWID máy tính để kích hoạt bot bản quyền.\n• Đổi IP Máy Chủ & Bảo Trì: Thiết lập IP Proxy tùy chọn và các công cụ Reset vốn, dọn dẹp cache nến khi cần.",
-        "actionHint": "💡 Bạn có thể nhấp nút 'Sao chép' nhanh HWID hoặc mã giới thiệu để gửi cho đội ngũ hỗ trợ bất kỳ lúc nào."
-    },
-    {
-        "badge": "Đánh Giá • Bước 22 / 22",
-        "title": "22. Tab Đánh Giá & Hoàn Tất Tour!",
-        "content": "• Xem Đánh Giá Cộng Đồng: Đọc các nhận xét, hình ảnh kết quả và lợi nhuận thực chiến từ các nhà giao dịch đang sử dụng hệ thống bot.\n• Gửi Đánh Giá Của Bạn: Chấm sao, đính kèm hình ảnh và chia sẻ trải nghiệm sử dụng bot của bạn với cộng đồng.",
-        "actionHint": "🎉 Chúc mừng bạn đã hoàn thành tour hướng dẫn toàn diện từ A - Z! Bạn đã hiểu rõ mọi tính năng, các nút bấm mới và bản chất vận hành của bot. Nhấn 'Hoàn tất' để đóng cài đặt và bắt đầu giao dịch!"
+        "badge": "Đánh Giá • Bước 21 / 21",
+        "title": "21. Tab Đánh Giá & Hoàn Tất!",
+        "content": "Cộng đồng & hoàn tất tour:\n• Đánh Giá Cộng Đồng: Xem đánh giá và hình ảnh lợi nhuận thực chiến từ các nhà giao dịch đang dùng bot.\n• Gửi Đánh Giá: Chấm sao và chia sẻ trải nghiệm sử dụng bot của bạn.\n\n🎉 Bạn đã hoàn thành toàn bộ tour hướng dẫn! Nhấn 'Hoàn tất' để đóng và bắt đầu giao dịch.",
+        "actionHint": "🎉 Chúc bạn giao dịch thành công và an toàn vốn cùng TLS1 Trading Bot!"
     }
 ],
   en: [
     {
-        "badge": "Main Screen • Step 1 / 22",
-        "title": "1. Connect Exchange & Prop Firm (Connect)",
-        "content": "Gateway to link your trading accounts to the bot system. Full multi-platform support:\n• OKX Exchange: 1-click Fast Connect or proactive manual API Key input.\n• International FX Prop Firms: Connect funded/evaluation accounts (E8 Markets, FTMO, Funding Pips...) via TradeLocker API protocol.\n\n• Click 'Next ▶' to open the Connect modal and explore each method in detail!",
+        "badge": "Main Screen • Step 1 / 21",
+        "title": "1. Connect Button (Connect)",
+        "content": "Link trading accounts to the bot system:\n• OKX Exchange: 1-click Fast Connect or manual API Key input.\n• FX Prop Firms: Connect funded accounts (E8, FTMO...) via TradeLocker.\n\nClick 'Next ▶' to open the Connect modal.",
         "actionHint": "💡 Click 'Next ▶' to open the Connect popup."
     },
     {
-        "badge": "Connect • Step 2 / 22",
-        "title": "2. Method 1: Fast Connect (OAuth 2.0)",
-        "content": "100% secure 1-click connection officially authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX on mobile app or browser for OAuth 2.0 permission grant.\n• 100% Secure: Automatically encrypts and synchronizes API Keys into the system, no credential leakage, zero manual copy-paste errors.\n• Supports independent Sub-Account routing for each bot instance.\n• Expanding soon to Binance Connect, Bybit Connect, and Web3 Wallets.",
-        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero key typing errors."
+        "badge": "Connect • Step 2 / 21",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "100% secure 1-click connection authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX app to grant OAuth permissions.\n• 100% Secure: Auto-syncs encrypted API Keys, zero secret leakage, no copy-paste errors.\n• Supports independent Sub-Account routing for each bot.",
+        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero typing errors."
     },
     {
-        "badge": "Connect • Step 3 / 22",
-        "title": "3. Method 2: Manual OKX API Key (Proactive)",
-        "content": "For traders who prefer creating and managing API Keys manually on OKX:\n• Account Management: Click green (+) to add new account, select from dropdown, or click (-) to delete.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase from OKX then click 'Save Configuration'.\n\n🛡️ CRITICAL SAFETY PRINCIPLE:\n• When creating OKX API Keys, ONLY grant 'Trade' permissions.\n• NEVER grant 'Withdraw' permissions. TLS1 Bot never requests withdrawal rights, keeping your capital 100% safe.",
-        "actionHint": "💡 Click 'Next ▶' to explore the new TradeLocker Prop Firm Connect feature!"
+        "badge": "Connect • Step 3 / 21",
+        "title": "3. Manual OKX API Key",
+        "content": "Manually enter API Keys generated from OKX:\n• Account Management: Click (+) to add, select from list, or (-) to remove.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase then click 'Save Configuration'.\n\n🛡️ SAFETY NOTICE:\n• Only grant 'Trade' permission.\n• NEVER grant 'Withdraw' permission.",
+        "actionHint": "💡 Click 'Next ▶' to explore FX Prop Firm Connect."
     },
     {
-        "badge": "Connect • Step 4 / 22",
-        "title": "4. Method 3: FX Prop Firm Connect (TradeLocker)",
-        "content": "Automated trading solution for world-class Prop Firm accounts:\n• Supported Firms: E8 Markets, FTMO, The 5%ers, Funding Pips... via official TradeLocker API.\n• Safe Connection: Enter Email, Password, Server (E8, Demo, Live). Passwords are local multi-layer Fernet encrypted.\n• Prop Risk Management: Set Fund Size ($5,000, $100,000, $200,000...), risk per trade limit, daily drawdown ceiling, and daily profit cap.\n• Dynamic Lot Sizing: Automatically computes optimal lot sizes based on stop-loss distance, preventing rule violations!",
-        "actionHint": "💡 Click 'Next ▶' to complete connection setup and return to the main dashboard!"
+        "badge": "Connect • Step 4 / 21",
+        "title": "4. FX Prop Firm Connect (TradeLocker)",
+        "content": "Automated trading for funded Prop Firm accounts:\n• Supported: E8 Markets, FTMO, Funding Pips... via TradeLocker API.\n• Login: Enter Email, Password, and Server.\n• Risk Control: Set Fund Size ($5,000, $100,000...), Daily Drawdown ceiling, and risk per trade.\n• Dynamic Lot: Bot automatically calculates exact Lots based on SL distance to prevent rule breaches.",
+        "actionHint": "💡 Click 'Next ▶' to finish connection and return to dashboard."
     },
     {
-        "badge": "Main Screen • Step 5 / 22",
-        "title": "5. Select Trading Platform (OKX / FX Prop)",
-        "content": "Quick platform switcher directly on the left sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap) on OKX.\n• FX Prop Firm: Trade international funded accounts (Gold XAU, Forex, Crypto) via TradeLocker.\n• Auto Sync: Switching platforms instantly updates account lists and pair selectors accordingly.\n• Safety Lock 🔒: While bot is running, this dropdown is locked to protect active orders.",
-        "actionHint": "💡 Seamlessly switch between personal crypto accounts and prop firm challenges in 1 click."
+        "badge": "Main Screen • Step 5 / 21",
+        "title": "5. Platform (OKX / FX Prop)",
+        "content": "Switch trading environment on the Sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap).\n• FX Prop: Trade Gold XAU, Forex, Crypto via TradeLocker.\n• Auto Sync: Changing platforms automatically updates account lists and pair selectors.\n• Safety Lock 🔒: Automatically locks while the bot is active.",
+        "actionHint": "💡 Effortlessly switch between personal exchange accounts and funded challenges in 1 click."
     },
     {
-        "badge": "Main Screen • Step 6 / 22",
-        "title": "6. Select Bot Strategy (Command Capsule)",
-        "content": "The system features 3 built-in quantitative algorithms with intuitive visual badges:\n• EMA200 Bot: Captures multi-timeframe trend pullbacks at dynamic EMA200 levels.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\n• Click this Capsule button to toggle between bot algorithms.",
+        "badge": "Main Screen • Step 6 / 21",
+        "title": "6. Select Bot Strategy",
+        "content": "3 built-in quantitative algorithms:\n• EMA200 Bot: Captures pullback waves along dynamic EMA200 trendlines.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\nClick this button to switch bot strategies.",
         "actionHint": "💡 Each bot operates independently with dedicated settings and accounts."
     },
     {
-        "badge": "Main Screen • Step 7 / 22",
-        "title": "7. Select Account & Live Balance Tracking",
-        "content": "Assign the trading account for the currently active bot:\n• Full Support: OKX Sub-Accounts and FX Prop Accounts (E8 Demo, E8 Live).\n• Live Balance Display: Accurately reflects live account equity ($5,000, $200,000...) for real-time risk supervision.\n• Protective Lock 🔒: While the bot is running, account selection locks automatically to prevent position conflicts.",
-        "actionHint": "💡 Right-aligned layout ensures full account balances are clearly visible without clipping."
+        "badge": "Main Screen • Step 7 / 21",
+        "title": "7. Select Account & Balance",
+        "content": "Assign the trading account for the active bot:\n• OKX: Select matching Sub-Account.\n• FX Prop: Select E8 Demo or Live account.\n• Live Balance: View account equity ($5,000, $200,000...) for real-time risk control.\n• Protective Lock 🔒: Account dropdown locks automatically when bot is running.",
+        "actionHint": "💡 Real-time equity is clearly displayed without clipping."
     },
     {
-        "badge": "Main Screen • Step 8 / 22",
-        "title": "8. Capital, Margin Management & Safety Lock 🔒",
-        "content": "• Units: Fixed USDT ($) or % of Account Equity.\n• TF Multiplier: Select 'Fixed' for uniform margin across timeframes, or 'Multiply TF' to scale size with larger candles (H1 x2.0, H4 x5.0).\n\n🔒 FOOLPROOF SAFETY LOCK:\n• Once you click 'START BOT', the margin input is LOCKED 🔒, preventing unintended margin jumps or accidental clicks.\n• To adjust capital, simply click 'STOP BOT', edit values, and restart.",
-        "actionHint": "💡 Beginner tip: Start with small margin ($1 - $5) to observe live execution first."
+        "badge": "Main Screen • Step 8 / 21",
+        "title": "8. Capital & Order Volume",
+        "content": "Configure capital per trade:\n• OKX: Fixed USDT ($) or % of Account Equity.\n• FX Prop: Volume in Lots (default 0.01 L).\n• Modes: 'Fixed' (uniform across timeframes) or 'Multiply TF' (auto-scales with larger candles H1 x2.0, H4 x5.0).\n\n🔒 Automatically locked while running to prevent mistakes.",
+        "actionHint": "💡 Beginners should use small capital ($1 - $5 or 0.01 Lot) to observe execution."
     },
     {
-        "badge": "Main Screen • Step 9 / 22",
-        "title": "9. Take Profit (TP) & Stop Loss (SL) M5 0.6% Standard",
-        "content": "Safety bracket ratios. TP/SL configured here represents the M5 BASE level (optimized default: 0.6% TP & 0.6% SL). Higher timeframes scale automatically via Margin Factor:\n\n📊 MULTI-TF TP/SL MULTIPLIER TABLE (M5 0.6% Base):\n• M5 : x1.0 ➔ TP 0.60% | SL 0.60% (Base TF)\n• M15: x1.2 ➔ TP 0.72% | SL 0.72%\n• M30: x1.5 ➔ TP 0.90% | SL 0.90%\n• H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n• H2 : x3.0 ➔ TP 1.80% | SL 1.80%\n• H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n\n🔍 Core principle: Larger candles experience wider swings. Auto-scaling lets positions ride major trends without premature stop-outs.\n🛡️ 15s Watchdog daemon continuously scans and attaches TP/SL brackets 24/7.",
-        "actionHint": "💡 0.6% base ratio is battle-tested for rapid profit-taking and minimal drawdown."
+        "badge": "Main Screen • Step 9 / 21",
+        "title": "9. Base M5 TP & SL (0.6% Default)",
+        "content": "Base TP and SL ratios on M5 timeframe (default: 0.6% TP | 0.6% SL):\n• Multi-TF Scaling: Larger candles have wider swings; bot scales via Margin Factor:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• 15s Watchdog daemon continuously attaches protective brackets 24/7.",
+        "actionHint": "💡 Battle-tested 0.6% base ratio provides rapid profit realization and capital safety."
     },
     {
-        "badge": "Main Screen • Step 10 / 22",
-        "title": "10. Select Trading Pairs & Timeframes",
-        "content": "• Pairs Column: Check symbols you want the bot to scan (XAU, BTC, ETH, SOL...).\n• Trade TF Column: Check timeframes (M5 to H4) where the bot is authorized to place Limit orders.\n• Quick Navigation: Click any pair name to instantly focus the TradingView chart on that symbol.",
-        "actionHint": "💡 Enable multiple timeframes simultaneously for automated multi-horizon diversification."
+        "badge": "Main Screen • Step 10 / 21",
+        "title": "10. Pairs & Trading Timeframes",
+        "content": "Manage symbol watchlist and order timeframes:\n• Pairs Column: Check symbols to scan (XAU, BTC, ETH...). Click pair name to open TradingView chart.\n• Trade TF Column: Check timeframes (5, 15, 30, H1, H2, H4) where the bot may place orders.\n• Multi-TF Enabled: Bot distributes orders across timeframes concurrently.",
+        "actionHint": "💡 Toggle coin pairs and timeframes flexibly to match your strategy."
     },
     {
-        "badge": "Main Screen • Step 11 / 22",
-        "title": "11. Activate Automated Bot Engine",
-        "content": "• Click 'START BOT': Launches background scanner engine to place/manage orders 24/7 on OKX or Prop Firm.\n• To Pause: Click 'STOP BOT' to cancel open limit orders and protect existing inventory.\n• Visual Status: Dynamic badge indicators (Green: Running, Red/Grey: Stopped).",
-        "actionHint": "💡 You can safely close your browser; the bot executes persistently on the backend daemon."
+        "badge": "Main Screen • Step 11 / 21",
+        "title": "11. Start / Stop Bot Engine",
+        "content": "Activate or halt automated bot operations:\n• 'START BOT': Scans market signals and places/manages orders 24/7 on exchange or prop.\n• 'STOP BOT': Cancels open pending limit orders and protects active positions.\n• You can safely close your browser; the bot runs persistently on the server.",
+        "actionHint": "💡 Button colors reflect active state (Green: Running, Gray: Stopped)."
     },
     {
-        "badge": "Main Screen • Step 12 / 22",
-        "title": "12. Bottom Command Pane & Split View (⮃)",
-        "content": "Comprehensive monitoring hub:\n• Positions Tab: Open positions, live PnL, leverage, entry price, liquidation risk, and emergency panic-close buttons.\n• Logs Tab: Real-time stream of engine scans, algorithmic triggers, and broker responses.\n• Charts Tab: Multi-frame TradingView technical charts.\n• ⮃ Split View Button: Click to decouple Charts on top and Positions below simultaneously, providing complete situational awareness!",
-        "actionHint": "💡 Try the ⮃ Split View button to unlock a professional dual-pane dashboard."
+        "badge": "Main Screen • Step 12 / 21",
+        "title": "12. Positions, Logs & Split View",
+        "content": "Central monitoring pane:\n• Positions Tab: Open positions, live PnL, entry price, SL/TP brackets, and panic-close button.\n• Logs Tab: Real-time scan logs and broker response feed.\n• Charts Tab: TradingView technical chart.\n• ⮃ Split View: View Charts on top and Positions below simultaneously without switching tabs.",
+        "actionHint": "💡 Click ⮃ button on the right to experience the dual-pane view."
     },
     {
-        "badge": "Main Screen • Step 13 / 22",
-        "title": "13. Explore Advanced System Settings ⚙",
-        "content": "Two key utility controls side by side:\n• 'Guide' Button 💡: Re-open this guided onboarding tour anytime.\n• 'Settings' Button ⚙: Opens Deep Configuration Panel for algorithmic tuning: Watchlist, Capital Management, DCA Trio, Circuit Breaker, Entry Triggers, Multi-TF Multipliers, Support & Reviews.\n\n• Click 'Next ▶' to open the Settings panel and step through each mechanism!",
-        "actionHint": "💡 Click 'Next ▶' to enter the Advanced Settings modal."
+        "badge": "Main Screen • Step 13 / 21",
+        "title": "13. Guide & Settings ⚙",
+        "content": "Two key utility controls on Sidebar:\n• 'Guide': Re-launch this guided tour anytime.\n• 'Settings' ⚙: Open Deep Configuration Panel to fine-tune Watchlist, DCA Trio, Circuit Breaker, Entry Setup, and Multipliers.\n\nClick 'Next ▶' to open the Settings modal.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Deep Settings."
     },
     {
-        "badge": "Settings • Step 14 / 22",
-        "title": "14. Coin Watchlist Configuration",
-        "content": "Customize trading universe for your bot:\n• Toggle coin tags (XAU, BTC, ETH, SOL, DOGE...).\n• Highlighted badges indicate coins active on the main dashboard.\n• Safety Lock: Coins with currently open positions are automatically locked from deselecting.",
-        "actionHint": "💡 Activate as many coins as appropriate for your capital capacity."
+        "badge": "Settings • Step 14 / 21",
+        "title": "14. Coin Watchlist",
+        "content": "Configure coins displayed on the dashboard:\n• Click to toggle coins (XAU, BTC, ETH, SOL, DOGE...).\n• Active badges display on main dashboard.\n• Safety Lock: Coins with open positions are locked from deselecting.",
+        "actionHint": "💡 Enable coins aligned with your account capital."
     },
     {
-        "badge": "Settings • Step 15 / 22",
-        "title": "15. Account & Capital Allocation",
-        "content": "Configure account assignment and granular risk sizing for the active bot:\n• Select Account: Bind bot to corresponding OKX or Prop account.\n• Per-order Margin: Enter fixed USDT ($) or % of equity.\n• Multiplier Mode: Toggle between Fixed or Multiplied margin scaling.\n• Leverage: Set safe leverage ratio for the position.",
-        "actionHint": "💡 While running, account and margin fields are locked 🔒 to protect active orders."
+        "badge": "Settings • Step 15 / 21",
+        "title": "15. DCA Mode Trio",
+        "content": "Select 1 of 3 advanced execution algorithms:\n• DCA Dương: Adds positions as profit develops along trend steps (H4 -> M5).\n• DCA Âm: Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 mode can be active at a time (enabling one disables the others).",
+        "actionHint": "💡 Split Grid and DCA Dương are recommended for conservative risk management."
     },
     {
-        "badge": "Settings • Step 16 / 22",
-        "title": "16. Strategy Switches (DCA Trio)",
-        "content": "The system provides 3 specialized order scaling algorithms:\n• Pyramid DCA (Positive DCA): Scales up positions as profit grows along trend stairs (H4 -> M5).\n• Negative DCA (Averaging Down): Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Multi-TF Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 of the 3 modes can be active at a time (enabling one automatically disables the others).",
-        "actionHint": "💡 Beginners are recommended to use Multi-TF Split Grid or Pyramid DCA for maximum capital defense."
+        "badge": "Settings • Step 16 / 21",
+        "title": "16. Circuit Breaker & BTC Alignment",
+        "content": "Protect account during sharp market shocks:\n• Reversal Circuit Breaker: When price extends too far from H4 EMA200 (> 8%), bot halts trend orders to avoid tops/bottoms, and opens hedge pullback orders.\n• BTC Alignment: Restricts Altcoins to only enter trades aligned with BTC market direction.",
+        "actionHint": "💡 Keep Circuit Breaker ON 24/7 to safeguard equity."
     },
     {
-        "badge": "Settings • Step 17 / 22",
-        "title": "17. Circuit Breaker & BTC Correlation Filter",
-        "content": "• Hedge Reversal Circuit Breaker: When price overextends far from H4 EMA200 (> 8%), bot locks trend limit orders to avoid tops/bottoms, while opening hedge orders on mean-reversion waves.\n• BTC Correlation Filter: Enforces Altcoins (ETH, SOL...) to only seek entries aligned with market leader BTC trend.",
-        "actionHint": "💡 Recommended: Keep Circuit Breaker ON 24/7 to protect equity against severe volatility spikes."
+        "badge": "Settings • Step 17 / 21",
+        "title": "17. Entry Setup & Accumulation",
+        "content": "Configure entry criteria:\n• Base Offset (%): Places limits ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds.\n• Base Gap (%): Minimum safety gap between adjacent EMA levels to avoid tight stacking.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before entering, eliminating sideways traps.",
+        "actionHint": "💡 Battle-tested defaults; beginners should keep Admin standards."
     },
     {
-        "badge": "Settings • Step 18 / 22",
-        "title": "18. Entry Setup & 60-Candle Accumulation",
-        "content": "Safety criteria for limit placement:\n• Base Offset %: Places Limit orders ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds. Scales with Entry Factor on higher TFs (e.g. H4 x6.8 -> 0.34% offset).\n• Base Gap %: Minimum distance required between consecutive EMA lines to avoid dense clustering.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before placing orders, confirming steady trends and filtering sideway noise.",
-        "actionHint": "💡 Admin defaults are battle-tested in live markets; beginners can safely retain standard parameters."
+        "badge": "Settings • Step 18 / 21",
+        "title": "18. Multi-TF Multipliers",
+        "content": "Multi-timeframe mathematical scaling mechanics:\n• Capital Column: Larger candles expand margin and TP/SL brackets (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) to match swing ranges.\n• Entry Column: Scales entry buffering for higher TFs (M5 x1.0, H4 x6.8) preventing order slippage.",
+        "actionHint": "💡 Mathematical framework that captures major H1/H4 waves while keeping M5 execution safe."
     },
     {
-        "badge": "Settings • Step 19 / 22",
-        "title": "19. Multi-TF Multiplier Architecture",
-        "content": "Mathematical scaling mechanics across timeframes:\n• Margin Factor: Larger candles expand margin and TP/SL amplitudes (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) to match swing ranges and optimize profits.\n• Entry Factor: Multiplies Base Offset % and Base Gap %. Higher TFs get wider buffering zones (M5 x1.0, H4 x6.8) preventing order slippage during large candle fluctuations.",
-        "actionHint": "💡 Core mathematical model enabling the bot to ride massive H1/H4 waves while keeping capital safe on M5/M15."
+        "badge": "Settings • Step 19 / 21",
+        "title": "19. Save Settings & Defaults",
+        "content": "Bot configuration management:\n• 'Save Settings': Immediately applies all configured parameters.\n• 'Reset to Default': Reverts back to battle-tested Admin baseline settings anytime.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Support and Community Reviews."
     },
     {
-        "badge": "Settings • Step 20 / 22",
-        "title": "20. Save Configuration & Reset Defaults",
-        "content": "• Save Strategy: Immediately writes all modified parameters into the bot configuration.\n• Reset to Default: Revert to Admin battle-tested baseline settings anytime if experiments prove unsatisfactory.",
-        "actionHint": "💡 Click 'Next ▶' to inspect the Support and Community Reviews tabs next!"
+        "badge": "Support • Step 20 / 21",
+        "title": "20. Support Tab",
+        "content": "Licensing and 24/7 technical assistance:\n• Terms of Service: Register exchange account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify connectivity and retrieve PC HWID for license activation.\n• Server IP & Cleanup: Configure custom Proxy IPs and reset capital or clear candle cache.",
+        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team."
     },
     {
-        "badge": "Support • Step 21 / 22",
-        "title": "21. Support & System Administration Tab",
-        "content": "License management and 24/7 technical assistance:\n• Terms of Service: Guide to registering OKX account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify API Key connectivity and retrieve PC HWID for license activation.\n• Proxy & Maintenance: Optional Proxy IP setup, capital reset tools, and candle cache cleaners.",
-        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team anytime."
-    },
-    {
-        "badge": "Reviews • Step 22 / 22",
-        "title": "22. Community Reviews & Tour Complete!",
-        "content": "• View Community Reviews: Browse verified feedback, profit screenshots, and live trading results from fellow traders.\n• Submit Your Review: Rate stars, attach trade snapshots, and share your experience with the community.",
-        "actionHint": "🎉 Congratulations on completing the full A-Z onboarding tour! You now master all features and inner logic of the bot. Click 'Finish' to close and begin trading!"
+        "badge": "Reviews • Step 21 / 21",
+        "title": "21. Reviews Tab & Tour Complete!",
+        "content": "Community & completion:\n• Community Reviews: Browse verified trade reviews and profit snapshots from fellow traders.\n• Submit Review: Rate stars and share your trading experience with the bot.\n\n🎉 You have completed the comprehensive onboarding tour! Click 'Finish' to close and begin trading.",
+        "actionHint": "🎉 Wishing you disciplined and profitable trading with TLS1 Trading Bot!"
     }
 ],
   zh: [
     {
-        "badge": "系统向导 • 第 1 / 22 步",
-        "title": "1. Connect Exchange & Prop Firm (Connect)",
-        "content": "Gateway to link your trading accounts to the bot system. Full multi-platform support:\n• OKX Exchange: 1-click Fast Connect or proactive manual API Key input.\n• International FX Prop Firms: Connect funded/evaluation accounts (E8 Markets, FTMO, Funding Pips...) via TradeLocker API protocol.\n\n• Click 'Next ▶' to open the Connect modal and explore each method in detail!",
+        "badge": "系统向导 • 第 1 / 21 步",
+        "title": "1. Connect Button (Connect)",
+        "content": "Link trading accounts to the bot system:\n• OKX Exchange: 1-click Fast Connect or manual API Key input.\n• FX Prop Firms: Connect funded accounts (E8, FTMO...) via TradeLocker.\n\nClick 'Next ▶' to open the Connect modal.",
         "actionHint": "💡 Click 'Next ▶' to open the Connect popup."
     },
     {
-        "badge": "系统向导 • 第 2 / 22 步",
-        "title": "2. Method 1: Fast Connect (OAuth 2.0)",
-        "content": "100% secure 1-click connection officially authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX on mobile app or browser for OAuth 2.0 permission grant.\n• 100% Secure: Automatically encrypts and synchronizes API Keys into the system, no credential leakage, zero manual copy-paste errors.\n• Supports independent Sub-Account routing for each bot instance.\n• Expanding soon to Binance Connect, Bybit Connect, and Web3 Wallets.",
-        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero key typing errors."
+        "badge": "系统向导 • 第 2 / 21 步",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "100% secure 1-click connection authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX app to grant OAuth permissions.\n• 100% Secure: Auto-syncs encrypted API Keys, zero secret leakage, no copy-paste errors.\n• Supports independent Sub-Account routing for each bot.",
+        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero typing errors."
     },
     {
-        "badge": "系统向导 • 第 3 / 22 步",
-        "title": "3. Method 2: Manual OKX API Key (Proactive)",
-        "content": "For traders who prefer creating and managing API Keys manually on OKX:\n• Account Management: Click green (+) to add new account, select from dropdown, or click (-) to delete.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase from OKX then click 'Save Configuration'.\n\n🛡️ CRITICAL SAFETY PRINCIPLE:\n• When creating OKX API Keys, ONLY grant 'Trade' permissions.\n• NEVER grant 'Withdraw' permissions. TLS1 Bot never requests withdrawal rights, keeping your capital 100% safe.",
-        "actionHint": "💡 Click 'Next ▶' to explore the new TradeLocker Prop Firm Connect feature!"
+        "badge": "系统向导 • 第 3 / 21 步",
+        "title": "3. Manual OKX API Key",
+        "content": "Manually enter API Keys generated from OKX:\n• Account Management: Click (+) to add, select from list, or (-) to remove.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase then click 'Save Configuration'.\n\n🛡️ SAFETY NOTICE:\n• Only grant 'Trade' permission.\n• NEVER grant 'Withdraw' permission.",
+        "actionHint": "💡 Click 'Next ▶' to explore FX Prop Firm Connect."
     },
     {
-        "badge": "系统向导 • 第 4 / 22 步",
-        "title": "4. Method 3: FX Prop Firm Connect (TradeLocker)",
-        "content": "Automated trading solution for world-class Prop Firm accounts:\n• Supported Firms: E8 Markets, FTMO, The 5%ers, Funding Pips... via official TradeLocker API.\n• Safe Connection: Enter Email, Password, Server (E8, Demo, Live). Passwords are local multi-layer Fernet encrypted.\n• Prop Risk Management: Set Fund Size ($5,000, $100,000, $200,000...), risk per trade limit, daily drawdown ceiling, and daily profit cap.\n• Dynamic Lot Sizing: Automatically computes optimal lot sizes based on stop-loss distance, preventing rule violations!",
-        "actionHint": "💡 Click 'Next ▶' to complete connection setup and return to the main dashboard!"
+        "badge": "系统向导 • 第 4 / 21 步",
+        "title": "4. FX Prop Firm Connect (TradeLocker)",
+        "content": "Automated trading for funded Prop Firm accounts:\n• Supported: E8 Markets, FTMO, Funding Pips... via TradeLocker API.\n• Login: Enter Email, Password, and Server.\n• Risk Control: Set Fund Size ($5,000, $100,000...), Daily Drawdown ceiling, and risk per trade.\n• Dynamic Lot: Bot automatically calculates exact Lots based on SL distance to prevent rule breaches.",
+        "actionHint": "💡 Click 'Next ▶' to finish connection and return to dashboard."
     },
     {
-        "badge": "系统向导 • 第 5 / 22 步",
-        "title": "5. Select Trading Platform (OKX / FX Prop)",
-        "content": "Quick platform switcher directly on the left sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap) on OKX.\n• FX Prop Firm: Trade international funded accounts (Gold XAU, Forex, Crypto) via TradeLocker.\n• Auto Sync: Switching platforms instantly updates account lists and pair selectors accordingly.\n• Safety Lock 🔒: While bot is running, this dropdown is locked to protect active orders.",
-        "actionHint": "💡 Seamlessly switch between personal crypto accounts and prop firm challenges in 1 click."
+        "badge": "系统向导 • 第 5 / 21 步",
+        "title": "5. Platform (OKX / FX Prop)",
+        "content": "Switch trading environment on the Sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap).\n• FX Prop: Trade Gold XAU, Forex, Crypto via TradeLocker.\n• Auto Sync: Changing platforms automatically updates account lists and pair selectors.\n• Safety Lock 🔒: Automatically locks while the bot is active.",
+        "actionHint": "💡 Effortlessly switch between personal exchange accounts and funded challenges in 1 click."
     },
     {
-        "badge": "系统向导 • 第 6 / 22 步",
-        "title": "6. Select Bot Strategy (Command Capsule)",
-        "content": "The system features 3 built-in quantitative algorithms with intuitive visual badges:\n• EMA200 Bot: Captures multi-timeframe trend pullbacks at dynamic EMA200 levels.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\n• Click this Capsule button to toggle between bot algorithms.",
+        "badge": "系统向导 • 第 6 / 21 步",
+        "title": "6. Select Bot Strategy",
+        "content": "3 built-in quantitative algorithms:\n• EMA200 Bot: Captures pullback waves along dynamic EMA200 trendlines.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\nClick this button to switch bot strategies.",
         "actionHint": "💡 Each bot operates independently with dedicated settings and accounts."
     },
     {
-        "badge": "系统向导 • 第 7 / 22 步",
-        "title": "7. Select Account & Live Balance Tracking",
-        "content": "Assign the trading account for the currently active bot:\n• Full Support: OKX Sub-Accounts and FX Prop Accounts (E8 Demo, E8 Live).\n• Live Balance Display: Accurately reflects live account equity ($5,000, $200,000...) for real-time risk supervision.\n• Protective Lock 🔒: While the bot is running, account selection locks automatically to prevent position conflicts.",
-        "actionHint": "💡 Right-aligned layout ensures full account balances are clearly visible without clipping."
+        "badge": "系统向导 • 第 7 / 21 步",
+        "title": "7. Select Account & Balance",
+        "content": "Assign the trading account for the active bot:\n• OKX: Select matching Sub-Account.\n• FX Prop: Select E8 Demo or Live account.\n• Live Balance: View account equity ($5,000, $200,000...) for real-time risk control.\n• Protective Lock 🔒: Account dropdown locks automatically when bot is running.",
+        "actionHint": "💡 Real-time equity is clearly displayed without clipping."
     },
     {
-        "badge": "系统向导 • 第 8 / 22 步",
-        "title": "8. Capital, Margin Management & Safety Lock 🔒",
-        "content": "• Units: Fixed USDT ($) or % of Account Equity.\n• TF Multiplier: Select 'Fixed' for uniform margin across timeframes, or 'Multiply TF' to scale size with larger candles (H1 x2.0, H4 x5.0).\n\n🔒 FOOLPROOF SAFETY LOCK:\n• Once you click 'START BOT', the margin input is LOCKED 🔒, preventing unintended margin jumps or accidental clicks.\n• To adjust capital, simply click 'STOP BOT', edit values, and restart.",
-        "actionHint": "💡 Beginner tip: Start with small margin ($1 - $5) to observe live execution first."
+        "badge": "系统向导 • 第 8 / 21 步",
+        "title": "8. Capital & Order Volume",
+        "content": "Configure capital per trade:\n• OKX: Fixed USDT ($) or % of Account Equity.\n• FX Prop: Volume in Lots (default 0.01 L).\n• Modes: 'Fixed' (uniform across timeframes) or 'Multiply TF' (auto-scales with larger candles H1 x2.0, H4 x5.0).\n\n🔒 Automatically locked while running to prevent mistakes.",
+        "actionHint": "💡 Beginners should use small capital ($1 - $5 or 0.01 Lot) to observe execution."
     },
     {
-        "badge": "系统向导 • 第 9 / 22 步",
-        "title": "9. Take Profit (TP) & Stop Loss (SL) M5 0.6% Standard",
-        "content": "Safety bracket ratios. TP/SL configured here represents the M5 BASE level (optimized default: 0.6% TP & 0.6% SL). Higher timeframes scale automatically via Margin Factor:\n\n📊 MULTI-TF TP/SL MULTIPLIER TABLE (M5 0.6% Base):\n• M5 : x1.0 ➔ TP 0.60% | SL 0.60% (Base TF)\n• M15: x1.2 ➔ TP 0.72% | SL 0.72%\n• M30: x1.5 ➔ TP 0.90% | SL 0.90%\n• H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n• H2 : x3.0 ➔ TP 1.80% | SL 1.80%\n• H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n\n🔍 Core principle: Larger candles experience wider swings. Auto-scaling lets positions ride major trends without premature stop-outs.\n🛡️ 15s Watchdog daemon continuously scans and attaches TP/SL brackets 24/7.",
-        "actionHint": "💡 0.6% base ratio is battle-tested for rapid profit-taking and minimal drawdown."
+        "badge": "系统向导 • 第 9 / 21 步",
+        "title": "9. Base M5 TP & SL (0.6% Default)",
+        "content": "Base TP and SL ratios on M5 timeframe (default: 0.6% TP | 0.6% SL):\n• Multi-TF Scaling: Larger candles have wider swings; bot scales via Margin Factor:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• 15s Watchdog daemon continuously attaches protective brackets 24/7.",
+        "actionHint": "💡 Battle-tested 0.6% base ratio provides rapid profit realization and capital safety."
     },
     {
-        "badge": "系统向导 • 第 10 / 22 步",
-        "title": "10. Select Trading Pairs & Timeframes",
-        "content": "• Pairs Column: Check symbols you want the bot to scan (XAU, BTC, ETH, SOL...).\n• Trade TF Column: Check timeframes (M5 to H4) where the bot is authorized to place Limit orders.\n• Quick Navigation: Click any pair name to instantly focus the TradingView chart on that symbol.",
-        "actionHint": "💡 Enable multiple timeframes simultaneously for automated multi-horizon diversification."
+        "badge": "系统向导 • 第 10 / 21 步",
+        "title": "10. Pairs & Trading Timeframes",
+        "content": "Manage symbol watchlist and order timeframes:\n• Pairs Column: Check symbols to scan (XAU, BTC, ETH...). Click pair name to open TradingView chart.\n• Trade TF Column: Check timeframes (5, 15, 30, H1, H2, H4) where the bot may place orders.\n• Multi-TF Enabled: Bot distributes orders across timeframes concurrently.",
+        "actionHint": "💡 Toggle coin pairs and timeframes flexibly to match your strategy."
     },
     {
-        "badge": "系统向导 • 第 11 / 22 步",
-        "title": "11. Activate Automated Bot Engine",
-        "content": "• Click 'START BOT': Launches background scanner engine to place/manage orders 24/7 on OKX or Prop Firm.\n• To Pause: Click 'STOP BOT' to cancel open limit orders and protect existing inventory.\n• Visual Status: Dynamic badge indicators (Green: Running, Red/Grey: Stopped).",
-        "actionHint": "💡 You can safely close your browser; the bot executes persistently on the backend daemon."
+        "badge": "系统向导 • 第 11 / 21 步",
+        "title": "11. Start / Stop Bot Engine",
+        "content": "Activate or halt automated bot operations:\n• 'START BOT': Scans market signals and places/manages orders 24/7 on exchange or prop.\n• 'STOP BOT': Cancels open pending limit orders and protects active positions.\n• You can safely close your browser; the bot runs persistently on the server.",
+        "actionHint": "💡 Button colors reflect active state (Green: Running, Gray: Stopped)."
     },
     {
-        "badge": "系统向导 • 第 12 / 22 步",
-        "title": "12. Bottom Command Pane & Split View (⮃)",
-        "content": "Comprehensive monitoring hub:\n• Positions Tab: Open positions, live PnL, leverage, entry price, liquidation risk, and emergency panic-close buttons.\n• Logs Tab: Real-time stream of engine scans, algorithmic triggers, and broker responses.\n• Charts Tab: Multi-frame TradingView technical charts.\n• ⮃ Split View Button: Click to decouple Charts on top and Positions below simultaneously, providing complete situational awareness!",
-        "actionHint": "💡 Try the ⮃ Split View button to unlock a professional dual-pane dashboard."
+        "badge": "系统向导 • 第 12 / 21 步",
+        "title": "12. Positions, Logs & Split View",
+        "content": "Central monitoring pane:\n• Positions Tab: Open positions, live PnL, entry price, SL/TP brackets, and panic-close button.\n• Logs Tab: Real-time scan logs and broker response feed.\n• Charts Tab: TradingView technical chart.\n• ⮃ Split View: View Charts on top and Positions below simultaneously without switching tabs.",
+        "actionHint": "💡 Click ⮃ button on the right to experience the dual-pane view."
     },
     {
-        "badge": "系统向导 • 第 13 / 22 步",
-        "title": "13. Explore Advanced System Settings ⚙",
-        "content": "Two key utility controls side by side:\n• 'Guide' Button 💡: Re-open this guided onboarding tour anytime.\n• 'Settings' Button ⚙: Opens Deep Configuration Panel for algorithmic tuning: Watchlist, Capital Management, DCA Trio, Circuit Breaker, Entry Triggers, Multi-TF Multipliers, Support & Reviews.\n\n• Click 'Next ▶' to open the Settings panel and step through each mechanism!",
-        "actionHint": "💡 Click 'Next ▶' to enter the Advanced Settings modal."
+        "badge": "系统向导 • 第 13 / 21 步",
+        "title": "13. Guide & Settings ⚙",
+        "content": "Two key utility controls on Sidebar:\n• 'Guide': Re-launch this guided tour anytime.\n• 'Settings' ⚙: Open Deep Configuration Panel to fine-tune Watchlist, DCA Trio, Circuit Breaker, Entry Setup, and Multipliers.\n\nClick 'Next ▶' to open the Settings modal.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Deep Settings."
     },
     {
-        "badge": "系统向导 • 第 14 / 22 步",
-        "title": "14. Coin Watchlist Configuration",
-        "content": "Customize trading universe for your bot:\n• Toggle coin tags (XAU, BTC, ETH, SOL, DOGE...).\n• Highlighted badges indicate coins active on the main dashboard.\n• Safety Lock: Coins with currently open positions are automatically locked from deselecting.",
-        "actionHint": "💡 Activate as many coins as appropriate for your capital capacity."
+        "badge": "系统向导 • 第 14 / 21 步",
+        "title": "14. Coin Watchlist",
+        "content": "Configure coins displayed on the dashboard:\n• Click to toggle coins (XAU, BTC, ETH, SOL, DOGE...).\n• Active badges display on main dashboard.\n• Safety Lock: Coins with open positions are locked from deselecting.",
+        "actionHint": "💡 Enable coins aligned with your account capital."
     },
     {
-        "badge": "系统向导 • 第 15 / 22 步",
-        "title": "15. Account & Capital Allocation",
-        "content": "Configure account assignment and granular risk sizing for the active bot:\n• Select Account: Bind bot to corresponding OKX or Prop account.\n• Per-order Margin: Enter fixed USDT ($) or % of equity.\n• Multiplier Mode: Toggle between Fixed or Multiplied margin scaling.\n• Leverage: Set safe leverage ratio for the position.",
-        "actionHint": "💡 While running, account and margin fields are locked 🔒 to protect active orders."
+        "badge": "系统向导 • 第 15 / 21 步",
+        "title": "15. DCA Mode Trio",
+        "content": "Select 1 of 3 advanced execution algorithms:\n• DCA Dương: Adds positions as profit develops along trend steps (H4 -> M5).\n• DCA Âm: Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 mode can be active at a time (enabling one disables the others).",
+        "actionHint": "💡 Split Grid and DCA Dương are recommended for conservative risk management."
     },
     {
-        "badge": "系统向导 • 第 16 / 22 步",
-        "title": "16. Strategy Switches (DCA Trio)",
-        "content": "The system provides 3 specialized order scaling algorithms:\n• Pyramid DCA (Positive DCA): Scales up positions as profit grows along trend stairs (H4 -> M5).\n• Negative DCA (Averaging Down): Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Multi-TF Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 of the 3 modes can be active at a time (enabling one automatically disables the others).",
-        "actionHint": "💡 Beginners are recommended to use Multi-TF Split Grid or Pyramid DCA for maximum capital defense."
+        "badge": "系统向导 • 第 16 / 21 步",
+        "title": "16. Circuit Breaker & BTC Alignment",
+        "content": "Protect account during sharp market shocks:\n• Reversal Circuit Breaker: When price extends too far from H4 EMA200 (> 8%), bot halts trend orders to avoid tops/bottoms, and opens hedge pullback orders.\n• BTC Alignment: Restricts Altcoins to only enter trades aligned with BTC market direction.",
+        "actionHint": "💡 Keep Circuit Breaker ON 24/7 to safeguard equity."
     },
     {
-        "badge": "系统向导 • 第 17 / 22 步",
-        "title": "17. Circuit Breaker & BTC Correlation Filter",
-        "content": "• Hedge Reversal Circuit Breaker: When price overextends far from H4 EMA200 (> 8%), bot locks trend limit orders to avoid tops/bottoms, while opening hedge orders on mean-reversion waves.\n• BTC Correlation Filter: Enforces Altcoins (ETH, SOL...) to only seek entries aligned with market leader BTC trend.",
-        "actionHint": "💡 Recommended: Keep Circuit Breaker ON 24/7 to protect equity against severe volatility spikes."
+        "badge": "系统向导 • 第 17 / 21 步",
+        "title": "17. Entry Setup & Accumulation",
+        "content": "Configure entry criteria:\n• Base Offset (%): Places limits ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds.\n• Base Gap (%): Minimum safety gap between adjacent EMA levels to avoid tight stacking.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before entering, eliminating sideways traps.",
+        "actionHint": "💡 Battle-tested defaults; beginners should keep Admin standards."
     },
     {
-        "badge": "系统向导 • 第 18 / 22 步",
-        "title": "18. Entry Setup & 60-Candle Accumulation",
-        "content": "Safety criteria for limit placement:\n• Base Offset %: Places Limit orders ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds. Scales with Entry Factor on higher TFs (e.g. H4 x6.8 -> 0.34% offset).\n• Base Gap %: Minimum distance required between consecutive EMA lines to avoid dense clustering.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before placing orders, confirming steady trends and filtering sideway noise.",
-        "actionHint": "💡 Admin defaults are battle-tested in live markets; beginners can safely retain standard parameters."
+        "badge": "系统向导 • 第 18 / 21 步",
+        "title": "18. Multi-TF Multipliers",
+        "content": "Multi-timeframe mathematical scaling mechanics:\n• Capital Column: Larger candles expand margin and TP/SL brackets (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) to match swing ranges.\n• Entry Column: Scales entry buffering for higher TFs (M5 x1.0, H4 x6.8) preventing order slippage.",
+        "actionHint": "💡 Mathematical framework that captures major H1/H4 waves while keeping M5 execution safe."
     },
     {
-        "badge": "系统向导 • 第 19 / 22 步",
-        "title": "19. Multi-TF Multiplier Architecture",
-        "content": "Mathematical scaling mechanics across timeframes:\n• Margin Factor: Larger candles expand margin and TP/SL amplitudes (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) to match swing ranges and optimize profits.\n• Entry Factor: Multiplies Base Offset % and Base Gap %. Higher TFs get wider buffering zones (M5 x1.0, H4 x6.8) preventing order slippage during large candle fluctuations.",
-        "actionHint": "💡 Core mathematical model enabling the bot to ride massive H1/H4 waves while keeping capital safe on M5/M15."
+        "badge": "系统向导 • 第 19 / 21 步",
+        "title": "19. Save Settings & Defaults",
+        "content": "Bot configuration management:\n• 'Save Settings': Immediately applies all configured parameters.\n• 'Reset to Default': Reverts back to battle-tested Admin baseline settings anytime.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Support and Community Reviews."
     },
     {
-        "badge": "系统向导 • 第 20 / 22 步",
-        "title": "20. Save Configuration & Reset Defaults",
-        "content": "• Save Strategy: Immediately writes all modified parameters into the bot configuration.\n• Reset to Default: Revert to Admin battle-tested baseline settings anytime if experiments prove unsatisfactory.",
-        "actionHint": "💡 Click 'Next ▶' to inspect the Support and Community Reviews tabs next!"
+        "badge": "系统向导 • 第 20 / 21 步",
+        "title": "20. Support Tab",
+        "content": "Licensing and 24/7 technical assistance:\n• Terms of Service: Register exchange account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify connectivity and retrieve PC HWID for license activation.\n• Server IP & Cleanup: Configure custom Proxy IPs and reset capital or clear candle cache.",
+        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team."
     },
     {
-        "badge": "系统向导 • 第 21 / 22 步",
-        "title": "21. Support & System Administration Tab",
-        "content": "License management and 24/7 technical assistance:\n• Terms of Service: Guide to registering OKX account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify API Key connectivity and retrieve PC HWID for license activation.\n• Proxy & Maintenance: Optional Proxy IP setup, capital reset tools, and candle cache cleaners.",
-        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team anytime."
-    },
-    {
-        "badge": "系统向导 • 第 22 / 22 步",
-        "title": "22. Community Reviews & Tour Complete!",
-        "content": "• View Community Reviews: Browse verified feedback, profit screenshots, and live trading results from fellow traders.\n• Submit Your Review: Rate stars, attach trade snapshots, and share your experience with the community.",
-        "actionHint": "🎉 Congratulations on completing the full A-Z onboarding tour! You now master all features and inner logic of the bot. Click 'Finish' to close and begin trading!"
+        "badge": "系统向导 • 第 21 / 21 步",
+        "title": "21. Reviews Tab & Tour Complete!",
+        "content": "Community & completion:\n• Community Reviews: Browse verified trade reviews and profit snapshots from fellow traders.\n• Submit Review: Rate stars and share your trading experience with the bot.\n\n🎉 You have completed the comprehensive onboarding tour! Click 'Finish' to close and begin trading.",
+        "actionHint": "🎉 Wishing you disciplined and profitable trading with TLS1 Trading Bot!"
     }
 ],
   ko: [
     {
-        "badge": "온보딩 투어 • 1 / 22 단계",
-        "title": "1. Connect Exchange & Prop Firm (Connect)",
-        "content": "Gateway to link your trading accounts to the bot system. Full multi-platform support:\n• OKX Exchange: 1-click Fast Connect or proactive manual API Key input.\n• International FX Prop Firms: Connect funded/evaluation accounts (E8 Markets, FTMO, Funding Pips...) via TradeLocker API protocol.\n\n• Click 'Next ▶' to open the Connect modal and explore each method in detail!",
+        "badge": "온보딩 투어 • 1 / 21 단계",
+        "title": "1. Connect Button (Connect)",
+        "content": "Link trading accounts to the bot system:\n• OKX Exchange: 1-click Fast Connect or manual API Key input.\n• FX Prop Firms: Connect funded accounts (E8, FTMO...) via TradeLocker.\n\nClick 'Next ▶' to open the Connect modal.",
         "actionHint": "💡 Click 'Next ▶' to open the Connect popup."
     },
     {
-        "badge": "온보딩 투어 • 2 / 22 단계",
-        "title": "2. Method 1: Fast Connect (OAuth 2.0)",
-        "content": "100% secure 1-click connection officially authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX on mobile app or browser for OAuth 2.0 permission grant.\n• 100% Secure: Automatically encrypts and synchronizes API Keys into the system, no credential leakage, zero manual copy-paste errors.\n• Supports independent Sub-Account routing for each bot instance.\n• Expanding soon to Binance Connect, Bybit Connect, and Web3 Wallets.",
-        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero key typing errors."
+        "badge": "온보딩 투어 • 2 / 21 단계",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "100% secure 1-click connection authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX app to grant OAuth permissions.\n• 100% Secure: Auto-syncs encrypted API Keys, zero secret leakage, no copy-paste errors.\n• Supports independent Sub-Account routing for each bot.",
+        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero typing errors."
     },
     {
-        "badge": "온보딩 투어 • 3 / 22 단계",
-        "title": "3. Method 2: Manual OKX API Key (Proactive)",
-        "content": "For traders who prefer creating and managing API Keys manually on OKX:\n• Account Management: Click green (+) to add new account, select from dropdown, or click (-) to delete.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase from OKX then click 'Save Configuration'.\n\n🛡️ CRITICAL SAFETY PRINCIPLE:\n• When creating OKX API Keys, ONLY grant 'Trade' permissions.\n• NEVER grant 'Withdraw' permissions. TLS1 Bot never requests withdrawal rights, keeping your capital 100% safe.",
-        "actionHint": "💡 Click 'Next ▶' to explore the new TradeLocker Prop Firm Connect feature!"
+        "badge": "온보딩 투어 • 3 / 21 단계",
+        "title": "3. Manual OKX API Key",
+        "content": "Manually enter API Keys generated from OKX:\n• Account Management: Click (+) to add, select from list, or (-) to remove.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase then click 'Save Configuration'.\n\n🛡️ SAFETY NOTICE:\n• Only grant 'Trade' permission.\n• NEVER grant 'Withdraw' permission.",
+        "actionHint": "💡 Click 'Next ▶' to explore FX Prop Firm Connect."
     },
     {
-        "badge": "온보딩 투어 • 4 / 22 단계",
-        "title": "4. Method 3: FX Prop Firm Connect (TradeLocker)",
-        "content": "Automated trading solution for world-class Prop Firm accounts:\n• Supported Firms: E8 Markets, FTMO, The 5%ers, Funding Pips... via official TradeLocker API.\n• Safe Connection: Enter Email, Password, Server (E8, Demo, Live). Passwords are local multi-layer Fernet encrypted.\n• Prop Risk Management: Set Fund Size ($5,000, $100,000, $200,000...), risk per trade limit, daily drawdown ceiling, and daily profit cap.\n• Dynamic Lot Sizing: Automatically computes optimal lot sizes based on stop-loss distance, preventing rule violations!",
-        "actionHint": "💡 Click 'Next ▶' to complete connection setup and return to the main dashboard!"
+        "badge": "온보딩 투어 • 4 / 21 단계",
+        "title": "4. FX Prop Firm Connect (TradeLocker)",
+        "content": "Automated trading for funded Prop Firm accounts:\n• Supported: E8 Markets, FTMO, Funding Pips... via TradeLocker API.\n• Login: Enter Email, Password, and Server.\n• Risk Control: Set Fund Size ($5,000, $100,000...), Daily Drawdown ceiling, and risk per trade.\n• Dynamic Lot: Bot automatically calculates exact Lots based on SL distance to prevent rule breaches.",
+        "actionHint": "💡 Click 'Next ▶' to finish connection and return to dashboard."
     },
     {
-        "badge": "온보딩 투어 • 5 / 22 단계",
-        "title": "5. Select Trading Platform (OKX / FX Prop)",
-        "content": "Quick platform switcher directly on the left sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap) on OKX.\n• FX Prop Firm: Trade international funded accounts (Gold XAU, Forex, Crypto) via TradeLocker.\n• Auto Sync: Switching platforms instantly updates account lists and pair selectors accordingly.\n• Safety Lock 🔒: While bot is running, this dropdown is locked to protect active orders.",
-        "actionHint": "💡 Seamlessly switch between personal crypto accounts and prop firm challenges in 1 click."
+        "badge": "온보딩 투어 • 5 / 21 단계",
+        "title": "5. Platform (OKX / FX Prop)",
+        "content": "Switch trading environment on the Sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap).\n• FX Prop: Trade Gold XAU, Forex, Crypto via TradeLocker.\n• Auto Sync: Changing platforms automatically updates account lists and pair selectors.\n• Safety Lock 🔒: Automatically locks while the bot is active.",
+        "actionHint": "💡 Effortlessly switch between personal exchange accounts and funded challenges in 1 click."
     },
     {
-        "badge": "온보딩 투어 • 6 / 22 단계",
-        "title": "6. Select Bot Strategy (Command Capsule)",
-        "content": "The system features 3 built-in quantitative algorithms with intuitive visual badges:\n• EMA200 Bot: Captures multi-timeframe trend pullbacks at dynamic EMA200 levels.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\n• Click this Capsule button to toggle between bot algorithms.",
+        "badge": "온보딩 투어 • 6 / 21 단계",
+        "title": "6. Select Bot Strategy",
+        "content": "3 built-in quantitative algorithms:\n• EMA200 Bot: Captures pullback waves along dynamic EMA200 trendlines.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\nClick this button to switch bot strategies.",
         "actionHint": "💡 Each bot operates independently with dedicated settings and accounts."
     },
     {
-        "badge": "온보딩 투어 • 7 / 22 단계",
-        "title": "7. Select Account & Live Balance Tracking",
-        "content": "Assign the trading account for the currently active bot:\n• Full Support: OKX Sub-Accounts and FX Prop Accounts (E8 Demo, E8 Live).\n• Live Balance Display: Accurately reflects live account equity ($5,000, $200,000...) for real-time risk supervision.\n• Protective Lock 🔒: While the bot is running, account selection locks automatically to prevent position conflicts.",
-        "actionHint": "💡 Right-aligned layout ensures full account balances are clearly visible without clipping."
+        "badge": "온보딩 투어 • 7 / 21 단계",
+        "title": "7. Select Account & Balance",
+        "content": "Assign the trading account for the active bot:\n• OKX: Select matching Sub-Account.\n• FX Prop: Select E8 Demo or Live account.\n• Live Balance: View account equity ($5,000, $200,000...) for real-time risk control.\n• Protective Lock 🔒: Account dropdown locks automatically when bot is running.",
+        "actionHint": "💡 Real-time equity is clearly displayed without clipping."
     },
     {
-        "badge": "온보딩 투어 • 8 / 22 단계",
-        "title": "8. Capital, Margin Management & Safety Lock 🔒",
-        "content": "• Units: Fixed USDT ($) or % of Account Equity.\n• TF Multiplier: Select 'Fixed' for uniform margin across timeframes, or 'Multiply TF' to scale size with larger candles (H1 x2.0, H4 x5.0).\n\n🔒 FOOLPROOF SAFETY LOCK:\n• Once you click 'START BOT', the margin input is LOCKED 🔒, preventing unintended margin jumps or accidental clicks.\n• To adjust capital, simply click 'STOP BOT', edit values, and restart.",
-        "actionHint": "💡 Beginner tip: Start with small margin ($1 - $5) to observe live execution first."
+        "badge": "온보딩 투어 • 8 / 21 단계",
+        "title": "8. Capital & Order Volume",
+        "content": "Configure capital per trade:\n• OKX: Fixed USDT ($) or % of Account Equity.\n• FX Prop: Volume in Lots (default 0.01 L).\n• Modes: 'Fixed' (uniform across timeframes) or 'Multiply TF' (auto-scales with larger candles H1 x2.0, H4 x5.0).\n\n🔒 Automatically locked while running to prevent mistakes.",
+        "actionHint": "💡 Beginners should use small capital ($1 - $5 or 0.01 Lot) to observe execution."
     },
     {
-        "badge": "온보딩 투어 • 9 / 22 단계",
-        "title": "9. Take Profit (TP) & Stop Loss (SL) M5 0.6% Standard",
-        "content": "Safety bracket ratios. TP/SL configured here represents the M5 BASE level (optimized default: 0.6% TP & 0.6% SL). Higher timeframes scale automatically via Margin Factor:\n\n📊 MULTI-TF TP/SL MULTIPLIER TABLE (M5 0.6% Base):\n• M5 : x1.0 ➔ TP 0.60% | SL 0.60% (Base TF)\n• M15: x1.2 ➔ TP 0.72% | SL 0.72%\n• M30: x1.5 ➔ TP 0.90% | SL 0.90%\n• H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n• H2 : x3.0 ➔ TP 1.80% | SL 1.80%\n• H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n\n🔍 Core principle: Larger candles experience wider swings. Auto-scaling lets positions ride major trends without premature stop-outs.\n🛡️ 15s Watchdog daemon continuously scans and attaches TP/SL brackets 24/7.",
-        "actionHint": "💡 0.6% base ratio is battle-tested for rapid profit-taking and minimal drawdown."
+        "badge": "온보딩 투어 • 9 / 21 단계",
+        "title": "9. Base M5 TP & SL (0.6% Default)",
+        "content": "Base TP and SL ratios on M5 timeframe (default: 0.6% TP | 0.6% SL):\n• Multi-TF Scaling: Larger candles have wider swings; bot scales via Margin Factor:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• 15s Watchdog daemon continuously attaches protective brackets 24/7.",
+        "actionHint": "💡 Battle-tested 0.6% base ratio provides rapid profit realization and capital safety."
     },
     {
-        "badge": "온보딩 투어 • 10 / 22 단계",
-        "title": "10. Select Trading Pairs & Timeframes",
-        "content": "• Pairs Column: Check symbols you want the bot to scan (XAU, BTC, ETH, SOL...).\n• Trade TF Column: Check timeframes (M5 to H4) where the bot is authorized to place Limit orders.\n• Quick Navigation: Click any pair name to instantly focus the TradingView chart on that symbol.",
-        "actionHint": "💡 Enable multiple timeframes simultaneously for automated multi-horizon diversification."
+        "badge": "온보딩 투어 • 10 / 21 단계",
+        "title": "10. Pairs & Trading Timeframes",
+        "content": "Manage symbol watchlist and order timeframes:\n• Pairs Column: Check symbols to scan (XAU, BTC, ETH...). Click pair name to open TradingView chart.\n• Trade TF Column: Check timeframes (5, 15, 30, H1, H2, H4) where the bot may place orders.\n• Multi-TF Enabled: Bot distributes orders across timeframes concurrently.",
+        "actionHint": "💡 Toggle coin pairs and timeframes flexibly to match your strategy."
     },
     {
-        "badge": "온보딩 투어 • 11 / 22 단계",
-        "title": "11. Activate Automated Bot Engine",
-        "content": "• Click 'START BOT': Launches background scanner engine to place/manage orders 24/7 on OKX or Prop Firm.\n• To Pause: Click 'STOP BOT' to cancel open limit orders and protect existing inventory.\n• Visual Status: Dynamic badge indicators (Green: Running, Red/Grey: Stopped).",
-        "actionHint": "💡 You can safely close your browser; the bot executes persistently on the backend daemon."
+        "badge": "온보딩 투어 • 11 / 21 단계",
+        "title": "11. Start / Stop Bot Engine",
+        "content": "Activate or halt automated bot operations:\n• 'START BOT': Scans market signals and places/manages orders 24/7 on exchange or prop.\n• 'STOP BOT': Cancels open pending limit orders and protects active positions.\n• You can safely close your browser; the bot runs persistently on the server.",
+        "actionHint": "💡 Button colors reflect active state (Green: Running, Gray: Stopped)."
     },
     {
-        "badge": "온보딩 투어 • 12 / 22 단계",
-        "title": "12. Bottom Command Pane & Split View (⮃)",
-        "content": "Comprehensive monitoring hub:\n• Positions Tab: Open positions, live PnL, leverage, entry price, liquidation risk, and emergency panic-close buttons.\n• Logs Tab: Real-time stream of engine scans, algorithmic triggers, and broker responses.\n• Charts Tab: Multi-frame TradingView technical charts.\n• ⮃ Split View Button: Click to decouple Charts on top and Positions below simultaneously, providing complete situational awareness!",
-        "actionHint": "💡 Try the ⮃ Split View button to unlock a professional dual-pane dashboard."
+        "badge": "온보딩 투어 • 12 / 21 단계",
+        "title": "12. Positions, Logs & Split View",
+        "content": "Central monitoring pane:\n• Positions Tab: Open positions, live PnL, entry price, SL/TP brackets, and panic-close button.\n• Logs Tab: Real-time scan logs and broker response feed.\n• Charts Tab: TradingView technical chart.\n• ⮃ Split View: View Charts on top and Positions below simultaneously without switching tabs.",
+        "actionHint": "💡 Click ⮃ button on the right to experience the dual-pane view."
     },
     {
-        "badge": "온보딩 투어 • 13 / 22 단계",
-        "title": "13. Explore Advanced System Settings ⚙",
-        "content": "Two key utility controls side by side:\n• 'Guide' Button 💡: Re-open this guided onboarding tour anytime.\n• 'Settings' Button ⚙: Opens Deep Configuration Panel for algorithmic tuning: Watchlist, Capital Management, DCA Trio, Circuit Breaker, Entry Triggers, Multi-TF Multipliers, Support & Reviews.\n\n• Click 'Next ▶' to open the Settings panel and step through each mechanism!",
-        "actionHint": "💡 Click 'Next ▶' to enter the Advanced Settings modal."
+        "badge": "온보딩 투어 • 13 / 21 단계",
+        "title": "13. Guide & Settings ⚙",
+        "content": "Two key utility controls on Sidebar:\n• 'Guide': Re-launch this guided tour anytime.\n• 'Settings' ⚙: Open Deep Configuration Panel to fine-tune Watchlist, DCA Trio, Circuit Breaker, Entry Setup, and Multipliers.\n\nClick 'Next ▶' to open the Settings modal.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Deep Settings."
     },
     {
-        "badge": "온보딩 투어 • 14 / 22 단계",
-        "title": "14. Coin Watchlist Configuration",
-        "content": "Customize trading universe for your bot:\n• Toggle coin tags (XAU, BTC, ETH, SOL, DOGE...).\n• Highlighted badges indicate coins active on the main dashboard.\n• Safety Lock: Coins with currently open positions are automatically locked from deselecting.",
-        "actionHint": "💡 Activate as many coins as appropriate for your capital capacity."
+        "badge": "온보딩 투어 • 14 / 21 단계",
+        "title": "14. Coin Watchlist",
+        "content": "Configure coins displayed on the dashboard:\n• Click to toggle coins (XAU, BTC, ETH, SOL, DOGE...).\n• Active badges display on main dashboard.\n• Safety Lock: Coins with open positions are locked from deselecting.",
+        "actionHint": "💡 Enable coins aligned with your account capital."
     },
     {
-        "badge": "온보딩 투어 • 15 / 22 단계",
-        "title": "15. Account & Capital Allocation",
-        "content": "Configure account assignment and granular risk sizing for the active bot:\n• Select Account: Bind bot to corresponding OKX or Prop account.\n• Per-order Margin: Enter fixed USDT ($) or % of equity.\n• Multiplier Mode: Toggle between Fixed or Multiplied margin scaling.\n• Leverage: Set safe leverage ratio for the position.",
-        "actionHint": "💡 While running, account and margin fields are locked 🔒 to protect active orders."
+        "badge": "온보딩 투어 • 15 / 21 단계",
+        "title": "15. DCA Mode Trio",
+        "content": "Select 1 of 3 advanced execution algorithms:\n• DCA Dương: Adds positions as profit develops along trend steps (H4 -> M5).\n• DCA Âm: Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 mode can be active at a time (enabling one disables the others).",
+        "actionHint": "💡 Split Grid and DCA Dương are recommended for conservative risk management."
     },
     {
-        "badge": "온보딩 투어 • 16 / 22 단계",
-        "title": "16. Strategy Switches (DCA Trio)",
-        "content": "The system provides 3 specialized order scaling algorithms:\n• Pyramid DCA (Positive DCA): Scales up positions as profit grows along trend stairs (H4 -> M5).\n• Negative DCA (Averaging Down): Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Multi-TF Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 of the 3 modes can be active at a time (enabling one automatically disables the others).",
-        "actionHint": "💡 Beginners are recommended to use Multi-TF Split Grid or Pyramid DCA for maximum capital defense."
+        "badge": "온보딩 투어 • 16 / 21 단계",
+        "title": "16. Circuit Breaker & BTC Alignment",
+        "content": "Protect account during sharp market shocks:\n• Reversal Circuit Breaker: When price extends too far from H4 EMA200 (> 8%), bot halts trend orders to avoid tops/bottoms, and opens hedge pullback orders.\n• BTC Alignment: Restricts Altcoins to only enter trades aligned with BTC market direction.",
+        "actionHint": "💡 Keep Circuit Breaker ON 24/7 to safeguard equity."
     },
     {
-        "badge": "온보딩 투어 • 17 / 22 단계",
-        "title": "17. Circuit Breaker & BTC Correlation Filter",
-        "content": "• Hedge Reversal Circuit Breaker: When price overextends far from H4 EMA200 (> 8%), bot locks trend limit orders to avoid tops/bottoms, while opening hedge orders on mean-reversion waves.\n• BTC Correlation Filter: Enforces Altcoins (ETH, SOL...) to only seek entries aligned with market leader BTC trend.",
-        "actionHint": "💡 Recommended: Keep Circuit Breaker ON 24/7 to protect equity against severe volatility spikes."
+        "badge": "온보딩 투어 • 17 / 21 단계",
+        "title": "17. Entry Setup & Accumulation",
+        "content": "Configure entry criteria:\n• Base Offset (%): Places limits ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds.\n• Base Gap (%): Minimum safety gap between adjacent EMA levels to avoid tight stacking.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before entering, eliminating sideways traps.",
+        "actionHint": "💡 Battle-tested defaults; beginners should keep Admin standards."
     },
     {
-        "badge": "온보딩 투어 • 18 / 22 단계",
-        "title": "18. Entry Setup & 60-Candle Accumulation",
-        "content": "Safety criteria for limit placement:\n• Base Offset %: Places Limit orders ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds. Scales with Entry Factor on higher TFs (e.g. H4 x6.8 -> 0.34% offset).\n• Base Gap %: Minimum distance required between consecutive EMA lines to avoid dense clustering.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before placing orders, confirming steady trends and filtering sideway noise.",
-        "actionHint": "💡 Admin defaults are battle-tested in live markets; beginners can safely retain standard parameters."
+        "badge": "온보딩 투어 • 18 / 21 단계",
+        "title": "18. Multi-TF Multipliers",
+        "content": "Multi-timeframe mathematical scaling mechanics:\n• Capital Column: Larger candles expand margin and TP/SL brackets (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) to match swing ranges.\n• Entry Column: Scales entry buffering for higher TFs (M5 x1.0, H4 x6.8) preventing order slippage.",
+        "actionHint": "💡 Mathematical framework that captures major H1/H4 waves while keeping M5 execution safe."
     },
     {
-        "badge": "온보딩 투어 • 19 / 22 단계",
-        "title": "19. Multi-TF Multiplier Architecture",
-        "content": "Mathematical scaling mechanics across timeframes:\n• Margin Factor: Larger candles expand margin and TP/SL amplitudes (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) to match swing ranges and optimize profits.\n• Entry Factor: Multiplies Base Offset % and Base Gap %. Higher TFs get wider buffering zones (M5 x1.0, H4 x6.8) preventing order slippage during large candle fluctuations.",
-        "actionHint": "💡 Core mathematical model enabling the bot to ride massive H1/H4 waves while keeping capital safe on M5/M15."
+        "badge": "온보딩 투어 • 19 / 21 단계",
+        "title": "19. Save Settings & Defaults",
+        "content": "Bot configuration management:\n• 'Save Settings': Immediately applies all configured parameters.\n• 'Reset to Default': Reverts back to battle-tested Admin baseline settings anytime.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Support and Community Reviews."
     },
     {
-        "badge": "온보딩 투어 • 20 / 22 단계",
-        "title": "20. Save Configuration & Reset Defaults",
-        "content": "• Save Strategy: Immediately writes all modified parameters into the bot configuration.\n• Reset to Default: Revert to Admin battle-tested baseline settings anytime if experiments prove unsatisfactory.",
-        "actionHint": "💡 Click 'Next ▶' to inspect the Support and Community Reviews tabs next!"
+        "badge": "온보딩 투어 • 20 / 21 단계",
+        "title": "20. Support Tab",
+        "content": "Licensing and 24/7 technical assistance:\n• Terms of Service: Register exchange account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify connectivity and retrieve PC HWID for license activation.\n• Server IP & Cleanup: Configure custom Proxy IPs and reset capital or clear candle cache.",
+        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team."
     },
     {
-        "badge": "온보딩 투어 • 21 / 22 단계",
-        "title": "21. Support & System Administration Tab",
-        "content": "License management and 24/7 technical assistance:\n• Terms of Service: Guide to registering OKX account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify API Key connectivity and retrieve PC HWID for license activation.\n• Proxy & Maintenance: Optional Proxy IP setup, capital reset tools, and candle cache cleaners.",
-        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team anytime."
-    },
-    {
-        "badge": "온보딩 투어 • 22 / 22 단계",
-        "title": "22. Community Reviews & Tour Complete!",
-        "content": "• View Community Reviews: Browse verified feedback, profit screenshots, and live trading results from fellow traders.\n• Submit Your Review: Rate stars, attach trade snapshots, and share your experience with the community.",
-        "actionHint": "🎉 Congratulations on completing the full A-Z onboarding tour! You now master all features and inner logic of the bot. Click 'Finish' to close and begin trading!"
+        "badge": "온보딩 투어 • 21 / 21 단계",
+        "title": "21. Reviews Tab & Tour Complete!",
+        "content": "Community & completion:\n• Community Reviews: Browse verified trade reviews and profit snapshots from fellow traders.\n• Submit Review: Rate stars and share your trading experience with the bot.\n\n🎉 You have completed the comprehensive onboarding tour! Click 'Finish' to close and begin trading.",
+        "actionHint": "🎉 Wishing you disciplined and profitable trading with TLS1 Trading Bot!"
     }
 ],
   fr: [
     {
-        "badge": "Guide Interactif • Étape 1 / 22",
-        "title": "1. Connect Exchange & Prop Firm (Connect)",
-        "content": "Gateway to link your trading accounts to the bot system. Full multi-platform support:\n• OKX Exchange: 1-click Fast Connect or proactive manual API Key input.\n• International FX Prop Firms: Connect funded/evaluation accounts (E8 Markets, FTMO, Funding Pips...) via TradeLocker API protocol.\n\n• Click 'Next ▶' to open the Connect modal and explore each method in detail!",
+        "badge": "Guide Interactif • Étape 1 / 21",
+        "title": "1. Connect Button (Connect)",
+        "content": "Link trading accounts to the bot system:\n• OKX Exchange: 1-click Fast Connect or manual API Key input.\n• FX Prop Firms: Connect funded accounts (E8, FTMO...) via TradeLocker.\n\nClick 'Next ▶' to open the Connect modal.",
         "actionHint": "💡 Click 'Next ▶' to open the Connect popup."
     },
     {
-        "badge": "Guide Interactif • Étape 2 / 22",
-        "title": "2. Method 1: Fast Connect (OAuth 2.0)",
-        "content": "100% secure 1-click connection officially authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX on mobile app or browser for OAuth 2.0 permission grant.\n• 100% Secure: Automatically encrypts and synchronizes API Keys into the system, no credential leakage, zero manual copy-paste errors.\n• Supports independent Sub-Account routing for each bot instance.\n• Expanding soon to Binance Connect, Bybit Connect, and Web3 Wallets.",
-        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero key typing errors."
+        "badge": "Guide Interactif • Étape 2 / 21",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "100% secure 1-click connection authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX app to grant OAuth permissions.\n• 100% Secure: Auto-syncs encrypted API Keys, zero secret leakage, no copy-paste errors.\n• Supports independent Sub-Account routing for each bot.",
+        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero typing errors."
     },
     {
-        "badge": "Guide Interactif • Étape 3 / 22",
-        "title": "3. Method 2: Manual OKX API Key (Proactive)",
-        "content": "For traders who prefer creating and managing API Keys manually on OKX:\n• Account Management: Click green (+) to add new account, select from dropdown, or click (-) to delete.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase from OKX then click 'Save Configuration'.\n\n🛡️ CRITICAL SAFETY PRINCIPLE:\n• When creating OKX API Keys, ONLY grant 'Trade' permissions.\n• NEVER grant 'Withdraw' permissions. TLS1 Bot never requests withdrawal rights, keeping your capital 100% safe.",
-        "actionHint": "💡 Click 'Next ▶' to explore the new TradeLocker Prop Firm Connect feature!"
+        "badge": "Guide Interactif • Étape 3 / 21",
+        "title": "3. Manual OKX API Key",
+        "content": "Manually enter API Keys generated from OKX:\n• Account Management: Click (+) to add, select from list, or (-) to remove.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase then click 'Save Configuration'.\n\n🛡️ SAFETY NOTICE:\n• Only grant 'Trade' permission.\n• NEVER grant 'Withdraw' permission.",
+        "actionHint": "💡 Click 'Next ▶' to explore FX Prop Firm Connect."
     },
     {
-        "badge": "Guide Interactif • Étape 4 / 22",
-        "title": "4. Method 3: FX Prop Firm Connect (TradeLocker)",
-        "content": "Automated trading solution for world-class Prop Firm accounts:\n• Supported Firms: E8 Markets, FTMO, The 5%ers, Funding Pips... via official TradeLocker API.\n• Safe Connection: Enter Email, Password, Server (E8, Demo, Live). Passwords are local multi-layer Fernet encrypted.\n• Prop Risk Management: Set Fund Size ($5,000, $100,000, $200,000...), risk per trade limit, daily drawdown ceiling, and daily profit cap.\n• Dynamic Lot Sizing: Automatically computes optimal lot sizes based on stop-loss distance, preventing rule violations!",
-        "actionHint": "💡 Click 'Next ▶' to complete connection setup and return to the main dashboard!"
+        "badge": "Guide Interactif • Étape 4 / 21",
+        "title": "4. FX Prop Firm Connect (TradeLocker)",
+        "content": "Automated trading for funded Prop Firm accounts:\n• Supported: E8 Markets, FTMO, Funding Pips... via TradeLocker API.\n• Login: Enter Email, Password, and Server.\n• Risk Control: Set Fund Size ($5,000, $100,000...), Daily Drawdown ceiling, and risk per trade.\n• Dynamic Lot: Bot automatically calculates exact Lots based on SL distance to prevent rule breaches.",
+        "actionHint": "💡 Click 'Next ▶' to finish connection and return to dashboard."
     },
     {
-        "badge": "Guide Interactif • Étape 5 / 22",
-        "title": "5. Select Trading Platform (OKX / FX Prop)",
-        "content": "Quick platform switcher directly on the left sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap) on OKX.\n• FX Prop Firm: Trade international funded accounts (Gold XAU, Forex, Crypto) via TradeLocker.\n• Auto Sync: Switching platforms instantly updates account lists and pair selectors accordingly.\n• Safety Lock 🔒: While bot is running, this dropdown is locked to protect active orders.",
-        "actionHint": "💡 Seamlessly switch between personal crypto accounts and prop firm challenges in 1 click."
+        "badge": "Guide Interactif • Étape 5 / 21",
+        "title": "5. Platform (OKX / FX Prop)",
+        "content": "Switch trading environment on the Sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap).\n• FX Prop: Trade Gold XAU, Forex, Crypto via TradeLocker.\n• Auto Sync: Changing platforms automatically updates account lists and pair selectors.\n• Safety Lock 🔒: Automatically locks while the bot is active.",
+        "actionHint": "💡 Effortlessly switch between personal exchange accounts and funded challenges in 1 click."
     },
     {
-        "badge": "Guide Interactif • Étape 6 / 22",
-        "title": "6. Select Bot Strategy (Command Capsule)",
-        "content": "The system features 3 built-in quantitative algorithms with intuitive visual badges:\n• EMA200 Bot: Captures multi-timeframe trend pullbacks at dynamic EMA200 levels.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\n• Click this Capsule button to toggle between bot algorithms.",
+        "badge": "Guide Interactif • Étape 6 / 21",
+        "title": "6. Select Bot Strategy",
+        "content": "3 built-in quantitative algorithms:\n• EMA200 Bot: Captures pullback waves along dynamic EMA200 trendlines.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\nClick this button to switch bot strategies.",
         "actionHint": "💡 Each bot operates independently with dedicated settings and accounts."
     },
     {
-        "badge": "Guide Interactif • Étape 7 / 22",
-        "title": "7. Select Account & Live Balance Tracking",
-        "content": "Assign the trading account for the currently active bot:\n• Full Support: OKX Sub-Accounts and FX Prop Accounts (E8 Demo, E8 Live).\n• Live Balance Display: Accurately reflects live account equity ($5,000, $200,000...) for real-time risk supervision.\n• Protective Lock 🔒: While the bot is running, account selection locks automatically to prevent position conflicts.",
-        "actionHint": "💡 Right-aligned layout ensures full account balances are clearly visible without clipping."
+        "badge": "Guide Interactif • Étape 7 / 21",
+        "title": "7. Select Account & Balance",
+        "content": "Assign the trading account for the active bot:\n• OKX: Select matching Sub-Account.\n• FX Prop: Select E8 Demo or Live account.\n• Live Balance: View account equity ($5,000, $200,000...) for real-time risk control.\n• Protective Lock 🔒: Account dropdown locks automatically when bot is running.",
+        "actionHint": "💡 Real-time equity is clearly displayed without clipping."
     },
     {
-        "badge": "Guide Interactif • Étape 8 / 22",
-        "title": "8. Capital, Margin Management & Safety Lock 🔒",
-        "content": "• Units: Fixed USDT ($) or % of Account Equity.\n• TF Multiplier: Select 'Fixed' for uniform margin across timeframes, or 'Multiply TF' to scale size with larger candles (H1 x2.0, H4 x5.0).\n\n🔒 FOOLPROOF SAFETY LOCK:\n• Once you click 'START BOT', the margin input is LOCKED 🔒, preventing unintended margin jumps or accidental clicks.\n• To adjust capital, simply click 'STOP BOT', edit values, and restart.",
-        "actionHint": "💡 Beginner tip: Start with small margin ($1 - $5) to observe live execution first."
+        "badge": "Guide Interactif • Étape 8 / 21",
+        "title": "8. Capital & Order Volume",
+        "content": "Configure capital per trade:\n• OKX: Fixed USDT ($) or % of Account Equity.\n• FX Prop: Volume in Lots (default 0.01 L).\n• Modes: 'Fixed' (uniform across timeframes) or 'Multiply TF' (auto-scales with larger candles H1 x2.0, H4 x5.0).\n\n🔒 Automatically locked while running to prevent mistakes.",
+        "actionHint": "💡 Beginners should use small capital ($1 - $5 or 0.01 Lot) to observe execution."
     },
     {
-        "badge": "Guide Interactif • Étape 9 / 22",
-        "title": "9. Take Profit (TP) & Stop Loss (SL) M5 0.6% Standard",
-        "content": "Safety bracket ratios. TP/SL configured here represents the M5 BASE level (optimized default: 0.6% TP & 0.6% SL). Higher timeframes scale automatically via Margin Factor:\n\n📊 MULTI-TF TP/SL MULTIPLIER TABLE (M5 0.6% Base):\n• M5 : x1.0 ➔ TP 0.60% | SL 0.60% (Base TF)\n• M15: x1.2 ➔ TP 0.72% | SL 0.72%\n• M30: x1.5 ➔ TP 0.90% | SL 0.90%\n• H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n• H2 : x3.0 ➔ TP 1.80% | SL 1.80%\n• H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n\n🔍 Core principle: Larger candles experience wider swings. Auto-scaling lets positions ride major trends without premature stop-outs.\n🛡️ 15s Watchdog daemon continuously scans and attaches TP/SL brackets 24/7.",
-        "actionHint": "💡 0.6% base ratio is battle-tested for rapid profit-taking and minimal drawdown."
+        "badge": "Guide Interactif • Étape 9 / 21",
+        "title": "9. Base M5 TP & SL (0.6% Default)",
+        "content": "Base TP and SL ratios on M5 timeframe (default: 0.6% TP | 0.6% SL):\n• Multi-TF Scaling: Larger candles have wider swings; bot scales via Margin Factor:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• 15s Watchdog daemon continuously attaches protective brackets 24/7.",
+        "actionHint": "💡 Battle-tested 0.6% base ratio provides rapid profit realization and capital safety."
     },
     {
-        "badge": "Guide Interactif • Étape 10 / 22",
-        "title": "10. Select Trading Pairs & Timeframes",
-        "content": "• Pairs Column: Check symbols you want the bot to scan (XAU, BTC, ETH, SOL...).\n• Trade TF Column: Check timeframes (M5 to H4) where the bot is authorized to place Limit orders.\n• Quick Navigation: Click any pair name to instantly focus the TradingView chart on that symbol.",
-        "actionHint": "💡 Enable multiple timeframes simultaneously for automated multi-horizon diversification."
+        "badge": "Guide Interactif • Étape 10 / 21",
+        "title": "10. Pairs & Trading Timeframes",
+        "content": "Manage symbol watchlist and order timeframes:\n• Pairs Column: Check symbols to scan (XAU, BTC, ETH...). Click pair name to open TradingView chart.\n• Trade TF Column: Check timeframes (5, 15, 30, H1, H2, H4) where the bot may place orders.\n• Multi-TF Enabled: Bot distributes orders across timeframes concurrently.",
+        "actionHint": "💡 Toggle coin pairs and timeframes flexibly to match your strategy."
     },
     {
-        "badge": "Guide Interactif • Étape 11 / 22",
-        "title": "11. Activate Automated Bot Engine",
-        "content": "• Click 'START BOT': Launches background scanner engine to place/manage orders 24/7 on OKX or Prop Firm.\n• To Pause: Click 'STOP BOT' to cancel open limit orders and protect existing inventory.\n• Visual Status: Dynamic badge indicators (Green: Running, Red/Grey: Stopped).",
-        "actionHint": "💡 You can safely close your browser; the bot executes persistently on the backend daemon."
+        "badge": "Guide Interactif • Étape 11 / 21",
+        "title": "11. Start / Stop Bot Engine",
+        "content": "Activate or halt automated bot operations:\n• 'START BOT': Scans market signals and places/manages orders 24/7 on exchange or prop.\n• 'STOP BOT': Cancels open pending limit orders and protects active positions.\n• You can safely close your browser; the bot runs persistently on the server.",
+        "actionHint": "💡 Button colors reflect active state (Green: Running, Gray: Stopped)."
     },
     {
-        "badge": "Guide Interactif • Étape 12 / 22",
-        "title": "12. Bottom Command Pane & Split View (⮃)",
-        "content": "Comprehensive monitoring hub:\n• Positions Tab: Open positions, live PnL, leverage, entry price, liquidation risk, and emergency panic-close buttons.\n• Logs Tab: Real-time stream of engine scans, algorithmic triggers, and broker responses.\n• Charts Tab: Multi-frame TradingView technical charts.\n• ⮃ Split View Button: Click to decouple Charts on top and Positions below simultaneously, providing complete situational awareness!",
-        "actionHint": "💡 Try the ⮃ Split View button to unlock a professional dual-pane dashboard."
+        "badge": "Guide Interactif • Étape 12 / 21",
+        "title": "12. Positions, Logs & Split View",
+        "content": "Central monitoring pane:\n• Positions Tab: Open positions, live PnL, entry price, SL/TP brackets, and panic-close button.\n• Logs Tab: Real-time scan logs and broker response feed.\n• Charts Tab: TradingView technical chart.\n• ⮃ Split View: View Charts on top and Positions below simultaneously without switching tabs.",
+        "actionHint": "💡 Click ⮃ button on the right to experience the dual-pane view."
     },
     {
-        "badge": "Guide Interactif • Étape 13 / 22",
-        "title": "13. Explore Advanced System Settings ⚙",
-        "content": "Two key utility controls side by side:\n• 'Guide' Button 💡: Re-open this guided onboarding tour anytime.\n• 'Settings' Button ⚙: Opens Deep Configuration Panel for algorithmic tuning: Watchlist, Capital Management, DCA Trio, Circuit Breaker, Entry Triggers, Multi-TF Multipliers, Support & Reviews.\n\n• Click 'Next ▶' to open the Settings panel and step through each mechanism!",
-        "actionHint": "💡 Click 'Next ▶' to enter the Advanced Settings modal."
+        "badge": "Guide Interactif • Étape 13 / 21",
+        "title": "13. Guide & Settings ⚙",
+        "content": "Two key utility controls on Sidebar:\n• 'Guide': Re-launch this guided tour anytime.\n• 'Settings' ⚙: Open Deep Configuration Panel to fine-tune Watchlist, DCA Trio, Circuit Breaker, Entry Setup, and Multipliers.\n\nClick 'Next ▶' to open the Settings modal.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Deep Settings."
     },
     {
-        "badge": "Guide Interactif • Étape 14 / 22",
-        "title": "14. Coin Watchlist Configuration",
-        "content": "Customize trading universe for your bot:\n• Toggle coin tags (XAU, BTC, ETH, SOL, DOGE...).\n• Highlighted badges indicate coins active on the main dashboard.\n• Safety Lock: Coins with currently open positions are automatically locked from deselecting.",
-        "actionHint": "💡 Activate as many coins as appropriate for your capital capacity."
+        "badge": "Guide Interactif • Étape 14 / 21",
+        "title": "14. Coin Watchlist",
+        "content": "Configure coins displayed on the dashboard:\n• Click to toggle coins (XAU, BTC, ETH, SOL, DOGE...).\n• Active badges display on main dashboard.\n• Safety Lock: Coins with open positions are locked from deselecting.",
+        "actionHint": "💡 Enable coins aligned with your account capital."
     },
     {
-        "badge": "Guide Interactif • Étape 15 / 22",
-        "title": "15. Account & Capital Allocation",
-        "content": "Configure account assignment and granular risk sizing for the active bot:\n• Select Account: Bind bot to corresponding OKX or Prop account.\n• Per-order Margin: Enter fixed USDT ($) or % of equity.\n• Multiplier Mode: Toggle between Fixed or Multiplied margin scaling.\n• Leverage: Set safe leverage ratio for the position.",
-        "actionHint": "💡 While running, account and margin fields are locked 🔒 to protect active orders."
+        "badge": "Guide Interactif • Étape 15 / 21",
+        "title": "15. DCA Mode Trio",
+        "content": "Select 1 of 3 advanced execution algorithms:\n• DCA Dương: Adds positions as profit develops along trend steps (H4 -> M5).\n• DCA Âm: Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 mode can be active at a time (enabling one disables the others).",
+        "actionHint": "💡 Split Grid and DCA Dương are recommended for conservative risk management."
     },
     {
-        "badge": "Guide Interactif • Étape 16 / 22",
-        "title": "16. Strategy Switches (DCA Trio)",
-        "content": "The system provides 3 specialized order scaling algorithms:\n• Pyramid DCA (Positive DCA): Scales up positions as profit grows along trend stairs (H4 -> M5).\n• Negative DCA (Averaging Down): Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Multi-TF Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 of the 3 modes can be active at a time (enabling one automatically disables the others).",
-        "actionHint": "💡 Beginners are recommended to use Multi-TF Split Grid or Pyramid DCA for maximum capital defense."
+        "badge": "Guide Interactif • Étape 16 / 21",
+        "title": "16. Circuit Breaker & BTC Alignment",
+        "content": "Protect account during sharp market shocks:\n• Reversal Circuit Breaker: When price extends too far from H4 EMA200 (> 8%), bot halts trend orders to avoid tops/bottoms, and opens hedge pullback orders.\n• BTC Alignment: Restricts Altcoins to only enter trades aligned with BTC market direction.",
+        "actionHint": "💡 Keep Circuit Breaker ON 24/7 to safeguard equity."
     },
     {
-        "badge": "Guide Interactif • Étape 17 / 22",
-        "title": "17. Circuit Breaker & BTC Correlation Filter",
-        "content": "• Hedge Reversal Circuit Breaker: When price overextends far from H4 EMA200 (> 8%), bot locks trend limit orders to avoid tops/bottoms, while opening hedge orders on mean-reversion waves.\n• BTC Correlation Filter: Enforces Altcoins (ETH, SOL...) to only seek entries aligned with market leader BTC trend.",
-        "actionHint": "💡 Recommended: Keep Circuit Breaker ON 24/7 to protect equity against severe volatility spikes."
+        "badge": "Guide Interactif • Étape 17 / 21",
+        "title": "17. Entry Setup & Accumulation",
+        "content": "Configure entry criteria:\n• Base Offset (%): Places limits ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds.\n• Base Gap (%): Minimum safety gap between adjacent EMA levels to avoid tight stacking.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before entering, eliminating sideways traps.",
+        "actionHint": "💡 Battle-tested defaults; beginners should keep Admin standards."
     },
     {
-        "badge": "Guide Interactif • Étape 18 / 22",
-        "title": "18. Entry Setup & 60-Candle Accumulation",
-        "content": "Safety criteria for limit placement:\n• Base Offset %: Places Limit orders ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds. Scales with Entry Factor on higher TFs (e.g. H4 x6.8 -> 0.34% offset).\n• Base Gap %: Minimum distance required between consecutive EMA lines to avoid dense clustering.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before placing orders, confirming steady trends and filtering sideway noise.",
-        "actionHint": "💡 Admin defaults are battle-tested in live markets; beginners can safely retain standard parameters."
+        "badge": "Guide Interactif • Étape 18 / 21",
+        "title": "18. Multi-TF Multipliers",
+        "content": "Multi-timeframe mathematical scaling mechanics:\n• Capital Column: Larger candles expand margin and TP/SL brackets (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) to match swing ranges.\n• Entry Column: Scales entry buffering for higher TFs (M5 x1.0, H4 x6.8) preventing order slippage.",
+        "actionHint": "💡 Mathematical framework that captures major H1/H4 waves while keeping M5 execution safe."
     },
     {
-        "badge": "Guide Interactif • Étape 19 / 22",
-        "title": "19. Multi-TF Multiplier Architecture",
-        "content": "Mathematical scaling mechanics across timeframes:\n• Margin Factor: Larger candles expand margin and TP/SL amplitudes (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) to match swing ranges and optimize profits.\n• Entry Factor: Multiplies Base Offset % and Base Gap %. Higher TFs get wider buffering zones (M5 x1.0, H4 x6.8) preventing order slippage during large candle fluctuations.",
-        "actionHint": "💡 Core mathematical model enabling the bot to ride massive H1/H4 waves while keeping capital safe on M5/M15."
+        "badge": "Guide Interactif • Étape 19 / 21",
+        "title": "19. Save Settings & Defaults",
+        "content": "Bot configuration management:\n• 'Save Settings': Immediately applies all configured parameters.\n• 'Reset to Default': Reverts back to battle-tested Admin baseline settings anytime.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Support and Community Reviews."
     },
     {
-        "badge": "Guide Interactif • Étape 20 / 22",
-        "title": "20. Save Configuration & Reset Defaults",
-        "content": "• Save Strategy: Immediately writes all modified parameters into the bot configuration.\n• Reset to Default: Revert to Admin battle-tested baseline settings anytime if experiments prove unsatisfactory.",
-        "actionHint": "💡 Click 'Next ▶' to inspect the Support and Community Reviews tabs next!"
+        "badge": "Guide Interactif • Étape 20 / 21",
+        "title": "20. Support Tab",
+        "content": "Licensing and 24/7 technical assistance:\n• Terms of Service: Register exchange account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify connectivity and retrieve PC HWID for license activation.\n• Server IP & Cleanup: Configure custom Proxy IPs and reset capital or clear candle cache.",
+        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team."
     },
     {
-        "badge": "Guide Interactif • Étape 21 / 22",
-        "title": "21. Support & System Administration Tab",
-        "content": "License management and 24/7 technical assistance:\n• Terms of Service: Guide to registering OKX account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify API Key connectivity and retrieve PC HWID for license activation.\n• Proxy & Maintenance: Optional Proxy IP setup, capital reset tools, and candle cache cleaners.",
-        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team anytime."
-    },
-    {
-        "badge": "Guide Interactif • Étape 22 / 22",
-        "title": "22. Community Reviews & Tour Complete!",
-        "content": "• View Community Reviews: Browse verified feedback, profit screenshots, and live trading results from fellow traders.\n• Submit Your Review: Rate stars, attach trade snapshots, and share your experience with the community.",
-        "actionHint": "🎉 Congratulations on completing the full A-Z onboarding tour! You now master all features and inner logic of the bot. Click 'Finish' to close and begin trading!"
+        "badge": "Guide Interactif • Étape 21 / 21",
+        "title": "21. Reviews Tab & Tour Complete!",
+        "content": "Community & completion:\n• Community Reviews: Browse verified trade reviews and profit snapshots from fellow traders.\n• Submit Review: Rate stars and share your trading experience with the bot.\n\n🎉 You have completed the comprehensive onboarding tour! Click 'Finish' to close and begin trading.",
+        "actionHint": "🎉 Wishing you disciplined and profitable trading with TLS1 Trading Bot!"
     }
 ],
   es: [
     {
-        "badge": "Guía Interactiva • Paso 1 / 22",
-        "title": "1. Connect Exchange & Prop Firm (Connect)",
-        "content": "Gateway to link your trading accounts to the bot system. Full multi-platform support:\n• OKX Exchange: 1-click Fast Connect or proactive manual API Key input.\n• International FX Prop Firms: Connect funded/evaluation accounts (E8 Markets, FTMO, Funding Pips...) via TradeLocker API protocol.\n\n• Click 'Next ▶' to open the Connect modal and explore each method in detail!",
+        "badge": "Guía Interactiva • Paso 1 / 21",
+        "title": "1. Connect Button (Connect)",
+        "content": "Link trading accounts to the bot system:\n• OKX Exchange: 1-click Fast Connect or manual API Key input.\n• FX Prop Firms: Connect funded accounts (E8, FTMO...) via TradeLocker.\n\nClick 'Next ▶' to open the Connect modal.",
         "actionHint": "💡 Click 'Next ▶' to open the Connect popup."
     },
     {
-        "badge": "Guía Interactiva • Paso 2 / 22",
-        "title": "2. Method 1: Fast Connect (OAuth 2.0)",
-        "content": "100% secure 1-click connection officially authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX on mobile app or browser for OAuth 2.0 permission grant.\n• 100% Secure: Automatically encrypts and synchronizes API Keys into the system, no credential leakage, zero manual copy-paste errors.\n• Supports independent Sub-Account routing for each bot instance.\n• Expanding soon to Binance Connect, Bybit Connect, and Web3 Wallets.",
-        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero key typing errors."
+        "badge": "Guía Interactiva • Paso 2 / 21",
+        "title": "2. Fast Connect (OAuth 2.0)",
+        "content": "100% secure 1-click connection authorized by OKX:\n• Click 'Open App ➔': Automatically launches OKX app to grant OAuth permissions.\n• 100% Secure: Auto-syncs encrypted API Keys, zero secret leakage, no copy-paste errors.\n• Supports independent Sub-Account routing for each bot.",
+        "actionHint": "💡 Recommended for beginners: connects in 3 seconds with zero typing errors."
     },
     {
-        "badge": "Guía Interactiva • Paso 3 / 22",
-        "title": "3. Method 2: Manual OKX API Key (Proactive)",
-        "content": "For traders who prefer creating and managing API Keys manually on OKX:\n• Account Management: Click green (+) to add new account, select from dropdown, or click (-) to delete.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase from OKX then click 'Save Configuration'.\n\n🛡️ CRITICAL SAFETY PRINCIPLE:\n• When creating OKX API Keys, ONLY grant 'Trade' permissions.\n• NEVER grant 'Withdraw' permissions. TLS1 Bot never requests withdrawal rights, keeping your capital 100% safe.",
-        "actionHint": "💡 Click 'Next ▶' to explore the new TradeLocker Prop Firm Connect feature!"
+        "badge": "Guía Interactiva • Paso 3 / 21",
+        "title": "3. Manual OKX API Key",
+        "content": "Manually enter API Keys generated from OKX:\n• Account Management: Click (+) to add, select from list, or (-) to remove.\n• Key Inputs: Enter API Key, Secret Key, and Passphrase then click 'Save Configuration'.\n\n🛡️ SAFETY NOTICE:\n• Only grant 'Trade' permission.\n• NEVER grant 'Withdraw' permission.",
+        "actionHint": "💡 Click 'Next ▶' to explore FX Prop Firm Connect."
     },
     {
-        "badge": "Guía Interactiva • Paso 4 / 22",
-        "title": "4. Method 3: FX Prop Firm Connect (TradeLocker)",
-        "content": "Automated trading solution for world-class Prop Firm accounts:\n• Supported Firms: E8 Markets, FTMO, The 5%ers, Funding Pips... via official TradeLocker API.\n• Safe Connection: Enter Email, Password, Server (E8, Demo, Live). Passwords are local multi-layer Fernet encrypted.\n• Prop Risk Management: Set Fund Size ($5,000, $100,000, $200,000...), risk per trade limit, daily drawdown ceiling, and daily profit cap.\n• Dynamic Lot Sizing: Automatically computes optimal lot sizes based on stop-loss distance, preventing rule violations!",
-        "actionHint": "💡 Click 'Next ▶' to complete connection setup and return to the main dashboard!"
+        "badge": "Guía Interactiva • Paso 4 / 21",
+        "title": "4. FX Prop Firm Connect (TradeLocker)",
+        "content": "Automated trading for funded Prop Firm accounts:\n• Supported: E8 Markets, FTMO, Funding Pips... via TradeLocker API.\n• Login: Enter Email, Password, and Server.\n• Risk Control: Set Fund Size ($5,000, $100,000...), Daily Drawdown ceiling, and risk per trade.\n• Dynamic Lot: Bot automatically calculates exact Lots based on SL distance to prevent rule breaches.",
+        "actionHint": "💡 Click 'Next ▶' to finish connection and return to dashboard."
     },
     {
-        "badge": "Guía Interactiva • Paso 5 / 22",
-        "title": "5. Select Trading Platform (OKX / FX Prop)",
-        "content": "Quick platform switcher directly on the left sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap) on OKX.\n• FX Prop Firm: Trade international funded accounts (Gold XAU, Forex, Crypto) via TradeLocker.\n• Auto Sync: Switching platforms instantly updates account lists and pair selectors accordingly.\n• Safety Lock 🔒: While bot is running, this dropdown is locked to protect active orders.",
-        "actionHint": "💡 Seamlessly switch between personal crypto accounts and prop firm challenges in 1 click."
+        "badge": "Guía Interactiva • Paso 5 / 21",
+        "title": "5. Platform (OKX / FX Prop)",
+        "content": "Switch trading environment on the Sidebar:\n• OKX Exchange: Trade Crypto Perpetual Futures (USDT Swap).\n• FX Prop: Trade Gold XAU, Forex, Crypto via TradeLocker.\n• Auto Sync: Changing platforms automatically updates account lists and pair selectors.\n• Safety Lock 🔒: Automatically locks while the bot is active.",
+        "actionHint": "💡 Effortlessly switch between personal exchange accounts and funded challenges in 1 click."
     },
     {
-        "badge": "Guía Interactiva • Paso 6 / 22",
-        "title": "6. Select Bot Strategy (Command Capsule)",
-        "content": "The system features 3 built-in quantitative algorithms with intuitive visual badges:\n• EMA200 Bot: Captures multi-timeframe trend pullbacks at dynamic EMA200 levels.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\n• Click this Capsule button to toggle between bot algorithms.",
+        "badge": "Guía Interactiva • Paso 6 / 21",
+        "title": "6. Select Bot Strategy",
+        "content": "3 built-in quantitative algorithms:\n• EMA200 Bot: Captures pullback waves along dynamic EMA200 trendlines.\n• SMC Bot: Hunts liquidity pools & Order Block mitigation reversals.\n• Liquidation Bot: Exploits Market Maker stop hunts during high volatility.\n\nClick this button to switch bot strategies.",
         "actionHint": "💡 Each bot operates independently with dedicated settings and accounts."
     },
     {
-        "badge": "Guía Interactiva • Paso 7 / 22",
-        "title": "7. Select Account & Live Balance Tracking",
-        "content": "Assign the trading account for the currently active bot:\n• Full Support: OKX Sub-Accounts and FX Prop Accounts (E8 Demo, E8 Live).\n• Live Balance Display: Accurately reflects live account equity ($5,000, $200,000...) for real-time risk supervision.\n• Protective Lock 🔒: While the bot is running, account selection locks automatically to prevent position conflicts.",
-        "actionHint": "💡 Right-aligned layout ensures full account balances are clearly visible without clipping."
+        "badge": "Guía Interactiva • Paso 7 / 21",
+        "title": "7. Select Account & Balance",
+        "content": "Assign the trading account for the active bot:\n• OKX: Select matching Sub-Account.\n• FX Prop: Select E8 Demo or Live account.\n• Live Balance: View account equity ($5,000, $200,000...) for real-time risk control.\n• Protective Lock 🔒: Account dropdown locks automatically when bot is running.",
+        "actionHint": "💡 Real-time equity is clearly displayed without clipping."
     },
     {
-        "badge": "Guía Interactiva • Paso 8 / 22",
-        "title": "8. Capital, Margin Management & Safety Lock 🔒",
-        "content": "• Units: Fixed USDT ($) or % of Account Equity.\n• TF Multiplier: Select 'Fixed' for uniform margin across timeframes, or 'Multiply TF' to scale size with larger candles (H1 x2.0, H4 x5.0).\n\n🔒 FOOLPROOF SAFETY LOCK:\n• Once you click 'START BOT', the margin input is LOCKED 🔒, preventing unintended margin jumps or accidental clicks.\n• To adjust capital, simply click 'STOP BOT', edit values, and restart.",
-        "actionHint": "💡 Beginner tip: Start with small margin ($1 - $5) to observe live execution first."
+        "badge": "Guía Interactiva • Paso 8 / 21",
+        "title": "8. Capital & Order Volume",
+        "content": "Configure capital per trade:\n• OKX: Fixed USDT ($) or % of Account Equity.\n• FX Prop: Volume in Lots (default 0.01 L).\n• Modes: 'Fixed' (uniform across timeframes) or 'Multiply TF' (auto-scales with larger candles H1 x2.0, H4 x5.0).\n\n🔒 Automatically locked while running to prevent mistakes.",
+        "actionHint": "💡 Beginners should use small capital ($1 - $5 or 0.01 Lot) to observe execution."
     },
     {
-        "badge": "Guía Interactiva • Paso 9 / 22",
-        "title": "9. Take Profit (TP) & Stop Loss (SL) M5 0.6% Standard",
-        "content": "Safety bracket ratios. TP/SL configured here represents the M5 BASE level (optimized default: 0.6% TP & 0.6% SL). Higher timeframes scale automatically via Margin Factor:\n\n📊 MULTI-TF TP/SL MULTIPLIER TABLE (M5 0.6% Base):\n• M5 : x1.0 ➔ TP 0.60% | SL 0.60% (Base TF)\n• M15: x1.2 ➔ TP 0.72% | SL 0.72%\n• M30: x1.5 ➔ TP 0.90% | SL 0.90%\n• H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n• H2 : x3.0 ➔ TP 1.80% | SL 1.80%\n• H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n\n🔍 Core principle: Larger candles experience wider swings. Auto-scaling lets positions ride major trends without premature stop-outs.\n🛡️ 15s Watchdog daemon continuously scans and attaches TP/SL brackets 24/7.",
-        "actionHint": "💡 0.6% base ratio is battle-tested for rapid profit-taking and minimal drawdown."
+        "badge": "Guía Interactiva • Paso 9 / 21",
+        "title": "9. Base M5 TP & SL (0.6% Default)",
+        "content": "Base TP and SL ratios on M5 timeframe (default: 0.6% TP | 0.6% SL):\n• Multi-TF Scaling: Larger candles have wider swings; bot scales via Margin Factor:\n  - M5 : x1.0 ➔ TP 0.60% | SL 0.60%\n  - M15: x1.2 ➔ TP 0.72% | SL 0.72%\n  - M30: x1.5 ➔ TP 0.90% | SL 0.90%\n  - H1 : x2.0 ➔ TP 1.20% | SL 1.20%\n  - H4 : x5.0 ➔ TP 3.00% | SL 3.00%\n• 15s Watchdog daemon continuously attaches protective brackets 24/7.",
+        "actionHint": "💡 Battle-tested 0.6% base ratio provides rapid profit realization and capital safety."
     },
     {
-        "badge": "Guía Interactiva • Paso 10 / 22",
-        "title": "10. Select Trading Pairs & Timeframes",
-        "content": "• Pairs Column: Check symbols you want the bot to scan (XAU, BTC, ETH, SOL...).\n• Trade TF Column: Check timeframes (M5 to H4) where the bot is authorized to place Limit orders.\n• Quick Navigation: Click any pair name to instantly focus the TradingView chart on that symbol.",
-        "actionHint": "💡 Enable multiple timeframes simultaneously for automated multi-horizon diversification."
+        "badge": "Guía Interactiva • Paso 10 / 21",
+        "title": "10. Pairs & Trading Timeframes",
+        "content": "Manage symbol watchlist and order timeframes:\n• Pairs Column: Check symbols to scan (XAU, BTC, ETH...). Click pair name to open TradingView chart.\n• Trade TF Column: Check timeframes (5, 15, 30, H1, H2, H4) where the bot may place orders.\n• Multi-TF Enabled: Bot distributes orders across timeframes concurrently.",
+        "actionHint": "💡 Toggle coin pairs and timeframes flexibly to match your strategy."
     },
     {
-        "badge": "Guía Interactiva • Paso 11 / 22",
-        "title": "11. Activate Automated Bot Engine",
-        "content": "• Click 'START BOT': Launches background scanner engine to place/manage orders 24/7 on OKX or Prop Firm.\n• To Pause: Click 'STOP BOT' to cancel open limit orders and protect existing inventory.\n• Visual Status: Dynamic badge indicators (Green: Running, Red/Grey: Stopped).",
-        "actionHint": "💡 You can safely close your browser; the bot executes persistently on the backend daemon."
+        "badge": "Guía Interactiva • Paso 11 / 21",
+        "title": "11. Start / Stop Bot Engine",
+        "content": "Activate or halt automated bot operations:\n• 'START BOT': Scans market signals and places/manages orders 24/7 on exchange or prop.\n• 'STOP BOT': Cancels open pending limit orders and protects active positions.\n• You can safely close your browser; the bot runs persistently on the server.",
+        "actionHint": "💡 Button colors reflect active state (Green: Running, Gray: Stopped)."
     },
     {
-        "badge": "Guía Interactiva • Paso 12 / 22",
-        "title": "12. Bottom Command Pane & Split View (⮃)",
-        "content": "Comprehensive monitoring hub:\n• Positions Tab: Open positions, live PnL, leverage, entry price, liquidation risk, and emergency panic-close buttons.\n• Logs Tab: Real-time stream of engine scans, algorithmic triggers, and broker responses.\n• Charts Tab: Multi-frame TradingView technical charts.\n• ⮃ Split View Button: Click to decouple Charts on top and Positions below simultaneously, providing complete situational awareness!",
-        "actionHint": "💡 Try the ⮃ Split View button to unlock a professional dual-pane dashboard."
+        "badge": "Guía Interactiva • Paso 12 / 21",
+        "title": "12. Positions, Logs & Split View",
+        "content": "Central monitoring pane:\n• Positions Tab: Open positions, live PnL, entry price, SL/TP brackets, and panic-close button.\n• Logs Tab: Real-time scan logs and broker response feed.\n• Charts Tab: TradingView technical chart.\n• ⮃ Split View: View Charts on top and Positions below simultaneously without switching tabs.",
+        "actionHint": "💡 Click ⮃ button on the right to experience the dual-pane view."
     },
     {
-        "badge": "Guía Interactiva • Paso 13 / 22",
-        "title": "13. Explore Advanced System Settings ⚙",
-        "content": "Two key utility controls side by side:\n• 'Guide' Button 💡: Re-open this guided onboarding tour anytime.\n• 'Settings' Button ⚙: Opens Deep Configuration Panel for algorithmic tuning: Watchlist, Capital Management, DCA Trio, Circuit Breaker, Entry Triggers, Multi-TF Multipliers, Support & Reviews.\n\n• Click 'Next ▶' to open the Settings panel and step through each mechanism!",
-        "actionHint": "💡 Click 'Next ▶' to enter the Advanced Settings modal."
+        "badge": "Guía Interactiva • Paso 13 / 21",
+        "title": "13. Guide & Settings ⚙",
+        "content": "Two key utility controls on Sidebar:\n• 'Guide': Re-launch this guided tour anytime.\n• 'Settings' ⚙: Open Deep Configuration Panel to fine-tune Watchlist, DCA Trio, Circuit Breaker, Entry Setup, and Multipliers.\n\nClick 'Next ▶' to open the Settings modal.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Deep Settings."
     },
     {
-        "badge": "Guía Interactiva • Paso 14 / 22",
-        "title": "14. Coin Watchlist Configuration",
-        "content": "Customize trading universe for your bot:\n• Toggle coin tags (XAU, BTC, ETH, SOL, DOGE...).\n• Highlighted badges indicate coins active on the main dashboard.\n• Safety Lock: Coins with currently open positions are automatically locked from deselecting.",
-        "actionHint": "💡 Activate as many coins as appropriate for your capital capacity."
+        "badge": "Guía Interactiva • Paso 14 / 21",
+        "title": "14. Coin Watchlist",
+        "content": "Configure coins displayed on the dashboard:\n• Click to toggle coins (XAU, BTC, ETH, SOL, DOGE...).\n• Active badges display on main dashboard.\n• Safety Lock: Coins with open positions are locked from deselecting.",
+        "actionHint": "💡 Enable coins aligned with your account capital."
     },
     {
-        "badge": "Guía Interactiva • Paso 15 / 22",
-        "title": "15. Account & Capital Allocation",
-        "content": "Configure account assignment and granular risk sizing for the active bot:\n• Select Account: Bind bot to corresponding OKX or Prop account.\n• Per-order Margin: Enter fixed USDT ($) or % of equity.\n• Multiplier Mode: Toggle between Fixed or Multiplied margin scaling.\n• Leverage: Set safe leverage ratio for the position.",
-        "actionHint": "💡 While running, account and margin fields are locked 🔒 to protect active orders."
+        "badge": "Guía Interactiva • Paso 15 / 21",
+        "title": "15. DCA Mode Trio",
+        "content": "Select 1 of 3 advanced execution algorithms:\n• DCA Dương: Adds positions as profit develops along trend steps (H4 -> M5).\n• DCA Âm: Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 mode can be active at a time (enabling one disables the others).",
+        "actionHint": "💡 Split Grid and DCA Dương are recommended for conservative risk management."
     },
     {
-        "badge": "Guía Interactiva • Paso 16 / 22",
-        "title": "16. Strategy Switches (DCA Trio)",
-        "content": "The system provides 3 specialized order scaling algorithms:\n• Pyramid DCA (Positive DCA): Scales up positions as profit grows along trend stairs (H4 -> M5).\n• Negative DCA (Averaging Down): Averages entry price during drawdowns with expanded higher-TF TP/SL.\n• Multi-TF Split Grid: Independent limit orders per timeframe, each taking profit independently.\n\n💡 Note: Exactly 1 of the 3 modes can be active at a time (enabling one automatically disables the others).",
-        "actionHint": "💡 Beginners are recommended to use Multi-TF Split Grid or Pyramid DCA for maximum capital defense."
+        "badge": "Guía Interactiva • Paso 16 / 21",
+        "title": "16. Circuit Breaker & BTC Alignment",
+        "content": "Protect account during sharp market shocks:\n• Reversal Circuit Breaker: When price extends too far from H4 EMA200 (> 8%), bot halts trend orders to avoid tops/bottoms, and opens hedge pullback orders.\n• BTC Alignment: Restricts Altcoins to only enter trades aligned with BTC market direction.",
+        "actionHint": "💡 Keep Circuit Breaker ON 24/7 to safeguard equity."
     },
     {
-        "badge": "Guía Interactiva • Paso 17 / 22",
-        "title": "17. Circuit Breaker & BTC Correlation Filter",
-        "content": "• Hedge Reversal Circuit Breaker: When price overextends far from H4 EMA200 (> 8%), bot locks trend limit orders to avoid tops/bottoms, while opening hedge orders on mean-reversion waves.\n• BTC Correlation Filter: Enforces Altcoins (ETH, SOL...) to only seek entries aligned with market leader BTC trend.",
-        "actionHint": "💡 Recommended: Keep Circuit Breaker ON 24/7 to protect equity against severe volatility spikes."
+        "badge": "Guía Interactiva • Paso 17 / 21",
+        "title": "17. Entry Setup & Accumulation",
+        "content": "Configure entry criteria:\n• Base Offset (%): Places limits ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds.\n• Base Gap (%): Minimum safety gap between adjacent EMA levels to avoid tight stacking.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before entering, eliminating sideways traps.",
+        "actionHint": "💡 Battle-tested defaults; beginners should keep Admin standards."
     },
     {
-        "badge": "Guía Interactiva • Paso 18 / 22",
-        "title": "18. Entry Setup & 60-Candle Accumulation",
-        "content": "Safety criteria for limit placement:\n• Base Offset %: Places Limit orders ahead of EMA200 touch (default 0.05% on M5) to fill before price rebounds. Scales with Entry Factor on higher TFs (e.g. H4 x6.8 -> 0.34% offset).\n• Base Gap %: Minimum distance required between consecutive EMA lines to avoid dense clustering.\n• Accum Candles: Requires 60 consecutive candles closed on one side of EMA200 before placing orders, confirming steady trends and filtering sideway noise.",
-        "actionHint": "💡 Admin defaults are battle-tested in live markets; beginners can safely retain standard parameters."
+        "badge": "Guía Interactiva • Paso 18 / 21",
+        "title": "18. Multi-TF Multipliers",
+        "content": "Multi-timeframe mathematical scaling mechanics:\n• Capital Column: Larger candles expand margin and TP/SL brackets (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H4 x5.0) to match swing ranges.\n• Entry Column: Scales entry buffering for higher TFs (M5 x1.0, H4 x6.8) preventing order slippage.",
+        "actionHint": "💡 Mathematical framework that captures major H1/H4 waves while keeping M5 execution safe."
     },
     {
-        "badge": "Guía Interactiva • Paso 19 / 22",
-        "title": "19. Multi-TF Multiplier Architecture",
-        "content": "Mathematical scaling mechanics across timeframes:\n• Margin Factor: Larger candles expand margin and TP/SL amplitudes (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0) to match swing ranges and optimize profits.\n• Entry Factor: Multiplies Base Offset % and Base Gap %. Higher TFs get wider buffering zones (M5 x1.0, H4 x6.8) preventing order slippage during large candle fluctuations.",
-        "actionHint": "💡 Core mathematical model enabling the bot to ride massive H1/H4 waves while keeping capital safe on M5/M15."
+        "badge": "Guía Interactiva • Paso 19 / 21",
+        "title": "19. Save Settings & Defaults",
+        "content": "Bot configuration management:\n• 'Save Settings': Immediately applies all configured parameters.\n• 'Reset to Default': Reverts back to battle-tested Admin baseline settings anytime.",
+        "actionHint": "💡 Click 'Next ▶' to inspect Support and Community Reviews."
     },
     {
-        "badge": "Guía Interactiva • Paso 20 / 22",
-        "title": "20. Save Configuration & Reset Defaults",
-        "content": "• Save Strategy: Immediately writes all modified parameters into the bot configuration.\n• Reset to Default: Revert to Admin battle-tested baseline settings anytime if experiments prove unsatisfactory.",
-        "actionHint": "💡 Click 'Next ▶' to inspect the Support and Community Reviews tabs next!"
+        "badge": "Guía Interactiva • Paso 20 / 21",
+        "title": "20. Support Tab",
+        "content": "Licensing and 24/7 technical assistance:\n• Terms of Service: Register exchange account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify connectivity and retrieve PC HWID for license activation.\n• Server IP & Cleanup: Configure custom Proxy IPs and reset capital or clear candle cache.",
+        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team."
     },
     {
-        "badge": "Guía Interactiva • Paso 21 / 22",
-        "title": "21. Support & System Administration Tab",
-        "content": "License management and 24/7 technical assistance:\n• Terms of Service: Guide to registering OKX account under TLS1 referral code to unlock lifetime free bot access.\n• API & HWID Check: Verify API Key connectivity and retrieve PC HWID for license activation.\n• Proxy & Maintenance: Optional Proxy IP setup, capital reset tools, and candle cache cleaners.",
-        "actionHint": "💡 Click 'Copy' to quickly share HWID or referral code with the support team anytime."
-    },
-    {
-        "badge": "Guía Interactiva • Paso 22 / 22",
-        "title": "22. Community Reviews & Tour Complete!",
-        "content": "• View Community Reviews: Browse verified feedback, profit screenshots, and live trading results from fellow traders.\n• Submit Your Review: Rate stars, attach trade snapshots, and share your experience with the community.",
-        "actionHint": "🎉 Congratulations on completing the full A-Z onboarding tour! You now master all features and inner logic of the bot. Click 'Finish' to close and begin trading!"
+        "badge": "Guía Interactiva • Paso 21 / 21",
+        "title": "21. Reviews Tab & Tour Complete!",
+        "content": "Community & completion:\n• Community Reviews: Browse verified trade reviews and profit snapshots from fellow traders.\n• Submit Review: Rate stars and share your trading experience with the bot.\n\n🎉 You have completed the comprehensive onboarding tour! Click 'Finish' to close and begin trading.",
+        "actionHint": "🎉 Wishing you disciplined and profitable trading with TLS1 Trading Bot!"
     }
 ]
 };
@@ -831,9 +795,9 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setShowConnectModal(false);
       },
     },
-    // 2: connect-fast-content
+    // 2: connect-fast-content bao gồm cả tab Fast Connect
     {
-      target: '[data-tour="connect-fast-content"]',
+      target: '[data-tour="connect-fast-tab"], [data-tour="connect-fast-content"]',
       placement: "right",
       preStep: () => {
         setShowSettings(false);
@@ -841,9 +805,9 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setConnectModalTab("fast");
       },
     },
-    // 3: connect-apikey-content
+    // 3: connect-apikey-content bao gồm cả tab API Key
     {
-      target: '[data-tour="connect-apikey-content"]',
+      target: '[data-tour="connect-apikey-tab"], [data-tour="connect-apikey-content"]',
       placement: "right",
       preStep: () => {
         setShowSettings(false);
@@ -851,9 +815,9 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setConnectModalTab("apikey");
       },
     },
-    // 4: connect-tradelocker-content
+    // 4: connect-tradelocker-content bao gồm cả tab Quỹ FX
     {
-      target: '[data-tour="connect-tradelocker-content"]',
+      target: '[data-tour="connect-tradelocker-tab"], [data-tour="connect-tradelocker-content"]',
       placement: "right",
       preStep: () => {
         setShowSettings(false);
@@ -953,17 +917,7 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 15: settings-account-capital
-    {
-      target: '[data-tour="settings-account-capital"]',
-      placement: "top",
-      preStep: () => {
-        setShowConnectModal(false);
-        setShowSettings(true);
-        setSettingsTab("strategy");
-      },
-    },
-    // 16: settings-dca
+    // 15: settings-dca
     {
       target: '[data-tour="settings-dca"]',
       placement: "top",
@@ -973,7 +927,7 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 17: settings-circuit-breaker
+    // 16: settings-circuit-breaker
     {
       target: '[data-tour="settings-circuit-breaker"]',
       placement: "top",
@@ -983,7 +937,7 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 18: settings-entry-filters
+    // 17: settings-entry-filters
     {
       target: '[data-tour="settings-entry-filters"]',
       placement: "top",
@@ -993,7 +947,7 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 19: settings-tf-multipliers
+    // 18: settings-tf-multipliers
     {
       target: '[data-tour="settings-tf-multipliers"]',
       placement: "top",
@@ -1003,7 +957,7 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 20: settings-actions
+    // 19: settings-actions
     {
       target: '[data-tour="settings-actions"]',
       placement: "top",
@@ -1013,17 +967,17 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setSettingsTab("strategy");
       },
     },
-    // 21: settings-support-tab-content
+    // 20: settings-support-tab-content
     {
       target: '[data-tour="settings-support-tab-content"]',
       placement: "top",
       preStep: () => {
         setShowConnectModal(false);
         setShowSettings(true);
-        setSettingsTab("system");
+        setSettingsTab("support");
       },
     },
-    // 22: settings-reviews-tab-content
+    // 21: settings-reviews-tab-content
     {
       target: '[data-tour="settings-reviews-tab-content"]',
       placement: "top",
@@ -1032,17 +986,14 @@ export function getTourSteps(lang = "vi", actions = {}) {
         setShowSettings(true);
         setSettingsTab("reviews");
       },
-    },
+    }
   ];
 
   return baseSpecs.map((spec, idx) => {
-    const text = contentList[idx] || (TOUR_CONTENT.en && TOUR_CONTENT.en[idx]) || TOUR_CONTENT.vi[idx];
+    const textInfo = contentList[idx] || {};
     return {
       ...spec,
-      badge: text ? text.badge : `Bước ${idx + 1} / 22`,
-      title: text ? text.title : `Tính Năng ${idx + 1}`,
-      content: text ? text.content : "",
-      actionHint: text ? text.actionHint : "",
+      ...textInfo
     };
   });
 }

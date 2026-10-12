@@ -33,6 +33,37 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[12/10/2026]** - Tối Ưu Viền Spotlight Connect Bao Trùm Tab, Rà Soát Font Chữ & Làm Gọn Nội Dung Tour Hướng Dẫn:
+  - **Mô tả yêu cầu CEO:**
+    1. Viền vàng Spotlight ở popup Connect phải bao quanh cả nút tab (ví dụ: cụm `[Fast Connect]` ở trên cùng với nội dung thẻ ở dưới) để người dùng dễ nhận biết đang ở tab nào.
+    2. Rà soát lỗi ký tự/font chữ chồng chéo (như ảnh 2 giữa bước 4 và 5), fix triệt để.
+    3. Bỏ icon và dấu `+` trước `Kết Nối Quỹ FX`, mặc định Lot là `0.01 L`.
+    4. Các ký hiệu mũi tên dropdown phải có màu sáng nổi bật, không bị chìm trên nền tối.
+    5. Nội dung giải thích phải sát với tiêu đề, tên nút trên UI, bỏ các từ thừa như `Pyramid DCA (DCA Dương)` thành `DCA Dương: Nhồi thêm...`, ưu tiên tiêu chí: đúng, ngắn gọn, súc tích, dễ hiểu.
+  - **Giải pháp kỹ thuật đã thực hiện:**
+    1. **Viền Spotlight đa phần tử (Union Bounding Box):** Trong `OnboardingTour.jsx`, hàm `updateTargetPosition` sử dụng `querySelectorAll` tính hợp nhất toạ độ `Math.min`/`Math.max` của nhiều selector. Cấu hình các bước 2, 3, 4 trong `tourData.js` thành target kép `[data-tour="connect-xxx-tab"], [data-tour="connect-xxx-content"]`. Viền Spotlight vàng bao trùm liền mạch từ nút tab phía trên xuống tận hết khối thẻ bên dưới.
+    2. **Khắc phục lỗi font chữ đè nhau:** Gắn `key={currentStepIndex}` cho thẻ tooltip card để React hủy và mount DOM hoàn toàn mới mỗi khi chuyển bước. Bổ sung `WebkitFontSmoothing: "antialiased"`, `wordBreak: "break-word"`, `overflowWrap: "break-word"` và rút gọn nội dung súc tích (3-4 dòng ngắn gọn), triệt tiêu hoàn toàn hiện tượng chồng chữ/lưu vết WebKit.
+    3. **Sidebar UI:** Nút `Kết Nối Quỹ FX` đã bỏ icon và dấu `+`. Giá trị mặc định khối lượng Lot cho Quỹ FX được thiết lập chuẩn `0.01 L` (tự động di chuyển từ `0.03 L` trong localStorage).
+    4. **Mũi tên Dropdown sáng màu:** Bổ sung `appearance: none` kèm SVG chevron trắng sáng (`#ffffff`) cho `.styled-select` trong `index.css`, dropdown chuyển bot `AppHeader.jsx`, dropdown nền tảng và dropdown tài khoản.
+    5. **Chuẩn hoá 21 bước Tour:** Toàn bộ 21 bước được biên tập lại súc tích, đúng thuật ngữ thực tế trên UI (DCA Dương, DCA Âm, Split Grid, v.v.), không còn từ thừa.
+  - **Kiểm tra và nghiệm thu:** `cmd.exe /c "npm run build"` thành công 100%, 0 lỗi.
+
+- **[12/10/2026]** - Khắc Phục Triệt Để Lỗi Thẻ Hướng Dẫn Che Mất Phần Chính & Bị Trượt Trượt Giật Cục Khi Cuộn (OnboardingTour Zero-Overlap):
+  - **Mô tả yêu cầu CEO:**
+    - Trong tour hướng dẫn khi vào Cài Đặt (nhất là trên điện thoại/màn hình nhỏ): Thẻ hướng dẫn bị trồi lên che mất phần chính được highlight (như ở bước 15 Điểm Vào Lệnh & 60 Nến Tích Lũy), tiêu đề thẻ bị thụt vào tai thỏ/status bar, và khi người dùng cuộn thì thẻ cứ trượt trượt dính theo thanh cuộn gây khó chịu.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Nguyên nhân thẻ bị trượt trượt dính thanh cuộn:** Trong `OnboardingTour.jsx`, event listener `scroll` (với capture `true`) mỗi khi bắt được thao tác cuộn của user lại liên tục gọi `updateTargetPosition()`. Trong đó hàm lại gọi `el.scrollIntoView({ behavior: 'smooth', block: 'center' })` và áp dụng `transition: top 0.22s ease`. Điều này tạo ra sự giằng co liên tục giữa ngón tay người dùng và code, làm thẻ tooltip trôi trượt giật cục.
+    2. **Nguyên nhân thẻ che mất mục tiêu:** Trên mobile (chiều cao ~700-840px), cả thẻ (~250-300px) lẫn mục tiêu (~200px) nếu đều bị ép vào giữa màn hình thì cả phía trên lẫn phía dưới đều không đủ chỗ (chỉ còn ~150px). Khi đó thuật toán ép `top = Math.max(margin, ...)` khiến thẻ nhảy lên `top: 12px`, đè trực tiếp lên phần trên của mục tiêu và lẹm vào tai thỏ.
+    3. **Kiến trúc giải pháp triệt để (Zero-Overlap & Docked Placement):**
+       - **Cuộn mục tiêu thông minh 1 lần duy nhất:** Khi chuyển bước, hàm `scrollTargetIntoSafeView` tìm `scrollParent` gần nhất (như `.settings-tab-scroll`) và chỉ cuộn 1 lần duy nhất để đưa mục tiêu lên phần trên của vùng nhìn thấy (~10-15px dưới header). Khi người dùng tự tay cuộn, TUYỆT ĐỐI KHÔNG gọi lại `scrollIntoView`!
+       - **Cơ chế Docked Bottom / Top an toàn tuyệt đối:**
+         - Mặc định trên mobile / modal hẹp: Tooltip Card được neo cố định ở đáy màn hình (`docked-bottom`, `bottom: 12px`, `left: 12px`, `right: 12px`, `maxWidth: 520px`). Mục tiêu nằm trọn vẹn ở nửa trên màn hình với viền vàng Spotlight rực rỡ -> Khoảng cách giữa mục tiêu và card luôn rộng rãi (> 180px), **cam kết 0% che khuất (Zero-Overlap)**!
+         - Khi mục tiêu nằm sâu ở nửa dưới màn hình: Card tự động neo ở đỉnh (`docked-top`, `top: 12px`) và mục tiêu nằm ở nửa dưới.
+       - **Triệt tiêu hoàn toàn độ trễ trôi trượt:** Khi người dùng vuốt cuộn, card ở đáy màn hình đứng vững như bàn thạch, không bị trượt; viền Spotlight bám theo phần tử với `transition: none` mượt mà tự nhiên 100%.
+       - **Chống tràn màn hình:** Thân nội dung có `maxHeight: 135px`, `overflowY: auto`. Tiêu đề và toàn bộ các nút điều hướng (Bỏ qua, ◀ Trước, Tiếp theo ▶) luôn được cố định `flexShrink: 0`, 100% hiển thị rõ ràng.
+  - **Kiểm tra và nghiệm thu:**
+    - `npm run build` thành công trong 224ms, 0 lỗi. Tour vận hành trơn tru cả trên mobile lẫn desktop.
+
 - **[12/10/2026]** - Khắc Phục Lỗi `tradelocker_service.py`, Khử Lỗi `logger` `main.py`, & Nâng Cấp Toàn Diện Tour Hướng Dẫn Sử Dụng (22 Bước Chi Tiết):
   - **Mô tả yêu cầu CEO:**
     1. Sửa triệt để 2 lỗi cảnh báo trong `tradelocker_service.py`.

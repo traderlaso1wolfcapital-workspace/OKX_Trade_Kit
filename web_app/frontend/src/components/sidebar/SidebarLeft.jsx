@@ -38,7 +38,14 @@ export default function SidebarLeft({
   const [e8Account, setE8Account] = useState(null);
   const [propAccounts, setPropAccounts] = useState([]);
   const [activePropId, setActivePropId] = useState("");
-  const [e8Lot, setE8Lot] = useState(() => Number(localStorage.getItem("tls1_e8_lot")) || 0.03);
+  const [e8Lot, setE8Lot] = useState(() => {
+    const saved = localStorage.getItem("tls1_e8_lot");
+    if (!saved || saved === "0.03" || Number(saved) === 0.03) {
+      try { localStorage.setItem("tls1_e8_lot", "0.01"); } catch {}
+      return 0.01;
+    }
+    return Number(saved) || 0.01;
+  });
   const [e8RiskUsd, setE8RiskUsd] = useState(() => Number(localStorage.getItem("tls1_e8_risk_usd")) || 25);
   const [e8DailyLoss, setE8DailyLoss] = useState(() => Number(localStorage.getItem("tls1_e8_daily_loss")) || 125);
 
@@ -257,13 +264,19 @@ export default function SidebarLeft({
                 backgroundColor: "#181818",
                 border: "1px solid #383838",
                 borderRadius: "5px",
-                padding: "4px 8px",
+                padding: "4px 24px 4px 10px",
                 fontSize: "12px",
                 fontWeight: "bold",
                 color: "#ffffff",
                 cursor: isRunning ? "not-allowed" : "pointer",
                 outline: "none",
                 transition: "all 0.15s ease",
+                appearance: "none",
+                WebkitAppearance: "none",
+                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 8px center",
+                backgroundSize: "13px 13px",
               }}
               title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi sàn!" : "Chọn nền tảng giao dịch"}
             >
@@ -382,7 +395,7 @@ export default function SidebarLeft({
                     background: isRunning ? "#1a1a1a" : "#2d2d2d",
                     border: isRunning ? "1px solid #444444" : "1px solid #555555",
                     color: isRunning ? "#888888" : "#ffffff",
-                    padding: "4px 22px 4px 8px",
+                    padding: "4px 24px 4px 8px",
                     borderRadius: "4px",
                     fontSize: "12px",
                     fontWeight: "600",
@@ -394,6 +407,12 @@ export default function SidebarLeft({
                     textAlign: "right",
                     textAlignLast: "right",
                     direction: "ltr",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 6px center",
+                    backgroundSize: "13px 13px",
                   }}
                   value={activePropId || (propAccounts[0] && propAccounts[0].id) || ""}
                   onChange={(e) => {
@@ -466,8 +485,7 @@ export default function SidebarLeft({
                   }}
                   title="Nhấp để kết nối tài khoản Quỹ FX (E8, The 5%ers, FTMO...)"
                 >
-                  <span style={{ fontSize: "12px", color: "#888888" }}>🔗</span>
-                  <span>+ Kết Nối Quỹ FX</span>
+                  <span style={{ fontWeight: "600" }}>Kết Nối Quỹ FX</span>
                 </div>
               )
             ) : (
@@ -482,7 +500,7 @@ export default function SidebarLeft({
                   background: isRunning ? "#1a1a1a" : "#2d2d2d",
                   border: isRunning ? "1px solid #444444" : "1px solid #555555",
                   color: isRunning ? "#888888" : "#e0e0e0",
-                  padding: "4px 22px 4px 8px",
+                  padding: "4px 24px 4px 8px",
                   borderRadius: "4px",
                   fontSize: "12px",
                   height: "30px",
@@ -493,6 +511,12 @@ export default function SidebarLeft({
                   textAlign: "right",
                   textAlignLast: "right",
                   direction: "ltr",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 6px center",
+                  backgroundSize: "13px 13px",
                 }}
                 value={effectiveAccId}
                 onChange={(e) => handleAccountSelect(e.target.value)}
@@ -687,10 +711,10 @@ export default function SidebarLeft({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>
+                      <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#dddddd" }}>
                         {risk.multiplyVolumeByTf ? t("multiply_tf") : t("fixed")}
                       </span>
-                      <span className="risk-mult-arrow" style={{ fontSize: "7px", opacity: 0.7, color: risk.multiplyVolumeByTf ? "#26a69a" : "#888" }}>▼</span>
+                      <span className="risk-mult-arrow" style={{ fontSize: "8px", opacity: 0.95, color: risk.multiplyVolumeByTf ? "#26a69a" : "#ffffff" }}>▼</span>
                     </div>
 
                     <select
