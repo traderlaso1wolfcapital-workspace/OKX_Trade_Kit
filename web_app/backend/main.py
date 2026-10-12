@@ -1151,6 +1151,9 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
                 api_uid = str(cfg.get("uid", "")).strip()
                 main_uid = str(cfg.get("mainUid", "")).strip()
                 label = str(cfg.get("label", "")).strip()
+                acctLv = str(cfg.get("acctLv", "")).strip()
+                if acctLv == "1":
+                    raise Exception("Tài khoản đang ở chế độ Simple (Đơn giản). Hãy đổi sang chế độ Ký quỹ (Single-currency hoặc Multi-currency) trên OKX để trade Futures.")
                 is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
 
                 detected_name = ""
@@ -1597,6 +1600,7 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
         custom_env = os.environ.copy()
         custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
         custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+        custom_env["BOT_USER_UID"] = uid
         custom_env["PYTHONUNBUFFERED"] = "1"
         custom_env["PYTHONIOENCODING"] = "utf-8"
 
@@ -2239,8 +2243,13 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                 api_uid = str(cfg.get("uid", "")).strip()
                 main_uid = str(cfg.get("mainUid", "")).strip()
                 label = str(cfg.get("label", "")).strip()
+                acctLv = str(cfg.get("acctLv", "")).strip()
+                
+                if acctLv == "1":
+                    raise HTTPException(status_code=400, detail="Tài khoản đang ở chế độ Simple (Đơn giản). Hãy đổi sang chế độ Ký quỹ (Single-currency hoặc Multi-currency) trên OKX để trade Futures.")
+
                 is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
-                print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, label={label}, is_main={is_main}, login UID={uid}", flush=True)
+                print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, label={label}, is_main={is_main}, login UID={uid}, acctLv={acctLv}", flush=True)
 
                 # Xác định UID chính (Master UID) từ OKX
                 owner_uid = str(main_uid).strip() if main_uid else str(api_uid).strip()

@@ -72,6 +72,28 @@ def clean_ob_orders(client, inst_id: str, cl_prefix: str, side: str = None):
 # Global counter để tránh trùng clOrdId trong cùng 1 giây
 _ORDER_COUNTER = 0
 
+def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, dry_run: bool = False):
+    """Chuyển tiếp lệnh sang tài khoản Quỹ TradeLocker (E8 Markets) nếu user có kích hoạt"""
+    try:
+        from web_app.backend.tradelocker_service import TradeLockerManager
+        uid = os.environ.get("BOT_USER_UID", "")
+        if not uid:
+            local_app = os.environ.get("LOCALAPPDATA", "")
+            if local_app:
+                uid = os.path.basename(local_app)
+        if uid:
+            TradeLockerManager.dispatch_signal_async(
+                uid=uid,
+                symbol=inst_id,
+                side=side,
+                price=price,
+                sl_price=sl_price,
+                tp_price=tp_price,
+                dry_run=dry_run
+            )
+    except Exception:
+        pass
+
 def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, tick_sz: Decimal, cl_prefix: str) -> tuple[bool, str]:
     global _ORDER_COUNTER
     _ORDER_COUNTER += 1
@@ -82,6 +104,15 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         pos_side = "net"
     else:
         pos_side = "long" if setup.bias == BULLISH else "short"
+
+    # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) nếu có bật
+    try:
+        tl_sl = float(setup.stop_loss) if setup.stop_loss else None
+        tl_tp = float(setup.take_profit) if setup.take_profit else None
+        tl_px = float(setup.entry_price) if setup.entry_price else 0.0
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=tl_px, sl_price=tl_sl, tp_price=tl_tp, dry_run=False)
+    except Exception:
+        pass
         
     cl_id = f"{cl_prefix}{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
     try:
@@ -174,6 +205,14 @@ def place_ob_market_order(client, inst_id: str, setup: TradeSetup, sz_str: str, 
     else:
         pos_side = "long" if setup.bias == BULLISH else "short"
         
+    # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) nếu có bật
+    try:
+        tl_sl = float(setup.stop_loss) if setup.stop_loss else None
+        tl_tp = float(setup.take_profit) if setup.take_profit else None
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, sl_price=tl_sl, tp_price=tl_tp, dry_run=False)
+    except Exception:
+        pass
+
     cl_id = f"{cl_prefix}mkt{_ORDER_COUNTER:03d}{int(time.time())}"[:32]
     try:
         if setup.ob_source == "INTERNAL":
@@ -353,3 +392,5 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
         print("✅ [SMC CLEANUP]: Hoàn tất dọn dẹp lệnh Limit. Bảo lưu 100% TP/SL của vị thế.")
     except Exception as e:
         print(f"⚠️ [SMC CLEANUP LỖI]: {e}")
+
+# z1952 | Tích hợp _dispatch_to_tradelocker cho SMC Market entry và Limit entry

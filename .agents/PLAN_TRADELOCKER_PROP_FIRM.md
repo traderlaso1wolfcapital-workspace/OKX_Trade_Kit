@@ -56,8 +56,13 @@
 
 ## 3. Lộ Trình Triển Khai Từng Bước
 - [x] **Bước 1:** Test kết nối ngầm trực tiếp thành công với TradeLocker API server E8 (Account $5,000, ID `2534591`).
-- [ ] **Bước 2:** Viết module `web_app/backend/tradelocker_service.py` xử lý toàn bộ logic API TradeLocker.
-- [ ] **Bước 3:** Bổ sung các endpoints REST API trong `web_app/backend/main.py`.
-- [ ] **Bước 4:** Nâng cấp `ConnectModal.jsx` và giao diện frontend để user nhập tài khoản quỹ, chọn ký quỹ và xem trạng thái.
-- [ ] **Bước 5:** Tích hợp bộ tính Lot và cơ chế bắn lệnh tự động từ tín hiệu chiến lược của bot.
-- [ ] **Bước 6:** Kiểm thử end-to-end trên tài khoản E8 Demo và nghiệm thu.
+- [x] **Bước 2:** Viết module `web_app/backend/tradelocker_service.py` xử lý toàn bộ logic API TradeLocker (JWT token, account state, symbol mapper, lot sizing, circuit breakers, placement/close position, cancel orders).
+- [x] **Bước 3:** Bổ sung các endpoints REST API trong `web_app/backend/main.py` (`/api/tradelocker/connect`, `/account`, `/config`, `/disconnect`, và truyền `BOT_USER_UID` vào process bot).
+- [x] **Bước 4:** Nâng cấp `ConnectModal.jsx` và `TradeLockerTab.jsx` để user nhập tài khoản quỹ, cấu hình rủi ro và giám sát mục tiêu quỹ trực quan.
+- [x] **Bước 5:** Tích hợp bộ tính Lot và cơ chế bắn lệnh tự động từ tín hiệu chiến lược của bot qua `dispatch_signal_async` trong `bots/sub1/bot_orders.py` và `bots/sub2/bot_orders.py`.
+- [x] **Bước 6:** Kiểm thử end-to-end trên tài khoản E8 Demo ($5,000 ID 2534591):
+  * Khắc phục vấn đề chặn mạng DNS/TLS SNI tại Việt Nam qua Cloudflare WARP.
+  * Bắn lệnh test thật BUY XAUUSD 0.01 Lot (Mã lệnh: `360287970213215464`), khớp vị thế ngay tức thì.
+  * Đóng vị thế thành công qua `DELETE /trade/positions/{posId}` (chuẩn TradeLocker API).
+  * Đặt và hủy lệnh Limit thành công (Mã lệnh: `360287970213215662`). Nghiệm thu sạch sẽ 100%.
+

@@ -16,4 +16,5 @@ from bots.sub1.bot_strategy import *
 from bots.sub1.bot_config import *
 
 # z3320 | Reload trigger for multi-tf independent grid & ui update
+# z3321 | Tích hợp TradeLocker dispatching cho tài khoản Quỹ
 

@@ -296,13 +296,40 @@ def _clean_num_str(val) -> str:
     except Exception:
         return str(val)
 
+def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, dry_run: bool = False):
+    """Chuyển tiếp lệnh sang tài khoản Quỹ TradeLocker (E8 Markets) nếu user có kích hoạt"""
+    try:
+        from web_app.backend.tradelocker_service import TradeLockerManager
+        uid = os.environ.get("BOT_USER_UID", "")
+        if not uid:
+            local_app = os.environ.get("LOCALAPPDATA", "")
+            if local_app:
+                uid = os.path.basename(local_app)
+        if uid:
+            TradeLockerManager.dispatch_signal_async(
+                uid=uid,
+                symbol=inst_id,
+                side=side,
+                price=price,
+                sl_price=sl_price,
+                tp_price=tp_price,
+                dry_run=dry_run
+            )
+    except Exception:
+        pass
+
 def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
     # 🔒 DRY-RUN
     if dry_run:
         if SHOW_DRY_RUN_LOGS:
             clean_sz = _clean_num_str(size)
             print(f"🌑 [DRY-RUN] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={clean_sz} (shadow mode, bỏ qua)")
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=True)
         return None
+
+    # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) nếu có bật
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=False)
+
     try:
         resp = client.request("POST", "/api/v5/trade/order", body={
             "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": size
@@ -334,6 +361,20 @@ def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str
         print(f"🚨 [MARKET FALLBACK ERROR]: Không thể bắn lệnh Market: {err_str}")
 
 def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, price: str, cl_id: str, td_mode: str = "cross", dry_run: bool = False, attach_algo_ords: list = None):
+    # Trích xuất TP/SL cho TradeLocker
+    tl_sl_px = None
+    tl_tp_px = None
+    if attach_algo_ords and len(attach_algo_ords) > 0:
+        try:
+            tl_sl_px = float(attach_algo_ords[0].get("slTriggerPx")) if attach_algo_ords[0].get("slTriggerPx") else None
+            tl_tp_px = float(attach_algo_ords[0].get("tpTriggerPx")) if attach_algo_ords[0].get("tpTriggerPx") else None
+        except Exception:
+            pass
+    try:
+        px_float = float(price) if price else 0.0
+    except Exception:
+        px_float = 0.0
+
     # 🔒 DRY-RUN: Ghi log ảo thay vì đặt lệnh thật lên OKX
     if dry_run:
         if SHOW_DRY_RUN_LOGS:
@@ -341,7 +382,12 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
             clean_px = _clean_num_str(price)
             algo_info = f" [TP/SL: {attach_algo_ords[0]['tpTriggerPx']}/{attach_algo_ords[0]['slTriggerPx']}]" if attach_algo_ords else ""
             print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz}{algo_info} (shadow mode, bỏ qua)")
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=True)
         return None
+
+    # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) nếu có bật
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=False)
+
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     if attach_algo_ords:
         body["attachAlgoOrds"] = attach_algo_ords
@@ -662,4 +708,5 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
 
 # 🧠 CÁC HÀM XỬ LÝ DỮ LIỆU & JSON LOGGING
 # ==============================================================================
+# z1952 | Tích hợp _dispatch_to_tradelocker cho Market entry và Pure limit entry
 

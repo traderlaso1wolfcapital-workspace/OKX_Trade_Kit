@@ -349,7 +349,7 @@ class TradeLockerClient:
         """Đóng vị thế theo positionId"""
         if not self._ensure_authenticated():
             return False, "Chưa xác thực TradeLocker"
-        url = f"{self.base_url}/trade/accounts/{self.account_id}/positions/{position_id}"
+        url = f"{self.base_url}/trade/positions/{position_id}"
         try:
             params = {}
             if qty and qty > 0:
@@ -366,6 +366,58 @@ class TradeLockerClient:
         except Exception as e:
             return False, f"Lỗi mạng: {str(e)}"
 
+    def get_orders(self) -> Tuple[bool, List[Any], str]:
+        """Lấy danh sách các lệnh chờ (Pending/Limit)"""
+        if not self._ensure_authenticated():
+            return False, [], "Chưa xác thực TradeLocker"
+        url = f"{self.base_url}/trade/accounts/{self.account_id}/orders"
+        try:
+            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+            if resp.status_code == 200:
+                orders = resp.json().get("d", {}).get("orders", [])
+                return True, orders, "OK"
+            return False, [], f"Lỗi lấy danh sách lệnh ({resp.status_code}): {resp.text}"
+        except Exception as e:
+            return False, [], str(e)
+
+    def cancel_order(self, order_id: str) -> Tuple[bool, str]:
+        """Hủy 1 lệnh chờ theo orderId"""
+        if not self._ensure_authenticated():
+            return False, "Chưa xác thực TradeLocker"
+        url = f"{self.base_url}/trade/orders/{order_id}"
+        try:
+            resp = requests.delete(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+            if resp.status_code in (200, 204):
+                return True, f"Đã hủy lệnh {order_id} thành công"
+            err_msg = resp.text
+            try:
+                err_msg = resp.json().get("message") or resp.text
+            except Exception:
+                pass
+            return False, f"Lỗi hủy lệnh ({resp.status_code}): {err_msg}"
+        except Exception as e:
+            return False, f"Lỗi mạng: {str(e)}"
+
+    def cancel_all_orders(self, tradable_instrument_id: Optional[str] = None) -> Tuple[bool, str]:
+        """Hủy toàn bộ lệnh chờ (hoặc theo mã instrument)"""
+        if not self._ensure_authenticated():
+            return False, "Chưa xác thực TradeLocker"
+        url = f"{self.base_url}/trade/accounts/{self.account_id}/orders"
+        try:
+            params = {}
+            if tradable_instrument_id:
+                params["tradableInstrumentId"] = str(tradable_instrument_id)
+            resp = requests.delete(url, params=params, headers=self._get_headers(include_acc_num=True), timeout=10)
+            if resp.status_code in (200, 204):
+                return True, "Đã hủy tất cả lệnh chờ thành công"
+            err_msg = resp.text
+            try:
+                err_msg = resp.json().get("message") or resp.text
+            except Exception:
+                pass
+            return False, f"Lỗi hủy lệnh ({resp.status_code}): {err_msg}"
+        except Exception as e:
+            return False, f"Lỗi mạng: {str(e)}"
 
 
 # ==============================================================================
@@ -376,13 +428,50 @@ class TradeLockerManager:
     _clients: Dict[str, TradeLockerClient] = {}
 
     @classmethod
-    def get_user_creds_file(cls, uid: str, user_base_dir_fn) -> str:
+    def _get_default_user_base_dir(cls, uid: str) -> str:
+        safe_uid = "".join(c for c in uid if c.isalnum() or c in ('_', '-'))
+        if not safe_uid: safe_uid = "default"
+        local_app = os.environ.get("LOCALAPPDATA", "")
+        if local_app:
+            if os.path.basename(local_app) == safe_uid:
+                return local_app
+            if os.path.basename(local_app) == "TLS1_Trading_Users":
+                return os.path.join(local_app, safe_uid)
+        base = os.environ.get("LOCALAPPDATA", os.path.join(os.path.expanduser("~"), "AppData", "Local"))
+        return os.path.join(base, "TLS1_Trading_Users", safe_uid)
+
+    @classmethod
+    def _get_default_fernet(cls):
+        try:
+            from cryptography.fernet import Fernet
+            local_app = os.environ.get("LOCALAPPDATA", "")
+            candidates = [
+                os.path.join(local_app, ".master_key"),
+                os.path.join(os.path.dirname(local_app), ".master_key"),
+                os.path.join(os.path.expanduser("~"), "AppData", "Local", "TLS1_Trading_Users", ".master_key")
+            ]
+            for p in candidates:
+                if os.path.exists(p):
+                    with open(p, "rb") as f:
+                        key = f.read().strip()
+                        if key:
+                            return Fernet(key)
+        except Exception:
+            pass
+        return None
+
+    @classmethod
+    def get_user_creds_file(cls, uid: str, user_base_dir_fn = None) -> str:
+        if not user_base_dir_fn:
+            user_base_dir_fn = cls._get_default_user_base_dir
         base_dir = user_base_dir_fn(uid)
         os.makedirs(base_dir, exist_ok=True)
         return os.path.join(base_dir, "tradelocker_config.json")
 
     @classmethod
-    def _decrypt_password(cls, pwd: str, fernet_instance) -> str:
+    def _decrypt_password(cls, pwd: str, fernet_instance = None) -> str:
+        if not fernet_instance:
+            fernet_instance = cls._get_default_fernet()
         if pwd and pwd.startswith("ENC:") and fernet_instance:
             try:
                 return fernet_instance.decrypt(pwd[4:].encode("utf-8")).decode("utf-8")
@@ -391,7 +480,9 @@ class TradeLockerManager:
         return pwd
 
     @classmethod
-    def _encrypt_password(cls, pwd: str, fernet_instance) -> str:
+    def _encrypt_password(cls, pwd: str, fernet_instance = None) -> str:
+        if not fernet_instance:
+            fernet_instance = cls._get_default_fernet()
         if pwd and not pwd.startswith("ENC:") and fernet_instance:
             try:
                 return "ENC:" + fernet_instance.encrypt(pwd.encode("utf-8")).decode("utf-8")
@@ -400,11 +491,16 @@ class TradeLockerManager:
         return pwd
 
     @classmethod
-    def load_raw_data(cls, uid: str, user_base_dir_fn, fernet_instance) -> Tuple[List[Dict[str, Any]], str]:
+    def load_raw_data(cls, uid: str, user_base_dir_fn = None, fernet_instance = None) -> Tuple[List[Dict[str, Any]], str]:
         """
         Đọc toàn bộ danh sách tài khoản Quỹ của user.
         Tự động chuẩn hóa file cấu hình cũ (1 tài khoản phẳng) thành cấu trúc Multi-Prop Firm.
         """
+        if not user_base_dir_fn:
+            user_base_dir_fn = cls._get_default_user_base_dir
+        if not fernet_instance:
+            fernet_instance = cls._get_default_fernet()
+
         file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
         if not os.path.exists(file_path):
             return [], ""
@@ -442,21 +538,26 @@ class TradeLockerManager:
             return [], ""
 
     @classmethod
-    def save_raw_data(cls, uid: str, accounts: List[Dict[str, Any]], active_id: str, user_base_dir_fn, fernet_instance) -> bool:
+    def save_raw_data(cls, uid: str, accounts: List[Dict[str, Any]], active_id: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """
         Lưu danh sách tài khoản Quỹ vào file JSON, mã hóa an toàn mật khẩu.
         """
+        if not user_base_dir_fn:
+            user_base_dir_fn = cls._get_default_user_base_dir
+        if not fernet_instance:
+            fernet_instance = cls._get_default_fernet()
+
         file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
         try:
-            save_accounts = []
+            safe_accounts = []
             for acc in accounts:
                 item = dict(acc)
                 item["password"] = cls._encrypt_password(item.get("password", ""), fernet_instance)
-                save_accounts.append(item)
+                safe_accounts.append(item)
 
             payload = {
                 "active_id": active_id,
-                "accounts": save_accounts,
+                "accounts": safe_accounts,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
             with open(file_path, "w", encoding="utf-8") as f:
@@ -466,7 +567,7 @@ class TradeLockerManager:
             return False
 
     @classmethod
-    def load_user_config(cls, uid: str, user_base_dir_fn, fernet_instance, account_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def load_user_config(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Tương thích 100% với hàm cũ: Trả về tài khoản Quỹ active (hoặc theo account_id cụ thể).
         """
@@ -481,7 +582,7 @@ class TradeLockerManager:
         return accounts[0]
 
     @classmethod
-    def save_user_config(cls, uid: str, config: Dict[str, Any], user_base_dir_fn, fernet_instance, account_id: Optional[str] = None) -> bool:
+    def save_user_config(cls, uid: str, config: Dict[str, Any], user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> bool:
         """
         Tương thích hàm cũ: Cập nhật tài khoản Quỹ active (hoặc theo account_id).
         """
@@ -507,7 +608,7 @@ class TradeLockerManager:
         return cls.save_raw_data(uid, accounts, active_id, user_base_dir_fn, fernet_instance)
 
     @classmethod
-    def upsert_account(cls, uid: str, acc_data: Dict[str, Any], user_base_dir_fn, fernet_instance) -> str:
+    def upsert_account(cls, uid: str, acc_data: Dict[str, Any], user_base_dir_fn = None, fernet_instance = None) -> str:
         """
         Thêm mới hoặc cập nhật 1 tài khoản Quỹ, tự động set làm active.
         """
@@ -534,7 +635,7 @@ class TradeLockerManager:
         return acc_id
 
     @classmethod
-    def select_active_account(cls, uid: str, account_id: str, user_base_dir_fn, fernet_instance) -> bool:
+    def select_active_account(cls, uid: str, account_id: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """
         Chọn tài khoản Quỹ đang hoạt động cho Bot.
         """
@@ -544,7 +645,7 @@ class TradeLockerManager:
         return False
 
     @classmethod
-    def delete_account(cls, uid: str, account_id: str, user_base_dir_fn, fernet_instance) -> bool:
+    def delete_account(cls, uid: str, account_id: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """
         Xóa 1 tài khoản Quỹ cụ thể.
         """
@@ -568,7 +669,7 @@ class TradeLockerManager:
         return cls.save_raw_data(uid, new_accounts, new_active, user_base_dir_fn, fernet_instance)
 
     @classmethod
-    def get_client(cls, uid: str, user_base_dir_fn, fernet_instance, account_id: Optional[str] = None) -> Optional[TradeLockerClient]:
+    def get_client(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Optional[TradeLockerClient]:
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance, account_id=account_id)
         if not cfg or not cfg.get("email") or not cfg.get("password"):
             return None
@@ -606,6 +707,7 @@ class TradeLockerManager:
         price: float,
         sl_price: Optional[float] = None,
         tp_price: Optional[float] = None,
+        dry_run: bool = False,
         user_base_dir_fn = None,
         fernet_instance = None
     ) -> Tuple[bool, str]:
@@ -614,7 +716,9 @@ class TradeLockerManager:
         Tích hợp đầy đủ Cầu Dao An Toàn (Circuit Breaker) và Tự Động Tính Lot Size.
         """
         if not user_base_dir_fn:
-            return False, "Thiếu hàm user_base_dir_fn"
+            user_base_dir_fn = cls._get_default_user_base_dir
+        if not fernet_instance:
+            fernet_instance = cls._get_default_fernet()
 
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance)
         if not cfg or not cfg.get("is_enabled", True):
@@ -658,14 +762,63 @@ class TradeLockerManager:
         fallback_sl = (price * 0.99) if side.lower() in ("buy", "long") else (price * 1.01)
         lot = client.calculate_lot(clean_base, risk_usd=risk_usd, entry_price=price, sl_price=sl_price or fallback_sl)
 
+        if dry_run:
+            print(f"🌑 [DRY-RUN TradeLocker] Bỏ qua đặt lệnh thật (Shadow Mode): {side.upper()} {lot} Lot {clean_base}")
+            return True, f"Chế độ Shadow Mode (Dry-run): Sẽ đặt {side.upper()} {lot} Lot {clean_base}"
+
+        order_type = "limit" if price and price > 0 else "market"
+        # Nếu là lệnh Limit, hủy các lệnh Limit chờ cũ của mã này trước khi đặt lệnh mới
+        if order_type == "limit":
+            try:
+                inst_info = client.resolve_instrument(clean_base)
+                if inst_info:
+                    client.cancel_all_orders(tradable_instrument_id=inst_info.get("tradableInstrumentId"))
+            except Exception:
+                pass
+
         # Đặt lệnh sang TradeLocker
         ok, res, msg = client.place_order(
             symbol=clean_base,
             side=side,
             qty=lot,
-            order_type="limit" if price and price > 0 else "market",
+            order_type=order_type,
             price=price,
             stop_loss=sl_price,
             take_profit=tp_price
         )
         return ok, msg
+
+    @classmethod
+    def dispatch_signal_async(
+        cls,
+        uid: str,
+        symbol: str,
+        side: str,
+        price: float,
+        sl_price: Optional[float] = None,
+        tp_price: Optional[float] = None,
+        dry_run: bool = False
+    ):
+        """Chạy dispatch sang TradeLocker trong luồng ngầm daemon không gây block bot loop"""
+        import threading
+        def _worker():
+            try:
+                ok, msg = cls.dispatch_signal_to_tradelocker(
+                    uid=uid,
+                    symbol=symbol,
+                    side=side,
+                    price=price,
+                    sl_price=sl_price,
+                    tp_price=tp_price,
+                    dry_run=dry_run
+                )
+                if ok:
+                    print(f"🏆 [TRADELOCKER E8 DISPATCH] {msg}", flush=True)
+                else:
+                    if "chưa được kích hoạt" not in msg and "không nằm trong danh sách" not in msg:
+                        print(f"⚠️ [TRADELOCKER E8 DISPATCH THẤT BẠI]: {msg}", flush=True)
+            except Exception as e:
+                print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI]: {e}", flush=True)
+
+        t = threading.Thread(target=_worker, daemon=True, name="TL_Dispatch_Worker")
+        t.start()

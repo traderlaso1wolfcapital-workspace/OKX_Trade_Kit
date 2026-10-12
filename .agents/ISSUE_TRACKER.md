@@ -4153,3 +4153,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Python AST Syntax đạt 100%.
     - Frontend Vite build production thành công (`✓ built in 221ms`).
   *(Mã patch: `z-tradelocker-e8-prop-firm-integration`)*
+
+- **[13/10/2026]** - Khắc phục sự cố Bot chưa bắn lệnh lên TradeLocker & Xử lý chặn mạng ISP Việt Nam & Hoàn thiện Dispatcher Bot Orders:
+  - **Vấn đề CEO báo cáo:** Đã kết nối tài khoản Quỹ E8 Markets trên TradeLocker (`demo.tradelocker.com`, Email `baotranlc020.ido@gmail.com`) nhưng khi bot chạy thì chưa thấy bắn lệnh lên sàn TradeLocker.
+  - **Phân tích nguyên nhân cốt lõi:**
+    1. **Chặn mạng ISP Việt Nam:** Router DNS nội bộ và nhà mạng phân giải `demo.tradelocker.com` về IP loopback `127.0.0.1` (`[Errno 61] Connection refused`) và lọc DPI gói TLS SNI (`Connection reset by peer`). Trên máy có `warp-cli` nhưng đang ở trạng thái `Disconnected`.
+    2. **Mã nguồn Bot thiếu Execution Dispatcher:** Các file `bots/sub1/bot_orders.py` và `bots/sub2/bot_orders.py` mới chỉ gửi lệnh qua OKX REST API, chưa móc nối dispatcher sang TradeLocker khi phát sinh tín hiệu vào lệnh (Market Entry hoặc Limit Order).
+    3. **Lỗi Endpoint đóng vị thế & Thiếu hủy lệnh:** `tradelocker_service.py` gọi nhầm `DELETE /trade/accounts/{accId}/positions/{posId}` (bị 404), trong khi TradeLocker API quy chuẩn là `DELETE /trade/positions/{posId}`. Ngoài ra còn thiếu các hàm hủy lệnh (`cancel_order`, `cancel_all_orders`).
+  - **Đã xử lý triệt để:**
+    1. **Mạng:** Bật kết nối Cloudflare WARP (`warp-cli connect`), kết nối tới TradeLocker API thông suốt 100%.
+    2. **Móc nối Dispatcher vào Bot Orders:**
+       - Tích hợp `_dispatch_to_tradelocker(...)` gọi bất đồng bộ (`dispatch_signal_async`) trong cả Sub1 (`place_market_entry`, `place_pure_limit`) và Sub2 (`place_ob_market_order`, `place_ob_limit_order`). Dispatcher chạy trên thread ngầm, bảo đảm không làm chậm chu kỳ quét nến OKX.
+       - Tự động nhận diện `BOT_USER_UID` truyền từ backend `main.py` để bot trỏ đúng cấu hình quỹ của người dùng.
+    3. **Nâng cấp `tradelocker_service.py`:**
+       - Chuẩn hóa endpoint `close_position` sang `DELETE /trade/positions/{posId}`.
+       - Bổ sung `get_orders`, `cancel_order`, `cancel_all_orders`.
+       - Thêm cơ chế tự động hủy lệnh Limit cũ trước khi đặt Limit mới để tránh trùng lệnh.
+  - **Kiểm chứng thực tế trên tài khoản E8 của CEO (ID `2534591`, Balance `$5,000.00`):**
+    - Xác thực JWT thành công, lấy thông tin tài khoản E8 Account 1 thành công.
+    - Bắn lệnh MARKET BUY XAUUSD 0.01 Lot thật lên sàn thành công (Mã lệnh: `360287970213215464`), vị thế khớp tức thì trên TradeLocker.
+    - Test đóng vị thế thành công qua `close_position`, tài khoản về 0 vị thế sạch sẽ.
+    - Test đặt lệnh LIMIT BUY XAUUSD tại giá 2000 thành công (Mã lệnh: `360287970213215662`).
+    - Test hủy lệnh Limit thành công, dọn sạch 100% lệnh chờ.
+  *(Mã patch: `z-tradelocker-dispatcher-live-fix-and-warp`)*
