@@ -57,7 +57,8 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
        - **Giải pháp:** Trong `log_event()`, khi không có subscriber WebSocket cục bộ, tự động in ra stdout với tiền tố `[TRADELOCKER] <msg>` và `flush=True`. Tiến trình cha `main.py` đọc qua `log_reader_task`, chuyển hướng vào queue của Quỹ FX và broadcast tới trình duyệt.
   - **Kiểm tra và nghiệm thu:**
     - `python3 -m py_compile` vượt qua 100% trên `tradelocker_service.py`, `main.py`, `bots/sub1/bot_orders.py`, `bots/sub2/bot_orders.py`.
-    - `npm run build` thành công, `dist` được cập nhật đồng bộ.
+    - Bổ sung `import threading` tại top-level của `tradelocker_service.py` để tránh lỗi `NameError: name 'threading' is not defined` khi khởi tạo `_dispatch_lock` lúc backend import module khi deploy.
+    - `python3 -c "import main"` và `npm run build` thành công, `dist` được cập nhật đồng bộ.
 
 - **[13/10/2026]** - Khắc Phục Triệt Để Lỗi Spam Lệnh TradeLocker, Thiếu SL/TP, Rác HTML Cloudflare Và Không Hiện Bảng Vị Thế:
   - **Mô tả yêu cầu CEO:**

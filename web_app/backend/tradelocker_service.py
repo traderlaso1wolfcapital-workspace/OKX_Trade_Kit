@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import threading
 from datetime import datetime, timezone
 import requests
 from typing import Optional, Dict, Any, List, Tuple
@@ -1237,4 +1238,5 @@ class TradeLockerManager:
 # z1956 | Khắc phục triệt để lỗi spam lệnh TradeLocker: kiểm tra vị thế mở cùng chiều, khóa cooldown 45s, tự động tính SL/TP bắt buộc và tự động vá SL/TP cho các vị thế đang trần
 # z1957 | Bổ sung logging chi tiết cho dispatch TradeLocker: log cancel_all_orders, log trước khi đặt lệnh, log raw response khi thất bại để chẩn đoán lỗi lệnh bị hủy/mất
 # z1958 | Triệt tiêu lỗi spam hủy/đặt lại limit order và lỗi netting đóng vị thế: đồng bộ hóa thread-lock _dispatch_lock, IPC stdout log forwarding, giữ nguyên limit order đang chờ nếu lệch < 0.2%, chặn 100% rác HTML Cloudflare qua _clean_error_text
+# z1959 | Bổ sung import threading ở top file giải quyết triệt để NameError khi khởi tạo TradeLockerManager._dispatch_lock
 
