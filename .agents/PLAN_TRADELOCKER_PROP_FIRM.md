@@ -79,4 +79,12 @@
   * Thẩm định chặt chẽ kết quả đặt lệnh từ TradeLocker API: Kiểm tra cờ trạng thái `s` ("ok" vs "error"/"fail") và trích xuất chính xác mã `orderId`. Loại bỏ hoàn toàn tình trạng báo thành công giả (`Mã lệnh: None`) khi sàn thực tế từ chối lệnh.
   * Đồng bộ khối lượng Lot cố định (Fixed Lot) giữa giao diện người dùng và backend: Ô SpinBox `Khối lượng: [LOT] [Cố định] 0.01 L` được lưu trực tiếp vào backend qua `/api/tradelocker/config`.
   * Bot ưu tiên tuyệt đối số Lot cố định được cài đặt trên UI (mặc định an toàn: 0.01 Lot), ngăn chặn việc tính toán khối lượng động quá lớn (ví dụ 0.70 Lot ETH) làm vi phạm ký quỹ của tài khoản quỹ.
+- [x] **Bước 10:** Khắc phục triệt để lỗi Spam vào lệnh liên tục, Thiếu Stop Loss / Take Profit, Không hiện Logs Quỹ FX và Bảng Vị Thế (0):
+  * **Cầu dao chống spam lệnh cùng chiều (Anti-Spam Position Check):** Trước khi chuyển tiếp lệnh sang TradeLocker, tự động truy vấn danh sách vị thế đang mở qua `get_positions()`. Nếu cặp giao dịch đã có vị thế mở cùng chiều (BUY/SELL), lập tức chặn và ghi nhận log cảnh báo, không mở thêm vị thế dồn dập.
+  * **Khóa ngắt nhịp Cooldown:** Áp dụng thời gian chờ tối thiểu 45 giây giữa các lần xử lý tín hiệu cho cùng một symbol.
+  * **Bảo vệ SL / TP Fallback:** Nếu bot không truyền tham số cắt lỗ/chốt lời (hoặc lệnh Limit giá cao hơn giá thị trường khiến OKX algo bị None), tự động tính toán SL và TP theo cấu hình `sl_percent`/`tp_percent` (mặc định 1.2%) trước khi bắn lệnh sang TradeLocker.
+  * **Cơ chế tự sửa lỗi SL/TP (Self-Healing Position Patch):** Khi duyệt danh sách vị thế đang mở trên TradeLocker, nếu phát hiện vị thế nào chưa có Stop Loss, hệ thống tự động gọi API `PATCH /trade/positions/{posId}` để gắn bổ sung SL và TP an toàn.
+  * **Sửa lỗi Bảng Vị Thế (0) & Định dạng ma trận:** Chuẩn hóa dữ liệu trả về từ TradeLocker API (ma trận mảng lồng nhau 2D) thông qua `get_positions_columns()`, ánh xạ chính xác `ticket_id, symbol, posSide, size, openPrice, upl, roi, stopLoss, takeProfit` hiển thị trực quan trên giao diện web.
+  * **Khắc phục kênh Logs Quỹ FX & Lọc rác HTML Cloudflare:** Chuyển hướng log song song vào cả queue UID và queue `default` cho WebSocket; lọc sạch thẻ HTML lỗi 502/504 từ Cloudflare thành thông báo súc tích dễ nhìn.
+
 

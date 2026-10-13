@@ -87,6 +87,8 @@ class OKXRestCore:
                 try:
                     resp.raise_for_status()
                 except Exception as http_err:
+                    if resp.status_code >= 500:
+                        raise RuntimeError(f"HTTP {resp.status_code} ({resp.reason or 'Cloudflare Gateway Timeout'})")
                     try:
                         err_json = resp.json()
                         if "msg" in err_json:
@@ -166,6 +168,10 @@ class AsyncOKXRestCore(OKXRestCore):
                         last_err = RuntimeError(f"HTTP 429 Rate Limit — retry {attempt+1}/{max_retries}")
                         await asyncio.sleep(1)
                         continue
+                    if resp.status >= 500:
+                        last_err = RuntimeError(f"HTTP {resp.status} ({resp.reason or 'Cloudflare Gateway Timeout'})")
+                        await asyncio.sleep(1)
+                        continue
                     resp.raise_for_status()
                     res_json = await resp.json()
                     if res_json.get("code") != "0":
@@ -202,3 +208,6 @@ class AsyncOKXRestCore(OKXRestCore):
         res = await self.request("GET", "/api/v5/public/instruments", params={"instType": "SWAP", "instId": inst_id})
         spec = res["data"][0]
         return {"ctVal": Decimal(spec["ctVal"]), "tickSz": Decimal(spec["tickSz"]), "lotSz": Decimal(spec["lotSz"]), "minSz": Decimal(spec["minSz"])}
+
+# z1956 | Chuẩn hóa bắt lỗi HTTP 5xx từ Cloudflare không in tràn mã HTML lỗi ra luồng log
+

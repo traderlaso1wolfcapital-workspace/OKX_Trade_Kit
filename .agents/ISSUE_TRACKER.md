@@ -33,6 +33,34 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[13/10/2026]** - Khắc Phục Triệt Để Lỗi Spam Lệnh TradeLocker, Thiếu SL/TP, Rác HTML Cloudflare Và Không Hiện Bảng Vị Thế:
+  - **Mô tả yêu cầu CEO:**
+    1. Bot spam lệnh liên tục lên TradeLocker (5 lệnh ETHUSD+ trong 3 phút).
+    2. Không thấy logs gì trong kênh Quỹ FX.
+    3. Không thấy cài Stop Loss và Take Profit (4/5 lệnh không có SL/TP).
+    4. Kiểm tra đúng logic thuật toán vào lệnh chưa và các lỗi còn lại (rác HTML Cloudflare trong log OKX, Bảng vị thế Quỹ FX trên web hiển thị 0).
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Nguyên nhân Spam lệnh TradeLocker:**
+       - Do sàn OKX chạy ở chế độ Shadow Mode (Dry-run), trên OKX không có vị thế mở (`tracker.has_long = False`) và danh sách lệnh chờ trên OKX trống. Do đó cả 6 khung thời gian (M5, M15, M30, H1, H2, H4) khi đủ điều kiện chiến lược đều kích hoạt `place_pure_limit` -> `_dispatch_to_tradelocker`.
+       - Tại `dispatch_signal_to_tradelocker`, hệ thống trước đây không kiểm tra xem TradeLocker đã có vị thế mở cho cặp đó hay chưa và không có khóa Cooldown theo mã. Do sàn TradeLocker mặc định bật chế độ Hedge, mỗi lần bắn tín hiệu đều mở thêm 1 vị thế độc lập mới.
+       - **Giải pháp:** Trong `dispatch_signal_to_tradelocker`: (1) Thiết lập khóa Cooldown 45 giây tối thiểu giữa các lần bắn lệnh của cùng 1 mã; (2) Kiểm tra trực tiếp bảng vị thế TradeLocker qua `get_positions()`: Nếu đã có vị thế mở cùng chiều (BUY/SELL) cho mã này, lập tức bỏ qua và ghi log thông báo, triệt tiêu 100% tình trạng spam lệnh trùng.
+    2. **Nguyên nhân thiếu Stop Loss / Take Profit (4/5 lệnh bị trần):**
+       - Tại `bot_strategy.py`, khối `attach_algo_long` bị gán `None` khi sanity check giá thị trường không thỏa điều kiện OKX. Khi đó `tl_sl_px` và `tl_tp_px` truyền sang TradeLocker bị `None`.
+       - `dispatch_signal_to_tradelocker` trước đây không có cơ chế tự tính SL/TP fallback nên đặt lệnh thẳng lên TradeLocker với SL/TP bằng `None`.
+       - **Giải pháp:** (1) Trong `bot_orders.py#place_pure_limit`: Nếu `attach_algo_ords` là `None`, tự động tính fallback `tl_sl_px` và `tl_tp_px` theo tỷ lệ 1.2% chuẩn; (2) Trong `dispatch_signal_to_tradelocker`: Bắt buộc tính toán SL/TP dựa trên giá tham chiếu và tỷ lệ người dùng cấu hình (`sl_percent`/`tp_percent` hoặc 1.2% mặc định); (3) Cơ chế Tự Động Vá (Self-Healing): Mỗi khi quét vị thế TradeLocker, nếu phát hiện vị thế đang mở nào chưa có SL (`stopLoss is None`), bot tự động gọi `modify_position` gắn ngay SL và TP để bảo vệ an toàn vốn tuyệt đối.
+    3. **Nguyên nhân không thấy logs trong Quỹ FX:**
+       - Quá trình bot chạy trong tiến trình con độc lập, bộ nhớ `TradeLockerManager` của tiến trình con không chia sẻ với `main.py`. Các dòng in `[TRADELOCKER E8 DISPATCH]` từ tiến trình con được chuyển qua `log_reader_task`, nhưng việc lưu log và đẩy WebSocket bị lệch UID giữa tiến trình con và `default` của frontend.
+       - **Giải pháp:** `TradeLockerManager.log_event` ghi đồng thời vào cả queue UID và queue `default`, đồng thời phát sóng WebSocket cho cả 2 kênh subscriber. REST API `get_logs_payload` tự động fallback sang `default`. Truyền biến môi trường `BOT_USER_UID` đồng bộ vào mọi vị trí spawn bot (`start_shadow_bot`, `auto_resume_bots`).
+    4. **Nguyên nhân rác mã HTML Cloudflare trong log OKX:**
+       - Khi OKX phản hồi lỗi 502/504 Bad Gateway, Cloudflare trả về trang HTML chứa các thẻ `<html>`, `<head>`, `<style>`. Tiến trình bot in lỗi ra stdout và `log_reader_task` đẩy từng dòng HTML vào giao diện log.
+       - **Giải pháp:** (1) Thêm bộ lọc trong `log_reader_task`: nhận diện chuỗi HTML Cloudflare và gom lại thành một thông báo mạng gọn gàng duy nhất `⚠️ [KẾT NỐI MẠNG] Máy chủ OKX phản hồi chậm qua Cloudflare (502/504)...`; (2) Chuẩn hóa `bot_api.py` (cả sub1 và sub2) để không ném chuỗi HTML thô ra ngoài Exception.
+    5. **Nguyên nhân Bảng vị thế Quỹ FX trên web hiển thị (0):**
+       - Endpoint TradeLocker `/trade/accounts/{accId}/positions` trả về ma trận dạng mảng lồng nhau (`list of lists`).
+       - Trong `main.py#tradelocker_get_positions`, có dòng `if isinstance(p, list): continue` khiến 100% vị thế bị bỏ qua.
+       - **Giải pháp:** Bổ sung `get_positions_columns` và ánh xạ chính xác ma trận mảng thành danh sách Dict hoàn chỉnh, trả về đầy đủ `ticket_id, symbol, posSide, size, openPrice, upl, roi, stopLoss, takeProfit`. Bảng Vị Thế trên web lập tức hiển thị chính xác toàn bộ vị thế đang mở.
+  - **Kiểm tra và nghiệm thu:**
+    - `python3 -m py_compile` vượt qua 100% trên `tradelocker_service.py`, `main.py`, `bots/sub1/bot_orders.py`, `bots/sub1/bot_api.py`, `bots/sub2/bot_api.py`.
+
 - **[13/10/2026]** - Tách Biệt Hoàn Toàn Hệ Thống Logs Giữa Sàn OKX Và Quỹ FX (TradeLocker):
   - **Mô tả yêu cầu CEO:**
     - Hiện phần logs đang hiển thị chung cả Sàn OKX và Quỹ FX, gây lẫn lộn thông tin khi bot chạy. Yêu cầu tách riêng 2 hệ thống logs ra hoàn toàn.

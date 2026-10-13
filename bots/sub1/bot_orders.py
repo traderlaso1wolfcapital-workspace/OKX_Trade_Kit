@@ -374,6 +374,13 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
     except Exception:
         px_float = 0.0
 
+    # Nếu chưa có SL/TP (do attach_algo_ords bị None hoặc bỏ qua), tính fallback theo tỷ lệ 1.2% chuẩn
+    if px_float > 0:
+        if tl_sl_px is None or tl_sl_px <= 0:
+            tl_sl_px = round(px_float * 0.988 if side.lower() == "buy" else px_float * 1.012, 2)
+        if tl_tp_px is None or tl_tp_px <= 0:
+            tl_tp_px = round(px_float * 1.012 if side.lower() == "buy" else px_float * 0.988, 2)
+
     # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
     _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=False)
 
@@ -707,4 +714,6 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
 # 🧠 CÁC HÀM XỬ LÝ DỮ LIỆU & JSON LOGGING
 # ==============================================================================
 # z1953 | Tách biệt hoàn toàn điều phối lệnh Quỹ TradeLocker (E8) độc lập với trạng thái dry_run của sàn OKX
+# z1956 | Tự động tính SL/TP fallback (1.2%) khi attach_algo_ords không cung cấp để đảm bảo 100% lệnh TradeLocker có cắt lỗ/chốt lời
+
 

@@ -612,6 +612,7 @@ async def log_reader_task(stream, uid, strategy):
     if uid not in bot_log_queues: bot_log_queues[uid] = {}
     if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = deque(maxlen=400)
     log_deque = bot_log_queues[uid][strategy]
+    last_cf_warn_time = 0.0
     try:
         while True:
             line = await asyncio.to_thread(stream.readline)
@@ -629,6 +630,23 @@ async def log_reader_task(stream, uid, strategy):
                     TradeLockerManager.log_event(uid, line_str)
                 except Exception:
                     pass
+                continue
+
+            # 🛡️ LỌC BỎ RÁC HTML CLOUDFLARE (502 / 504 Bad Gateway / Error Pages):
+            lower_line = line_str.lower()
+            is_cf_html = any(tag in lower_line for tag in [
+                "<!doctype html", "<html", "<head>", "<body", "cloudflare", "ray id:", "cf-error", "<script", "<style", "502 bad gateway", "504 gateway time-out"
+            ])
+            if is_cf_html:
+                now_t = time.time()
+                if (now_t - last_cf_warn_time) > 15.0:
+                    last_cf_warn_time = now_t
+                    warn_line = "⚠️ [KẾT NỐI MẠNG] Máy chủ OKX phản hồi chậm qua Cloudflare (502/504). Bot đang tự động giữ kết nối và thử lại..."
+                    log_deque.append(warn_line)
+                    if uid in active_connections and strategy in active_connections[uid]:
+                        for connection in list(active_connections[uid][strategy]):
+                            try: await connection.send_text(warn_line)
+                            except Exception: pass
                 continue
 
             log_deque.append(line_str)
@@ -1425,6 +1443,7 @@ async def auto_resume_bots():
                     custom_env = os.environ.copy()
                     custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
                     custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+                    custom_env["BOT_USER_UID"] = uid
                     custom_env["PYTHONUNBUFFERED"] = "1"
                     custom_env["PYTHONIOENCODING"] = "utf-8"
                     
@@ -1839,6 +1858,7 @@ async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = N
         custom_env = os.environ.copy()
         custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
         custom_env["LOCALAPPDATA"] = get_user_base_dir(uid)
+        custom_env["BOT_USER_UID"] = uid
         custom_env["PYTHONUNBUFFERED"] = "1"
         custom_env["PYTHONIOENCODING"] = "utf-8"
 
@@ -4012,7 +4032,11 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
         mapped_list = []
         for p in raw_positions:
             if isinstance(p, list):
-                continue
+                cols = client.get_positions_columns() if hasattr(client, "get_positions_columns") else [
+                    "id", "tradableInstrumentId", "routeId", "side", "qty", "price",
+                    "stopLoss", "takeProfit", "moment", "pnl", "trailingOffset"
+                ]
+                p = {cols[i]: p[i] for i in range(min(len(cols), len(p)))}
             pos_id = str(p.get("id") or p.get("positionId") or "")
             tradable_id = p.get("tradableInstrumentId")
             raw_sym = id_to_name.get(tradable_id) or id_to_name.get(str(tradable_id)) or p.get("symbol") or "BTCUSD+"
@@ -4184,3 +4208,4 @@ if __name__ == "__main__":
 # z7732 | Tách riêng hoàn toàn trạng thái chạy và bảng vị thế giữa Sàn OKX và Quỹ FX (TradeLocker): bổ sung API bot status/start/stop cho TradeLocker, đảm bảo OKX và Quỹ FX có thể chạy đồng thời độc lập không xung đột.
 # z7733 | Tách biệt hoàn toàn hệ thống Logs giữa Sàn OKX và Quỹ FX: chuyển hướng log TradeLocker trong log_reader_task không cho lẫn vào OKX, bổ sung REST API /api/tradelocker/logs và WebSocket /ws/tradelocker/logs.
 # z7734 | Hỗ trợ lưu trữ và đồng bộ tham số fixed_lot cho cấu hình Quỹ TradeLocker qua endpoint REST API
+# z7735 | Khắc phục triệt để lỗi TradeLocker không hiển thị vị thế trên web (chuẩn hóa ma trận list sang dict), lọc rác HTML 502/504 Cloudflare trong log OKX, và truyền BOT_USER_UID đồng bộ vào shadow bot
