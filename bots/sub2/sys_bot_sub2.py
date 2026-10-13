@@ -527,3 +527,4 @@ if __name__ == "__main__":
 # z1950 | Fix UI missing PID check causing multi-instance by removing strict 'python' process name requirement from lock check
 # z1951 | Flush I/O queue and wait for worker thread to finish before process exit to prevent data loss
 # z1952 | Tích hợp TradeLocker dispatcher bất đồng bộ khi khớp lệnh và đặt lệnh limit SMC
+# z1953 | Tách biệt hoàn toàn luồng xử lý và trạng thái hoạt động giữa Sàn OKX và Quỹ FX

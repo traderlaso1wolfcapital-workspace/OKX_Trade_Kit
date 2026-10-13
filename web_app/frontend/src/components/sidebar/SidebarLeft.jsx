@@ -255,7 +255,6 @@ export default function SidebarLeft({
               data-tour="platform-select"
               value={tradingPlatform}
               onChange={(e) => handlePlatformSwitch(e.target.value)}
-              disabled={isRunning}
               className="styled-select"
               style={{
                 flex: 1,
@@ -268,7 +267,7 @@ export default function SidebarLeft({
                 fontSize: "12px",
                 fontWeight: "bold",
                 color: "#ffffff",
-                cursor: isRunning ? "not-allowed" : "pointer",
+                cursor: "pointer",
                 outline: "none",
                 transition: "all 0.15s ease",
                 appearance: "none",
@@ -278,7 +277,7 @@ export default function SidebarLeft({
                 backgroundPosition: "right 8px center",
                 backgroundSize: "13px 13px",
               }}
-              title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi sàn!" : "Chọn nền tảng giao dịch"}
+              title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ FX)"
             >
               <option value="okx" style={{ background: "#1e1e1e", color: "#ffffff" }}>Sàn OKX</option>
               <option value="e8" style={{ background: "#1e1e1e", color: "#ffffff" }}>Quỹ FX</option>

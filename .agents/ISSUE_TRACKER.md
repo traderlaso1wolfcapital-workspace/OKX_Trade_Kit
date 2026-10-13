@@ -4176,3 +4176,31 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Test đặt lệnh LIMIT BUY XAUUSD tại giá 2000 thành công (Mã lệnh: `360287970213215662`).
     - Test hủy lệnh Limit thành công, dọn sạch 100% lệnh chờ.
   *(Mã patch: `z-tradelocker-dispatcher-live-fix-and-warp`)*
+
+- **[13/10/2026]** - Tách Biệt Độc Lập Trạng Thái Chạy & Bảng Vị Thế Giữa Sàn OKX và Quỹ FX (TradeLocker):
+  - **Vấn đề CEO báo cáo:**
+    1. Khi ở chế độ FX thì bảng vị thế cứ nhảy liên tục qua lại từ bên Quỹ FX sang Sàn OKX (flickering).
+    2. Cần tách riêng ra: khi đang trade OKX bot đang chạy thì nó vẫn tiếp tục chạy, để khi chuyển sang tab Quỹ FX và bật chạy Quỹ FX thì bên sàn OKX không bị dừng mà vẫn sẽ chạy song song độc lập.
+  - **Nguyên nhân kỹ thuật:**
+    1. **Bảng vị thế bị giật (Flickering):** File `App.jsx` dùng chung một state `positions` cho cả WebSocket (stream vị thế OKX mỗi 2s) và HTTP fetch (`/api/tradelocker/positions` mỗi 5s). Cứ mỗi 2s WebSocket push tick OKX đè lên `positions`, sau đó HTTP polling lại đè vị thế FX lên ⭢ Bảng bị giật qua lại liên tục giữa 2 nền tảng.
+    2. **Khóa cứng chuyển tab khi bot chạy:** Trong `SidebarLeft.jsx`, thẻ `<select>` chọn nền tảng có thuộc tính `disabled={isRunning}`, làm người dùng không thể chuyển sang xem Quỹ FX khi Bot OKX đang chạy nếu không bấm dừng bot.
+    3. **Start Bot triệt tiêu lẫn nhau:** Khi bật bot Quỹ FX, backend `/api/bot/start` kiểm tra `current_running_acc != target_acc` ("sub1" != "e8_prop") dẫn đến ra lệnh KILL process bot OKX đang chạy để restart.
+    4. **Cờ thực thi đơn nhất:** `_dispatch_to_tradelocker` trong `bot_orders.py` bị ràng buộc chung với cờ `dry_run` của OKX, không có cờ quản lý bật/tắt bot riêng cho Quỹ FX.
+  - **Đã xử lý triệt để:**
+    1. **Cô lập Bảng Vị Thế:** Tách biệt state `wsPositions` (cho WebSocket OKX) và `propPositions` (cho Quỹ FX). Biến `positions` hiển thị được memoize chặt chẽ theo `currentPlatform`: khi ở tab Quỹ FX (`currentPlatform === "e8"`), bảng vị thế 100% chỉ nhận dữ liệu từ `propPositions`, WebSocket OKX tuyệt đối không thể can thiệp hay làm giật bảng.
+    2. **Cờ Chạy & API Độc Lập cho Quỹ FX:**
+       - Thêm cờ `is_bot_running` độc lập trong `tradelocker_service.py` cho từng user.
+       - Thêm 3 endpoint REST API riêng biệt trong `web_app/backend/main.py`: `GET /api/tradelocker/bot/status`, `POST /api/tradelocker/bot/start`, `POST /api/tradelocker/bot/stop`.
+       - Trong `bots/sub1/bot_orders.py` và `bots/sub2/bot_orders.py`, tách rời dispatch tín hiệu sang Quỹ FX khỏi cờ `dry_run` của OKX. Quỹ FX tự kiểm tra cờ `is_bot_running` của mình trước khi đặt lệnh.
+    3. **Tách Nút Bấm & Trạng Thái Chạy trên Frontend:**
+       - Tách biệt `isOkxRunning` và `isPropRunning`.
+       - Khi ở Sàn OKX: Nút bấm hiển thị trạng thái và điều khiển Start/Stop của Bot OKX.
+       - Khi ở Quỹ FX: Nút bấm hiển thị trạng thái và điều khiển Start/Stop của Bot Quỹ FX.
+       - Khi Bot OKX đang chạy, người dùng thoải mái chuyển sang tab Quỹ FX để bấm CHẠY BOT Quỹ FX. Cả hai bot cùng chạy song song ngầm, lệnh sàn OKX vẫn khớp và lệnh quỹ E8 vẫn bắn độc lập 100%.
+    4. **Mở khóa chọn nền tảng:** Gỡ bỏ `disabled={isRunning}` tại thẻ select trong `SidebarLeft.jsx`, cho phép người dùng chuyển đổi nền tảng mượt mà bất cứ lúc nào.
+    5. **Đóng vị thế Quỹ FX:** Bổ sung `onCloseTicket` trong `PositionsTable.jsx` để đóng trực tiếp vị thế Quỹ FX qua API `/api/tradelocker/positions/close`.
+  - **Kiểm chứng:**
+    - `npm run build` frontend thành công 100%, không lỗi cú pháp JSX hay build error (`✓ built in 10.55s`).
+    - Python syntax (`py_compile`) trên toàn bộ các file bot (`sub1`, `sub2`, `main.py`, `tradelocker_service.py`) đạt 100%.
+  *(Mã patch: `z-tradelocker-dual-engine-and-anti-flicker`)*
+

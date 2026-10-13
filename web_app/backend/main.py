@@ -1465,6 +1465,9 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     if not uid: raise HTTPException(status_code=400, detail="uid is required")
 
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    if target_acc in ["e8_prop", "e8"]:
+        return await tradelocker_start_bot(uid, strategy=strategy)
+
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
 
     # ── HỖ TRỢ CHẾ ĐỘ QUỸ PROP FIRM (TRADELOCKER / E8) ──
@@ -1745,8 +1748,11 @@ def reset_nen(uid: str, strategy: str = "sub1"):
 @app.post("/api/bot/stop")
 async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     """Dừng bot (chuyển về Shadow mode). Hủy toàn bộ limit chưa khớp trên sàn, bảo lưu 100% TP/SL."""
-    acc_name = strategy
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    if target_acc in ["e8_prop", "e8"]:
+        return tradelocker_stop_bot(uid)
+
+    acc_name = strategy
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
 
@@ -4056,6 +4062,38 @@ def tradelocker_close_position(req: TradeLockerCloseReq):
         return {"status": "success", "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
+@app.get("/api/tradelocker/bot/status")
+def tradelocker_get_bot_status(uid: str = "default"):
+    clean_uid = uid.strip() if uid else "default"
+    is_running = TradeLockerManager.is_bot_running(clean_uid, get_user_base_dir, fernet)
+    return {
+        "status": "RUNNING" if is_running else "STOPPED",
+        "is_running": is_running
+    }
+
+@app.post("/api/tradelocker/bot/start")
+async def tradelocker_start_bot(uid: str, strategy: str = "sub1"):
+    clean_uid = uid.strip() if uid else "default"
+    client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet)
+    if not client:
+        raise HTTPException(status_code=400, detail="Chưa kết nối Quỹ TradeLocker. Vui lòng kết nối Quỹ trước khi chạy bot!")
+    
+    # Đảm bảo Shadow Bot hoặc Engine Bot đang chạy ngầm để tính toán nến/EMA và gửi tín hiệu cho TradeLocker
+    pid = get_running_pid(clean_uid, strategy)
+    proc = get_nested(bot_processes, clean_uid, strategy)
+    process_alive = (pid > 0) or (proc and proc.poll() is None)
+    if not process_alive:
+        await start_shadow_bot(clean_uid, strategy=strategy)
+
+    TradeLockerManager.set_bot_running(clean_uid, True, get_user_base_dir, fernet)
+    return {"status": "success", "message": "⚡ Bot Quỹ FX (TradeLocker) đã được KÍCH HOẠT! Tín hiệu sẽ tự động đặt lệnh lên Quỹ độc lập."}
+
+@app.post("/api/tradelocker/bot/stop")
+def tradelocker_stop_bot(uid: str):
+    clean_uid = uid.strip() if uid else "default"
+    TradeLockerManager.set_bot_running(clean_uid, False, get_user_base_dir, fernet)
+    return {"status": "success", "message": "Bot Quỹ FX (TradeLocker) đã dừng!"}
+
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
 if os.path.exists(frontend_dist_path):
@@ -4091,3 +4129,4 @@ if __name__ == "__main__":
 # z7729 | Khắc phục triệt để lỗi rò rỉ và điều khiển chéo tài khoản giữa các user: cô lập 100% data, credentials, positions, logs và websocket theo OKX main_uid; loại bỏ hoàn toàn fallback default và hardcoded UID.
 # z7730 | Tự động chuyển đổi session sang OKX Master UID khi người dùng Fast Connect / thêm API Key thành công, loại bỏ lỗi chặn nhầm session cũ không khớp UID.
 # z7731 | Tích hợp toàn diện TradeLocker API cho quỹ E8 Markets: module tradelocker_service, các endpoint kết nối, quản lý số dư, tính toán Lot size và giám sát Drawdown/Profit Cap.
+# z7732 | Tách riêng hoàn toàn trạng thái chạy và bảng vị thế giữa Sàn OKX và Quỹ FX (TradeLocker): bổ sung API bot status/start/stop cho TradeLocker, đảm bảo OKX và Quỹ FX có thể chạy đồng thời độc lập không xung đột.

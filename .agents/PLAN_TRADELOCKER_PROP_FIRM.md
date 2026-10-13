@@ -65,4 +65,10 @@
   * Bắn lệnh test thật BUY XAUUSD 0.01 Lot (Mã lệnh: `360287970213215464`), khớp vị thế ngay tức thì.
   * Đóng vị thế thành công qua `DELETE /trade/positions/{posId}` (chuẩn TradeLocker API).
   * Đặt và hủy lệnh Limit thành công (Mã lệnh: `360287970213215662`). Nghiệm thu sạch sẽ 100%.
+- [x] **Bước 7:** Tách biệt độc lập 100% giữa Sàn OKX và Quỹ FX (TradeLocker Dual-Engine Isolation):
+  * Khắc phục triệt để lỗi bảng vị thế bị giật/nhảy liên tục (flickering) giữa OKX và TradeLocker: cô lập riêng `wsPositions` và `propPositions`.
+  * Bổ sung cờ chạy `is_bot_running` riêng cho Quỹ FX trong `tradelocker_service.py` và các API độc lập: `GET /api/tradelocker/bot/status`, `POST /api/tradelocker/bot/start`, `POST /api/tradelocker/bot/stop`.
+  * Tách biệt nút bấm và trạng thái `isRunning` trên giao diện: Khi Bot OKX đang chạy, người dùng vẫn có thể chuyển sang Quỹ FX và bật chạy Bot Quỹ FX song song mà không làm dừng hay ảnh hưởng đến Bot OKX.
+  * Mở khóa dropdown chọn nền tảng (`SidebarLeft.jsx`) cho phép chuyển đổi qua lại bất kỳ lúc nào.
+  * Hoàn thiện thao tác đóng vị thế Quỹ FX trực tiếp từ Bảng Vị Thế (`PositionsTable.jsx`).
 

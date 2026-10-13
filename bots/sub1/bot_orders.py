@@ -319,22 +319,21 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
         pass
 
 def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
-    # 🔒 DRY-RUN
+    # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=False)
+
+    # 🔒 DRY-RUN SÀN OKX
     if dry_run:
         if SHOW_DRY_RUN_LOGS:
             clean_sz = _clean_num_str(size)
-            print(f"🌑 [DRY-RUN] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={clean_sz} (shadow mode, bỏ qua)")
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=True)
+            print(f"🌑 [DRY-RUN OKX] place_market_entry: Sẽ vào lệnh Market {inst_id} {side.upper()} {pos_side.upper()} sz={clean_sz} (OKX dừng, bỏ qua)")
         return None
-
-    # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) nếu có bật
-    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=False)
 
     try:
         resp = client.request("POST", "/api/v5/trade/order", body={
             "instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "market", "sz": size
         })
-        print(f"🚀 [MARKET FALLBACK 51006] Đã khớp Market {inst_id} ({side.upper()} {pos_side.upper()}) size={size}: {resp}")
+        print(f"🚀 [MARKET FALLBACK 51006] Đã khớp Market OKX {inst_id} ({side.upper()} {pos_side.upper()}) size={size}: {resp}")
         return resp
     except Exception as e:
         err_str = str(e)
@@ -375,18 +374,17 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
     except Exception:
         px_float = 0.0
 
-    # 🔒 DRY-RUN: Ghi log ảo thay vì đặt lệnh thật lên OKX
+    # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=False)
+
+    # 🔒 DRY-RUN SÀN OKX: Ghi log ảo thay vì đặt lệnh thật lên OKX
     if dry_run:
         if SHOW_DRY_RUN_LOGS:
             clean_sz = _clean_num_str(size)
             clean_px = _clean_num_str(price)
             algo_info = f" [TP/SL: {attach_algo_ords[0]['tpTriggerPx']}/{attach_algo_ords[0]['slTriggerPx']}]" if attach_algo_ords else ""
-            print(f"🌑 [DRY-RUN] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz}{algo_info} (shadow mode, bỏ qua)")
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=True)
+            print(f"🌑 [DRY-RUN OKX] place_pure_limit: Sẽ đặt LIMIT {inst_id} {side.upper()} {pos_side.upper()} @{clean_px} sz={clean_sz}{algo_info} (OKX dừng, bỏ qua)")
         return None
-
-    # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) nếu có bật
-    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=False)
 
     body = {"instId": inst_id, "tdMode": td_mode, "side": side, "posSide": pos_side, "ordType": "limit", "sz": size, "px": price, "clOrdId": cl_id}
     if attach_algo_ords:
@@ -708,5 +706,5 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
 
 # 🧠 CÁC HÀM XỬ LÝ DỮ LIỆU & JSON LOGGING
 # ==============================================================================
-# z1952 | Tích hợp _dispatch_to_tradelocker cho Market entry và Pure limit entry
+# z1953 | Tách biệt hoàn toàn điều phối lệnh Quỹ TradeLocker (E8) độc lập với trạng thái dry_run của sàn OKX
 

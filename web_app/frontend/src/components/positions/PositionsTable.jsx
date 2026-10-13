@@ -16,6 +16,7 @@ export default function PositionsTable({
   selectedAccount = "sub1",
   loginUid = "",
   onRefreshPositions,
+  onCloseTicket,
 }) {
   const { t } = useTranslation();
 
@@ -53,10 +54,35 @@ export default function PositionsTable({
   });
 
   const handleClosePosition = async (coin, pos) => {
-    const coinName = coin.label.replace("-SWAP", "");
+    if (onCloseTicket) {
+      onCloseTicket(pos, coin);
+      return;
+    }
+    const coinName = coin?.label ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
     const confirmMsg = t("close_pos_confirm").replace("{coin}", coinName);
     if (!window.confirm(confirmMsg)) return;
     try {
+      if (pos.platform === "tradelocker" || pos.is_prop || (localStorage.getItem("tls1_trading_platform") === "e8")) {
+        const u = localStorage.getItem("tls1_uid") || loginUid || "default";
+        const res = await fetch("/api/tradelocker/positions/close", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            position_id: pos.position_id || pos.ticket_id,
+            uid: u,
+            qty: pos.lots || parseFloat(pos.pos)
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("✅ " + t("close_pos_success").replace("{coin}", coinName));
+          if (onRefreshPositions) onRefreshPositions();
+        } else {
+          alert("❌ " + t("close_pos_fail").replace("{coin}", coinName) + (data.detail || data.message || t("server_error")));
+        }
+        return;
+      }
+
       const u = localStorage.getItem("tls1_uid") || loginUid;
       const strat = selectedAccount || "sub1";
       const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}`, {

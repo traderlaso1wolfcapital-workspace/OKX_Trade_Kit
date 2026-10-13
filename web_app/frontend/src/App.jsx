@@ -119,12 +119,32 @@ function App() {
     botStatus,
     setBotStatus,
     activeAccounts: wsActiveAccounts,
-    positions,
-    setPositions,
+    positions: wsPositions,
+    setPositions: setWsPositions,
     closedPositions,
     setClosedPositions,
     refresh: refreshBotData,
   } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
+
+  const [currentPlatform, setCurrentPlatform] = useState(() => localStorage.getItem("tls1_trading_platform") || "okx");
+  const [propPositions, setPropPositions] = useState([]);
+  const [propBotStatus, setPropBotStatus] = useState("STOPPED");
+  const [isStartingPropBot, setIsStartingPropBot] = useState(false);
+  const [isStoppingPropBot, setIsStoppingPropBot] = useState(false);
+  const [overridePropBotRunning, setOverridePropBotRunning] = useState(null);
+
+  // Bảng vị thế: Tách riêng tuyệt đối giữa Sàn OKX và Quỹ FX, chống hoàn toàn giật/flicker
+  const positions = useMemo(() => {
+    return currentPlatform === "e8" ? propPositions : (wsPositions || []);
+  }, [currentPlatform, propPositions, wsPositions]);
+
+  const setPositions = useCallback((val) => {
+    if ((localStorage.getItem("tls1_trading_platform") || "okx") === "e8") {
+      setPropPositions(val);
+    } else {
+      setWsPositions(val);
+    }
+  }, [setWsPositions]);
 
   useEffect(() => {
     if (wsActiveAccounts && Object.keys(wsActiveAccounts).length > 0) {
@@ -194,7 +214,9 @@ function App() {
   const [isStoppingBot, setIsStoppingBot] = useState(false);
   const [overrideBotRunning, setOverrideBotRunning] = useState(null);
 
-  const isRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
+  const isPropRunning = overridePropBotRunning !== null ? overridePropBotRunning : (propBotStatus === "RUNNING");
+  const isOkxRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
+  const isRunning = currentPlatform === "e8" ? isPropRunning : isOkxRunning;
 
   // Tự động giải phóng cờ ép trạng thái khi WebSocket hoặc Server đã xác nhận đồng bộ
   useEffect(() => {
@@ -204,6 +226,14 @@ function App() {
       setOverrideBotRunning(null);
     }
   }, [botStatus, overrideBotRunning]);
+
+  useEffect(() => {
+    if (overridePropBotRunning === true && propBotStatus === "RUNNING") {
+      setOverridePropBotRunning(null);
+    } else if (overridePropBotRunning === false && propBotStatus === "STOPPED") {
+      setOverridePropBotRunning(null);
+    }
+  }, [propBotStatus, overridePropBotRunning]);
 
   // 6. Multi-chart Layout & Configuration
   const getLayoutDefaults = (layout) => {
@@ -1417,8 +1447,8 @@ function App() {
 
   // Bot Start / Stop Handlers
   const handleStartBotClick = async () => {
-    const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
-    if (currentPlatform === "e8") {
+    const curPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
+    if (curPlatform === "e8") {
       // Kiểm tra trạng thái kết nối Quỹ FX
       const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
       const token = localStorage.getItem("tls1_jwt_token");
@@ -1438,7 +1468,7 @@ function App() {
         setConnectModalTab("tradelocker");
         setShowConnectModal(true);
       } else {
-        handleStartBot();
+        handleStartPropBot();
       }
       return;
     }
@@ -1451,29 +1481,89 @@ function App() {
     }
   };
 
+  const handleStartPropBot = async () => {
+    if (isStartingPropBot || isStoppingPropBot) return;
+    try {
+      setIsStartingPropBot(true);
+      const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const r = await fetch(`/api/tradelocker/bot/start?uid=${encodeURIComponent(botUid)}&strategy=${activeBotTab}`, {
+        method: "POST"
+      });
+      if (r.ok) {
+        setOverridePropBotRunning(true);
+        setPropBotStatus("RUNNING");
+        addSystemLog(`🚀 [QUỸ FX] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} cho Quỹ TradeLocker.`);
+        fetchPropPositions();
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setIsStartingPropBot(false);
+      } else {
+        let errMsg = "Không rõ nguyên nhân";
+        try {
+          const err = await r.json();
+          errMsg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail || err);
+        } catch {
+          errMsg = await r.text();
+        }
+        alert(`❌ Lỗi khởi động bot Quỹ: ${errMsg || r.statusText}`);
+        setOverridePropBotRunning(null);
+        setIsStartingPropBot(false);
+      }
+    } catch (e) {
+      alert(`❌ Lỗi kết nối khi khởi động bot Quỹ: ${e?.message || e}`);
+      setOverridePropBotRunning(null);
+      setIsStartingPropBot(false);
+    }
+  };
+
+  const handleStopPropBot = async () => {
+    if (isStoppingPropBot || isStartingPropBot) return;
+    try {
+      setIsStoppingPropBot(true);
+      const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const r = await fetch(`/api/tradelocker/bot/stop?uid=${encodeURIComponent(botUid)}`, {
+        method: "POST"
+      });
+      if (r.ok) {
+        setOverridePropBotRunning(false);
+        setPropBotStatus("STOPPED");
+        addSystemLog(`🛑 [QUỸ FX] Đã dừng Bot Quỹ FX (TradeLocker).`);
+        fetchPropPositions();
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setIsStoppingPropBot(false);
+      } else {
+        let errMsg = "Không rõ nguyên nhân";
+        try {
+          const err = await r.json();
+          errMsg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail || err);
+        } catch {
+          errMsg = await r.text();
+        }
+        alert(`❌ Lỗi dừng bot Quỹ: ${errMsg || r.statusText}`);
+        setOverridePropBotRunning(null);
+        setIsStoppingPropBot(false);
+      }
+    } catch (e) {
+      alert(`❌ Lỗi kết nối khi dừng bot Quỹ: ${e?.message || e}`);
+      setOverridePropBotRunning(null);
+      setIsStoppingPropBot(false);
+    }
+  };
+
   const handleStartBot = async () => {
     if (isStartingBot || isStoppingBot) return;
-    const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
-    const isE8 = (currentPlatform === "e8");
     let currentAcc = effectiveAccId;
 
-    if (!isE8) {
-      if (!currentAcc || accounts.length === 0) {
-        alert("⚠️ Vui lòng cấu hình API Key OKX trong phần Cài Đặt (hoặc Connect) trước khi chạy bot!");
-        setShowSettings(true);
-        setSettingsTab("api");
-        return;
-      }
-      if (!apiKey || !secretKey || !passphrase) {
-        alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
-        setShowSettings(true);
-        setSettingsTab("api");
-        return;
-      }
-    } else {
-      if (!currentAcc) {
-        currentAcc = "e8_prop";
-      }
+    if (!currentAcc || accounts.length === 0) {
+      alert("⚠️ Vui lòng cấu hình API Key OKX trong phần Cài Đặt (hoặc Connect) trước khi chạy bot!");
+      setShowSettings(true);
+      setSettingsTab("api");
+      return;
+    }
+    if (!apiKey || !secretKey || !passphrase) {
+      alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
+      setShowSettings(true);
+      setSettingsTab("api");
+      return;
     }
 
     // Kiểm tra xem đã có ít nhất 1 cặp giao dịch nào được cấu hình TF trade hay chưa
@@ -1484,17 +1574,8 @@ function App() {
     });
 
     if (pairsWithTf.length === 0) {
-      if (isE8) {
-        // Tự động gán mặc định TF 5m cho các cặp Quỹ FX nếu chưa kích hoạt
-        const fallbackTfs = {};
-        (activePairs || []).forEach(p => { fallbackTfs[p] = ["5m"]; });
-        setEnabledTfs(fallbackTfs);
-        effectiveTfs = fallbackTfs;
-        pairsWithTf = activePairs || [];
-      } else {
-        alert("⚠️ Vui lòng chọn ít nhất 1 khung thời gian (TF trade) để bắt đầu chạy bot!");
-        return;
-      }
+      alert("⚠️ Vui lòng chọn ít nhất 1 khung thời gian (TF trade) để bắt đầu chạy bot!");
+      return;
     }
 
     try {
@@ -1531,7 +1612,7 @@ function App() {
         } catch { }
         setOverrideBotRunning(true);
         if (setBotStatus) setBotStatus("RUNNING");
-        const accLabel = isE8 ? "Quỹ E8 Markets" : (accounts.find(a => a.id === currentAcc)?.name || currentAcc);
+        const accLabel = accounts.find(a => a.id === currentAcc)?.name || currentAcc;
         addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accLabel}${cleanMsg}`);
         refreshBotData();
         // Giữ hiệu ứng loading tối thiểu 600ms mượt mà, sau đó khi tắt loading thì giao diện chuyển thẳng sang nút DỪNG BOT
@@ -2167,16 +2248,33 @@ function App() {
     }
   }, [logs]);
 
+  const fetchPropPositions = useCallback(async () => {
+    try {
+      const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
+      const rProp = await fetch(`/api/tradelocker/positions?uid=${encodeURIComponent(curUid)}`);
+      if (rProp.ok) {
+        const propPos = await rProp.json();
+        setPropPositions(Array.isArray(propPos) ? propPos : []);
+      }
+    } catch { }
+  }, [loginUid]);
+
+  const fetchPropBotStatus = useCallback(async () => {
+    try {
+      const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
+      const r = await fetch(`/api/tradelocker/bot/status?uid=${encodeURIComponent(curUid)}`);
+      if (r.ok) {
+        const d = await r.json();
+        setPropBotStatus(d.status || (d.is_running ? "RUNNING" : "STOPPED"));
+      }
+    } catch { }
+  }, [loginUid]);
+
   const fetchPositions = useCallback(async () => {
     try {
-      const currentPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
-      if (currentPlatform === "e8") {
-        const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
-        const rProp = await fetch(`/api/tradelocker/positions?uid=${encodeURIComponent(curUid)}`);
-        if (rProp.ok) {
-          const propPos = await rProp.json();
-          setPositions(Array.isArray(propPos) ? propPos : []);
-        }
+      const curPlat = localStorage.getItem("tls1_trading_platform") || "okx";
+      if (curPlat === "e8") {
+        await fetchPropPositions();
         return;
       }
 
@@ -2200,16 +2298,38 @@ function App() {
         setAdminClosedPositions(await rAdmin.json());
       }
     } catch { }
-  }, [effectiveAccId, activeBotTab, loginUid, setPositions, setClosedPositions]);
+  }, [effectiveAccId, activeBotTab, loginUid, fetchPropPositions, setPositions, setClosedPositions]);
 
   // Listener khi chuyển đổi giữa SÀN OKX và QUỸ E8
   useEffect(() => {
-    const onPlatformChanged = () => {
-      fetchPositions();
+    const onPlatformChanged = (e) => {
+      const plat = e?.detail || localStorage.getItem("tls1_trading_platform") || "okx";
+      setCurrentPlatform(plat);
+      if (plat === "e8") {
+        fetchPropPositions();
+        fetchPropBotStatus();
+      } else {
+        fetchPositions();
+      }
     };
     window.addEventListener("tls1_platform_changed", onPlatformChanged);
     return () => window.removeEventListener("tls1_platform_changed", onPlatformChanged);
-  }, [fetchPositions]);
+  }, [fetchPositions, fetchPropPositions, fetchPropBotStatus]);
+
+  // Polling chu kỳ cho Quỹ FX (cập nhật vị thế & trạng thái độc lập)
+  useEffect(() => {
+    fetchPropBotStatus();
+    if (currentPlatform === "e8") {
+      fetchPropPositions();
+    }
+    const interval = setInterval(() => {
+      fetchPropBotStatus();
+      if ((localStorage.getItem("tls1_trading_platform") || "okx") === "e8") {
+        fetchPropPositions();
+      }
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [currentPlatform, fetchPropBotStatus, fetchPropPositions]);
 
   // Periodic polling
   useEffect(() => {
@@ -2399,7 +2519,7 @@ function App() {
             {/* ACTION BAR: START / STOP BOT */}
             <div className="bot-action-bar" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px', boxSizing: 'border-box' }}>
               <div data-tour="action-bot" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                {isStartingBot ? (
+                {(currentPlatform === "e8" ? isStartingPropBot : isStartingBot) ? (
                   <button
                     disabled
                     className="btn-action-start btn-action-loading"
@@ -2408,7 +2528,7 @@ function App() {
                     <span className="spinner" style={{ width: "13px", height: "13px", margin: "0 8px 0 0", borderWidth: "2px" }}></span>
                     {t("starting_bot")}
                   </button>
-                ) : isStoppingBot ? (
+                ) : (currentPlatform === "e8" ? isStoppingPropBot : isStoppingBot) ? (
                   <button
                     disabled
                     className="btn-action-stop btn-action-loading"
@@ -2793,6 +2913,7 @@ function App() {
                         }}
                         onCloseTicket={handleClosePosition}
                         coinList={COIN_LIST}
+                        onRefreshPositions={fetchPositions}
                       />
                     )}
                   </div>
@@ -2902,11 +3023,23 @@ function App() {
       <ConfirmStopBotModal
         isOpen={showStopBotModal}
         onClose={() => setShowStopBotModal(false)}
-        botName={activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"}
-        accountName={accounts.find(a => a.id === (selectedAccount || effectiveAccId))?.name || (selectedAccount || effectiveAccId || "Mặc định")}
-        isLoading={isStoppingBot}
+        botName={
+          currentPlatform === "e8"
+            ? `${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} (Quỹ FX)`
+            : (activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot")
+        }
+        accountName={
+          currentPlatform === "e8"
+            ? "Quỹ FX (TradeLocker)"
+            : (accounts.find(a => a.id === (selectedAccount || effectiveAccId))?.name || (selectedAccount || effectiveAccId || "Mặc định"))
+        }
+        isLoading={currentPlatform === "e8" ? isStoppingPropBot : isStoppingBot}
         onConfirm={async () => {
-          await handleStopBot();
+          if (currentPlatform === "e8") {
+            await handleStopPropBot();
+          } else {
+            await handleStopBot();
+          }
           setShowStopBotModal(false);
         }}
       />

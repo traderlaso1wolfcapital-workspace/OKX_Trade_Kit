@@ -699,6 +699,21 @@ class TradeLockerManager:
                 cls._clients.pop(k, None)
 
     @classmethod
+    def is_bot_running(cls, uid: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
+        """Kiểm tra trạng thái chạy Bot Quỹ FX (TradeLocker) của người dùng"""
+        cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance)
+        if not cfg:
+            return False
+        return bool(cfg.get("is_bot_running", False))
+
+    @classmethod
+    def set_bot_running(cls, uid: str, running: bool, user_base_dir_fn = None, fernet_instance = None) -> bool:
+        """Bật/Tắt trạng thái chạy Bot Quỹ FX (TradeLocker) độc lập với Sàn OKX"""
+        cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance) or {}
+        cfg["is_bot_running"] = bool(running)
+        return cls.save_user_config(uid, cfg, user_base_dir_fn, fernet_instance)
+
+    @classmethod
     def dispatch_signal_to_tradelocker(
         cls,
         uid: str,
@@ -714,6 +729,7 @@ class TradeLockerManager:
         """
         Bộ điều phối tín hiệu chiến lược từ Bot sang tài khoản Quỹ TradeLocker (E8 Markets)
         Tích hợp đầy đủ Cầu Dao An Toàn (Circuit Breaker) và Tự Động Tính Lot Size.
+        Chạy ĐỘC LẬP: Chỉ đặt lệnh khi bot Quỹ FX đang BẬT (is_bot_running=True).
         """
         if not user_base_dir_fn:
             user_base_dir_fn = cls._get_default_user_base_dir
@@ -723,6 +739,10 @@ class TradeLockerManager:
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance)
         if not cfg or not cfg.get("is_enabled", True):
             return False, "TradeLocker chưa được kích hoạt hoặc chưa kết nối"
+
+        # 🛑 KIỂM TRA TRẠNG THÁI CHẠY BOT QUỸ FX:
+        if not cfg.get("is_bot_running", False):
+            return False, "Bot Quỹ FX đang DỪNG — Bỏ qua đặt lệnh Quỹ"
 
         # Kiểm tra mã giao dịch có được bật đánh Quỹ không
         enabled_syms = cfg.get("enabled_symbols", ["XAU", "BTC", "ETH"])
@@ -762,7 +782,9 @@ class TradeLockerManager:
         fallback_sl = (price * 0.99) if side.lower() in ("buy", "long") else (price * 1.01)
         lot = client.calculate_lot(clean_base, risk_usd=risk_usd, entry_price=price, sl_price=sl_price or fallback_sl)
 
-        if dry_run:
+        # Khi Quỹ FX bot đang chạy (is_bot_running == True), luôn đặt lệnh thật lên sàn TradeLocker
+        # (Không bị ảnh hưởng bởi cờ dry_run của sàn OKX)
+        if dry_run and not cfg.get("is_bot_running", False):
             print(f"🌑 [DRY-RUN TradeLocker] Bỏ qua đặt lệnh thật (Shadow Mode): {side.upper()} {lot} Lot {clean_base}")
             return True, f"Chế độ Shadow Mode (Dry-run): Sẽ đặt {side.upper()} {lot} Lot {clean_base}"
 

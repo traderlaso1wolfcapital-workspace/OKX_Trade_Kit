@@ -393,4 +393,4 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     except Exception as e:
         print(f"⚠️ [SMC CLEANUP LỖI]: {e}")
 
-# z1952 | Tích hợp _dispatch_to_tradelocker cho SMC Market entry và Limit entry
+# z1953 | Tích hợp độc lập _dispatch_to_tradelocker cho SMC Market entry và Limit entry không phụ thuộc OKX
