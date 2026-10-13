@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import requests
 from typing import Optional, Dict, Any, List, Tuple
 from decimal import Decimal
+from collections import deque
 
 # Môi trường mặc định của TradeLocker
 DEFAULT_DEMO_ENV = "https://demo.tradelocker.com/backend-api"
@@ -298,15 +299,46 @@ class TradeLockerClient:
         try:
             resp = requests.post(url, json=payload, headers=self._get_headers(include_acc_num=True), timeout=10)
             if resp.status_code in (200, 201):
-                res_data = resp.json()
-                order_id = res_data.get("d", {}).get("orderId")
-                return True, {"orderId": order_id, "data": res_data}, f"Đã đặt lệnh TradeLocker thành công! Mã lệnh: {order_id}"
+                try:
+                    res_data = resp.json()
+                except Exception:
+                    res_data = {}
+
+                # 1. Kiểm tra trạng thái "s" và dữ liệu trả về từ TradeLocker
+                status_flag = str(res_data.get("s", "")).lower().strip()
+                d_obj = res_data.get("d") if isinstance(res_data.get("d"), dict) else {}
+                
+                # 2. Tìm mã orderId trong mọi cấu trúc trả về khả dĩ
+                order_id = (
+                    d_obj.get("orderId") or 
+                    d_obj.get("id") or 
+                    res_data.get("orderId") or 
+                    res_data.get("id")
+                )
+
+                # 3. Lấy thông báo lỗi chi tiết nếu bị từ chối
+                err_detail = (
+                    res_data.get("errMsg") or 
+                    res_data.get("message") or 
+                    d_obj.get("errMsg") or 
+                    d_obj.get("message") or 
+                    d_obj.get("rejectReason") or
+                    d_obj.get("description")
+                )
+
+                # Nếu TradeLocker báo lỗi (s == error) hoặc không sinh được order_id -> Xử lý THẤT BẠI
+                if status_flag in ("error", "fail") or not order_id:
+                    err_msg = err_detail or res_data.get("code") or resp.text or "Không nhận được mã lệnh từ sàn"
+                    return False, {"data": res_data}, f"TradeLocker từ chối ({err_msg})"
+
+                order_id_str = str(order_id)
+                return True, {"orderId": order_id_str, "data": res_data}, f"Đã đặt lệnh TradeLocker thành công! Mã lệnh: {order_id_str}"
             else:
                 err_text = resp.text
                 try:
                     err_json = resp.json()
-                    err_text = err_json.get("message") or resp.text
-                except:
+                    err_text = err_json.get("errMsg") or err_json.get("message") or resp.text
+                except Exception:
                     pass
                 return False, {}, f"TradeLocker từ chối ({resp.status_code}): {err_text}"
         except Exception as e:
@@ -426,6 +458,8 @@ class TradeLockerClient:
 
 class TradeLockerManager:
     _clients: Dict[str, TradeLockerClient] = {}
+    _log_queues: Dict[str, Any] = {}
+    _subscribers: Dict[str, List[Any]] = {}
 
     @classmethod
     def _get_default_user_base_dir(cls, uid: str) -> str:
@@ -699,6 +733,79 @@ class TradeLockerManager:
                 cls._clients.pop(k, None)
 
     @classmethod
+    def log_event(cls, uid: str, message: str):
+        """Ghi log sự kiện riêng biệt cho Quỹ FX (TradeLocker) và đẩy tới WebSocket subscribers"""
+        if not uid:
+            uid = "default"
+        if uid not in cls._log_queues:
+            cls._log_queues[uid] = deque(maxlen=300)
+        
+        now_str = datetime.now().strftime("%H:%M:%S")
+        is_formatted = (
+            message.startswith("[") or message.startswith("⏳") or 
+            message.startswith("🏆") or message.startswith("⚠️") or 
+            message.startswith("🚀") or message.startswith("🛑") or 
+            message.startswith("🔑") or message.startswith("🧹") or 
+            message.startswith("🌑") or message.startswith("✅")
+        )
+        formatted_msg = message if is_formatted else f"[{now_str}] {message}"
+        cls._log_queues[uid].append(formatted_msg)
+
+        subs = cls._subscribers.get(uid, [])
+        if subs:
+            import asyncio
+            for ws in list(subs):
+                try:
+                    asyncio.create_task(ws.send_text(formatted_msg))
+                except Exception:
+                    pass
+
+    @classmethod
+    def get_recent_logs(cls, uid: str) -> List[str]:
+        """Lấy danh sách log sự kiện gần nhất của Quỹ FX"""
+        if not uid:
+            uid = "default"
+        if uid in cls._log_queues:
+            return list(cls._log_queues[uid])
+        return []
+
+    @classmethod
+    def get_dashboard_lines(cls, uid: str, user_base_dir_fn = None, fernet_instance = None) -> List[str]:
+        """Tạo bảng Dashboard Snapshot chuyên biệt cho Quỹ FX (E8 Markets)"""
+        if not uid:
+            uid = "default"
+        client = cls.get_client(uid, user_base_dir_fn, fernet_instance)
+        cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance) or {}
+        is_running = cfg.get("is_bot_running", False)
+        risk_usd = float(cfg.get("risk_per_trade", 25.0))
+        acc_num = client.acc_num if (client and client.acc_num) else (cfg.get("acc_num") or cfg.get("email") or "Chưa kết nối")
+        server = client.server if (client and client.server) else cfg.get("server", "E8")
+        bal = float(client.account_balance) if (client and client.account_balance) else 0.0
+        status_str = "🟢 RUNNING (ĐANG HOẠT ĐỘNG)" if is_running else "🛑 STOPPED (ĐÃ DỪNG)"
+        conn_str = "✅ ĐÃ KẾT NỐI" if (client and client.access_token) else "⚪ CHƯA KẾT NỐI"
+
+        return [
+            "=" * 78,
+            "             🏆 HỆ THỐNG GIAO DỊCH QUỸ FX - TRADELOCKER (E8 MARKETS)",
+            "=" * 78,
+            f" Tài khoản Quỹ : {str(acc_num):<18} | Máy chủ   : {str(server)}",
+            f" Số dư Quỹ     : ${bal:,.2f} USD{'':<10} | Risk/Lệnh : ${risk_usd:,.2f} USD",
+            f" Trạng thái Bot: {status_str:<26} | Kết nối API: {conn_str}",
+            "=" * 78,
+        ]
+
+    @classmethod
+    def get_logs_payload(cls, uid: str, user_base_dir_fn = None, fernet_instance = None) -> Dict[str, Any]:
+        """Gói dữ liệu hoàn chỉnh gồm Dashboard & Event logs cho Quỹ FX"""
+        if not uid:
+            uid = "default"
+        return {
+            "status": "success",
+            "dashboardLines": cls.get_dashboard_lines(uid, user_base_dir_fn, fernet_instance),
+            "eventLogs": list(cls._log_queues.get(uid, []))[::-1]
+        }
+
+    @classmethod
     def is_bot_running(cls, uid: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """Kiểm tra trạng thái chạy Bot Quỹ FX (TradeLocker) của người dùng"""
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance)
@@ -711,7 +818,13 @@ class TradeLockerManager:
         """Bật/Tắt trạng thái chạy Bot Quỹ FX (TradeLocker) độc lập với Sàn OKX"""
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance) or {}
         cfg["is_bot_running"] = bool(running)
-        return cls.save_user_config(uid, cfg, user_base_dir_fn, fernet_instance)
+        saved = cls.save_user_config(uid, cfg, user_base_dir_fn, fernet_instance)
+        if saved:
+            if running:
+                cls.log_event(uid, "🚀 [TRADELOCKER] Đã khởi động Bot Quỹ FX (TradeLocker - E8 Markets)")
+            else:
+                cls.log_event(uid, "🛑 [TRADELOCKER] Đã dừng Bot Quỹ FX (TradeLocker - E8 Markets)")
+        return saved
 
     @classmethod
     def dispatch_signal_to_tradelocker(
@@ -777,10 +890,10 @@ class TradeLockerManager:
             if profit >= daily_profit_cap * 0.95:
                 return False, f"⏳ CẦU DAO CHỐT LÃI: Đã đạt trần lãi ngày (${profit:.2f} / ${daily_profit_cap:.2f}), bảo toàn kết quả thi."
 
-        # Tính Lot Size theo Risk
-        risk_usd = float(cfg.get("risk_per_trade", 25.0))
-        fallback_sl = (price * 0.99) if side.lower() in ("buy", "long") else (price * 1.01)
-        lot = client.calculate_lot(clean_base, risk_usd=risk_usd, entry_price=price, sl_price=sl_price or fallback_sl)
+        # Xác định khối lượng Lot:
+        # Lấy theo số Lot cố định (fixed_lot) do người dùng cài đặt trên giao diện (mặc định an toàn: 0.01 Lot)
+        fixed_lot = float(cfg.get("fixed_lot") or 0.01)
+        lot = round(max(0.01, fixed_lot), 2)
 
         # Khi Quỹ FX bot đang chạy (is_bot_running == True), luôn đặt lệnh thật lên sàn TradeLocker
         # (Không bị ảnh hưởng bởi cờ dry_run của sàn OKX)
@@ -808,6 +921,11 @@ class TradeLockerManager:
             stop_loss=sl_price,
             take_profit=tp_price
         )
+        if ok:
+            order_id = res.get("orderId") or res.get("id") or "N/A"
+            cls.log_event(uid, f"🏆 [TRADELOCKER] Đặt lệnh {side.upper()} {lot} Lot {clean_base} thành công (Ticket #{order_id})")
+        else:
+            cls.log_event(uid, f"⚠️ [TRADELOCKER] Đặt lệnh {side.upper()} {lot} Lot {clean_base} thất bại: {msg}")
         return ok, msg
 
     @classmethod
@@ -844,3 +962,5 @@ class TradeLockerManager:
 
         t = threading.Thread(target=_worker, daemon=True, name="TL_Dispatch_Worker")
         t.start()
+
+# z1955 | Sửa triệt để lỗi TradeLocker báo thành công mã None: thẩm định chặt cờ s/orderId, ưu tiên fixed_lot từ UI tránh vượt ký quỹ sàn Quỹ

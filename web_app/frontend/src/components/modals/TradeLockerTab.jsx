@@ -234,6 +234,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
         daily_profit_cap: Number(dailyProfitCap),
         enabled_symbols: enabledSymbols,
         is_enabled: isEnabled,
+        fixed_lot: Number(accountData?.fixed_lot) || 0.01,
       };
       const res = await fetch("/api/tradelocker/config", {
         method: "POST",

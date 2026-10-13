@@ -70,5 +70,13 @@
   * Bổ sung cờ chạy `is_bot_running` riêng cho Quỹ FX trong `tradelocker_service.py` và các API độc lập: `GET /api/tradelocker/bot/status`, `POST /api/tradelocker/bot/start`, `POST /api/tradelocker/bot/stop`.
   * Tách biệt nút bấm và trạng thái `isRunning` trên giao diện: Khi Bot OKX đang chạy, người dùng vẫn có thể chuyển sang Quỹ FX và bật chạy Bot Quỹ FX song song mà không làm dừng hay ảnh hưởng đến Bot OKX.
   * Mở khóa dropdown chọn nền tảng (`SidebarLeft.jsx`) cho phép chuyển đổi qua lại bất kỳ lúc nào.
-  * Hoàn thiện thao tác đóng vị thế Quỹ FX trực tiếp từ Bảng Vị Thế (`PositionsTable.jsx`).
+- [x] **Bước 8:** Tách biệt hoàn toàn hệ thống Logs giữa Sàn OKX và Quỹ FX (TradeLocker Logs Channel Isolation):
+  * Phân luồng dữ liệu log tại backend `log_reader_task`: Tự động nhận diện và chuyển hướng các dòng log liên quan đến Quỹ FX (TradeLocker, E8 Dispatch, Shadow Mode) sang `TradeLockerManager.log_event`, tuyệt đối không để lẫn vào log ring buffer của sàn OKX.
+  * Xây dựng Dashboard Snapshot và Event stream riêng cho Quỹ FX qua REST endpoint `GET /api/tradelocker/logs` và WebSocket `/ws/tradelocker/logs/{uid}`.
+  * Tách biệt 2 state log độc lập trên Frontend (`logs` cho OKX, `propLogs` cho Quỹ FX).
+  * Nâng cấp `LogsTerminal.jsx` với thanh điều hướng kênh logs chuyên nghiệp: `[ 🌐 SÀN OKX ]` và `[ 🏆 QUỸ FX (TRADELOCKER) ]`, tích hợp đèn tín hiệu trạng thái LIVE thời gian thực và tự động đồng bộ khi chuyển nền tảng.
+- [x] **Bước 9:** Khắc phục triệt để lỗi báo đặt lệnh TradeLocker thành công mã None và lỗi vượt ký quỹ (Not enough margin):
+  * Thẩm định chặt chẽ kết quả đặt lệnh từ TradeLocker API: Kiểm tra cờ trạng thái `s` ("ok" vs "error"/"fail") và trích xuất chính xác mã `orderId`. Loại bỏ hoàn toàn tình trạng báo thành công giả (`Mã lệnh: None`) khi sàn thực tế từ chối lệnh.
+  * Đồng bộ khối lượng Lot cố định (Fixed Lot) giữa giao diện người dùng và backend: Ô SpinBox `Khối lượng: [LOT] [Cố định] 0.01 L` được lưu trực tiếp vào backend qua `/api/tradelocker/config`.
+  * Bot ưu tiên tuyệt đối số Lot cố định được cài đặt trên UI (mặc định an toàn: 0.01 Lot), ngăn chặn việc tính toán khối lượng động quá lớn (ví dụ 0.70 Lot ETH) làm vi phạm ký quỹ của tài khoản quỹ.
 

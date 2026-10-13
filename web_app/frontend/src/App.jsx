@@ -487,6 +487,10 @@ function App() {
     dashboardLines: [],
     eventLogs: ["Đang kết nối với TLS1 Trading Web Terminal Server..."],
   });
+  const [propLogs, setPropLogs] = useState({
+    dashboardLines: [],
+    eventLogs: ["Đang kết nối với máy chủ Quỹ FX (TradeLocker - E8)..."],
+  });
   const stagingDashboardRef = useRef([]);
   const stagingTimerRef = useRef(null);
   const isStagingRef = useRef(false);
@@ -684,15 +688,27 @@ function App() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  const addSystemLog = (msg) => {
-    setLogs(prev => {
-      const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
-      const updatedEvents = [msg, ...currentEvents];
-      return {
-        dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
-        eventLogs: updatedEvents.slice(0, 60),
-      };
-    });
+  const addSystemLog = (msg, platform = null) => {
+    const targetPlatform = platform || currentPlatform;
+    if (targetPlatform === "e8") {
+      setPropLogs(prev => {
+        const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+        const updatedEvents = [msg, ...currentEvents];
+        return {
+          dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+          eventLogs: updatedEvents.slice(0, 60),
+        };
+      });
+    } else {
+      setLogs(prev => {
+        const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+        const updatedEvents = [msg, ...currentEvents];
+        return {
+          dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+          eventLogs: updatedEvents.slice(0, 60),
+        };
+      });
+    }
   };
 
   // Switch bot defaults
@@ -1064,6 +1080,27 @@ function App() {
         const line = text.trimEnd();
         if (!line) return;
 
+        // 🛡️ Lọc bảo vệ: Nếu là dòng log thuộc Quỹ FX TradeLocker -> nạp vào propLogs, không cho lẫn vào logs OKX
+        const isTradeLockerLine = 
+          line.includes("[TRADELOCKER") || 
+          line.includes("TRADELOCKER E8 DISPATCH") || 
+          line.includes("[DRY-RUN TradeLocker]") || 
+          line.includes("[QUỸ FX]") ||
+          line.includes("E8 DISPATCH");
+
+        if (isTradeLockerLine) {
+          setPropLogs(prev => {
+            const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+            const nowStr = new Date().toLocaleTimeString("vi-VN", { hour12: false });
+            const formattedLine = (line.startsWith("[") || line.startsWith("🏆") || line.startsWith("⚠️") || line.startsWith("🌑")) ? line : `[${nowStr}] ${line}`;
+            return {
+              dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+              eventLogs: [formattedLine, ...currentEvents].slice(0, 60),
+            };
+          });
+          return;
+        }
+
         const isHeader = line.includes("bot_sub1.py") || line.includes("bot_sub2.py") || line.includes("bot_sub3.py") || line.includes("sys_bot_sub") || line.includes("bot_core");
 
         // Nhận diện dòng sự kiện (Event log tức thời)
@@ -1194,6 +1231,86 @@ function App() {
       }
     };
   }, [activeBotTab, currentUid]);
+
+  // 10b. Quỹ FX (TradeLocker) Logs Terminal Stream & Sync
+  const propWsRef = useRef(null);
+
+  const fetchPropLogs = useCallback(async () => {
+    try {
+      const safeUid = currentUid || localStorage.getItem('tls1_uid') || "default";
+      const res = await fetch(`/api/tradelocker/logs?uid=${encodeURIComponent(safeUid)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "success") {
+          setPropLogs(prev => ({
+            dashboardLines: Array.isArray(data.dashboardLines) && data.dashboardLines.length > 0 ? data.dashboardLines : (prev ? prev.dashboardLines : []),
+            eventLogs: Array.isArray(data.eventLogs) && data.eventLogs.length > 0 ? data.eventLogs : (prev ? prev.eventLogs : []),
+          }));
+        }
+      }
+    } catch {}
+  }, [currentUid]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let ws = null;
+
+    const connectPropWS = () => {
+      if (!isMounted) return;
+      const safeUid = currentUid || localStorage.getItem('tls1_uid') || "default";
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws/tradelocker/logs/${safeUid}`);
+      propWsRef.current = ws;
+
+      ws.onopen = () => {
+        fetchPropLogs();
+      };
+
+      ws.onmessage = (e) => {
+        const text = e.data;
+        if (typeof text !== 'string') return;
+        const line = text.trimEnd();
+        if (!line) return;
+
+        if (line.startsWith("===") || line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") || line.includes("Tài khoản Quỹ :") || line.includes("Số dư Quỹ     :")) {
+          fetchPropLogs();
+          return;
+        }
+
+        setPropLogs(prev => {
+          const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
+          const nowStr = new Date().toLocaleTimeString("vi-VN", { hour12: false });
+          const formattedLine = (line.startsWith("[") || line.startsWith("⏳") || line.startsWith("🏆") || line.startsWith("⚠️") || line.startsWith("🚀") || line.startsWith("🛑") || line.startsWith("🔑") || line.startsWith("🧹"))
+            ? line 
+            : `[${nowStr}] ${line}`;
+          return {
+            dashboardLines: (prev && Array.isArray(prev.dashboardLines)) ? prev.dashboardLines : [],
+            eventLogs: [formattedLine, ...currentEvents].slice(0, 60),
+          };
+        });
+      };
+
+      ws.onclose = () => {
+        if (isMounted && propWsRef.current === ws) {
+          setTimeout(connectPropWS, 3000);
+        }
+      };
+    };
+
+    fetchPropLogs();
+    connectPropWS();
+
+    const propPollInterval = setInterval(fetchPropLogs, 3500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(propPollInterval);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
+  }, [currentUid, fetchPropLogs]);
 
   const handleToggleMultiplyVolume = async (val) => {
     const nextVal = Boolean(val);
@@ -2246,7 +2363,7 @@ function App() {
         terminalRef.current.scrollTop = 0;
       }
     }
-  }, [logs]);
+  }, [logs, propLogs, currentPlatform]);
 
   const fetchPropPositions = useCallback(async () => {
     try {
@@ -2886,7 +3003,16 @@ function App() {
 
                     {/* 2. LOGS TERMINAL */}
                     {activeTab === "logs" && (
-                      <LogsTerminal logs={logs} activeBotTab={activeBotTab} />
+                      <LogsTerminal 
+                        logs={currentPlatform === "e8" ? propLogs : logs}
+                        okxLogs={logs}
+                        propLogs={propLogs}
+                        currentPlatform={currentPlatform}
+                        onSwitchPlatform={setCurrentPlatform}
+                        isOkxRunning={isOkxRunning}
+                        isPropRunning={isPropRunning}
+                        activeBotTab={activeBotTab} 
+                      />
                     )}
 
                     {/* 3. LỊCH SỬ GIAO DỊCH */}

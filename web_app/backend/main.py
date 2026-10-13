@@ -617,6 +617,20 @@ async def log_reader_task(stream, uid, strategy):
             line = await asyncio.to_thread(stream.readline)
             if not line: break
             line_str = line.decode("utf-8", errors="replace").rstrip("\n")
+
+            # 🛡️ TÁCH BIỆT LOGS: Nếu là dòng log của Quỹ FX (TradeLocker / E8) -> chuyển hướng sang Quỹ FX, không trộn vào OKX
+            is_tl_log = any(keyword in line_str for keyword in [
+                "[TRADELOCKER", "TRADELOCKER E8 DISPATCH", "[DRY-RUN TradeLocker]", 
+                "TradeLockerManager", "[QUỸ FX]", "E8 DISPATCH"
+            ])
+            if is_tl_log:
+                try:
+                    from web_app.backend.tradelocker_service import TradeLockerManager
+                    TradeLockerManager.log_event(uid, line_str)
+                except Exception:
+                    pass
+                continue
+
             log_deque.append(line_str)
             # CHỈ phát sóng cho các kết nối thuộc CHÍNH UID này và chiến thuật này
             if uid in active_connections and strategy in active_connections[uid]:
@@ -3702,6 +3716,7 @@ class TradeLockerConfigReq(BaseModel):
     daily_profit_cap: Optional[float] = 100.0
     enabled_symbols: Optional[List[str]] = ["XAU", "BTC", "ETH"]
     is_enabled: Optional[bool] = True
+    fixed_lot: Optional[float] = 0.01
 
 class TradeLockerSelectReq(BaseModel):
     uid: str
@@ -3817,6 +3832,7 @@ def tradelocker_get_all_accounts(uid: str, jwt_data: Optional[dict] = Depends(ve
             "daily_profit_cap": a.get("daily_profit_cap", 100.0),
             "enabled_symbols": a.get("enabled_symbols", ["XAU", "BTC", "ETH"]),
             "is_enabled": a.get("is_enabled", True),
+            "fixed_lot": a.get("fixed_lot", 0.01),
             "is_active": a.get("id") == active_id
         })
     return {"status": "success", "accounts": safe_list, "active_id": active_id}
@@ -3896,6 +3912,7 @@ def tradelocker_get_account(uid: str, account_id: Optional[str] = None, jwt_data
         "daily_loss_limit": daily_loss_limit,
         "daily_profit_cap": daily_profit_cap,
         "risk_per_trade": cfg.get("risk_per_trade", 25.0),
+        "fixed_lot": cfg.get("fixed_lot", 0.01),
         "enabled_symbols": cfg.get("enabled_symbols", ["XAU", "BTC", "ETH"]),
         "is_enabled": cfg.get("is_enabled", True)
     }
@@ -3918,6 +3935,7 @@ def tradelocker_update_config(req: TradeLockerConfigReq, jwt_data: Optional[dict
     if req.daily_profit_cap is not None: cfg["daily_profit_cap"] = req.daily_profit_cap
     if req.enabled_symbols is not None: cfg["enabled_symbols"] = req.enabled_symbols
     if req.is_enabled is not None: cfg["is_enabled"] = req.is_enabled
+    if req.fixed_lot is not None: cfg["fixed_lot"] = round(float(req.fixed_lot), 2)
     cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     TradeLockerManager.save_user_config(clean_uid, cfg, get_user_base_dir, fernet, account_id=req.account_id)
@@ -4059,6 +4077,7 @@ def tradelocker_close_position(req: TradeLockerCloseReq):
         raise HTTPException(status_code=400, detail="Chưa kết nối Quỹ TradeLocker")
     ok, msg = client.close_position(req.position_id, qty=req.qty)
     if ok:
+        TradeLockerManager.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã đóng vị thế ticket #{req.position_id} thành công")
         return {"status": "success", "message": msg}
     raise HTTPException(status_code=400, detail=msg)
 
@@ -4093,6 +4112,39 @@ def tradelocker_stop_bot(uid: str):
     clean_uid = uid.strip() if uid else "default"
     TradeLockerManager.set_bot_running(clean_uid, False, get_user_base_dir, fernet)
     return {"status": "success", "message": "Bot Quỹ FX (TradeLocker) đã dừng!"}
+
+@app.get("/api/tradelocker/logs")
+def tradelocker_get_logs(uid: str = "default"):
+    clean_uid = uid.strip() if uid else "default"
+    return TradeLockerManager.get_logs_payload(clean_uid, get_user_base_dir, fernet)
+
+@app.websocket("/ws/tradelocker/logs/{uid}")
+async def websocket_tradelocker_logs(websocket: WebSocket, uid: str):
+    await websocket.accept()
+    clean_uid = uid.strip() if (uid and uid not in ["default", "guest", "undefined", "null"]) else "default"
+    
+    if clean_uid not in TradeLockerManager._subscribers:
+        TradeLockerManager._subscribers[clean_uid] = []
+    TradeLockerManager._subscribers[clean_uid].append(websocket)
+    
+    try:
+        # Gửi bảng Dashboard ban đầu của Quỹ FX
+        dash_lines = TradeLockerManager.get_dashboard_lines(clean_uid, get_user_base_dir, fernet)
+        for line in dash_lines:
+            await websocket.send_text(line)
+        
+        # Gửi ring buffer các log sự kiện gần nhất
+        recent = TradeLockerManager.get_recent_logs(clean_uid)
+        for l in recent:
+            await websocket.send_text(l)
+            
+        while True:
+            await websocket.receive_text()
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        if clean_uid in TradeLockerManager._subscribers and websocket in TradeLockerManager._subscribers[clean_uid]:
+            TradeLockerManager._subscribers[clean_uid].remove(websocket)
 
 # --- SERVE FRONTEND (REACT) ---
 frontend_dist_path = os.path.join(os.path.dirname(__file__), "../frontend/dist")
@@ -4130,3 +4182,5 @@ if __name__ == "__main__":
 # z7730 | Tự động chuyển đổi session sang OKX Master UID khi người dùng Fast Connect / thêm API Key thành công, loại bỏ lỗi chặn nhầm session cũ không khớp UID.
 # z7731 | Tích hợp toàn diện TradeLocker API cho quỹ E8 Markets: module tradelocker_service, các endpoint kết nối, quản lý số dư, tính toán Lot size và giám sát Drawdown/Profit Cap.
 # z7732 | Tách riêng hoàn toàn trạng thái chạy và bảng vị thế giữa Sàn OKX và Quỹ FX (TradeLocker): bổ sung API bot status/start/stop cho TradeLocker, đảm bảo OKX và Quỹ FX có thể chạy đồng thời độc lập không xung đột.
+# z7733 | Tách biệt hoàn toàn hệ thống Logs giữa Sàn OKX và Quỹ FX: chuyển hướng log TradeLocker trong log_reader_task không cho lẫn vào OKX, bổ sung REST API /api/tradelocker/logs và WebSocket /ws/tradelocker/logs.
+# z7734 | Hỗ trợ lưu trữ và đồng bộ tham số fixed_lot cho cấu hình Quỹ TradeLocker qua endpoint REST API

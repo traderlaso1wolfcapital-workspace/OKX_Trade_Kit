@@ -1,10 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 
-export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUid, isAuthenticated }) {
+export default function LogsTerminal({ 
+  logs: externalLogs, 
+  okxLogs,
+  propLogs,
+  currentPlatform = "okx",
+  onSwitchPlatform,
+  isOkxRunning = false,
+  isPropRunning = false,
+  activeBotTab, 
+  loginUid, 
+  isAuthenticated 
+}) {
   // Dual-mode: nếu App.jsx truyền logs prop sẵn → render từ nó (App tự quản lý WS)
   // Nếu truyền activeBotTab + isAuthenticated → tự kết nối WS riêng
-  const isSelfManaged = !externalLogs && isAuthenticated && activeBotTab;
+  const isSelfManaged = !externalLogs && !okxLogs && !propLogs && isAuthenticated && activeBotTab;
 
   const [internalLogs, setInternalLogs] = useState({ dashboardLines: [], eventLogs: [] });
   const terminalRef = useRef(null);
@@ -179,9 +190,17 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
     };
   }, [isSelfManaged, activeBotTab, loginUid]);
 
+  // Lựa chọn nguồn log theo Kênh sàn/quỹ
+  const activeRawLogs = React.useMemo(() => {
+    if (currentPlatform === "e8") {
+      return propLogs || externalLogs;
+    }
+    return okxLogs || externalLogs;
+  }, [currentPlatform, propLogs, okxLogs, externalLogs]);
+
   // Phân rã dữ liệu: Bảng Dashboard cố định ở trên + Dải Event Logs ở dưới
   const { dashboardLines, eventLogs } = React.useMemo(() => {
-    const raw = externalLogs || internalLogs;
+    const raw = activeRawLogs || internalLogs;
     if (!raw) return { dashboardLines: [], eventLogs: [] };
     if (typeof raw === "object" && !Array.isArray(raw)) {
       return {
@@ -201,7 +220,7 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
       }
     }
     return { dashboardLines: [], eventLogs: [] };
-  }, [externalLogs, internalLogs]);
+  }, [activeRawLogs, internalLogs]);
 
   // Giữ vị trí cuộn đầu trang khi nạp Dashboard lần đầu
   const hasInitializedScrollRef = useRef(false);
@@ -221,12 +240,120 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
     });
   };
 
-  const displayBotName = activeBotTab
-    ? activeBotTab.toUpperCase()
-    : "BOT";
+  const displayBotName = currentPlatform === "e8"
+    ? "TRADELOCKER (QUỸ FX)"
+    : (activeBotTab ? activeBotTab.toUpperCase() : "OKX BOT");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
+      {/* 🧭 THANH ĐIỀU HƯỚNG TÁCH BIỆT KÊNH LOGS (SÀN OKX / QUỸ FX) */}
+      <div
+        className="logs-terminal-nav"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "7px 12px",
+          background: "rgba(15, 23, 42, 0.85)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          flexShrink: 0,
+          gap: "8px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {t("log_channel_label", "Kênh Logs:")}
+          </span>
+
+          {/* Nút Tab Kênh Sàn OKX */}
+          <button
+            type="button"
+            onClick={() => onSwitchPlatform && onSwitchPlatform("okx")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 11px",
+              borderRadius: "6px",
+              fontSize: "11px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              background: currentPlatform === "okx" ? "rgba(59, 130, 246, 0.22)" : "rgba(255, 255, 255, 0.04)",
+              border: currentPlatform === "okx" ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.1)",
+              color: currentPlatform === "okx" ? "#60a5fa" : "#94a3b8",
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: isOkxRunning ? "#22c55e" : "#64748b",
+                boxShadow: isOkxRunning ? "0 0 7px #22c55e" : "none",
+              }}
+            />
+            <span>🌐 SÀN OKX</span>
+            {isOkxRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
+          </button>
+
+          {/* Nút Tab Kênh Quỹ FX (TradeLocker) */}
+          <button
+            type="button"
+            onClick={() => onSwitchPlatform && onSwitchPlatform("e8")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 11px",
+              borderRadius: "6px",
+              fontSize: "11px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              background: currentPlatform === "e8" ? "rgba(245, 158, 11, 0.22)" : "rgba(255, 255, 255, 0.04)",
+              border: currentPlatform === "e8" ? "1px solid #f59e0b" : "1px solid rgba(255, 255, 255, 0.1)",
+              color: currentPlatform === "e8" ? "#fbbf24" : "#94a3b8",
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: isPropRunning ? "#22c55e" : "#64748b",
+                boxShadow: isPropRunning ? "0 0 7px #22c55e" : "none",
+              }}
+            />
+            <span>🏆 QUỸ FX (TRADELOCKER)</span>
+            {isPropRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
+          </button>
+        </div>
+
+        {/* Nút Sao chép Logs */}
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            padding: "4px 10px",
+            borderRadius: "5px",
+            background: "rgba(255, 255, 255, 0.06)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#cbd5e1",
+            fontSize: "11px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            transition: "all 0.15s ease",
+          }}
+          title={t("log_copy_tooltip", "Sao chép toàn bộ logs của kênh đang chọn")}
+        >
+          📋 {t("log_copy_btn", "Sao chép")}
+        </button>
+      </div>
+
       {/* Vùng hiển thị Logs Terminal */}
       <div
         className="logs-terminal"
@@ -319,14 +446,20 @@ export default function LogsTerminal({ logs: externalLogs, activeBotTab, loginUi
                       fontSize: "inherit",
                       letterSpacing: "inherit",
                       WebkitTextSizeAdjust: "none",
-                      color: (l.includes("⏳") || l.includes("TP/SL"))
+                      color: (l.includes("⏳") || l.includes("TP/SL") || l.includes("🏆"))
                         ? "#fbbf24"
-                        : (l.includes("🚨") || l.includes("Lỗi") || l.includes("ERROR") || l.includes("REJECT"))
+                        : (l.includes("🚨") || l.includes("Lỗi") || l.includes("ERROR") || l.includes("REJECT") || l.includes("THẤT BẠI"))
                         ? "#f87171"
-                        : (l.includes("✅") || l.includes("SUCCESS"))
+                        : (l.includes("⚠️"))
+                        ? "#fb923c"
+                        : (l.includes("✅") || l.includes("SUCCESS") || l.includes("thành công") || l.includes("🔑"))
                         ? "#34d399"
                         : (l.includes("🚀") || l.includes("LIMIT") || l.includes("MARKET"))
                         ? "#38bdf8"
+                        : (l.includes("🧹"))
+                        ? "#c084fc"
+                        : (l.includes("🌑"))
+                        ? "#94a3b8"
                         : "#94a3b8",
                       lineHeight: "1.45",
                     }}

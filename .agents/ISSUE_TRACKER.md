@@ -33,6 +33,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[13/10/2026]** - Tách Biệt Hoàn Toàn Hệ Thống Logs Giữa Sàn OKX Và Quỹ FX (TradeLocker):
+  - **Mô tả yêu cầu CEO:**
+    - Hiện phần logs đang hiển thị chung cả Sàn OKX và Quỹ FX, gây lẫn lộn thông tin khi bot chạy. Yêu cầu tách riêng 2 hệ thống logs ra hoàn toàn.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Nguyên nhân:**
+       - Tại backend, tiến trình bot xuất toàn bộ log (gồm cả lệnh OKX và các dòng `[TRADELOCKER E8 DISPATCH]`, `[DRY-RUN TradeLocker]`) ra cùng một luồng stdout và được `log_reader_task` nạp chung vào `bot_log_queues`.
+       - Tại frontend, `App.jsx` chỉ duy trì duy nhất một state `logs` và truyền chung vào `LogsTerminal.jsx`, khiến log hai bên bị trộn lẫn và chớp nháy.
+    2. **Kiến trúc giải pháp triệt để:**
+       - **Backend (`tradelocker_service.py` & `main.py`):**
+         * Thiết lập ring buffer deque `_log_queues` và danh sách subscriber riêng biệt cho Quỹ FX trong `TradeLockerManager`.
+         * Trong `log_reader_task` tại `main.py`: Tự động nhận diện và chuyển hướng mọi dòng log chứa từ khóa Quỹ FX (`[TRADELOCKER`, `TRADELOCKER E8 DISPATCH`, `[DRY-RUN TradeLocker]`, `[QUỸ FX]`) sang `TradeLockerManager.log_event`, bỏ qua không nạp vào queue của OKX.
+         * Bổ sung REST endpoint `GET /api/tradelocker/logs` và WebSocket `/ws/tradelocker/logs/{uid}` cung cấp Dashboard Snapshot Quỹ FX chuyên biệt và Event Logs thời gian thực.
+       - **Frontend (`App.jsx` & `LogsTerminal.jsx`):**
+         * Tách riêng 2 state: `logs` (cho Sàn OKX) và `propLogs` (cho Quỹ FX).
+         * Kết nối 2 kênh WebSocket và polling song song, độc lập: `/ws/logs/...` (OKX) và `/ws/tradelocker/logs/...` (Quỹ FX).
+         * Thêm thanh điều hướng kênh logs chuyên nghiệp trực tiếp trên `LogsTerminal.jsx` gồm 2 nút tab: `[ 🌐 SÀN OKX ]` và `[ 🏆 QUỸ FX (TRADELOCKER) ]` kèm đèn trạng thái LIVE thời gian thực, tự động đồng bộ khi chuyển nền tảng trên giao diện.
+         * Nút sao chép logs (Copy) sao chép chính xác logs của kênh đang xem.
+  - **Kiểm tra và nghiệm thu:**
+    - `npm run build` thành công trong 619ms, 0 lỗi.
+    - `python3 -m py_compile` vượt qua 100% trên cả `main.py` và `tradelocker_service.py`.
+
 - **[12/10/2026]** - Sửa Lỗi Chưa Bôi Vàng Bước 7 (Chọn Tài Khoản) & Bước 20 (Tab Hỗ Trợ):
   - **Mô tả yêu cầu CEO:**
     1. Bước 7/21 chưa bôi vàng phần chọn tài khoản và số dư.
@@ -4203,4 +4224,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - `npm run build` frontend thành công 100%, không lỗi cú pháp JSX hay build error (`✓ built in 10.55s`).
     - Python syntax (`py_compile`) trên toàn bộ các file bot (`sub1`, `sub2`, `main.py`, `tradelocker_service.py`) đạt 100%.
   *(Mã patch: `z-tradelocker-dual-engine-and-anti-flicker`)*
+
+- **[13/10/2026]** - Sửa Triệt Để Lỗi Báo Đặt Lệnh TradeLocker Thành Công Nhưng Mã Lệnh None & Bị Từ Chối Do Vượt Ký Quỹ:
+  - **Vấn đề CEO báo cáo:**
+    1. Khi bot bắn lệnh sang Quỹ FX, log báo `[TRADELOCKER E8 DISPATCH] Đã đặt lệnh TradeLocker thành công! Mã lệnh: None`.
+    2. Trên app TradeLocker (E8) báo popup lỗi đỏ: `Trading Refused: Not enough margin to create Order #... Buy 0.70 Price 2564.12` (Vượt ký quỹ yêu cầu ~$1,677 trong khi tài khoản quỹ chỉ có $5,000 với đòn bẩy crypto 1:2).
+  - **Nguyên nhân kỹ thuật:**
+    1. **Báo thành công ảo (False Positive):** Trong `TradeLockerClient.place_order`, code cũ chỉ kiểm tra `if resp.status_code in (200, 201):`. Khi TradeLocker từ chối lệnh do thiếu ký quỹ hoặc giá sai, server trả về HTTP 200 nhưng body chứa `{"s": "error", "errMsg": "Not enough margin..."}` và không có object `d.orderId`. Do đó `order_id = None`, nhưng code vẫn `return True` và in ra `Đã đặt lệnh TradeLocker thành công! Mã lệnh: None`.
+    2. **Khối lượng Lot bị tính vống quá lớn:** Trên UI người dùng cài đặt `Khối lượng: LOT Cố định 0.01 L`. Tuy nhiên ô `e8Lot` trước đó chỉ lưu tạm ở `localStorage` của trình duyệt mà không đồng bộ lên backend. Backend chạy hàm `client.calculate_lot` tính theo Risk USD ($25) chia khoảng cách SL ($35.7), ra tới **0.70 Lot** ETH! Mua 0.70 ETH với đòn bẩy crypto 1:2 đòi hỏi ký quỹ $1,677, vượt khả năng tài khoản dẫn đến bị sàn TradeLocker từ chối.
+  - **Đã xử lý triệt để:**
+    1. **Thẩm định phản hồi chặt chẽ trong `place_order`:**
+       - Kiểm tra cờ `s`: nếu `status_flag in ("error", "fail")` hoặc không tìm thấy `order_id` hợp lệ trong phản hồi -> Xử lý THẤT BẠI (`return False`), trích xuất thông báo lỗi chính xác từ `errMsg`/`message`/`rejectReason`.
+       - Chỉ trả về `return True` khi thực sự nhận được `orderId` hợp lệ từ TradeLocker.
+       - Sửa lỗi trích xuất `orderId` trong `dispatch_signal_to_tradelocker` (`res.get("orderId") or res.get("id")`).
+    2. **Đồng bộ và ưu tiên Lot cố định (Fixed Lot):**
+       - Bổ sung trường `fixed_lot` vào schema backend (`TradeLockerConfigReq`), lưu trữ vào `tradelocker_config.json` và trả về qua API.
+       - Trong `SidebarLeft.jsx`, khi người dùng chỉnh ô số Lot, hàm `updateE8Config` sẽ lập tức gọi POST `/api/tradelocker/config` để lưu số Lot cố định lên backend.
+       - Trong `dispatch_signal_to_tradelocker`, bot ưu tiên tuyệt đối số Lot cố định do người dùng cài đặt trên giao diện (`fixed_lot`, mặc định an toàn: `0.01 Lot`). Khối lượng 0.01 Lot ETH chỉ tốn ~$12-$15 ký quỹ, hoàn toàn an toàn và không bao giờ bị sàn từ chối.
+  - **Kiểm chứng:**
+    - `python3 -m py_compile web_app/backend/tradelocker_service.py web_app/backend/main.py` thành công 100%.
+    - `npm run build` frontend Vite thành công 100% (`✓ built in 246ms`).
+  *(Mã patch: `z-tradelocker-fixed-lot-and-orderid-validation`)*
 

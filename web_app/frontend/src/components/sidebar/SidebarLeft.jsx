@@ -49,9 +49,10 @@ export default function SidebarLeft({
   const [e8RiskUsd, setE8RiskUsd] = useState(() => Number(localStorage.getItem("tls1_e8_risk_usd")) || 25);
   const [e8DailyLoss, setE8DailyLoss] = useState(() => Number(localStorage.getItem("tls1_e8_daily_loss")) || 125);
 
-  const updateE8Config = (newRisk, newDailyLoss) => {
+  const updateE8Config = (newRisk, newDailyLoss, newLot) => {
     const rVal = newRisk !== undefined ? newRisk : e8RiskUsd;
     const dlVal = newDailyLoss !== undefined ? newDailyLoss : e8DailyLoss;
+    const lotVal = newLot !== undefined ? newLot : e8Lot;
     const curUid = localStorage.getItem("tls1_uid") || "default";
     const token = localStorage.getItem("tls1_jwt_token");
     const headers = {
@@ -68,6 +69,7 @@ export default function SidebarLeft({
         daily_drawdown_limit: Number(dlVal),
         fund_size: e8Account?.fund_size || 5000,
         daily_profit_cap: e8Account?.daily_profit_cap || 100,
+        fixed_lot: Number(lotVal) || 0.01,
         is_enabled: true
       })
     }).catch(() => {});
@@ -119,6 +121,10 @@ export default function SidebarLeft({
           if (d.daily_loss_limit) {
             setE8DailyLoss(Number(d.daily_loss_limit));
             localStorage.setItem("tls1_e8_daily_loss", d.daily_loss_limit);
+          }
+          if (d.fixed_lot) {
+            setE8Lot(Number(d.fixed_lot));
+            localStorage.setItem("tls1_e8_lot", d.fixed_lot);
           }
         }
       })
@@ -751,6 +757,7 @@ export default function SidebarLeft({
                       if (isRunning) return;
                       setE8Lot(val);
                       localStorage.setItem("tls1_e8_lot", val);
+                      updateE8Config(undefined, undefined, val);
                     }}
                     min={0.01}
                     max={10.0}
