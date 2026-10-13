@@ -1080,6 +1080,26 @@ function App() {
         const line = text.trimEnd();
         if (!line) return;
 
+        // 🛡️ Lọc bỏ tuyệt đối các chuỗi / thẻ rác HTML từ Cloudflare (502/504 Bad Gateway)
+        const lowerLine = line.toLowerCase();
+        if (
+          lowerLine.startsWith("<") ||
+          lowerLine.includes("<!doctype") ||
+          lowerLine.includes("<html") ||
+          lowerLine.includes("<body") ||
+          lowerLine.includes("<head") ||
+          lowerLine.includes("<script") ||
+          lowerLine.includes("<style") ||
+          lowerLine.includes("cloudflare") ||
+          lowerLine.includes("cf-error") ||
+          lowerLine.includes("ray id:") ||
+          lowerLine.includes("502 bad gateway") ||
+          lowerLine.includes("504 gateway") ||
+          lowerLine.includes("window._cf_")
+        ) {
+          return;
+        }
+
         // 🛡️ Lọc bảo vệ: Nếu là dòng log thuộc Quỹ FX TradeLocker -> nạp vào propLogs, không cho lẫn vào logs OKX
         const isTradeLockerLine = 
           line.includes("[TRADELOCKER") || 
@@ -1271,6 +1291,26 @@ function App() {
         if (typeof text !== 'string') return;
         const line = text.trimEnd();
         if (!line) return;
+
+        // 🛡️ Lọc bỏ tuyệt đối các chuỗi / thẻ rác HTML từ Cloudflare (502/504 Bad Gateway)
+        const lowerLine = line.toLowerCase();
+        if (
+          lowerLine.startsWith("<") ||
+          lowerLine.includes("<!doctype") ||
+          lowerLine.includes("<html") ||
+          lowerLine.includes("<body") ||
+          lowerLine.includes("<head") ||
+          lowerLine.includes("<script") ||
+          lowerLine.includes("<style") ||
+          lowerLine.includes("cloudflare") ||
+          lowerLine.includes("cf-error") ||
+          lowerLine.includes("ray id:") ||
+          lowerLine.includes("502 bad gateway") ||
+          lowerLine.includes("504 gateway") ||
+          lowerLine.includes("window._cf_")
+        ) {
+          return;
+        }
 
         if (line.startsWith("===") || line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") || line.includes("Tài khoản Quỹ :") || line.includes("Số dư Quỹ     :")) {
           fetchPropLogs();

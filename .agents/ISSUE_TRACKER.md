@@ -33,6 +33,32 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[13/10/2026]** - Triệt Tiêu Lỗi Spam Hủy/Đặt Lại Lệnh Limit, Lỗi Netting Đóng Vị Thế Ngược Chiều, Rò Rỉ HTML Cloudflare Và Kênh Logs Quỹ FX:
+  - **Mô tả yêu cầu CEO:**
+    1. Lệnh trên Quỹ E8 (TradeLocker) cứ đặt xong là bị hủy ngay lập tức ("như là đặt xong hủy luôn").
+    2. Vị thế đang chạy bị đóng ngược chiều bất ngờ ("Position fermée: VENDRE 0.01 Lots...").
+    3. Rác HTML Cloudflare (502 Bad Gateway) vẫn thỉnh thoảng lọt vào kênh logs OKX.
+    4. Kênh Logs Quỹ FX không hiển thị đủ chi tiết hoạt động của bot.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Nguyên nhân Spam Hủy/Đặt Lại Lệnh Limit:**
+       - Vòng lặp chiến lược đa khung thời gian (`bot_strategy.py`) quét liên tục các khung M5, M15, M30, H1. Với mỗi khung thỏa điều kiện, bot gọi `place_pure_limit` -> `_dispatch_to_tradelocker`.
+       - `_dispatch_to_tradelocker` tạo các luồng nền độc lập (`threading.Thread`) mà không có khóa đồng bộ (`threading.Lock`). Các luồng M5, M15, M30 chạy song song, vượt qua kiểm tra cooldown do biến cooldown chưa kịp cập nhật.
+       - Khi luồng M5 vừa đặt lệnh Limit thành công, luồng M15 chạy ngay sau đó gọi `cancel_all_orders` để hủy toàn bộ lệnh chờ của cặp đó và đặt lệnh mới của M15; tiếp đó M30 lại hủy M15 và đặt M30... tạo ra chu kỳ hủy - đặt lại liên hoàn mỗi vài giây.
+       - **Giải pháp:** (1) Thêm khóa đồng bộ `_dispatch_lock = threading.Lock()` bao bọc toàn bộ phương thức `dispatch_signal_to_tradelocker`, cập nhật timestamp cooldown `cls._symbol_cooldowns[clean_base] = now_time` ngay dưới lock để chặn đứng mọi luồng sau; (2) Truy vấn danh sách lệnh chờ qua `get_orders()`, nếu đã tồn tại lệnh Limit cùng chiều có mức giá gần tương đương (chênh lệch < 0.2%), bot BẢO LƯU NGUYÊN VẸN lệnh chờ đó, không hủy và không đặt lại.
+    2. **Nguyên nhân Vị Thế Bị Đóng Ngược Chiều ("Position fermée"):**
+       - Trên tài khoản Quỹ Netting / FIFO của TradeLocker, nếu tài khoản đang có vị thế MUA (BUY) mà một lệnh BÁN (SELL) được thực thi, sàn sẽ tự động cấn trừ (Netting) làm giảm hoặc đóng hoàn toàn vị thế MUA đang mở.
+       - Logic cũ chỉ chặn lệnh trùng nếu vị thế đang mở cùng chiều (`p_side == side_clean`), chưa chặn nếu có vị thế ngược chiều.
+       - **Giải pháp:** Áp dụng quy tắc an toàn nghiêm ngặt của Quỹ (1 vị thế duy nhất cho mỗi coin): Khi quét thấy ĐÃ CÓ BẤT KỲ VỊ THẾ NÀO của cặp tiền đó (dù BUY hay SELL), bot lập tức dọn dẹp các lệnh limit chờ của cặp đó, từ chối mở thêm lệnh mới và tự động vá SL/TP nếu vị thế chưa có bảo vệ.
+    3. **Nguyên nhân Rò Rỉ HTML Cloudflare:**
+       - Trong `TradeLockerClient`, các nhánh lỗi trả về trực tiếp `resp.text`. Khi Cloudflare phản hồi trang lỗi HTML 502/504 nhiều dòng, chuỗi lỗi được in ra stdout; dòng 1 có tag `[TRADELOCKER]` nhưng các dòng HTML tiếp theo (`<html>`, `<body>`, `<script>`) không có tag này nên bị `log_reader_task` coi là log của OKX.
+       - **Giải pháp:** (1) Bổ sung phương thức chuẩn hóa `_clean_error_text(resp)` trong `TradeLockerClient` để lọc sạch 100% thẻ HTML và trang lỗi Cloudflare thành một thông báo lỗi ngắn gọn duy nhất (ví dụ: `Máy chủ TradeLocker phản hồi HTTP 502 qua Cloudflare`); (2) Mở rộng bộ lọc `is_cf_stray` tại `log_reader_task` (`main.py`) và trong cả WebSocket handler tại frontend (`App.jsx`, `LogsTerminal.jsx`) loại bỏ triệt để mọi dòng bắt đầu bằng `<` hoặc chứa token Cloudflare.
+    4. **Nguyên nhân Kênh Logs Quỹ FX Thiếu Dữ Liệu:**
+       - Tiến trình con chạy bot gọi `TradeLockerManager.log_event()`, nhưng trong tiến trình con danh sách `_subscribers` là rỗng (vì WebSocket kết nối vào tiến trình cha `main.py`). `log_event()` trước đây không gọi `print` ra stdout nên tiến trình cha không nhận được log.
+       - **Giải pháp:** Trong `log_event()`, khi không có subscriber WebSocket cục bộ, tự động in ra stdout với tiền tố `[TRADELOCKER] <msg>` và `flush=True`. Tiến trình cha `main.py` đọc qua `log_reader_task`, chuyển hướng vào queue của Quỹ FX và broadcast tới trình duyệt.
+  - **Kiểm tra và nghiệm thu:**
+    - `python3 -m py_compile` vượt qua 100% trên `tradelocker_service.py`, `main.py`, `bots/sub1/bot_orders.py`, `bots/sub2/bot_orders.py`.
+    - `npm run build` thành công, `dist` được cập nhật đồng bộ.
+
 - **[13/10/2026]** - Khắc Phục Triệt Để Lỗi Spam Lệnh TradeLocker, Thiếu SL/TP, Rác HTML Cloudflare Và Không Hiện Bảng Vị Thế:
   - **Mô tả yêu cầu CEO:**
     1. Bot spam lệnh liên tục lên TradeLocker (5 lệnh ETHUSD+ trong 3 phút).

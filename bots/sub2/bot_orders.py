@@ -91,8 +91,8 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
                 tp_price=tp_price,
                 dry_run=dry_run
             )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side}: {e}", flush=True)
 
 def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, tick_sz: Decimal, cl_prefix: str) -> tuple[bool, str]:
     global _ORDER_COUNTER
@@ -394,3 +394,4 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
         print(f"⚠️ [SMC CLEANUP LỖI]: {e}")
 
 # z1953 | Tích hợp độc lập _dispatch_to_tradelocker cho SMC Market entry và Limit entry không phụ thuộc OKX
+# z1954 | Thêm trace exception chi tiết cho _dispatch_to_tradelocker trong SMC bot_orders

@@ -113,6 +113,26 @@ export default function LogsTerminal({
         const line = e.data.trimEnd();
         if (!line) return;
 
+        // 🛡️ Lọc bỏ tuyệt đối các chuỗi / thẻ rác HTML từ Cloudflare (502/504 Bad Gateway)
+        const lowerLine = line.toLowerCase();
+        if (
+          lowerLine.startsWith("<") ||
+          lowerLine.includes("<!doctype") ||
+          lowerLine.includes("<html") ||
+          lowerLine.includes("<body") ||
+          lowerLine.includes("<head") ||
+          lowerLine.includes("<script") ||
+          lowerLine.includes("<style") ||
+          lowerLine.includes("cloudflare") ||
+          lowerLine.includes("cf-error") ||
+          lowerLine.includes("ray id:") ||
+          lowerLine.includes("502 bad gateway") ||
+          lowerLine.includes("504 gateway") ||
+          lowerLine.includes("window._cf_")
+        ) {
+          return;
+        }
+
         const isHeader = line.includes("bot_sub1.py") || line.includes("bot_sub2.py") || line.includes("bot_sub3.py") || line.includes("sys_bot_");
 
         const isEventLog = 

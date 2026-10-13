@@ -613,6 +613,7 @@ async def log_reader_task(stream, uid, strategy):
     if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = deque(maxlen=400)
     log_deque = bot_log_queues[uid][strategy]
     last_cf_warn_time = 0.0
+    in_html_block = False  # Cờ theo dõi đang ở trong khối HTML nhiều dòng
     try:
         while True:
             line = await asyncio.to_thread(stream.readline)
@@ -632,12 +633,21 @@ async def log_reader_task(stream, uid, strategy):
                     pass
                 continue
 
-            # 🛡️ LỌC BỎ RÁC HTML CLOUDFLARE (502 / 504 Bad Gateway / Error Pages):
-            lower_line = line_str.lower()
-            is_cf_html = any(tag in lower_line for tag in [
-                "<!doctype html", "<html", "<head>", "<body", "cloudflare", "ray id:", "cf-error", "<script", "<style", "502 bad gateway", "504 gateway time-out"
-            ])
-            if is_cf_html:
+            # 🛡️ LỌC BỎ TOÀN BỘ KHỐI HTML CLOUDFLARE NHIỀU DÒNG (502/504 Bad Gateway / Error Pages):
+            lower_line = line_str.lower().strip()
+
+            # Phát hiện dòng mở đầu khối HTML
+            if not in_html_block:
+                html_start_tags = ["<!doctype html", "<html", "<head>", "<body"]
+                if any(tag in lower_line for tag in html_start_tags):
+                    in_html_block = True
+
+            # Nếu đang trong khối HTML -> loại bỏ dòng này và kiểm tra kết thúc
+            if in_html_block:
+                # Kiểm tra dòng kết thúc khối HTML
+                if "</html>" in lower_line or "</body>" in lower_line:
+                    in_html_block = False
+                # Chỉ in 1 cảnh báo mạng gọn gàng duy nhất mỗi 15 giây
                 now_t = time.time()
                 if (now_t - last_cf_warn_time) > 15.0:
                     last_cf_warn_time = now_t
@@ -647,6 +657,20 @@ async def log_reader_task(stream, uid, strategy):
                         for connection in list(active_connections[uid][strategy]):
                             try: await connection.send_text(warn_line)
                             except Exception: pass
+                continue
+
+            # Lọc thêm các dòng HTML lẻ không nằm trong khối (cloudflare ray id, cf-error, ...)
+            is_cf_stray = (
+                lower_line.startswith("<") or
+                lower_line.startswith("<!--") or
+                any(tag in lower_line for tag in [
+                    "cloudflare", "ray id:", "cf-error", "502 bad gateway", "504 gateway time-out",
+                    "<script", "<style", "</script", "</style", "<div", "</div", "<span", "</span",
+                    "<meta", "<link ", "<title", "</title", "<p ", "</p>", "<img ", "<br",
+                    "class=\"", "id=\"", "window._cf_", "cf-ray", "data-cf", "cferror", "error code 52"
+                ])
+            )
+            if is_cf_stray:
                 continue
 
             log_deque.append(line_str)
@@ -4209,3 +4233,4 @@ if __name__ == "__main__":
 # z7733 | Tách biệt hoàn toàn hệ thống Logs giữa Sàn OKX và Quỹ FX: chuyển hướng log TradeLocker trong log_reader_task không cho lẫn vào OKX, bổ sung REST API /api/tradelocker/logs và WebSocket /ws/tradelocker/logs.
 # z7734 | Hỗ trợ lưu trữ và đồng bộ tham số fixed_lot cho cấu hình Quỹ TradeLocker qua endpoint REST API
 # z7735 | Khắc phục triệt để lỗi TradeLocker không hiển thị vị thế trên web (chuẩn hóa ma trận list sang dict), lọc rác HTML 502/504 Cloudflare trong log OKX, và truyền BOT_USER_UID đồng bộ vào shadow bot
+# z7736 | Triệt tiêu 100% rác HTML Cloudflare: mở rộng bộ lọc regex và token Cloudflare trong log_reader_task ngăn không cho bất kỳ fragment nào lọt vào OKX log stream

@@ -86,5 +86,12 @@
   * **Cơ chế tự sửa lỗi SL/TP (Self-Healing Position Patch):** Khi duyệt danh sách vị thế đang mở trên TradeLocker, nếu phát hiện vị thế nào chưa có Stop Loss, hệ thống tự động gọi API `PATCH /trade/positions/{posId}` để gắn bổ sung SL và TP an toàn.
   * **Sửa lỗi Bảng Vị Thế (0) & Định dạng ma trận:** Chuẩn hóa dữ liệu trả về từ TradeLocker API (ma trận mảng lồng nhau 2D) thông qua `get_positions_columns()`, ánh xạ chính xác `ticket_id, symbol, posSide, size, openPrice, upl, roi, stopLoss, takeProfit` hiển thị trực quan trên giao diện web.
   * **Khắc phục kênh Logs Quỹ FX & Lọc rác HTML Cloudflare:** Chuyển hướng log song song vào cả queue UID và queue `default` cho WebSocket; lọc sạch thẻ HTML lỗi 502/504 từ Cloudflare thành thông báo súc tích dễ nhìn.
+- [x] **Bước 11:** Triệt tiêu lỗi spam hủy/đặt lại lệnh Limit, lỗi Netting đóng vị thế ngược chiều, rò rỉ HTML Cloudflare và hoàn thiện kênh Logs Quỹ FX:
+  * **Đồng bộ hóa luồng Thread-Safe Lock (`_dispatch_lock`):** Bao bọc toàn bộ chu trình xử lý `dispatch_signal_to_tradelocker` bằng `threading.Lock()`, cập nhật timestamp cooldown ngay lập tức dưới lock, triệt tiêu triệt để race condition khi các khung thời gian M5, M15, M30, H1 kích hoạt đồng thời.
+  * **Bảo lưu lệnh Limit đang chờ (Anti-Cancel-Spam):** Trước khi hủy lệnh cũ để đặt lệnh mới, kiểm tra sổ lệnh chờ `get_orders()`. Nếu đã tồn tại lệnh Limit cùng chiều có mức giá chênh lệch < 0.2%, bot giữ nguyên lệnh chờ đang có, không gọi `cancel_all_orders` và không đặt lại lệnh trùng.
+  * **Quy tắc an toàn Quỹ (1 coin = 1 vị thế):** Chặn mở lệnh mới nếu đã có bất kỳ vị thế nào của cặp tiền đó (dù BUY hay SELL), dọn dẹp các lệnh limit chờ tương ứng, ngăn chặn việc khớp lệnh ngược chiều gây cấn trừ (Netting) đóng vị thế đang chạy trên tài khoản E8.
+  * **IPC Log Forwarding qua stdout:** `TradeLockerManager.log_event` tự động in ra stdout với tag `[TRADELOCKER]` khi chạy trong tiến trình con của bot; tiến trình cha `main.py` đón bắt qua `log_reader_task` và stream trực tiếp tới kênh Quỹ FX trên giao diện web.
+  * **Triệt tiêu 100% rác HTML Cloudflare:** Bổ sung `_clean_error_text(resp)` trong `TradeLockerClient` và tăng cường bộ lọc tại cả backend (`main.py`) lẫn frontend (`App.jsx`, `LogsTerminal.jsx`), loại bỏ vĩnh viễn các dòng HTML Cloudflare (502/504).
+
 
 

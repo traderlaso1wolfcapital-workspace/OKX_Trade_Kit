@@ -315,8 +315,8 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
                 tp_price=tp_price,
                 dry_run=dry_run
             )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side}: {e}", flush=True)
 
 def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
     # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
@@ -715,5 +715,6 @@ def apply_emergency_tpsl(client, inst_id: str, pos: dict, state_matrix: dict, gl
 # ==============================================================================
 # z1953 | Tách biệt hoàn toàn điều phối lệnh Quỹ TradeLocker (E8) độc lập với trạng thái dry_run của sàn OKX
 # z1956 | Tự động tính SL/TP fallback (1.2%) khi attach_algo_ords không cung cấp để đảm bảo 100% lệnh TradeLocker có cắt lỗ/chốt lời
+# z1958 | Thêm logging chi tiết khi dispatch TradeLocker gặp ngoại lệ trong bot_orders sub1
 
 
