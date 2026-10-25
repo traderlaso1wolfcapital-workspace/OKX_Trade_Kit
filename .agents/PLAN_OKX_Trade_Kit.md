@@ -873,3 +873,39 @@ Mọi Box Long/Short vẽ trên biểu đồ bắt buộc phải ánh xạ trự
 - **Trục giá (Right Price Scale):** Định dạng chuẩn Hyperliquid (ngăn cách hàng nghìn bằng dấu chấm, phần thập phân bằng dấu phẩy theo `vi-VN`). BTC $\ge 10.000$ không số lẻ, ETH 1 số lẻ, NEAR 4 số lẻ. Độ rộng trục giá co nhỏ tự động vừa khít chữ số, không thừa khoảng đen bên phải.
 - **Bảng Backtesting:** Bảng nổi nằm sát mép trục giá, hiển thị 4 chỉ số minh bạch: `Total Entries`, `Wins`, `Losses`, `Winrate (%)`. Đã loại bỏ chỉ số `Total Profit` không cần thiết.
 - **Bảo toàn thẩm mỹ biểu đồ:** Trên biểu đồ chỉ render tối đa 15 box vị thế gần nhất để nến luôn thông thoáng, sạch đẹp, đúng chuẩn TradingView chuyên nghiệp.
+
+
+===========================================================================================
+## XII. KIẾN TRÚC MÁY CHỦ WEB APP & DEPLOYMENT CLOUDFLARE TUNNEL (MAC MINI M1)
+*(Cập nhật chuẩn hóa: 25/10/2026 - zWebDeploy)*
+===========================================================================================
+
+### 1. Mô Hình Vận Hành Đám Mây 24/7
+- **Môi trường máy chủ:** Apple Silicon Mac Mini M1 chạy macOS, Node.js, Python 3.14 (Homebrew).
+- **Frontend:** Single Page App React build tối ưu bằng `npm run build` vào `web_app/frontend/dist/`.
+- **Backend:** FastAPI + Uvicorn đảm nhiệm toàn bộ (REST API, WebSocket, phục vụ static frontend).
+- **Quản lý tiến trình (PM2):** Sử dụng `ecosystem.config.js` với đường dẫn tuyệt đối `path.resolve(__dirname, 'web_app/backend')` và biến môi trường `PYTHONUNBUFFERED: "1"` để tự phục hồi khi crash và ghi log tức thì.
+- **Tên miền công khai:** `https://autotrader.fun` thông qua Cloudflare Zero Trust Tunnel token.
+
+### 2. Quy Chuẩn Cổng Mạng (Port Architecture) & Cầu Nối Kép (Port Bridge 5173 ➔ 8080)
+- **Cổng 8080 (Primary Port):** Cổng chính thức của FastAPI Backend và Web UI React.
+- **Cổng 5173 (Port Bridge):** Cổng tương thích ngược với cấu hình Vite cũ. Trong `main.py`, một server TCP Streamer trực tiếp bằng `asyncio` tự động lắng nghe trên cổng 5173 và chuyển tiếp 100% dữ liệu sang 8080.
+- **Nguyên lý triệt tiêu lỗi 502 Bad Gateway:** 
+  - Khi người dùng truy cập `https://autotrader.fun`, Cloudflare Tunnel trỏ vào `localhost:8080` hay `localhost:5173` đều được đáp ứng tức thì mà không cần phải can thiệp cấu hình thủ công trên Cloudflare Dashboard.
+  - Trường hợp chạy môi trường lập trình (Local Dev), nếu cổng 5173 đã được Vite chiếm dụng, Port Bridge tự động bỏ qua để nhường chỗ cho Vite.
+
+### 3. Quy Trình Khởi Động & Cập Nhật Chuẩn
+- **Cập nhật mã nguồn & Khởi chạy:**
+  ```bash
+  cd web_app
+  git pull origin main && bash start_web_server.sh
+  ```
+- **Dừng an toàn:**
+  ```bash
+  bash web_app/stop_web_server.sh
+  ```
+- **Lệnh chẩn đoán nhanh:**
+  - Trạng thái tiến trình: `pm2 status`
+  - Log chi tiết Backend: `pm2 logs tls1-bot-backend --lines 30`
+  - Log kết nối Cloudflare: `tail -n 30 web_app/tunnel.log`
+
