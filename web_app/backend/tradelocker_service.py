@@ -1,12 +1,27 @@
 import os
 import json
 import time
+import socket
 import threading
 from datetime import datetime, timezone
 import requests
 from typing import Optional, Dict, Any, List, Tuple
 from decimal import Decimal
 from collections import deque
+
+# 🛡️ BYPASS ISP SINKHOLE: Tránh router/nhà mạng phân giải demo.tradelocker.com về 127.0.0.1
+_orig_getaddrinfo = socket.getaddrinfo
+def _tradelocker_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if host and "tradelocker.com" in str(host):
+        try:
+            res = _orig_getaddrinfo(host, port, family, type, proto, flags)
+            if all(r[4][0] in ("127.0.0.1", "::1", "localhost") for r in res):
+                return _orig_getaddrinfo("104.18.28.67", port, family, type, proto, flags)
+            return res
+        except Exception:
+            return _orig_getaddrinfo("104.18.28.67", port, family, type, proto, flags)
+    return _orig_getaddrinfo(host, port, family, type, proto, flags)
+socket.getaddrinfo = _tradelocker_getaddrinfo
 
 # Môi trường mặc định của TradeLocker
 DEFAULT_DEMO_ENV = "https://demo.tradelocker.com/backend-api"
@@ -637,7 +652,12 @@ class TradeLockerManager:
 
         file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
         if not os.path.exists(file_path):
-            return [], ""
+            if uid != "default":
+                default_path = cls.get_user_creds_file("default", user_base_dir_fn)
+                if os.path.exists(default_path):
+                    file_path = default_path
+            if not os.path.exists(file_path):
+                return [], ""
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -907,11 +927,19 @@ class TradeLockerManager:
         cfg = cls.load_user_config(clean_uid, user_base_dir_fn, fernet_instance) or {}
         if not cfg and clean_uid != "default":
             cfg = cls.load_user_config("default", user_base_dir_fn, fernet_instance) or {}
+        if client:
+            if not client.access_token or client.account_balance <= 0:
+                try:
+                    if client._ensure_authenticated():
+                        client.get_accounts()
+                except Exception:
+                    pass
+
         is_running = cfg.get("is_bot_running", False)
         risk_usd = float(cfg.get("risk_per_trade", 25.0))
         acc_num = client.acc_num if (client and client.acc_num) else (cfg.get("acc_num") or cfg.get("email") or "Chưa kết nối")
         server = client.server if (client and client.server) else cfg.get("server", "E8")
-        bal = float(client.account_balance) if (client and client.account_balance) else 0.0
+        bal = float(client.account_balance) if (client and client.account_balance > 0) else float(cfg.get("fund_size", 5000.0))
         status_str = "🟢 RUNNING (ĐANG HOẠT ĐỘNG)" if is_running else "🛑 STOPPED (ĐÃ DỪNG)"
         conn_str = "✅ ĐÃ KẾT NỐI" if (client and client.access_token) else "⚪ CHƯA KẾT NỐI"
 

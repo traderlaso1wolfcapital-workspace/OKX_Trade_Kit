@@ -428,6 +428,7 @@ def run_strategy_cycle(*args, **kwargs):
 
 def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool, is_enabled: bool = True): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
+    from bots.sub1.bot_orders import clean_limit_orders
 
     swap_id = cfg["swap"]
     coin_name = cfg["coin"]
@@ -464,7 +465,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ⚡ EARLY EXIT: Bỏ qua hoàn toàn coin không được kích hoạt và không có vị thế
     if not is_enabled and not tracker.has_long and not tracker.has_short:
         if not getattr(tracker, "_disabled_cleaned", False):
-            from bots.sub1.bot_orders import clean_limit_orders
             clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
             tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
             tracker.placed_entry_px_long_by_tf, tracker.placed_entry_px_short_by_tf = {}, {}
@@ -479,7 +479,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     if not current_enabled_tfs:
         if not tracker.has_long and not tracker.has_short:
             if not getattr(tracker, "_no_tf_cleaned", False):
-                from bots.sub1.bot_orders import clean_limit_orders
                 clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
                 tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
                 tracker.placed_entry_px_long_by_tf, tracker.placed_entry_px_short_by_tf = {}, {}
@@ -720,17 +719,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         ema_ceiling = alt_own_ema * (Decimal("1") - base_buffer)
                         raw_px = max(raw_px, ema_ceiling)  # SHORT: không đặt thấp hơn EMA200 Altcoin - buffer
 
-        # ⚡ SAFETY CLAMP: Giới hạn limit không vượt quá EMA200 của TF tín hiệu chủ đạo
-        # Khi TF lưới nhỏ hơn TF tín hiệu, EMA200 của TF nhỏ có thể lệch pha gây limit vô nghĩa
-        # VD: M5 EMA200 > H4 EMA200 → SHORT limit M5 vượt lên trên cản H4 → không bao giờ khớp
-        _signal_tf = getattr(tracker, "signal_short_tf", None) if side == "short" else getattr(tracker, "signal_long_tf", None)
-        if _signal_tf and tf_weight(_signal_tf) > tf_weight(tf):
-            _signal_ema = get_ema200_for_tf(_signal_tf)
-            if _signal_ema > 0:
-                if side == "short" and raw_px > _signal_ema:
-                    raw_px = _signal_ema  # SHORT: không đặt limit trên EMA200 của TF tín hiệu
-                elif side == "long" and raw_px < _signal_ema:
-                    raw_px = _signal_ema  # LONG: không đặt limit dưới EMA200 của TF tín hiệu
+        # ⚡ SAFETY CLAMP: Chỉ áp dụng khi KHÔNG ở chế độ Lưới Đa Khung (_is_multitf)
+        # Trong Lưới Đa Khung (Hedge), mỗi TF chạy độc lập 100% theo cản EMA200 của chính khung đó
+        _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+        _is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+        _is_multitf_cfg = getattr(globals_ref, "ENABLE_MULTITF_GRID", True) and not _is_pyramid and not _is_negative_dca
+        if not _is_multitf_cfg:
+            _signal_tf = getattr(tracker, "signal_short_tf", None) if side == "short" else getattr(tracker, "signal_long_tf", None)
+            if _signal_tf and tf_weight(_signal_tf) > tf_weight(tf):
+                _signal_ema = get_ema200_for_tf(_signal_tf)
+                if _signal_ema > 0 and tracker.live_price > 0:
+                    if side == "short" and _signal_ema >= tracker.live_price and raw_px > _signal_ema:
+                        raw_px = _signal_ema  # SHORT: không đặt limit trên EMA200 của TF tín hiệu
+                    elif side == "long" and _signal_ema <= tracker.live_price and raw_px < _signal_ema:
+                        raw_px = _signal_ema  # LONG: không đặt limit dưới EMA200 của TF tín hiệu
 
         return round_to_tick(raw_px, tick_sz)
 
@@ -1456,7 +1458,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             except Exception:
                 pnl_usd = Decimal("0")
                 
-        bot_models.record_trade_marker(coin_name, "LONG", 0, "closed", pnl=float(pnl_usd), exit_price=float(tracker.live_price))
+        bot_models.record_trade_marker(coin_name, "LONG", 0, volume=0, status="closed", pnl=float(pnl_usd), exit_price=float(tracker.live_price))
         
         if not closure_reason_l:
             pnl_label = "Lãi" if pnl_usd >= 0 else "Lỗ"
@@ -1668,7 +1670,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             except Exception:
                 pnl_usd = Decimal("0")
                 
-        bot_models.record_trade_marker(coin_name, "SHORT", 0, "closed", pnl=float(pnl_usd), exit_price=float(tracker.live_price))
+        bot_models.record_trade_marker(coin_name, "SHORT", 0, volume=0, status="closed", pnl=float(pnl_usd), exit_price=float(tracker.live_price))
         
         if not closure_reason_s:
             pnl_label = "Lãi" if pnl_usd >= 0 else "Lỗ"
@@ -2481,9 +2483,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             _is_sync = getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True)
             _enable_hedge = getattr(globals_ref, "ENABLE_STRATEGY_HEDGE", getattr(globals_ref, "ENABLE_STRATEGY_XOLE", False))
+            _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+            _is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+            _is_multitf = getattr(globals_ref, "ENABLE_MULTITF_GRID", True) and not _is_pyramid and not _is_negative_dca
 
-            if not _enable_hedge:
-                # 🛑 KHI TẮT HEDGE: KHÓA CỐ ĐỊNH 1 CHIỀU TUYỆT ĐỐI (CẤM KẸP VỊ THẾ LONG & SHORT)
+            if _is_multitf:
+                # 🌐 CHẾ ĐỘ LƯỚI ĐA KHUNG ĐỘC LẬP (SPLIT GRID OKX):
+                # Bản thân Lưới Đa Khung cho phép đánh 2 đầu Long & Short độc lập trong cùng 1 cặp coin!
+                # Mỗi TF hoạt động độc lập theo cản EMA200 của chính khung đó (▲ -> Long, ▼ -> Short).
+                # OKX hỗ trợ song song cả 2 vị thế Long và Short cùng lúc trên cùng 1 coin (chế độ Chia / Split Mode).
+                allowed_long = True
+                allowed_short = True
+            elif _is_pyramid or _is_negative_dca:
+                # 🛑 CHẾ ĐỘ DCA (DCA DƯƠNG / DCA ÂM):
+                # DCA là dồn vị thế nên BẮT BUỘC KHÓA CỐ ĐỊNH 1 CHIỀU TUYỆT ĐỐI (Chỉ Long HOẶC Chỉ Short)
                 if tracker.has_long:
                     allowed_long = True
                     allowed_short = False
@@ -2491,7 +2504,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     allowed_long = False
                     allowed_short = True
                 else:
-                    # Chu kỳ mới chưa có vị thế: Xác định duy nhất 1 hướng đi (Long HOẶC Short)
                     tracker.pos_cycle_filled_tfs = []
                     tracker.pos_cycle_closed_tfs = []
                     tracker.filled_entry_px_by_tf_long = {}
@@ -2511,23 +2523,12 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             allowed_long = (btc_dir == "UPTREND") and btc_h4_side != "under"
                             allowed_short = (btc_dir == "DOWNTREND") and btc_h4_side != "above"
                     else:
-                        # Đi theo xu hướng nến/EMA độc lập của chính coin đó
                         h4_side = tracker.mtf_states.get("H4", {}).get("side", "none")
                         allowed_long = (tracker.trend == "UPTREND") and h4_side != "under"
                         allowed_short = (tracker.trend == "DOWNTREND") and h4_side != "above"
             else:
-                # ⚡ KHI BẬT HEDGE: Cho phép giao dịch 2 chiều linh hoạt
-                if tracker.has_long:
-                    allowed_long = True
-                if tracker.has_short:
-                    allowed_short = True
-                if not tracker.has_long and not tracker.has_short:
-                    tracker.pos_cycle_filled_tfs = []
-                    tracker.pos_cycle_closed_tfs = []
-                    tracker.filled_entry_px_by_tf_long = {}
-                    tracker.filled_entry_px_by_tf_short = {}
-                    allowed_long = True
-                    allowed_short = True
+                allowed_long = True
+                allowed_short = True
 
             # ⚡ Bổ sung Bypass vị thế cho Sóng Đảo Chiều Hedge (Chỉ khi thực sự là vị thế HEDGE hoặc đang rình HEDGE)
             is_hd_active = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False)) or (not tracker.has_long and not tracker.has_short and xl_found)
@@ -2628,7 +2629,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             else:
                 # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (ĐỘC LẬP TF - KHI CẢ 2 NÚT DCA CÙNG OFF):
                 target_long_tfs = []
-                if allowed_long and not (not _enable_hedge and tracker.has_short):
+                if allowed_long:
                     for tf in TFS:
                         if tf in _filled_long: continue
                         st = tracker.mtf_states.get(tf, {})
@@ -2642,7 +2643,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         if getattr(tracker, f"is_{tf.lower()}_squeeze", False):
                             continue
                         _ema = get_ema200_for_tf(tf)
-                        if _ema > 0 and tracker.live_price >= _ema:
+                        if _ema > 0 and tracker.live_price >= _ema and st.get("side") == "above":
                             target_long_tfs.append(tf)
                 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
@@ -2692,7 +2693,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             else:
                 # ⚡ CHẾ ĐỘ LƯỚI ĐA KHUNG (ĐỘC LẬP TF - KHI CẢ 2 NÚT DCA CÙNG OFF):
                 target_short_tfs = []
-                if allowed_short and not (not _enable_hedge and tracker.has_long):
+                if allowed_short:
                     for tf in TFS:
                         if tf in _filled_short: continue
                         st = tracker.mtf_states.get(tf, {})
@@ -2706,7 +2707,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         if getattr(tracker, f"is_{tf.lower()}_squeeze", False):
                             continue
                         _ema = get_ema200_for_tf(tf)
-                        if _ema > 0 and tracker.live_price < _ema:
+                        if _ema > 0 and tracker.live_price <= _ema and st.get("side") == "under":
                             target_short_tfs.append(tf)
                 
             target_short_tfs = [tf for tf in target_short_tfs if tf not in _blocked_tfs]
@@ -2823,8 +2824,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     else:
                         target_short_tfs = []
 
-            # 🛑 CẦU DAO KHÓA 1 CHIỀU KHI TẮT HEDGE (BẢO VỆ TUYỆT ĐỐI CHỐNG KẸP VỊ THẾ):
-            if not _enable_hedge:
+            # 🛑 CẦU DAO KHÓA 1 CHIỀU CHO CHẾ ĐỘ DCA (DCA DƯƠNG / DCA ÂM):
+            # DCA là dồn vị thế nên bắt buộc khóa 1 chiều duy nhất, cấm kẹp 2 chiều.
+            # Với Lưới Đa Khung (Split Grid), mỗi TF chạy độc lập nên cho phép đánh 2 đầu trên OKX.
+            if _is_pyramid or _is_negative_dca:
                 if tracker.has_long:
                     target_short_tfs = []
                 elif tracker.has_short:
@@ -2884,12 +2887,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 px_tf = calculate_entry_px(tf, "long")
                 if px_tf <= 0: continue
                 
+                # ⚡ Yêu cầu của CEO: Nếu giá live hiện tại đang thấp hơn hoặc bằng giá Limit entry (giá mua đẹp hơn cản EMA200):
+                # Ép giá Limit về sát giá live hiện tại để lệnh khớp ngay lập tức thay vì bị từ chối 51006
+                if tracker.live_price > 0 and px_tf >= tracker.live_price:
+                    px_tf = tracker.live_price
+
                 # Tính volume dựa trên entry price (px_tf) thay vì live_price để chống rung lắc size liên tục
                 _sz_tf_raw = round_to_tick(tf_target_usdt / (px_tf * contract_val), spec["lotSz"])
                 sz_for_tf = max(_sz_tf_raw, spec["minSz"])
-                
-                # ⚡ Yêu cầu của User: Cho phép khớp luôn thành Market nếu giá Limit đẹp hơn giá Live hiện tại
-                # (Đã bỏ block: BẢO VỆ CHỐNG KHỚP LỆNH MARKET)
                     
                 px_str = f"{px_tf:.{dec_places}f}"
                 
@@ -3162,12 +3167,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 px_tf = calculate_entry_px(tf, "short")
                 if px_tf <= 0: continue
 
+                # ⚡ Yêu cầu của CEO: Nếu giá live hiện tại đang cao hơn hoặc bằng giá Limit entry (giá bán đẹp hơn cản EMA200):
+                # Ép giá Limit về sát giá live hiện tại để lệnh khớp ngay lập tức thay vì bị từ chối 51006
+                if tracker.live_price > 0 and px_tf <= tracker.live_price:
+                    px_tf = tracker.live_price
+
                 # Tính volume dựa trên entry price (px_tf) thay vì live_price để chống rung lắc size liên tục
                 _sz_tf_raw = round_to_tick(tf_target_usdt / (px_tf * contract_val), spec["lotSz"])
                 sz_for_tf = max(_sz_tf_raw, spec["minSz"])
-                
-                # ⚡ Yêu cầu của User: Cho phép khớp luôn thành Market nếu giá Limit đẹp hơn giá Live hiện tại
-                # (Đã bỏ block: BẢO VỆ CHỐNG KHỚP LỆNH MARKET)
                     
                 px_str = f"{px_tf:.{dec_places}f}"
                 

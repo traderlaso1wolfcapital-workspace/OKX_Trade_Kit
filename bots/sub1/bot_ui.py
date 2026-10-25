@@ -349,7 +349,8 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
         h4_ema200_raw = getattr(tk, "h4_ema200", Decimal("0"))
         if h4_ema200_raw > 0:
             dist_to_h4 = ((tk.live_price - h4_ema200_raw) / h4_ema200_raw * 100)
-            dist_str = f"{abs(dist_to_h4):.1f}%"
+            rounded_dist = round(float(dist_to_h4), 1)
+            dist_str = "0.0%" if rounded_dist == 0.0 else f"{rounded_dist:.1f}%"
         else:
             dist_to_h4 = Decimal("0")
             dist_str = "--%"
@@ -506,6 +507,9 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             return f", chờ{tag_h} tại {fmt_tf(hedge_entry_tf)}"
             
         tag_t = " [TREND]" if SHOW_STRATEGY_MODE_TAG else ""
+        entry_st = tk.mtf_states.get(entry_tf, {}) if getattr(tk, "mtf_states", None) else {}
+        if entry_st.get("fail", 0) >= globals_ref.MAX_CYCLE_FAILURES:
+            return f", quan sát Sideway tại {fmt_tf(entry_tf)}"
         if trend == "UPTREND": return f", chờ LONG{tag_t} tại {fmt_tf(entry_tf)}"
         if trend == "DOWNTREND": return f", chờ SHORT{tag_t} tại {fmt_tf(entry_tf)}"
         if trend == "HEDGE": return f", chờ LONG/SHORT tại {fmt_tf(entry_tf)}"

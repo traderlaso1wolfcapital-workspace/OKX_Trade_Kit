@@ -92,14 +92,14 @@ export const TOUR_CONTENT = {
     {
         "badge": "Cài Đặt • Bước 15 / 21",
         "title": "15. Bộ 3 Cơ Chế DCA",
-        "content": "Chọn 1 trong 3 cơ chế xử lý lệnh nâng cao:\n• DCA Dương: Nhồi thêm lệnh khi vị thế đang có lãi theo bậc thang xu hướng (H4 -> M5).\n• DCA Âm: Trung bình giá khi gồng lỗ và tự động nâng biên độ TP/SL theo khung lớn.\n• Split Grid: Chia lệnh Limit độc lập cho từng khung, khớp khung nào chốt lời riêng khung đó.\n\n💡 Lưu ý: Hệ thống chỉ cho phép bật 1 trong 3 chế độ (bật chế độ này thì 2 chế độ kia tự tắt).",
-        "actionHint": "💡 Khuyên dùng Split Grid hoặc DCA Dương để quản trị vốn an toàn."
+        "content": "Chọn 1 trong 3 cơ chế xử lý lệnh nâng cao:\n• DCA Dương: Nhồi thêm lệnh khi vị thế đang có lãi theo bậc thang xu hướng (H4 -> M5).\n• DCA Âm: Trung bình giá khi gồng lỗ và tự động nâng biên độ TP/SL theo khung lớn.\n• Lưới Đa Khung (Hedge): Chia lệnh Limit độc lập cho từng khung, khớp khung nào chốt lời riêng khung đó (hỗ trợ vị thế song song Long/Short).\n\n💡 Lưu ý: Hệ thống chỉ cho phép bật 1 trong 3 chế độ (bật chế độ này thì 2 chế độ kia tự tắt).",
+        "actionHint": "💡 Khuyên dùng Lưới Đa Khung (Hedge) hoặc DCA Dương để quản trị vốn an toàn."
     },
     {
         "badge": "Cài Đặt • Bước 16 / 21",
-        "title": "16. Cầu Dao & Đồng Pha BTC",
-        "content": "Bảo vệ tài khoản trước biến động mạnh:\n• Cầu Dao Đảo Chiều: Khi giá rướn quá xa EMA200 H4 (> 8%), bot ngưng rải Limit thuận trend để tránh đu đỉnh/bắt đáy, đồng thời mở lệnh phòng hộ bắt sóng hồi.\n• Đồng Pha BTC: Ép Altcoin chỉ tìm điểm vào lệnh cùng hướng với xu hướng BTC.",
-        "actionHint": "💡 Nên luôn BẬT Cầu Dao để tài khoản được bảo vệ tự động 24/7."
+        "title": "16. Đảo Chiều H4 & Đồng Pha BTC",
+        "content": "Bảo vệ tài khoản trước biến động mạnh:\n• Đảo Chiều EMA200 H4 >8%: Khi giá rướn quá xa EMA200 H4 (> 8%), bot ngưng rải Limit thuận trend để tránh đu đỉnh/bắt đáy, đồng thời mở lệnh phòng hộ bắt sóng hồi.\n• Đồng Pha H4 BTC: Ép Altcoin chỉ tìm điểm vào lệnh cùng hướng với xu hướng BTC.",
+        "actionHint": "💡 Nên luôn BẬT Đảo Chiều EMA200 H4 >8% để tài khoản được bảo vệ tự động 24/7."
     },
     {
         "badge": "Cài Đặt • Bước 17 / 21",

@@ -5,7 +5,20 @@ import time
 
 def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = "", pnl: float = 0.0, exit_price: float = 0.0):
     try:
-        coin = coin.upper()
+        coin = str(coin).upper()
+        if isinstance(volume, str):
+            if volume.lower() in ("closed", "active"):
+                status = volume.lower()
+            volume = 0.0
+        try: price = float(price)
+        except Exception: price = 0.0
+        try: volume = float(volume)
+        except Exception: volume = 0.0
+        try: exit_price = float(exit_price)
+        except Exception: exit_price = 0.0
+        try: pnl = float(pnl)
+        except Exception: pnl = 0.0
+
         import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
         marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')

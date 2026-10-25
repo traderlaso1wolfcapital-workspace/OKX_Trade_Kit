@@ -146,6 +146,24 @@ export default function LogsTerminal({
           line.startsWith("[ORDER") || line.startsWith("[CLOSE") || line.startsWith("[ERROR") || 
           line.startsWith("[INFO") || line.startsWith("[SYSTEM") || line.startsWith("[OKX");
 
+        const isDashboardLine = 
+          line.startsWith("===") || 
+          line.startsWith("---") ||
+          line.includes("Thợ săn EMA200") ||
+          line.includes("Mode:") ||
+          line.includes("Gốc:") ||
+          line.includes("Lợi nhuận") ||
+          line.includes("Coin |") ||
+          (line.includes("Coin") && line.includes("Price")) ||
+          line.includes("Tình trạng vị thế") ||
+          line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") ||
+          line.includes("Tài khoản Quỹ :") ||
+          line.includes("Số dư Quỹ     :") ||
+          line.includes("Trạng thái Bot:") ||
+          line.includes("╭─") || line.includes("├─") || line.includes("╰─") ||
+          line.includes("Win Streak:") ||
+          (line.includes("|") && (line.includes("▲") || line.includes("▼")));
+
         if (isHeader) {
           isStagingRef.current = true;
           stagingRef.current = [line];
@@ -165,6 +183,10 @@ export default function LogsTerminal({
             }));
             return;
           }
+          return;
+        }
+
+        if (isDashboardLine) {
           return;
         }
 
@@ -210,17 +232,43 @@ export default function LogsTerminal({
     };
   }, [isSelfManaged, activeBotTab, loginUid]);
 
-  // Lựa chọn nguồn log theo Kênh sàn/quỹ
-  const activeRawLogs = React.useMemo(() => {
-    if (currentPlatform === "e8") {
-      return propLogs || externalLogs;
-    }
-    return okxLogs || externalLogs;
-  }, [currentPlatform, propLogs, okxLogs, externalLogs]);
-
   // Phân rã dữ liệu: Bảng Dashboard cố định ở trên + Dải Event Logs ở dưới
   const { dashboardLines, eventLogs } = React.useMemo(() => {
-    const raw = activeRawLogs || internalLogs;
+    if (currentPlatform === "e8") {
+      const propHeader = Array.isArray(propLogs?.dashboardLines) ? propLogs.dashboardLines : [];
+      const okxDashboard = Array.isArray(okxLogs?.dashboardLines) ? okxLogs.dashboardLines : [];
+      
+      // Tìm vị trí bắt đầu chi tiết vị thế và bảng nến từ OKX Dashboard
+      let detailIndex = -1;
+      for (let i = 0; i < okxDashboard.length; i++) {
+        const l = okxDashboard[i];
+        if (l.includes("Tình trạng vị thế") || l.includes("✜") || l.includes("╭─")) {
+          detailIndex = i;
+          break;
+        }
+      }
+
+      let combinedDashboard = propHeader;
+      if (propHeader.length > 0 && detailIndex !== -1) {
+        // Giữ nguyên giao diện Quỹ FX ở đầu + Chi tiết vị thế & bảng nến của bot ở dưới!
+        combinedDashboard = [...propHeader, ...okxDashboard.slice(detailIndex)];
+      } else if (propHeader.length > 0 && okxDashboard.length > 6) {
+        combinedDashboard = [...propHeader, ...okxDashboard.slice(6)];
+      } else if (propHeader.length > 0) {
+        combinedDashboard = propHeader;
+      } else if (okxDashboard.length > 0) {
+        combinedDashboard = okxDashboard;
+      }
+
+      const pEvents = Array.isArray(propLogs?.eventLogs) ? propLogs.eventLogs : [];
+      return {
+        dashboardLines: combinedDashboard,
+        eventLogs: pEvents,
+      };
+    }
+
+    // Khi ở Sàn OKX:
+    const raw = okxLogs || externalLogs || internalLogs;
     if (!raw) return { dashboardLines: [], eventLogs: [] };
     if (typeof raw === "object" && !Array.isArray(raw)) {
       return {
@@ -240,7 +288,7 @@ export default function LogsTerminal({
       }
     }
     return { dashboardLines: [], eventLogs: [] };
-  }, [activeRawLogs, internalLogs]);
+  }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs]);
 
   // Giữ vị trí cuộn đầu trang khi nạp Dashboard lần đầu
   const hasInitializedScrollRef = useRef(false);

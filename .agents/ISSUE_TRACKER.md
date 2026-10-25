@@ -33,6 +33,62 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/10/2026]** - Sửa Triệt Để Lỗi OKX Reject 51006 (buy@81942.4) & Ép Vào Lệnh Ngay Tại Giá Live Khi Thị Trường Đạt/Vượt Entry:
+  - **Mô tả hiện tượng & Yêu cầu CEO:**
+    1. Trên Dashboard báo log: `[14:59:13] ⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho BTC-USDT-SWAP buy@81942.4. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!`.
+    2. Tín hiệu m5 Long xuất hiện nhưng bot tự xóa `Đang limit LONG: m5` và không có lệnh Long m5 nào trên sàn OKX.
+    3. CEO chỉ đạo: Nếu giá hiện tại nằm dưới entry limit của bot (giá mua đẹp hơn cản EMA200 mặc định), ép bot vào lệnh ngay ở giá hiện tại thay vì bỏ qua cơ hội đẹp.
+  - **Nguyên nhân kỹ thuật sâu xa:**
+    1. **Lỗi SAFETY CLAMP (`bot_strategy.py` dòng 722):**
+       - Cơ chế Safety Clamp cũ cố ép cản entry của TF nhỏ không được lệch pha với TF tín hiệu chủ đạo.
+       - Khi nến H4 của BTC là `▲ 472-2` (UPTREND), bot gán `signal_long_tf = "H4"`.
+       - Đường EMA200 của H4 nằm ở mức giá `81,942.4` (cách giá live `80,660` tới +1.6%).
+       - Khi tính entry LONG cho m5 (vốn nằm quanh cản m5 `80,598`), đoạn code `elif side == "long" and raw_px < _signal_ema: raw_px = _signal_ema` đã cưỡng ép đẩy giá limit m5 lên tận `81,942.4`!
+       - Đặt lệnh BUY Limit cao hơn giá thị trường 1,282 USD (+1.6%) khiến OKX lập tức từ chối lệnh với mã lỗi `51006: Order price is not within the price limit`.
+       - Trong `bot_orders.py`, khi dính 51006, bot in cảnh báo và bỏ qua lệnh (không vào Market) -> Lệnh m5 bị hủy và mất dấu trên sàn.
+  - **Giải pháp hoàn hảo đã triển khai:**
+    1. **Vô hiệu hóa Safety Clamp trong "Lưới Đa Khung (Hedge)":** Trong chế độ Split Grid độc lập, mỗi TF vận hành 100% độc lập theo EMA200 của chính khung đó, tuyệt đối không bị TF lớn bóp méo giá. Đối với các chế độ DCA, thêm điều kiện an toàn: chỉ clamp Long nếu EMA tín hiệu nằm dưới giá live (`_signal_ema <= live_price`), ngăn chặn vĩnh viễn việc kẹp giá Buy lên trên giá thị trường.
+    2. **Ép khớp ngay tại giá live khi giá đẹp hơn entry (`bot_strategy.py`):**
+       - Với LONG: Nếu `live_price <= px_tf` (giá thị trường đã chiết khấu sâu hơn cản EMA200), ép `px_tf = live_price` để bắn Limit đón đầu ngay sát giá live, khớp ngay tức khắc ở giá tối ưu nhất.
+       - Với SHORT: Nếu `live_price >= px_tf` (giá thị trường đã rướn cao hơn cản EMA200), ép `px_tf = live_price` để khớp ngay ở giá đỉnh.
+    3. **Tự động kích hoạt Market Fallback khi OKX báo 51006 (`bot_orders.py`):**
+       - Nếu sàn OKX trả về lỗi 51006 (giá vượt biên độ limit), bot tự động chuyển ngay sang `place_market_entry` để nuốt thanh khoản thị trường tại giá hiện tại theo đúng chỉ thị CEO, không bao giờ bỏ lỡ vị thế.
+
+- **[25/10/2026]** - Chuẩn Hóa Danh Xưng 3 Công Tắc Chiến Thuật Cốt Lõi (Lưới Đa Khung - Đồng Pha BTC - Đảo Chiều H4):
+  - **Mô tả yêu cầu CEO:**
+    Đổi tên 3 nút công tắc trên giao diện để phản ánh đúng 100% bản chất vận hành:
+    1. `Lưới Đa Khung` ➔ `Lưới Đa Khung (Hedge)` (Bản chất: Chế độ Split Grid độc lập từng TF, OKX hỗ trợ giữ đồng thời 2 vị thế Long và Short trên cùng 1 cặp coin).
+    2. `Đồng pha BTC & Lọc Vĩ mô` ➔ `Đồng pha H4 BTC` (Bản chất: Altcoin neo hướng và trần khung thời gian theo nến H4 của BTC).
+    3. `Đánh Sóng Đảo Chiều (Hedge)` ➔ `Đảo Chiều EMA200 H4 >8%` (Bản chất: Cầu dao phòng hộ và bắt sóng hồi khi giá rướn cách EMA200 H4 vượt quá ngưỡng an toàn > 8%).
+  - **Phạm vi triển khai:**
+    1. **Đa ngôn ngữ (`i18n/index.js`):** Cập nhật cả 6 ngôn ngữ (Tiếng Việt, English, 中文, 한국어, Français, Español).
+    2. **Giao diện Web (`SystemSettingsModal.jsx`, `App.jsx`, `tourData.js`):** Đồng bộ nhãn công tắc, tooltip hướng dẫn, thông báo khôi phục mặc định và hệ thống nhật ký log.
+    3. **Giao diện Desktop (`desktop_app/gui_main.py`):** Cập nhật label các checkbox `chk_multi_tf_grid`, `chk_xole`, `chk_altcoin_follow_btc_ema`.
+    4. **Biên dịch Frontend:** Đã chạy `npm run build` thành công rực rỡ, không phát sinh lỗi.
+
+- **[25/10/2026]** - Sửa Lỗi Định Dạng Cột Price (-% Khi Dưới EMA200) & Mở Khóa Độc Lập 2 Chiều Long/Short Cho Chế Độ "Lưới Đa Khung":
+  - **Mô tả yêu cầu CEO:**
+    1. Cột `Price` trên Dashboard hiển thị khoảng cách tới EMA200-H4: nếu giá nằm trên EMA200 thì hiển thị `(4.3%)`, nếu nằm dưới EMA200 thì phải có dấu âm `(-4.3%)`.
+    2. Khi TẮT "Đồng pha BTC & Lọc Vĩ mô" và BẬT "Lưới Đa Khung" (tắt cả 2 nút DCA): BTC có các khung nhỏ m15, m30, H1, H2 tích lũy nến dưới EMA200 (>60 nến, fail < 2) nhưng bot không đặt lệnh Limit nào và chỉ báo `"BTC Chưa có vị thế, chờ LONG tại H4"`. CEO yêu cầu kiểm tra và làm rõ việc các TF nhỏ hơn của BTC chưa vào sideway có nên được đánh Short/Long độc lập không, và sửa lại toàn bộ logic cho chuẩn.
+  - **Phân tích nguyên nhân & Giải pháp kỹ thuật:**
+    1. **Định dạng cột Price (`bot_ui.py`):**
+       - Trước đây dùng `dist_str = f"{abs(dist_to_h4):.1f}%"` khiến giá trị âm luôn bị biến thành dương.
+       - Sửa thành làm tròn `rounded_dist = round(float(dist_to_h4), 1)`, nếu âm thì hiển thị `-X.X%` (e.g. `(-4.3%)`, `(-6.0%)`), nếu dương thì `X.X%` (e.g. `(4.3%)`, `(1.8%)`).
+    2. **Khóa 1 chiều vô lý của Lưới Đa Khung (`bot_strategy.py`):**
+       - **Nguyên nhân:** Dù đã ở chế độ "Lưới Đa Khung" (Độc Lập TF), đoạn code cũ tại dòng 2513 lại ép `allowed_long = (tracker.trend == "UPTREND") and h4_side != "under"` và `allowed_short = (tracker.trend == "DOWNTREND") and h4_side != "above"`. Vì H4 của BTC đang có nến > EMA200 nên `tracker.trend` bị gán là UPTREND, khiến `allowed_short` bị ép thành `False`. Ở chiều Long, các TF nhỏ (m15, m30, H1, H2) đều đang nằm dưới EMA200 nên không thỏa điều kiện Long; còn H4 vấp cản fail=2 (sideway) nên cũng bị loại. Kết quả: BTC bị liệt hoàn toàn, không đặt được lệnh nào.
+       - **Bản chất Lưới Đa Khung (Split Grid):** Từng khung thời gian hoạt động độc lập 100%. Khung nào nến tích lũy trên EMA200 (▲) >= 60 nến thì rải Limit LONG tại EMA200 khung đó; khung nào tích lũy dưới EMA200 (▼) >= 60 nến thì rải Limit SHORT tại EMA200 khung đó.
+       - **Giải pháp:**
+         - Trong chế độ `ENABLE_MULTITF_GRID` (khi 2 nút DCA tắt), nếu coin chưa có vị thế mở (`not has_long and not has_short`), mở khóa `allowed_long = True` VÀ `allowed_short = True` để từng TF tự do tìm điểm vào lệnh theo EMA200 của nó.
+         - Thêm điều kiện kiểm tra `st.get("side") == "above"` cho Long và `st.get("side") == "under"` cho Short để khớp tuyệt đối với hướng tích lũy nến của từng TF.
+         - **Tách biệt hoàn toàn Lưới Đa Khung và Sóng Đảo Chiều (Hedge):**
+           + Nút "Đánh Sóng Đảo Chiều (Hedge)" chỉ phục vụ riêng cho việc bắt sóng hồi khi H4 rướn > 8%.
+           + Bản thân chế độ "Lưới Đa Khung" (Multi-TF Split Grid) vốn là chế độ cho phép đánh 2 đầu Long & Short độc lập trên cùng 1 cặp coin (OKX hỗ trợ song song 2 vị thế Long và Short cùng lúc). Khung nào tích lũy trên EMA200 rải Long, khung nào tích lũy dưới EMA200 rải Short. Mỗi vị thế có TP/SL riêng của khung đó và đóng độc lập.
+           + Khóa 1 chiều duy nhất chỉ áp dụng riêng cho các chế độ DCA (DCA Dương / DCA Âm) vì DCA là dồn vị thế.
+    3. **Hiển thị trạng thái Sideway chuẩn (`bot_ui.py`):**
+       - Trong `_get_waiting_str(tk)`, nếu `entry_tf` có `fail >= MAX_CYCLE_FAILURES`, hiển thị chính xác `", quan sát Sideway tại {entry_tf}"` thay vì báo `"chờ LONG/SHORT"`.
+    4. **Kiểm thử & Nghiệm thu:**
+       - Viết test simulation kiểm chứng cả 2 trường hợp (dấu âm cột Price và lọc TF lưới đa khung), kết quả pass 100%. Không có lỗi biên dịch AST.
+
 - **[13/10/2026]** - Triệt Tiêu Lỗi Spam Hủy/Đặt Lại Lệnh Limit, Lỗi Netting Đóng Vị Thế Ngược Chiều, Rò Rỉ HTML Cloudflare Và Kênh Logs Quỹ FX:
   - **Mô tả yêu cầu CEO:**
     1. Lệnh trên Quỹ E8 (TradeLocker) cứ đặt xong là bị hủy ngay lập tức ("như là đặt xong hủy luôn").
@@ -4296,8 +4352,31 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
        - Bổ sung trường `fixed_lot` vào schema backend (`TradeLockerConfigReq`), lưu trữ vào `tradelocker_config.json` và trả về qua API.
        - Trong `SidebarLeft.jsx`, khi người dùng chỉnh ô số Lot, hàm `updateE8Config` sẽ lập tức gọi POST `/api/tradelocker/config` để lưu số Lot cố định lên backend.
        - Trong `dispatch_signal_to_tradelocker`, bot ưu tiên tuyệt đối số Lot cố định do người dùng cài đặt trên giao diện (`fixed_lot`, mặc định an toàn: `0.01 Lot`). Khối lượng 0.01 Lot ETH chỉ tốn ~$12-$15 ký quỹ, hoàn toàn an toàn và không bao giờ bị sàn từ chối.
+- **[25/10/2026]** - Triệt Tiêu Rò Rỉ Dashboard Vào Event Logs, Vá Lỗi Quét ETH (`clean_limit_orders`), Sửa Lỗi Float Marker Vừa Đóng Và Hoàn Thiện Toàn Diện Kênh Logs Quỹ FX:
+  - **Vấn đề CEO báo cáo:**
+    1. Bảng giá và cấu trúc vị thế bị rò rỉ, hiển thị thừa thãi trong dải "⚡ NHẬT KÝ SỰ KIỆN TỨC THỜI".
+    2. Báo lỗi `⚠️ [Lỗi quét ETH]: cannot access local variable 'clean_limit_orders' where it is not associated with a value`.
+    3. Báo lỗi `Error recording marker: could not convert string to float: 'closed'`.
+    4. Kênh Logs Quỹ FX hiển thị đơn điệu chỉ có 7 dòng header (báo $0.00 USD và Chưa kết nối API), thiếu toàn bộ chi tiết vị thế và bảng nến so với Sàn OKX Live.
+  - **Nguyên nhân kỹ thuật & Giải pháp triệt để:**
+    1. **Rò rỉ Dashboard vào Event Logs:**
+       - *Nguyên nhân:* Bộ đệm gom snapshot `stagingTimerRef` (1200ms) quá ngắn, khi chu kỳ in nến dài hơn 1.2s thì timer ngắt staging, đẩy các dòng cuối của bảng (`╰─`, `Coin |`, nến) vào hàm `setLogs -> eventLogs`. Ngoài ra `connectPropWS` thiếu bộ lọc dòng `Trạng thái Bot:` và `Kết nối API:`.
+       - *Đã xử lý:* Tăng `stagingTimerRef` lên 4000ms. Bổ sung bộ lọc chặt chẽ `isDashboardLine` trong `App.jsx` và `LogsTerminal.jsx`: toàn bộ các dòng thuộc cấu trúc Dashboard (khung `===`, `---`, `Coin |`, `Tình trạng vị thế`, `╭─`, `├─`, `╰─`, `▲`, `▼`, `Trạng thái Bot:`, `Kết nối API:`) bị chặn 100% không cho lọt vào `eventLogs`.
+    2. **Lỗi `clean_limit_orders`:**
+       - *Nguyên nhân:* Trong `bot_strategy.py#_run_strategy_cycle_impl`, có 2 lệnh `from bots.sub1.bot_orders import clean_limit_orders` đặt cục bộ bên trong khối `if`. Theo cơ chế scoping của Python, điều này biến `clean_limit_orders` thành biến local trong toàn hàm. Khi khối `if` không chạy, các dòng lệnh bên dưới gặp `UnboundLocalError`.
+       - *Đã xử lý:* Khai báo `from bots.sub1.bot_orders import clean_limit_orders` ngay đầu hàm `_run_strategy_cycle_impl` và gỡ bỏ 2 lệnh import cục bộ thừa.
+    3. **Lỗi `could not convert string to float: 'closed'`:**
+       - *Nguyên nhân:* Tại 2 điểm ghi nhận thoát vị thế (dòng 1459 và 1671 của `bot_strategy.py`), code truyền `"closed"` vào vị trí tham số thứ 4 (`volume`), khiến hàm `record_trade_marker` thực thi `float("closed")`.
+       - *Đã xử lý:* Sửa đúng cú pháp `volume=0, status="closed"`. Đồng thời trong `bot_models.py`, thêm cơ chế phòng thủ tự động nhận diện nếu `volume` là chuỗi `"closed"`/`"active"` thì chuyển sang gán cho `status` và ép kiểu an toàn với `try/except`.
+    4. **Hoàn thiện Kênh Logs Quỹ FX & Khắc phục Chặn Mạng:**
+       - *Nguyên nhân mạng:* Router và DNS nhà mạng tại Việt Nam chặn `demo.tradelocker.com` bằng cách sinkhole về `127.0.0.1` (`[WinError 10061]`).
+       - *Đã xử lý mạng:* Bổ sung cơ chế tự động chuyển tiếp DNS thông minh qua `socket.getaddrinfo` ngay trong `tradelocker_service.py`, phát hiện sinkhole 127.0.0.1 là lập tức trỏ thẳng về Anycast IP của Cloudflare (`104.18.28.67`). Kết nối JWT và lấy số dư tài khoản thật (`$4,899.33 USD - $5,000.00 USD`) thành công 100% mà không phụ thuộc VPN hay quyền Admin.
+       - *Đã xử lý hiển thị:* Trong `LogsTerminal.jsx`, ghép chuẩn xác: Giữ nguyên Hộp Thông Báo Đầu của Quỹ FX (`🏆 HỆ THỐNG GIAO DỊCH QUỸ FX - TRADELOCKER (E8 MARKETS)`) ở trên cùng, phía dưới hiển thị trọn vẹn chi tiết `✜ Tình trạng vị thế` và `Bảng đếm nến đa khung của các Coin` sống động y hệt bên Sàn OKX Live.
   - **Kiểm chứng:**
-    - `python3 -m py_compile web_app/backend/tradelocker_service.py web_app/backend/main.py` thành công 100%.
-    - `npm run build` frontend Vite thành công 100% (`✓ built in 246ms`).
-  *(Mã patch: `z-tradelocker-fixed-lot-and-orderid-validation`)*
+    - Cú pháp AST Python toàn bộ các file sửa đổi đạt 100%.
+    - Chạy thử nghiệm hàm `get_dashboard_lines('default')` trả về đầy đủ `$5,000.00 USD` và `✅ ĐÃ KẾT NỐI`.
+    - Chạy thử nghiệm `record_trade_marker` với chuỗi `volume="closed"` thành công 100%.
+    - Build Vite bundle frontend production thành công 100% (`✓ built in 263ms`).
+  *(Mã patch: `z-fix-dashboard-leak-eth-scan-and-prop-terminal`)*
+
 

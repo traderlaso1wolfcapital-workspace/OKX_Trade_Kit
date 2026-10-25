@@ -3270,9 +3270,9 @@ class BotInstanceWidget(QtWidgets.QWidget):
         
         add_checkbox(l_toggles, 0, 0, "DCA Dương", self.chk_pyramid, "BẬT: Nhồi lệnh thuận xu hướng từ H4->M5.")
         add_checkbox(l_toggles, 1, 0, "DCA Âm", self.chk_negative_dca, "BẬT: Cho phép trung bình giá DCA khi âm.")
-        add_checkbox(l_toggles, 2, 0, "Lưới Đa Khung", self.chk_multi_tf_grid, "BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng.")
-        add_checkbox(l_toggles, 0, 1, "Đánh Sóng Đảo Chiều (Hedge)", self.chk_xole, "Bật/Tắt chiến thuật HEDGE đánh sóng đảo chiều.")
-        add_checkbox(l_toggles, 1, 1, "Đồng pha BTC & Lọc Vĩ mô", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.")
+        add_checkbox(l_toggles, 2, 0, "Lưới Đa Khung (Hedge)", self.chk_multi_tf_grid, "BẬT: Đặt Limit độc lập theo tab 'Chia' của OKX, mỗi TF tự chốt lời/cắt lỗ riêng.")
+        add_checkbox(l_toggles, 0, 1, "Đảo Chiều EMA200 H4 >8%", self.chk_xole, "Bật/Tắt chiến thuật đánh sóng đảo chiều khi H4 cách EMA200 >8%.")
+        add_checkbox(l_toggles, 1, 1, "Đồng pha H4 BTC", self.chk_altcoin_follow_btc_ema, "BẬT: Altcoin tính Limit bằng cản EMA200 của BTC & H4.")
         
         def on_pyramid_toggled(checked):
             if checked:

@@ -435,8 +435,13 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
                 err_str = f"{err_str} | Fallback plain limit failed: {e_fallback}"
 
         if "51006" in err_str or "Order price is not within the price limit" in err_str:
-            print(f"⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!")
-            return None
+            print(f"⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho {inst_id} {side}@{price}. Giá vượt biên độ Limit, kích hoạt MARKET FALLBACK theo lệnh CEO...")
+            try:
+                mkt_resp = place_market_entry(client, inst_id=inst_id, side=side, pos_side=pos_side, size=size, td_mode=td_mode, dry_run=dry_run)
+                return mkt_resp
+            except Exception as e_mkt:
+                print(f"🚨 [MARKET FALLBACK 51006 FAILED]: {e_mkt}")
+                return None
             
         print(f"🚨 [LIMIT] Lỗi kết nối: {err_str} | {inst_id} {side}@{price}")
         if "51008" in err_str:

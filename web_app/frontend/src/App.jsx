@@ -1154,6 +1154,24 @@ function App() {
           line.startsWith("[DRY-RUN") ||
           line.startsWith("[ATTACH");
 
+        const isDashboardLine = 
+          line.startsWith("===") || 
+          line.startsWith("---") ||
+          line.includes("Thợ săn EMA200") ||
+          line.includes("Mode:") ||
+          line.includes("Gốc:") ||
+          line.includes("Lợi nhuận") ||
+          line.includes("Coin |") ||
+          (line.includes("Coin") && line.includes("Price")) ||
+          line.includes("Tình trạng vị thế") ||
+          line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") ||
+          line.includes("Tài khoản Quỹ :") ||
+          line.includes("Số dư Quỹ     :") ||
+          line.includes("Trạng thái Bot:") ||
+          line.includes("╭─") || line.includes("├─") || line.includes("╰─") ||
+          line.includes("Win Streak:") ||
+          (line.includes("|") && (line.includes("▲") || line.includes("▼")));
+
         if (isHeader) {
           // Khởi động chu kỳ gom Snapshot Dashboard mới (bộ đệm ngầm, KHÔNG xóa bảng đang hiển thị)
           isStagingRef.current = true;
@@ -1169,7 +1187,7 @@ function App() {
             }
             stagingDashboardRef.current = [];
             isStagingRef.current = false;
-          }, 1200);
+          }, 4000);
           return;
         }
 
@@ -1204,7 +1222,12 @@ function App() {
             }
             stagingDashboardRef.current = [];
             isStagingRef.current = false;
-          }, 1200);
+          }, 4000);
+          return;
+        }
+
+        // 🛡️ Chặn triệt để: Nếu là dòng thuộc bảng Dashboard mà rơi ra ngoài chu kỳ staging -> TUYỆT ĐỐI không nạp vào Event Logs
+        if (isDashboardLine) {
           return;
         }
 
@@ -1312,7 +1335,15 @@ function App() {
           return;
         }
 
-        if (line.startsWith("===") || line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") || line.includes("Tài khoản Quỹ :") || line.includes("Số dư Quỹ     :")) {
+        if (
+          line.startsWith("===") || 
+          line.startsWith("---") ||
+          line.includes("HỆ THỐNG GIAO DỊCH QUỸ FX") || 
+          line.includes("Tài khoản Quỹ :") || 
+          line.includes("Số dư Quỹ     :") ||
+          line.includes("Trạng thái Bot:") ||
+          line.includes("Kết nối API:")
+        ) {
           fetchPropLogs();
           return;
         }
@@ -2206,7 +2237,7 @@ function App() {
 
       const curBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
       alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!${cancelMsg}`);
-      const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Lưới Đa Khung";
+      const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Lưới Đa Khung (Hedge)";
       addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình ${curBotName}: Chế độ = ${dcaMode}${cancelMsg}`);
       refreshBotData();
     } catch (e) {
@@ -2218,7 +2249,7 @@ function App() {
   };
 
   const handleResetDefaultStrat = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH chuẩn (XAU, BTC, ETH - Ký quỹ 1$ - Lưới Đa Khung - Đồng pha BTC) không?")) return;
+    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH chuẩn (XAU, BTC, ETH - Ký quỹ 1$ - Lưới Đa Khung (Hedge) - Đồng pha H4 BTC) không?")) return;
 
     setIsSavingConfig(true);
     try {
@@ -2297,7 +2328,7 @@ function App() {
           }
         }
         alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho EMA200 Bot thành công!${cancelMsg}`);
-        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 1$, Lưới Đa Khung, Đồng pha BTC, XAU/BTC/ETH${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 1$, Lưới Đa Khung (Hedge), Đồng pha H4 BTC, XAU/BTC/ETH${cancelMsg}`);
         refreshBotData();
       } else if (activeBotTab === "sub2") {
         setRisk({ posVol: 1, tpPct: 1.5, slPct: 1.5, volUnit: "USDT", multiplyVolumeByTf: false });
