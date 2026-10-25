@@ -33,6 +33,45 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/10/2026]** - Khắc Phục Lỗi Lệnh Limit SHORT BTC Bị Huỷ Ngầm & Hiển Thị "Lệnh Ma" Trên UI Dashboard:
+  - **Mô tả hiện tượng:**
+    Dashboard thông báo: `BTC ├─ Đang limit SHORT: m15: 80850.5 (VOL: 0.1 U)...` đầy đủ cho 4 khung (m15, m30, H1, H2), nhưng trên web sàn OKX không hề có lệnh chờ nào của BTC (chỉ có 5 lệnh XAU và 5 lệnh ETH).
+  - **Nguyên nhân kỹ thuật sâu xa:**
+    1. **Khung H4 Sideway Cướp Xu Hướng:** Khung H4 của BTC là `▲ 472-2` (đã fail = 2 nến, đang sideway). Hàm `_is_tf_valid` thiếu điều kiện chặn `fail >= MAX_CYCLE_FAILURES`, khiến bot vẫn chọn H4 làm tín hiệu Long và gán xu hướng chính `tracker.trend = "UPTREND"`.
+    2. **Xung Đột Bộ Lọc Vĩ Mô Đơn Hướng:** Tại khung m15, các đường EMA cho thấy xu hướng giảm (`macro_trend = "DOWNTREND"`). Do `trend` (UPTREND) ngược pha với `macro_trend` (DOWNTREND), biến `is_macro_approved` bị đặt thành `False`.
+    3. **Huỷ Lệnh Ngầm:** Khi `is_macro_approved == False`, bot kích hoạt `clean_limit_orders(client, swap_id, "cross")` lúc 15:30:26 nến đóng, huỷ toàn bộ 4 lệnh Short của BTC trên sàn OKX.
+    4. **Hiển Thị Lệnh Ma (Ghost/Phantom Orders):** Sau khi gọi huỷ lệnh sàn, bot chỉ gán `tracker.placed_entry_px_short = "---"` mà KHÔNG xóa dictionary `tracker.placed_entry_px_short_by_tf`. Dẫn đến mỗi lần vẽ lại UI Terminal, bot vẫn lấy giá trị cũ trong RAM và in ra dòng "Đang limit SHORT: m15..." khiến người dùng hiểu nhầm bot đang giữ lệnh chờ trên sàn.
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Chặn TF Sideway:** Trong `_is_tf_valid(tf)` tại `bot_strategy.py`, bổ sung kiểm tra `st.get("fail", 0) < globals_ref.MAX_CYCLE_FAILURES`. Các TF đã sideway không được phép cướp xu hướng chính.
+    2. **Miễn Nhiễm Cho Chế Độ Lưới Đa Khung:** Khi bật `Lưới Đa Khung (Hedge)` (`_is_multitf`), từng TF vận hành độc lập hai chiều, bộ lọc vĩ mô đơn hướng không được phép quét sạch lệnh limit của các TF khác.
+    3. **Xoá Sạch Lệnh Ma Trong RAM:** Bất cứ khi nào gọi `clean_limit_orders`, xóa đồng bộ cả `placed_entry_px_long_by_tf = {}` và `placed_entry_px_short_by_tf = {}`, đảm bảo UI và trạng thái thực tế trên sàn luôn đồng nhất 100%.
+    4. **Khai Báo Phạm Vi Biến:** Đưa các cờ chế độ `_is_multitf`, `_is_pyramid`, `_is_negative_dca` lên đầu hàm `_run_strategy_cycle_impl` để triệt tiêu lỗi `UnboundLocalError`.
+    5. **Kiểm Thử Thực Tế:** Đã chạy thử nghiệm trên tài khoản live, 4 lệnh limit SHORT của BTC đã được đẩy thành công lên sàn OKX (Tổng 14 lệnh chờ đang hoạt động: 5 XAU, 5 ETH, 4 BTC).
+
+- **[25/10/2026]** - Tự Động Chuyển Đổi Tài Khoản OKX Sang Chế Độ Phòng Hộ (Hedge Mode / long_short_mode):
+  - **Mô tả yêu cầu CEO:**
+    Kiểm tra xem Web Bot có tự động chuyển chế độ vị thế của tài khoản OKX sang Chế độ phòng hộ (Hedge Mode) được không, hay chỉ quét và bắt người dùng chuyển thủ công. Yêu cầu thêm lệnh tự động chuyển sang Chế độ phòng hộ cho mọi tài khoản đăng nhập vào Web.
+  - **Khảo sát kỹ thuật API OKX:**
+    - OKX API V5 hỗ trợ endpoint `POST /api/v5/account/set-position-mode` với body `{"posMode": "long_short_mode"}`.
+    - **Lỗi ở bản cũ:** Tham số bị truyền sai thành `{"posMode": "long_short"}` (thiếu chữ `_mode`) nên bị sàn từ chối âm thầm.
+    - **Điều kiện sàn:** OKX chỉ cho phép chuyển đổi chế độ vị thế khi **không có vị thế mở và không có lệnh chờ**.
+  - **Giải pháp triển khai:**
+    1. **Khi Lưu API Key / Thêm Tài Khoản Mới (`/api/bot/credentials`, `detect_okx_account_info`):** Tự động phát hiện `posMode`. Nếu chưa phải `long_short_mode`, bot lập tức gửi lệnh `POST /api/v5/account/set-position-mode` chuyển sang Chế độ phòng hộ.
+    2. **Khi Bấm Bật Bot (`/api/bot/start`):** Sau khi dọn sạch các lệnh limit rác (đảm bảo 0 lệnh chờ), bot tự động gửi lệnh `set-position-mode` chuyển ngay sang `long_short_mode`. Nếu OKX từ chối chuyển do tài khoản còn vướng vị thế cũ của người dùng, Web App lập tức chặn lại và hiển thị cảnh báo popup rõ ràng để người dùng xử lý, ngăn chặn hoàn toàn lỗi reject lệnh.
+    3. **Tại Lõi Chạy Bot (`sys_bot_sub1.py`, `sys_bot_sub2.py`):** Sửa lỗi tham số thành `{"posMode": "long_short_mode"}`. Nếu phát hiện tài khoản chưa ở `long_short_mode`, bot lập tức log cảnh báo và dừng tiến trình an toàn thay vì spam lệnh lỗi.
+
+- **[25/10/2026]** - Rà Soát Toàn Diện Mã Nguồn & Triệt Tiêu Lỗi Xung Đột Phạm Vi Biến (UnboundLocalError):
+  - **Mô tả hiện tượng:**
+    Khi bot quét coin XAU (hoặc các coin bị tắt / chưa chọn TF), terminal báo lỗi: `⚠️ [Lỗi quét XAU]: cannot access local variable 'clean_limit_orders' where it is not associated with a value`.
+  - **Nguyên nhân kỹ thuật & Rà soát toàn bộ repo:**
+    1. **`clean_limit_orders` trong `bot_strategy.py`:** Do lệnh `from bots.sub1.bot_orders import clean_limit_orders` bị import thụt lề bên trong thân hàm, Python đánh dấu biến này là cục bộ (local). Khi luồng code chạy tới lệnh gọi hàm trước dòng import, Python ném ngoại lệ `UnboundLocalError`.
+    2. **`json` trong `sys_bot_sub1.py`:** Hàm `main()` có lệnh `import json` ở dòng 564 bên trong vòng lặp, khiến lệnh `json.dump` tại dòng 291 bị lỗi tham chiếu cục bộ trước khi gán.
+    3. **`os, json, time` trong `bot_models.py`:** Các hàm `record_trade_marker` và `sync_initial_marker_if_needed` import cục bộ bên trong hàm thay vì ở mức module.
+  - **Giải pháp xử lý:**
+    1. Đưa toàn bộ các import (`clean_limit_orders`, `json`, `os`, `time`) lên khai báo toàn cục ở đầu file (module-level) trong `bot_strategy.py`, `sys_bot_sub1.py`, `bot_models.py`.
+    2. Xóa sạch các câu lệnh import cục bộ ngắt quãng trong thân hàm.
+    3. Chạy script phân tích AST & Symtable quét toàn bộ repo: Đảm bảo 100% file Python không còn lỗi syntax và không còn biến bị UnboundLocalError.
+
 - **[25/10/2026]** - Sửa Triệt Để Lỗi OKX Reject 51006 (buy@81942.4) & Ép Vào Lệnh Ngay Tại Giá Live Khi Thị Trường Đạt/Vượt Entry:
   - **Mô tả hiện tượng & Yêu cầu CEO:**
     1. Trên Dashboard báo log: `[14:59:13] ⚠️ [LIMIT REJECT 51006] OKX báo 51006 cho BTC-USDT-SWAP buy@81942.4. Giá Limit không hợp lệ, bỏ qua lệnh này chờ nhịp sau (PURE LIMIT không vào Market)!`.

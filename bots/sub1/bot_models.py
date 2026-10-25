@@ -1,6 +1,8 @@
 
-from decimal import Decimal
+import os
+import json
 import time
+from decimal import Decimal
 
 
 def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, ticket_id: str = "", status: str = "active", tf: str = "", pnl: float = 0.0, exit_price: float = 0.0):
@@ -19,7 +21,6 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
         try: pnl = float(pnl)
         except Exception: pnl = 0.0
 
-        import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
         marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')
         os.makedirs(marker_dir, exist_ok=True)
@@ -95,7 +96,6 @@ def record_trade_marker(coin: str, side: str, price: float, volume: float = 0, t
 def sync_initial_marker_if_needed(coin: str, side: str, price: float, volume: float, tf: str = ""):
     try:
         coin = coin.upper()
-        import os, json, time
         local_app_data = os.getenv('LOCALAPPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
         marker_dir = os.path.join(local_app_data, 'TLS1_Trading', 'bots/sub1', 'json_data')
         os.makedirs(marker_dir, exist_ok=True)

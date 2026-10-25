@@ -6,6 +6,7 @@ import requests
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import json
 
 hft_logger = logging.getLogger("TLS1_Bot_Logger")
 hft_logger.setLevel(logging.ERROR)
@@ -23,6 +24,7 @@ hft_logger.addHandler(handler)
 
 from bots.sub1.bot_indicators import *
 from bots.sub1.bot_orders import *
+from bots.sub1.bot_orders import clean_limit_orders
 try:
     from bots.sub1 import bot_models
 except ImportError:
@@ -428,7 +430,6 @@ def run_strategy_cycle(*args, **kwargs):
 
 def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, env_paths: dict, system_config: dict, is_limit_setup_cycle: bool, is_enabled: bool = True): # pyright: ignore[reportGeneralTypeIssues]
     import sys; globals_ref = sys.modules[__name__] # Tham chiếu trực tiếp thay vì import lại
-    from bots.sub1.bot_orders import clean_limit_orders
 
     swap_id = cfg["swap"]
     coin_name = cfg["coin"]
@@ -461,6 +462,9 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     else:
         _asset_class = _raw_asset_class or "crypto"
     _is_alt_synced = (coin_name != "BTC" and _asset_class == "crypto" and getattr(globals_ref, "ALTCOIN_FOLLOW_BTC_EMA", True))
+    _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
+    _is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
+    _is_multitf = getattr(globals_ref, "ENABLE_MULTITF_GRID", True) and not _is_pyramid and not _is_negative_dca
     
     # ⚡ EARLY EXIT: Bỏ qua hoàn toàn coin không được kích hoạt và không có vị thế
     if not is_enabled and not tracker.has_long and not tracker.has_short:
@@ -1810,10 +1814,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ==============================================================================
     def _is_tf_valid(tf):
         st = tracker.mtf_states[tf]
-        # Trend còn hiệu lực khi: đủ nến tích lũy + side rõ ràng + không bị lock cứng
-        # ⚡ KHÔNG dùng fail count ở đây — EMA34/89 vs EMA200 là tiêu chí cuối cùng
+        # Trend còn hiệu lực khi: đủ nến tích lũy + side rõ ràng + không bị lock cứng + chưa vấp sideway (fail < 2)
         return (not st["locked"] and
                 st["accum"] >= globals_ref.REQUIRED_ACCUMULATION_CANDLES and
+                st.get("fail", 0) < globals_ref.MAX_CYCLE_FAILURES and
                 st["side"] in ("above", "under"))
 
     def _ema_confirms(tf, direction):
@@ -2201,17 +2205,27 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     # ==============================
     is_macro_approved = True
     # ⚡ ALTCOIN SYNC: Khi neo theo BTC, bỏ qua filter macro_trend của chính Altcoin
-    if not (coin_name != "BTC" and _is_alt_synced):
+    # 🌐 CHẾ ĐỘ LƯỚI ĐA KHUNG (HEDGE): Mỗi TF giao dịch hoàn toàn độc lập theo cản EMA200 của riêng khung đó, bỏ qua lọc vĩ mô một chiều
+    if not _is_multitf and not (coin_name != "BTC" and _is_alt_synced):
         if tracker.macro_trend != "SIDEWAY":
             if tracker.trend == "UPTREND" and tracker.macro_trend == "DOWNTREND":
                 is_macro_approved = False
             elif tracker.trend == "DOWNTREND" and tracker.macro_trend == "UPTREND":
                 is_macro_approved = False
 
+    _has_any_placed_limit = (
+        tracker.placed_entry_px_long != "---"
+        or tracker.placed_entry_px_short != "---"
+        or bool(getattr(tracker, "placed_entry_px_long_by_tf", {}))
+        or bool(getattr(tracker, "placed_entry_px_short_by_tf", {}))
+    )
+
     if not is_macro_approved and not xl_found:
-        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
+        if _has_any_placed_limit:
             clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
             tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
+            tracker.placed_entry_px_long_by_tf = {}
+            tracker.placed_entry_px_short_by_tf = {}
 
     # ==============================
     # ==============================
@@ -2222,7 +2236,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
     if is_btc_h4_squeeze:
         # 1. Chặn lưới Limit mới (tạm ngưng giao dịch chờ xu hướng rõ)
         is_limit_setup_cycle = False
-        if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
+        if _has_any_placed_limit:
             clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
             tracker.placed_entry_px_long_by_tf = {}
             tracker.placed_entry_px_short_by_tf = {}
@@ -2234,7 +2248,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             avg_px_l = tracker.active_avg_px_long
             current_roi_long = ((tracker.live_price - avg_px_l) / avg_px_l) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_long >= Decimal("0.1"):
-                clean_algo_orders(client, swap_id, "cross", "long", dry_run=dry_run)
+                clean_algo_orders(client, swap_id, "cross", pos_l["posSide"] if 'pos_l' in locals() else "long", dry_run=dry_run)
                 close_position_market(client, swap_id, "long", str(cross_long_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_long:.1f}%)", "cross", dry_run=dry_run)
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
                 
@@ -2242,7 +2256,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             avg_px_s = tracker.active_avg_px_short
             current_roi_short = ((avg_px_s - tracker.live_price) / avg_px_s) * Decimal("100") * Decimal(str(cfg["leverage"]))
             if current_roi_short >= Decimal("0.1"):
-                clean_algo_orders(client, swap_id, "cross", "short", dry_run=dry_run)
+                clean_algo_orders(client, swap_id, "cross", pos_s["posSide"] if 'pos_s' in locals() else "short", dry_run=dry_run)
                 close_position_market(client, swap_id, "short", str(cross_short_amt), f"BTC_H4_Squeeze_BreakEven (ROI {current_roi_short:.1f}%)", "cross", dry_run=dry_run)
                 tracker.last_closed_reason = "BTC_H4_Squeeze_BreakEven"
 
@@ -2251,9 +2265,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         if True: # Bỏ chặn is_sideway_strict để hỗ trợ rải lưới độc lập từng TF
             # 🛑 CẦU DAO AN TOÀN: VOLUME SPIKE KHÔNG GÀI LIMIT
             if is_vol_spike:
-                if tracker.placed_entry_px_long != "---" or tracker.placed_entry_px_short != "---":
+                if _has_any_placed_limit:
                     clean_limit_orders(client, swap_id, "cross", dry_run=dry_run)
                     tracker.placed_entry_px_long, tracker.placed_entry_px_short = "---", "---"
+                    tracker.placed_entry_px_long_by_tf = {}
+                    tracker.placed_entry_px_short_by_tf = {}
                     send_telegram_notification(f"🛑 [CẦU DAO] {cfg['coin']}: Bão Volume Spike! Đã hủy lưới Limit để né bắt dao rơi.")
                 return 
 

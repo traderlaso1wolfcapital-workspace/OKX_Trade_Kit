@@ -310,11 +310,22 @@ def main():
 
     import bots.sub1.bot_sub1 as bot_sub1 # Lần nạp module đầu tiên
     
-    try: client.request("POST", "/api/v5/account/set-position-mode", body={"posMode": "long_short"})
+    try:
+        set_pos_resp = client.request("POST", "/api/v5/account/set-position-mode", body={"posMode": "long_short_mode"})
+        if set_pos_resp and str(set_pos_resp.get("code")) == "0":
+            print("🛡️ [OKX TỰ ĐỘNG]: Đã tự động chuyển sang Chế độ phòng hộ (long_short_mode)!", flush=True)
     except: pass
     
     try:
-        pMode = client.request("GET", "/api/v5/account/config")["data"][0].get("posMode", "net_mode")
+        acc_cfg = client.request("GET", "/api/v5/account/config")["data"][0]
+        pMode = acc_cfg.get("posMode", "net_mode")
+        if pMode != "long_short_mode":
+            print("⚠️ [CẢNH BÁO]: Tài khoản đang ở Chế độ một chiều (net_mode). Vui lòng vào App OKX -> Cài đặt vị thế chuyển sang Chế độ phòng hộ!", flush=True)
+            print("❌ Bot dừng hoạt động vì chiến lược yêu cầu Chế độ phòng hộ (Hedge Mode / long_short_mode)!", flush=True)
+            time.sleep(5)
+            sys.exit(1)
+        else:
+            print("✅ [CHẾ ĐỘ VỊ THẾ OKX]: Chế độ phòng hộ (Hedge Mode / long_short_mode) đã sẵn sàng!", flush=True)
     except Exception as e:
         print(f"❌ [LỖI API]: Không thể khởi tạo kết nối OKX: {e}", flush=True)
         print("💡 HƯỚNG DẪN SỬA LỖI: API Key của bạn không hợp lệ, bị hết hạn, hoặc bị giới hạn quyền. Vui lòng kiểm tra lại trong mục Cài Đặt!", flush=True)
@@ -561,7 +572,6 @@ def main():
                     sys._bot_sub1_executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(32, len(bot_sub1.COIN_PORTFOLIO) * 2))
                 
                 try:
-                    import json
                     with open(env_paths["FILE_GLOBAL_CONFIG"], "r", encoding="utf-8") as f:
                         _gcfg = json.load(f)
                         enabled_coins = _gcfg.get("ENABLED_COINS", ["BTC", "ETH", "XAU"])

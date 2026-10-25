@@ -1212,6 +1212,16 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
                     raise Exception("Tài khoản đang ở chế độ Simple (Đơn giản). Hãy đổi sang chế độ Ký quỹ (Single-currency hoặc Multi-currency) trên OKX để trade Futures.")
                 is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
 
+                posMode = str(cfg.get("posMode", "")).strip()
+                if posMode != "long_short_mode":
+                    try:
+                        sw_body = json.dumps({"posMode": "long_short_mode"})
+                        sw_resp = _okx_signed_request("POST", "/api/v5/account/set-position-mode", sw_body, clean_api_key, clean_secret_key, clean_passphrase, is_demo, timeout=5)
+                        if sw_resp.status_code == 200 and str(sw_resp.json().get("code")) == "0":
+                            posMode = "long_short_mode"
+                            print(f"[DETECT OKX ACC] Đã tự động chuyển tài khoản {api_uid} sang Chế độ phòng hộ (long_short_mode)!", flush=True)
+                    except Exception: pass
+
                 detected_name = ""
                 if label and not label.startswith("TLS1_"):
                     detected_name = label
@@ -1586,6 +1596,36 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
 
     # 🧹 Dọn sạch toàn bộ lệnh Limit cũ chưa khớp trên OKX để bot đặt lại theo logic mới (bảo lưu 100% TP/SL)
     canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="START BOT") if not is_prop_mode else 0
+
+    # 🛡️ TỰ ĐỘNG CHUYỂN SANG CHẾ ĐỘ PHÒNG HỘ (HEDGE MODE) CHO OKX
+    if not is_prop_mode and api_key and secret_key and passphrase:
+        try:
+            clean_ak = decrypt_value(api_key)
+            clean_sk = decrypt_value(secret_key)
+            clean_pp = decrypt_value(passphrase)
+            
+            # 1. Gửi lệnh tự động chuyển sang Chế độ phòng hộ
+            sw_body = json.dumps({"posMode": "long_short_mode"})
+            sw_resp = _okx_signed_request("POST", "/api/v5/account/set-position-mode", sw_body, clean_ak, clean_sk, clean_pp, is_demo, timeout=5)
+            if sw_resp.status_code == 200 and str(sw_resp.json().get("code")) == "0":
+                print(f"[START_BOT] Đã tự động chuyển tài khoản sang Chế độ phòng hộ (long_short_mode)!", flush=True)
+
+            # 2. Quét kiểm tra trạng thái posMode thực tế
+            cfg_resp = _okx_signed_request("GET", "/api/v5/account/config", "", clean_ak, clean_sk, clean_pp, is_demo, timeout=5)
+            if cfg_resp.status_code == 200:
+                cfg_data = cfg_resp.json()
+                if str(cfg_data.get("code")) == "0" and len(cfg_data.get("data", [])) > 0:
+                    current_pos_mode = str(cfg_data["data"][0].get("posMode", "")).strip()
+                    if current_pos_mode != "long_short_mode":
+                        # OKX từ chối tự chuyển do tài khoản đang vướng vị thế mở dở dang trên sàn
+                        raise HTTPException(
+                            status_code=400,
+                            detail="⚠️ Tài khoản OKX đang ở Chế độ Một Chiều (Net Mode). Hệ thống đã tự động gửi lệnh chuyển sang Chế độ Phòng Hộ nhưng sàn OKX từ chối do tài khoản đang còn vị thế mở dở dang. Vui lòng đóng hết các vị thế cũ trên OKX, chuyển sang Chế độ Phòng Hộ (Hedge Mode) rồi mới bấm Khởi Động Bot!"
+                        )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[START_BOT] Lỗi kiểm tra/chuyển Chế độ phòng hộ: {e}", flush=True)
 
     proc = get_nested(bot_processes, uid, strategy)
     pid = get_running_pid(uid, strategy)
@@ -2314,6 +2354,28 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
 
                 is_main = (api_uid == main_uid) if (api_uid and main_uid) else False
                 print(f"[API CHECK] API UID={api_uid}, mainUid={main_uid}, label={label}, is_main={is_main}, login UID={uid}, acctLv={acctLv}", flush=True)
+
+                # 🛡️ TỰ ĐỘNG CHUYỂN SANG CHẾ ĐỘ PHÒNG HỘ (HEDGE MODE) KHI LƯU API KEY
+                posMode = str(cfg.get("posMode", "")).strip()
+                if posMode != "long_short_mode":
+                    try:
+                        sw_path = "/api/v5/account/set-position-mode"
+                        sw_body = json.dumps({"posMode": "long_short_mode"})
+                        sw_ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+                        sw_msg = sw_ts + "POST" + sw_path + sw_body
+                        sw_mac = hmac.new(bytes(creds.secret_key, encoding='utf8'), bytes(sw_msg, encoding='utf-8'), digestmod=hashlib.sha256)
+                        sw_sign = base64.b64encode(sw_mac.digest()).decode('utf-8')
+                        sw_headers = {
+                            "OK-ACCESS-KEY": creds.api_key,
+                            "OK-ACCESS-SIGN": sw_sign,
+                            "OK-ACCESS-TIMESTAMP": sw_ts,
+                            "OK-ACCESS-PASSPHRASE": creds.passphrase,
+                            "Content-Type": "application/json"
+                        }
+                        sw_resp = requests.post(base_url + sw_path, data=sw_body, headers=sw_headers, timeout=5)
+                        if sw_resp.status_code == 200 and str(sw_resp.json().get("code")) == "0":
+                            print(f"[API CHECK] Đã tự động chuyển tài khoản {api_uid} sang Chế độ phòng hộ (long_short_mode)!", flush=True)
+                    except Exception: pass
 
                 # Xác định UID chính (Master UID) từ OKX
                 owner_uid = str(main_uid).strip() if main_uid else str(api_uid).strip()
