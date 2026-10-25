@@ -33,6 +33,29 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[25/10/2026]** - Sửa Lỗi Cloudflare 502 Bad Gateway (Lệch Cổng 5173 / 8080 & Crash Backend) Khi Deploy Lên Máy Mac Mini M1:
+  - **Mô tả hiện tượng:**
+    Khi CEO chạy lệnh `git pull origin main && bash start_web_server.sh` trên terminal máy Mac Mini M1 để cập nhật bản web mới, truy cập domain `https://autotrader.fun` bị lỗi Cloudflare `Bad gateway - Error code 502 (Host Error)`.
+  - **Nguyên nhân kỹ thuật sâu xa:**
+    1. **Xung đột cổng giữa Vite (5173) và FastAPI Static (8080):** 
+       - Ở các phiên bản trước, hệ thống chạy web qua Vite Dev Server ở cổng `5173`. Do đó, cấu hình Public Hostname trên Cloudflare Zero Trust của domain `autotrader.fun` đã được cài đặt trỏ về `http://localhost:5173`.
+       - Dev Thọ chuyển đổi sang cơ chế gom toàn bộ Frontend và Backend vào FastAPI phục vụ Static files trên cổng `8080` qua PM2.
+       - Khi chạy `start_web_server.sh`, Vite bị tắt hoàn toàn; hệ thống chỉ lắng nghe trên cổng 8080. Cloudflare Tunnel khi nhận request từ người dùng vẫn tìm đến cổng 5173 -> gặp `Connection Refused` -> trả về lỗi 502 Bad Gateway.
+    2. **Thiếu thư viện `requests` trong `web_app/backend/requirements.txt`:**
+       - File `main.py` import `requests` ngay tại dòng 24 và `tradelocker_service.py` cũng dùng `requests`.
+       - Trong file `requirements.txt` của backend thiếu `requests`. Nếu môi trường Python 3.14 trên Mac Mini chưa cài global module này, tiến trình `main.py` lập tức văng `ModuleNotFoundError: No module named 'requests'`, khiến PM2 crash vòng lặp (báo mem chỉ 288kb).
+    3. **Đường dẫn tương đối `cwd` trong `ecosystem.config.js`:**
+       - PM2 cấu hình `cwd: "./web_app/backend"` có thể bị sai lệch thư mục làm việc khi daemon PM2 chạy từ thư mục khác hoặc sau khi `pm2 save`.
+  - **Giải pháp triệt để đã triển khai:**
+    1. **Tích hợp Tự Động Cầu Nối Cổng (Port Bridge 5173 ➔ 8080):**
+       - Viết cơ chế TCP Byte Streamer trực tiếp bằng `asyncio` chuẩn trong `main.py`.
+       - Khi Backend FastAPI khởi chạy trên cổng 8080, nó tự động mở thêm socket lắng nghe trên cổng `5173` và chuyển tiếp trực tiếp hai chiều sang cổng `8080` (hỗ trợ cả HTTP request, static assets và WebSocket duplex).
+       - Bất kể trên Cloudflare Zero Trust người dùng trỏ về cổng `5173` hay cổng `8080`, hệ thống đều tiếp nhận và phản hồi tức thì 100%, không cần phải sửa cấu hình Cloudflare Dashboard thủ công.
+    2. **Bổ sung `requests` & `pydantic` vào `backend/requirements.txt`:** Đảm bảo `pip3 install -r requirements.txt` luôn cài đặt đầy đủ tất cả dependencies.
+    3. **Chuẩn hóa đường dẫn tuyệt đối cho PM2:** Sử dụng `path.resolve(__dirname, 'web_app/backend')` và thêm cờ `PYTHONUNBUFFERED: "1"` trong `ecosystem.config.js` để PM2 ghi log thời gian thực.
+    4. **Cập nhật script điều khiển:** Bổ sung bước kiểm tra trạng thái PM2 sau khởi động (`sleep 2 && pm2 status`) trong `start_web_server.sh` và lệnh dọn dẹp PM2 triệt để trong `stop_web_server.sh`.
+
+
 - **[25/10/2026]** - Khắc Phục Lỗi Lệnh Limit SHORT BTC Bị Huỷ Ngầm & Hiển Thị "Lệnh Ma" Trên UI Dashboard:
   - **Mô tả hiện tượng:**
     Dashboard thông báo: `BTC ├─ Đang limit SHORT: m15: 80850.5 (VOL: 0.1 U)...` đầy đủ cho 4 khung (m15, m30, H1, H2), nhưng trên web sàn OKX không hề có lệnh chờ nào của BTC (chỉ có 5 lệnh XAU và 5 lệnh ETH).

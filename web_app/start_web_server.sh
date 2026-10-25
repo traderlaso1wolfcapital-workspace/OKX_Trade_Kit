@@ -24,6 +24,10 @@ cd "$PROJECT_ROOT"
 pm2 start ecosystem.config.js
 pm2 save
 
+# Chờ 2 giây để tiến trình ổn định và kiểm tra trạng thái
+sleep 2
+pm2 status
+
 # Khởi động Cloudflare Tunnel
 echo "Đang khởi động Cloudflare Tunnel..."
 nohup cloudflared tunnel run --token eyJhIjoiNzFmZjE5ZTAxMzQzM2FkNDBiMWMyYjU3Njk4ZmFmNmUiLCJ0IjoiNWYyZTE0NmEtZjNjOS00NjJlLTg4YzctYzAyNzk2NzQ1MTBlIiwicyI6IlpqaG1Nak13TW1VdFlXUXhPUzAwTVRFeUxUZzJPR0l0T1dJNE1EbGlZelUzWXpoaSJ9 > "$DIR/tunnel.log" 2>&1 &
@@ -32,8 +36,10 @@ echo "✅ Cloudflare Tunnel đã thông mạng (PID: $TUNNEL_PID)"
 
 echo "---------------------------------------------------"
 echo "🚀 HỆ THỐNG ĐÃ SẴN SÀNG CHẠY 24/7!"
-echo "Toàn bộ Frontend và Backend đã được gộp chung và chạy ngầm trên cổng 8080."
-echo "Truy cập trực tiếp tại máy: http://localhost:8080"
+echo "Toàn bộ Frontend và Backend đã gộp chung chạy trên cổng 8080 (kèm cầu nối tự động cổng 5173)."
+echo "Truy cập trực tiếp tại máy: http://localhost:8080 hoặc http://localhost:5173"
 echo "Truy cập qua Domain: https://autotrader.fun"
-echo "⚠️ LƯU Ý QUAN TRỌNG: Hãy đảm bảo trên Cloudflare Zero Trust bạn đã thêm Public Hostname cho autotrader.fun trỏ về http://localhost:8080"
-echo "Để dừng hệ thống, hãy chạy lệnh: pm2 stop tls1-bot-backend && pkill -f cloudflared"
+echo "💡 Ghi chú: Hệ thống hỗ trợ song song cả 2 cổng 8080 và 5173, tương thích 100% với cấu hình Cloudflare Zero Trust."
+echo "Để kiểm tra log Backend: pm2 logs tls1-bot-backend --lines 20"
+echo "Để kiểm tra log Cloudflare: tail -n 20 \"$DIR/tunnel.log\""
+echo "Để dừng hệ thống, hãy chạy lệnh: pm2 stop all && pkill -f cloudflared"

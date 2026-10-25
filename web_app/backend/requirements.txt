@@ -8,3 +8,5 @@ cryptography
 slowapi
 bcrypt
 python-dotenv
+requests
+pydantic

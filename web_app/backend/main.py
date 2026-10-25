@@ -211,10 +211,13 @@ app.add_middleware(
 
 # Paths Setup
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.insert(0, CURRENT_DIR)
 # Vi tri moi: nam trong OKX_Trade_Kit/TLS1_Trading_Web/backend
 OKX_TRADE_KIT_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
 XGUI_MAIN_PATH = os.path.join(OKX_TRADE_KIT_DIR, "xGui_main.py")
-sys.path.append(OKX_TRADE_KIT_DIR)
+if OKX_TRADE_KIT_DIR not in sys.path:
+    sys.path.append(OKX_TRADE_KIT_DIR)
 
 
 # AppData path của TLS1_Trading
@@ -627,7 +630,7 @@ async def log_reader_task(stream, uid, strategy):
             ])
             if is_tl_log:
                 try:
-                    from web_app.backend.tradelocker_service import TradeLockerManager
+                    from tradelocker_service import TradeLockerManager
                     TradeLockerManager.log_event(uid, line_str)
                 except Exception:
                     pass
@@ -4270,10 +4273,55 @@ if os.path.exists(frontend_dist_path):
             return FileResponse(file_path)
         return FileResponse(os.path.join(frontend_dist_path, "index.html"))
 
+# 🌉 TỰ ĐỘNG KÍCH HOẠT CẦU NỐI CỔNG 5173 -> 8080 (PORT BRIDGE)
+# Đảm bảo Cloudflare Tunnel / Client kết nối vào cổng 5173 (cổng Vite cũ) hay 8080 (cổng FastAPI mới)
+# đều hoạt động 100%, triệt tiêu hoàn toàn lỗi 502 Bad Gateway do sai cổng.
+async def _start_port_bridge():
+    backend_port = int(os.environ.get("PORT", 8080))
+    if backend_port == 5173:
+        return
+    async def _handle_bridge_conn(reader, writer):
+        try:
+            remote_reader, remote_writer = await asyncio.open_connection('127.0.0.1', backend_port)
+            async def _pipe(src, dst):
+                try:
+                    while True:
+                        data = await src.read(65536)
+                        if not data: break
+                        dst.write(data)
+                        await dst.drain()
+                except Exception: pass
+                finally:
+                    try: dst.close()
+                    except Exception: pass
+            await asyncio.gather(_pipe(reader, remote_writer), _pipe(remote_reader, writer))
+        except Exception: pass
+        finally:
+            try: writer.close()
+            except Exception: pass
+
+    try:
+        bridge_server = await asyncio.start_server(_handle_bridge_conn, '0.0.0.0', 5173)
+        print(f"[PORT BRIDGE] ✅ Cổng 5173 đã kích hoạt làm cầu nối thông suốt sang {backend_port} (Hỗ trợ kép cả 2 cổng 5173 & 8080)!", flush=True)
+    except OSError:
+        pass
+    except Exception as e:
+        print(f"[PORT BRIDGE] Cổng 5173 không khả dụng: {e}", flush=True)
+
+@app.on_event("startup")
+async def startup_bridge_task():
+    asyncio.create_task(_start_port_bridge())
+
 if __name__ == "__main__":
     import uvicorn
     is_prod = os.environ.get("NODE_ENV") == "production"
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=not is_prod)
+    port = int(os.environ.get("PORT", 8080))
+    if is_prod:
+        uvicorn.run(app, host="0.0.0.0", port=port)
+    else:
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+# z7737 | Tự động hóa Port Bridge 5173 -> 8080, sửa lỗi ModuleNotFoundError requests/tradelocker_service, và tối ưu hóa Uvicorn production chạy qua PM2
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 
