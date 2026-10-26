@@ -663,7 +663,11 @@ export default function SingleChartPane({
     if (w <= 0) return;
     const plotW = (c.timeScale && typeof c.timeScale().width === 'function') ? c.timeScale().width() : 0;
     const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - 70);
+    const timeAxisH = (c.timeScale && typeof c.timeScale().height === 'function') ? c.timeScale().height() : 26;
+    const totalH = cont.clientHeight || 400;
+    const maxBottomY = Math.max(10, totalH - timeAxisH);
     o.style.width = maxRightX + 'px';
+    o.style.height = maxBottomY + 'px';
     o.style.overflow = 'hidden';
 
     // Chỉ hiển thị các OB còn đủ điều kiện, chưa bị đâm thủng / lấp hết
@@ -685,8 +689,10 @@ export default function SingleChartPane({
       const y2 = s.priceToCoordinate(ob.low);
       if (y1 === null || y2 === null) return;
 
-      const topY = Math.min(y1, y2);
-      const botY = Math.max(y1, y2);
+      const rawTop = Math.min(y1, y2);
+      const rawBot = Math.max(y1, y2);
+      const topY = Math.min(maxBottomY, Math.max(0, rawTop));
+      const botY = Math.min(maxBottomY, Math.max(0, rawBot));
       const h = Math.max(botY - topY, 4);
       const isBull = ob.bias === 1;
 
@@ -750,6 +756,9 @@ export default function SingleChartPane({
     const plotW = (c.timeScale && typeof c.timeScale().width === 'function') ? c.timeScale().width() : 0;
     const pScaleWidth = (c.priceScale && typeof c.priceScale('right').width === 'function') ? c.priceScale('right').width() : (w - plotW);
     const maxRightX = plotW > 0 ? Math.floor(plotW) : (w - (pScaleWidth > 0 ? pScaleWidth : 55));
+    const timeAxisH = (c.timeScale && typeof c.timeScale().height === 'function') ? c.timeScale().height() : 26;
+    const totalH = cont.clientHeight || 400;
+    const maxBottomY = Math.max(10, totalH - timeAxisH);
 
     if (pScaleWidth > 20 && pScaleWidth < 120 && Math.abs(pScaleWidth - priceScaleWidth) >= 2) {
       setPriceScaleWidth(pScaleWidth);
@@ -757,10 +766,12 @@ export default function SingleChartPane({
 
     if (oBoxes) {
       oBoxes.style.width = maxRightX + 'px';
+      oBoxes.style.height = maxBottomY + 'px';
       oBoxes.style.overflow = 'hidden';
     }
     if (oTop) {
       oTop.style.width = maxRightX + 'px';
+      oTop.style.height = maxBottomY + 'px';
       oTop.style.overflow = 'hidden';
     }
 
@@ -883,10 +894,10 @@ export default function SingleChartPane({
         const ySL = s.priceToCoordinate(pos.slTarget);
         if (yEntry1 === null) return;
 
-        const clientH = oTop.clientHeight || 400;
+        const clientH = maxBottomY;
         const isLong = pos.entryType === 'Long';
-        const clampedYTP = yTP !== null ? yTP : (isLong ? 0 : clientH);
-        const clampedYSL = ySL !== null ? ySL : (isLong ? clientH : 0);
+        const clampedYTP = Math.min(clientH, Math.max(0, yTP !== null ? yTP : (isLong ? 0 : clientH)));
+        const clampedYSL = Math.min(clientH, Math.max(0, ySL !== null ? ySL : (isLong ? clientH : 0)));
 
         const isStandardBot = pos.isEmaBot || pos.isSmcBot;
         
@@ -898,15 +909,17 @@ export default function SingleChartPane({
           const yEntry2 = s.priceToCoordinate(entry2Price);
           effectiveYEntry2 = yEntry2 !== null ? yEntry2 : (yEntry1 + (clampedYSL - yEntry1) * (2 / 3));
         }
+        effectiveYEntry2 = Math.min(clientH, Math.max(0, effectiveYEntry2));
 
         const posContainer = document.createElement('div');
         posContainer.style.position = 'absolute';
         posContainer.style.top = '0px';
         posContainer.style.left = startX + 'px';
         posContainer.style.width = boxWidth + 'px';
-        posContainer.style.height = '100%';
+        posContainer.style.height = clientH + 'px';
         posContainer.style.pointerEvents = 'none';
         posContainer.style.zIndex = '1';
+        posContainer.style.overflow = 'hidden';
 
         const greenBg = 'rgba(20, 58, 54, 0.75)';
         const redBg = 'rgba(68, 24, 33, 0.75)';
@@ -1355,7 +1368,7 @@ export default function SingleChartPane({
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth || 300,
       height: containerRef.current.clientHeight || 200,
-      layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', attributionLogo: false },
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#787b86', fontSize: 11, attributionLogo: false },
       grid: {
         vertLines: { color: 'rgba(42, 46, 57, 0.4)' },
         horzLines: { color: 'rgba(42, 46, 57, 0.4)' }
@@ -1382,6 +1395,7 @@ export default function SingleChartPane({
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
+        ticksVisible: false,
         rightOffset: 8,
         barSpacing: 12,
         minBarSpacing: 3,
@@ -1865,22 +1879,34 @@ export default function SingleChartPane({
           <div
             ref={overlayRef}
             style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              position: 'absolute', top: 0, left: 0, width: '100%', height: 'calc(100% - 26px)',
               pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
             }}
           />
           <div
             ref={liquidV5BoxesOverlayRef}
             style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              position: 'absolute', top: 0, left: 0, width: '100%', height: 'calc(100% - 26px)',
               pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
             }}
           />
           <div
             ref={liquidV5OverlayRef}
             style={{
-              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              position: 'absolute', top: 0, left: 0, width: '100%', height: 'calc(100% - 26px)',
               pointerEvents: 'none', zIndex: 1, overflow: 'hidden'
+            }}
+          />
+
+          {/* Lớp che chắn trục thời gian: Đảm bảo 100% các khối phân vùng, chỉ báo dừng lại ở đường chỉ và không bao giờ chèn màu vào trục thời gian */}
+          <div
+            className="chart-time-axis-backdrop"
+            style={{
+              position: 'absolute', bottom: 0, left: 0, width: '100%', height: '26px',
+              backgroundColor: '#0c0c0c',
+              borderTop: '1px solid #2a2e39',
+              pointerEvents: 'none',
+              zIndex: 2
             }}
           />
 
@@ -2066,8 +2092,8 @@ export default function SingleChartPane({
           </div>
 
           <div style={{
-            position: "absolute", bottom: "6px", right: "6px",
-            display: "flex", gap: "3px", zIndex: 10
+            position: "absolute", bottom: "4px", right: "6px",
+            display: "flex", gap: "3px", zIndex: 15
           }}>
             <button
               title="Auto (Mặc định hiển thị ~60 nến & căn đều nến/EMA200)"
@@ -2082,7 +2108,7 @@ export default function SingleChartPane({
                 }
               }}
               style={{
-                width: "20px", height: "20px",
+                width: "19px", height: "17px",
                 background: isAutoFit ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
                 color: isAutoFit ? "#fff" : "#d1d4dc",
                 border: isAutoFit ? "1px solid #2962ff" : "1px solid #444",
@@ -2103,7 +2129,7 @@ export default function SingleChartPane({
                 }
               }}
               style={{
-                width: "20px", height: "20px",
+                width: "19px", height: "17px",
                 background: isLogScale ? "rgba(41,98,255,0.85)" : "rgba(30,30,46,0.85)",
                 color: isLogScale ? "#fff" : "#d1d4dc",
                 border: isLogScale ? "1px solid #2962ff" : "1px solid #444",

@@ -592,11 +592,7 @@ export default function ConnectModal({
                         <div
                           key={pAcc.id}
                           className="connect-card"
-                          style={{
-                            cursor: "pointer",
-                            borderColor: isActive ? "rgba(0, 230, 118, 0.4)" : "#333333",
-                            background: isActive ? "rgba(0, 230, 118, 0.04)" : "#161616",
-                          }}
+                          style={{ cursor: "pointer" }}
                           onClick={() => {
                             setSelectedPropId(pAcc.id);
                             handleTabSwitch("tradelocker");
@@ -608,7 +604,7 @@ export default function ConnectModal({
                               width: "36px",
                               height: "36px",
                               background: "#000000",
-                              border: isActive ? "1px solid #00e676" : "1px solid #333333",
+                              border: "1px solid #333333",
                               borderRadius: "6px",
                               display: "flex",
                               alignItems: "center",
@@ -786,11 +782,7 @@ export default function ConnectModal({
                       <div
                         key={pAcc.id}
                         className="connect-card"
-                        style={{
-                          cursor: "pointer",
-                          borderColor: isActive ? "rgba(0, 230, 118, 0.4)" : "#333333",
-                          background: isActive ? "rgba(0, 230, 118, 0.04)" : "#161616",
-                        }}
+                        style={{ cursor: "pointer" }}
                         onClick={() => {
                           setSelectedPropId(pAcc.id);
                           handleTabSwitch("tradelocker");
@@ -801,7 +793,7 @@ export default function ConnectModal({
                             width: "36px",
                             height: "36px",
                             background: "#000000",
-                            border: isActive ? "1px solid #00e676" : "1px solid #333333",
+                            border: "1px solid #333333",
                             borderRadius: "6px",
                             display: "flex",
                             alignItems: "center",
@@ -1041,7 +1033,8 @@ export default function ConnectModal({
                         </option>
                         {accounts.map(acc => {
                           const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id)?.[0];
-                          const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
+                          const isThisBotAccount = (acc.id === modalAccountId || acc.id === botAccountMap?.[activeBotTab]);
+                          const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
 
                           const getTargetBotName = (key) => {
                             if (key === "sub1") return t("bot_ema200") || "EMA200 Bot";

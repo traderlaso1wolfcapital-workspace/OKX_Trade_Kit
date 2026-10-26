@@ -807,33 +807,7 @@ body.is-resizing iframe {
 }
 
 .resizer.horizontal-resizer {
-  height: 9px;
-  cursor: row-resize;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #111111;
-  border-top: none;
-  border-bottom: 1.5px solid #444;
-  box-sizing: border-box;
-  touch-action: none;
-  user-select: none;
-}
-
-.resizer.horizontal-resizer::after {
-  content: "";
-  width: 48px;
-  height: 3px;
-  background-color: #666666; /* Bright grey grab handle so it stands out */
-  border-radius: 2px;
-}
-
-.resizer.horizontal-resizer:hover, .resizer.horizontal-resizer:active {
-  background-color: #3a3a3a;
-}
-
-.resizer.horizontal-resizer:hover::after, .resizer.horizontal-resizer:active::after {
-  background-color: #ef5350; /* Bright red when interacted with */
+  display: none !important;
 }
 
 .resizer.vertical-resizer {
@@ -990,6 +964,8 @@ body.is-resizing iframe {
   align-items: center;
   justify-content: center;
   transition: all 0.15s ease;
+  touch-action: none;
+  user-select: none;
 }
 
 .btn-tab-split:hover {
@@ -1000,6 +976,7 @@ body.is-resizing iframe {
 .btn-tab-split.active {
   background-color: #252836;
   color: #ff9900;
+  cursor: ns-resize;
 }
 
 .btn-tab-split.active:hover {
@@ -3891,36 +3868,16 @@ div[class*="tradingview-widget-copyright"],
   border: none !important;
 }
 
-/* RESIZER THANH KÉO (GIỮA BIỂU ĐỒ VÀ BẢNG VỊ THẾ) */
+/* RESIZER THANH KÉO (GIỮA BIỂU ĐỒ VÀ BẢNG VỊ THẾ - ĐÃ TÍCH HỢP TRỰC TIẾP VÀO NÚT ⇅) */
 .theme-glass-pro .resizer.horizontal-resizer {
-  height: 8px !important;
-  background-color: #161823 !important;
-  border-top: 1px solid #2e3347 !important;
-  border-bottom: 1px solid #2e3347 !important;
-  border-left: none !important;
-  border-right: none !important;
-}
-
-.theme-glass-pro .resizer.horizontal-resizer::after {
-  background-color: #484e66 !important;
-  border-radius: 2px !important;
-}
-
-.theme-glass-pro .resizer.horizontal-resizer:hover,
-.theme-glass-pro .resizer.horizontal-resizer:active {
-  background-color: #1f2231 !important;
-}
-
-.theme-glass-pro .resizer.horizontal-resizer:hover::after,
-.theme-glass-pro .resizer.horizontal-resizer:active::after {
-  background-color: #f59e0b !important;
+  display: none !important;
 }
 
 /* 4. KHỐI NÚT CHÍNH (BẢNG VỊ THẾ / LOGS / BIỂU ĐỒ) */
 .theme-glass-pro .tab-bar-header {
   height: 32px !important;
   background-color: #161823 !important;
-  border-top: none !important;
+  border-top: 1px solid #2e3347 !important;
   border-bottom: 1px solid #2e3347 !important;
   border-left: none !important;
   border-right: none !important;
@@ -3954,6 +3911,8 @@ div[class*="tradingview-widget-copyright"],
   border-top: none !important;
   border-bottom: none !important;
   color: #878da2 !important;
+  touch-action: none !important;
+  user-select: none !important;
 }
 
 .theme-glass-pro .btn-tab-split:hover {
@@ -3964,6 +3923,7 @@ div[class*="tradingview-widget-copyright"],
 .theme-glass-pro .btn-tab-split.active {
   background-color: #202332 !important;
   color: #f59e0b !important;
+  cursor: ns-resize !important;
 }
 
 .theme-glass-pro .btn-tab-split.active:hover {

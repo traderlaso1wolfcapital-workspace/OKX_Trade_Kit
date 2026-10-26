@@ -358,7 +358,7 @@ export default function LogsTerminal({
   };
 
   const displayBotName = currentPlatform === "e8"
-    ? "TRADELOCKER (QUỸ FX)"
+    ? "TRADELOCKER (QUỸ E8)"
     : (activeBotTab ? activeBotTab.toUpperCase() : "OKX BOT");
 
   return (

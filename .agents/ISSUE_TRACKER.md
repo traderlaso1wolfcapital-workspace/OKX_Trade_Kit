@@ -33,6 +33,78 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/10/2026]** - Đồng Bộ Hóa Viền & Nền Thẻ Quỹ E8 Demo Trong Cửa Sổ Kết Nối (Connect Modal):
+  - **Mô tả yêu cầu CEO:** Thẻ `E8 Demo` có viền xanh lá và nền xanh nhẹ không cần thiết, làm lệch tông so với các thẻ khác. Yêu cầu đưa viền và nền của thẻ E8 Demo về đồng bộ hoàn toàn với các ô thẻ tài khoản hiện tại.
+  - **Giải pháp kỹ thuật đã triển khai (`ConnectModal.jsx`):**
+    1. Gỡ bỏ `borderColor: isActive ? "rgba(0, 230, 118, 0.4)" : "#333333"` và `background: isActive ? "rgba(0, 230, 118, 0.04)" : "#161616"` trên thẻ `.connect-card` của tài khoản E8 Demo.
+    2. Đưa thẻ E8 về dùng `style={{ cursor: "pointer" }}` chuẩn như các thẻ OKX và Quỹ khác. Khung logo E8 đưa về viền chuẩn `#333333`.
+    3. Giữ nguyên tên tab `Quỹ FX Connect` và nhãn `Quỹ FX:` ở cửa sổ Kết Nối vì đây là trung tâm kết nối chung cho mọi quỹ cấp vốn (E8, FTMO, The 5%ers...).
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
+
+- **[26/10/2026]** - Khắc Phục Hiện Tượng Dính Chữ "(Gán ở SMC Bot)" Khi Nhập Tài Khoản Phụ OKX & Chuẩn Hóa Logo Thương Hiệu OKX (Trắng) / Quỹ E8:
+  - **Nguyên nhân lỗi "(Gán ở SMC Bot)":**
+    1. Trình duyệt lưu vết mapping bot trong `localStorage.getItem("tls1_bot_accounts")`. Khi người dùng từng mở tab SMC Bot (`sub2`), ID tài khoản `Bot-m15` (`sub_1792913766525`) được lưu vào key `sub2`.
+    2. Khi người dùng chuyển sang tab bot khác (ví dụ: `sub1` EMA200 Bot) và chọn tài khoản `Bot-m15`, hàm `handleAssignAccountToActiveBot` chỉ cập nhật `sub1` mà không gỡ bỏ mapping ở `sub2`.
+    3. Trong `SidebarLeft.jsx` và `ConnectModal.jsx`, logic kiểm tra `assignedOtherBot` tìm thấy `sub2 !== sub1` nên tự động nối chuỗi ` (Gán ở SMC Bot)` vào tên tài khoản, mà không kiểm tra xem tài khoản này có đang được chọn làm tài khoản hiện hành (`isThisBotAccount`) hay không.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Sửa logic hiển thị nhãn tài khoản (`SidebarLeft.jsx` & `ConnectModal.jsx`):**
+       - Thêm điều kiện `const isThisBotAccount = (acc.id === effectiveAccId || acc.name === effectiveAccId)`.
+       - Chỉ tính `assignedOtherBot` khi `!isThisBotAccount`. Tài khoản đang thuộc bot hiện hành tuyệt đối không bao giờ bị dán nhãn `(Gán ở ... Bot)`.
+    2. **Khử lưu vết gán chéo tài khoản (`App.jsx`):**
+       - Khi gán tài khoản cho bot hiện tại (`handleAssignAccountToActiveBot`), tự động gỡ bỏ tài khoản đó khỏi các bot khác trong `botAccountMap` và cập nhật lại `localStorage`.
+       - Khử trùng lặp ngay khi khởi tạo state `botAccountMap` ban đầu.
+    3. **Chuẩn hóa Logo & Bỏ chấm tròn xám (`SidebarLeft.jsx`):**
+       - Xóa bỏ hoàn toàn chấm tròn xám (`span` status dot) ở đầu nút dropdown và trong popup menu để giao diện tinh gọn, không rườm rà.
+       - Áp dụng logo **OKX** chuẩn màu trắng (`#ffffff`), vector sắc nét 5 khối vuông.
+       - Áp dụng logo **Quỹ E8** bằng chính file ảnh chuẩn `public/e8_logo.png` (khớp 100% hash SHA256 với ảnh CEO gửi).
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
+
+- **[26/10/2026]** - Tích Hợp Logo Thương Hiệu OKX & Quỹ E8, Đổi Tên Quỹ E8 và Làm Nhạt Viền Dropdown Nền Tảng:
+  - **Mô tả yêu cầu CEO:**
+    1. Thay icon quả địa cầu (`🌐`) và icon cúp (`🏆`) bằng logo thương hiệu vector sắc nét của OKX và Quỹ E8.
+    2. Đổi tên gọi "QUỸ FX" thành "QUỸ E8" đồng bộ toàn bộ giao diện dropdown và hệ thống.
+    3. Làm dịu/nhạt màu viền dropdown nền tảng (cam nhạt hơn cho OKX, xanh nhạt hơn cho E8).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Logo SVG chuẩn (`SidebarLeft.jsx`):**
+       - Tạo component `OkxLogo`: 5 khối vuông hình cờ caro đặc trưng của OKX, hiển thị sắc nét, tỷ lệ chuẩn với text.
+       - Tạo component `E8Logo`: Biểu tượng hình vuông bo góc với chữ E và số 8 geometric đặc trưng của quỹ E8 Markets.
+    2. **Đổi tên toàn diện sang "QUỸ E8":**
+       - Cập nhật text hiển thị trên nút chọn nền tảng chính: `SÀN OKX` và `QUỸ E8`.
+       - Cập nhật text trong danh sách thả xuống (popup menu) và nút `Kết Nối Quỹ E8`.
+       - Đồng bộ hóa modal dừng bot (`App.jsx`) và thanh thông tin logs (`LogsTerminal.jsx` -> `TRADELOCKER (QUỸ E8)`).
+    3. **Làm nhạt và tinh tế màu viền dropdown:**
+       - Viền OKX (cam): Chuyển từ viền chói `#f59e0b` sang viền cam nhạt êm dịu `1px solid rgba(245, 158, 11, 0.45)`.
+       - Viền E8 (xanh): Chuyển từ viền gắt `#3b82f6` sang viền xanh dương pastel nhạt `1px solid rgba(59, 130, 246, 0.45)`.
+       - Áp dụng đồng bộ cho cả nút dropdown chính và các item khi mở menu.
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công 100% không cảnh báo lỗi cú pháp.
+
+
+- **[26/10/2026]** - Tối Ưu Chiều Cao Thanh Thời Gian Chart, Khắc Phục Chỉ Báo Phân Vùng Long/Short Tràn Trục Và Tích Hợp Nút ⇅ Đa Năng (Click Thu Gọn / Nắm Kéo Chỉnh Tỉ Lệ):
+  - **Mô tả yêu cầu CEO:**
+    1. Chỉ báo phân vùng Long/Short (các khối hộp TP/SL xanh/đỏ) không được đè lên thanh thời gian bên dưới, phải bị chặn lại ở đáy nến tương tự như thân nến.
+    2. Thu nhỏ chiều cao dòng mốc thời gian dưới chart, giảm khoảng cách trên dưới chỉ bằng với chiều cao của hai nút `[ A ] [ L ]` (~20px).
+    3. Ẩn thanh kéo chia khoảng cách dày cộp cũ (`.resizer.horizontal-resizer` có thanh grab đỏ).
+    4. Tích hợp tính năng kéo phân chia tỉ lệ biểu đồ và bảng vị thế trực tiếp vào nút `⇅` (`btn-tab-split`):
+       - Click 1 lần: Thu gọn về tab chung (giữ nguyên tính năng cũ).
+       - Nắm kéo lên/xuống: Chia lại tỉ lệ chiều cao giữa Biểu Đồ và Bảng Vị Thế, thay thế hoàn toàn cho thanh kéo cũ.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Khắc phục triệt để tràn trục thời gian (`SingleChartPane.jsx`):**
+       - Khắc phục lỗi logic tính toán `maxBottomY`: Trước đây biểu thức `oTop.clientHeight || ...` luôn trả về chiều cao 100% của toàn bộ container (gồm cả trục thời gian), khiến các khối vẽ luôn kéo dài đến đáy màn hình. Đã sửa thành `totalH - timeAxisH` chính xác tuyệt đối.
+       - Thêm lớp nền `chart-time-axis-backdrop` (`position: absolute, bottom: 0, height: 26px, backgroundColor: #0c0c0c, borderTop: 1px solid #2a2e39, zIndex: 2`). Lớp này nằm trên toàn bộ các lớp overlay vẽ (`zIndex: 1`) và nằm dưới canvas nến/trục thời gian (`zIndex: 10`). Bất kỳ khối nến hay chỉ báo nào khi chạm tới đường chỉ phân cách thời gian đều tự động bị che chắn ở lớp dưới, triệt tiêu 100% tình trạng lem màu xanh/đỏ vào trục thời gian.
+       - Đặt chiều cao các lớp overlay `overlayRef`, `liquidV5BoxesOverlayRef`, `liquidV5OverlayRef` thành `height: calc(100% - 26px)` và `overflow: hidden`.
+    2. **Căn chuẩn hàng nút [ A ] [ L ] với text mốc thời gian (`SingleChartPane.jsx`):**
+       - Nâng nút `[ A ] [ L ]` lên vị trí `bottom: 4px`, chiều cao `17px`, rộng `19px`. Cạnh trên của nút thẳng tắp với đỉnh các con số `12:45` đúng như đường kẻ vàng của CEO, căn giữa hoàn hảo theo chiều dọc của thanh mốc thời gian.
+    3. **Tích hợp nút `⇅` đa năng (Click + Kéo) & Ẩn thanh resizer cũ (`App.jsx` & `index.css`):**
+       - Viết hàm `handleSplitBtnPointerDown` trên `btn-tab-split`:
+         - Di chuyển < 3px: Xử lý click thu gọn / mở rộng tab chung (`toggleSplitView`).
+         - Nắm kéo >= 3px: Kéo lên/xuống chia lại tỉ lệ `chartRatio` mượt mà trong thời gian thực.
+       - Ẩn hoàn toàn thanh resizer dày cũ (`.resizer.horizontal-resizer`), giải phóng 9px chiều cao biểu đồ.
+    4. **Điều chỉnh màu nền ô chọn sàn/quỹ đậm màu hơn so với nền ngoài (`SidebarLeft.jsx`):**
+       - Áp dụng màu nền tối đậm có chiều sâu (`rgba(18, 14, 6, 0.92)` cho OKX và `rgba(8, 14, 26, 0.92)` cho Quỹ FX) kết hợp bóng đổ chìm `boxShadow: inset 0 1px 4px rgba(0, 0, 0, 0.6)`. Nền bên trong ô tối và đậm hơn rõ rệt so với nền ngoài của Sidebar, làm nổi bật đường viền phát sáng và chữ.
+    5. Kiểm thử `npm run build` thành công code 0, không có lỗi runtime.
+
 - **[26/10/2026]** - Nâng Cấp Dropdown Nền Tảng (Sàn OKX / Quỹ FX) Chuẩn Pill Badge & Tinh Chỉnh Màu Sắc Đồng Nhất Cho Dashboard:
   - **Mô tả yêu cầu CEO:**
     1. Đưa phong cách thiết kế nút Kênh Logs (pill badge phát sáng, status dot, live badge) xuống thay thế dropdown native `Sàn OKX / Quỹ FX` ở thanh bên trái nhưng vẫn giữ dạng dropdown có menu chọn.

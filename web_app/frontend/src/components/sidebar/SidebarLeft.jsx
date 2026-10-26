@@ -14,6 +14,38 @@ const getTextWidth = (text, font = "600 12px 'Segoe UI', sans-serif") => {
   }
 };
 
+const OkxLogo = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="#ffffff"
+    style={{ flexShrink: 0, display: "inline-block", verticalAlign: "middle" }}
+  >
+    <rect x="3" y="3" width="5.4" height="5.4" rx="1.2" />
+    <rect x="15.6" y="3" width="5.4" height="5.4" rx="1.2" />
+    <rect x="9.3" y="9.3" width="5.4" height="5.4" rx="1.2" />
+    <rect x="3" y="15.6" width="5.4" height="5.4" rx="1.2" />
+    <rect x="15.6" y="15.6" width="5.4" height="5.4" rx="1.2" />
+  </svg>
+);
+
+const E8Logo = ({ size = 14 }) => (
+  <img
+    src="/e8_logo.png"
+    alt="E8"
+    style={{
+      width: `${size}px`,
+      height: `${size}px`,
+      objectFit: "contain",
+      flexShrink: 0,
+      display: "inline-block",
+      verticalAlign: "middle",
+      borderRadius: "2px",
+    }}
+  />
+);
+
 export default function SidebarLeft({
   activeBotTab,
   accounts = [],
@@ -302,26 +334,26 @@ export default function SidebarLeft({
                   fontWeight: 700,
                   cursor: "pointer",
                   transition: "all 0.18s ease",
-                  background: tradingPlatform === "okx" ? "rgba(245, 158, 11, 0.22)" : "rgba(59, 130, 246, 0.22)",
-                  border: tradingPlatform === "okx" ? "1px solid #f59e0b" : "1px solid #3b82f6",
+                  background: tradingPlatform === "okx" ? "rgba(18, 14, 6, 0.92)" : "rgba(8, 14, 26, 0.92)",
+                  border: tradingPlatform === "okx" ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid rgba(59, 130, 246, 0.45)",
                   color: tradingPlatform === "okx" ? "#fbbf24" : "#60a5fa",
-                  boxShadow: tradingPlatform === "okx" ? "0 0 10px rgba(245, 158, 11, 0.25)" : "0 0 10px rgba(59, 130, 246, 0.25)",
+                  boxShadow: "inset 0 1px 4px rgba(0, 0, 0, 0.6)",
                   outline: "none",
                 }}
-                title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ FX)"
+                title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ E8)"
               >
                 <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  <span
-                    style={{
-                      width: "7px",
-                      height: "7px",
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background: (tradingPlatform === "okx" ? isOkxRunning : isPropRunning) ? "#22c55e" : "#64748b",
-                      boxShadow: (tradingPlatform === "okx" ? isOkxRunning : isPropRunning) ? "0 0 7px #22c55e" : "none",
-                    }}
-                  />
-                  <span>{tradingPlatform === "okx" ? "🌐 SÀN OKX" : "🏆 QUỸ FX"}</span>
+                  {tradingPlatform === "okx" ? (
+                    <>
+                      <OkxLogo size={14} />
+                      <span>SÀN OKX</span>
+                    </>
+                  ) : (
+                    <>
+                      <E8Logo size={14} />
+                      <span>QUỸ E8</span>
+                    </>
+                  )}
                   {(tradingPlatform === "okx" ? isOkxRunning : isPropRunning) && (
                     <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>
                   )}
@@ -379,8 +411,8 @@ export default function SidebarLeft({
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
-                      background: tradingPlatform === "okx" ? "rgba(245, 158, 11, 0.22)" : "transparent",
-                      border: tradingPlatform === "okx" ? "1px solid #f59e0b" : "1px solid transparent",
+                      background: tradingPlatform === "okx" ? "rgba(18, 14, 6, 0.95)" : "transparent",
+                      border: tradingPlatform === "okx" ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid transparent",
                       color: tradingPlatform === "okx" ? "#fbbf24" : "#cbd5e1",
                       textAlign: "left",
                     }}
@@ -398,22 +430,14 @@ export default function SidebarLeft({
                     }}
                   >
                     <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <span
-                        style={{
-                          width: "7px",
-                          height: "7px",
-                          borderRadius: "50%",
-                          background: isOkxRunning ? "#22c55e" : "#64748b",
-                          boxShadow: isOkxRunning ? "0 0 7px #22c55e" : "none",
-                        }}
-                      />
-                      <span>🌐 SÀN OKX</span>
+                      <OkxLogo size={13} />
+                      <span>SÀN OKX</span>
                       {isOkxRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
                     </div>
                     {tradingPlatform === "okx" && <span style={{ fontSize: "11px", color: "#fbbf24" }}>✓</span>}
                   </button>
 
-                  {/* Mục 2: QUỸ FX (Tông Xanh dương) */}
+                  {/* Mục 2: QUỸ E8 (Tông Xanh dương) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -431,8 +455,8 @@ export default function SidebarLeft({
                       fontWeight: 700,
                       cursor: "pointer",
                       transition: "all 0.15s ease",
-                      background: tradingPlatform === "e8" ? "rgba(59, 130, 246, 0.22)" : "transparent",
-                      border: tradingPlatform === "e8" ? "1px solid #3b82f6" : "1px solid transparent",
+                      background: tradingPlatform === "e8" ? "rgba(8, 14, 26, 0.95)" : "transparent",
+                      border: tradingPlatform === "e8" ? "1px solid rgba(59, 130, 246, 0.45)" : "1px solid transparent",
                       color: tradingPlatform === "e8" ? "#60a5fa" : "#cbd5e1",
                       textAlign: "left",
                     }}
@@ -450,16 +474,8 @@ export default function SidebarLeft({
                     }}
                   >
                     <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <span
-                        style={{
-                          width: "7px",
-                          height: "7px",
-                          borderRadius: "50%",
-                          background: isPropRunning ? "#22c55e" : "#64748b",
-                          boxShadow: isPropRunning ? "0 0 7px #22c55e" : "none",
-                        }}
-                      />
-                      <span>🏆 QUỸ FX</span>
+                      <E8Logo size={13} />
+                      <span>QUỸ E8</span>
                       {isPropRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
                     </div>
                     {tradingPlatform === "e8" && <span style={{ fontSize: "11px", color: "#60a5fa" }}>✓</span>}
@@ -730,9 +746,10 @@ export default function SidebarLeft({
                 )}
                 {accounts.map((acc) => {
                   const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
-                  const isRunningThisBot = isRunning && (acc.id === effectiveAccId || acc.name === effectiveAccId || runningBotKey === activeBotTab);
+                  const isThisBotAccount = (acc.id === effectiveAccId || acc.name === effectiveAccId);
+                  const isRunningThisBot = isRunning && (isThisBotAccount || runningBotKey === activeBotTab);
                   const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
-                  const assignedOtherBot = Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
+                  const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
 
                   const getTargetBotName = (key) => {
                     if (key === "sub1") return t("bot_ema200");

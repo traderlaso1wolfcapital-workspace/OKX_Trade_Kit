@@ -83,7 +83,23 @@ function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === "object") return parsed;
+        if (parsed && typeof parsed === "object") {
+          const curBot = localStorage.getItem("tls1_active_bot_tab") || "sub1";
+          const curAcc = parsed[curBot];
+          if (curAcc) {
+            let changed = false;
+            for (const b in parsed) {
+              if (b !== curBot && parsed[b] === curAcc) {
+                parsed[b] = "";
+                changed = true;
+              }
+            }
+            if (changed) {
+              try { localStorage.setItem("tls1_bot_accounts", JSON.stringify(parsed)); } catch {}
+            }
+          }
+          return parsed;
+        }
       } catch { }
     }
     return {};
@@ -155,8 +171,16 @@ function App() {
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
     setBotAccountMap(prev => {
-      const next = { ...prev, [activeBotTab]: accId };
-      localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+      const next = { ...prev };
+      if (accId) {
+        for (const b in next) {
+          if (b !== activeBotTab && next[b] === accId) {
+            next[b] = "";
+          }
+        }
+      }
+      next[activeBotTab] = accId;
+      try { localStorage.setItem("tls1_bot_accounts", JSON.stringify(next)); } catch {}
       return next;
     });
 
@@ -384,6 +408,69 @@ function App() {
       setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
       return next;
     });
+  };
+
+  const handleSplitBtnPointerDown = (e) => {
+    if (e.button && e.button !== 0) return;
+    const isTouch = e.type === "touchstart";
+    const startY = isTouch ? e.touches[0].clientY : e.clientY;
+    let hasMoved = false;
+
+    if (!isSplitView) {
+      toggleSplitView();
+      return;
+    }
+
+    if (e.cancelable && isTouch) e.preventDefault();
+
+    const doDrag = (dragEvent) => {
+      const clientY = isTouch ? dragEvent.touches[0].clientY : dragEvent.clientY;
+      const diffY = Math.abs(clientY - startY);
+      if (!hasMoved && diffY >= 3) {
+        hasMoved = true;
+        document.body.classList.add("is-resizing");
+        document.body.classList.add("is-resizing-vertical");
+      }
+      if (hasMoved) {
+        if (isTouch && dragEvent.cancelable) dragEvent.preventDefault();
+        const workspace = document.querySelector(".main-workspace");
+        if (!workspace) return;
+        const rect = workspace.getBoundingClientRect();
+        let newRatio = ((clientY - rect.top) / rect.height) * 100;
+        if (newRatio < 15) newRatio = 15;
+        if (newRatio > 85) newRatio = 85;
+        setChartRatio(newRatio);
+        localStorage.setItem("tls1_chart_ratio", String(newRatio));
+      }
+    };
+
+    const stopDrag = () => {
+      if (hasMoved) {
+        document.body.classList.remove("is-resizing");
+        document.body.classList.remove("is-resizing-vertical");
+        window.dispatchEvent(new Event("resize"));
+      } else {
+        toggleSplitView();
+      }
+
+      if (isTouch) {
+        document.removeEventListener("touchmove", doDrag);
+        document.removeEventListener("touchend", stopDrag);
+        document.removeEventListener("touchcancel", stopDrag);
+      } else {
+        document.removeEventListener("mousemove", doDrag);
+        document.removeEventListener("mouseup", stopDrag);
+      }
+    };
+
+    if (isTouch) {
+      document.addEventListener("touchmove", doDrag, { passive: false });
+      document.addEventListener("touchend", stopDrag);
+      document.addEventListener("touchcancel", stopDrag);
+    } else {
+      document.addEventListener("mousemove", doDrag);
+      document.addEventListener("mouseup", stopDrag);
+    }
   };
 
   const startResizing = (e) => {
@@ -2881,13 +2968,6 @@ function App() {
                         ))}
                       </div>
                     </section>
-
-                    {/* Resizer thanh kéo giữa Biểu Đồ và Bảng Vị Thế */}
-                    <div
-                      className={`resizer ${layoutMode === "vertical" ? "horizontal-resizer" : "vertical-resizer"}`}
-                      onMouseDown={startResizing}
-                      onTouchStart={startResizing}
-                    />
                   </>
                 )}
 
@@ -2920,8 +3000,10 @@ function App() {
                     <button
                       type="button"
                       className={`btn-tab-split ${isSplitView ? "active" : ""}`}
-                      onClick={toggleSplitView}
-                      title={isSplitView ? "Thu gọn về dạng Tab chung" : "Tách Biểu Đồ lên trên và Bảng Vị Thế xuống dưới (Chia đôi màn hình)"}
+                      onMouseDown={handleSplitBtnPointerDown}
+                      onTouchStart={handleSplitBtnPointerDown}
+                      onClick={(e) => e.preventDefault()}
+                      title={isSplitView ? "Click: Thu gọn về Tab chung | Nắm kéo: Phân chia tỉ lệ biểu đồ và bảng" : "Tách Biểu Đồ lên trên và Bảng Vị Thế xuống dưới (Chia đôi màn hình)"}
                     >
                       ⮃
                     </button>
@@ -3224,12 +3306,12 @@ function App() {
         onClose={() => setShowStopBotModal(false)}
         botName={
           currentPlatform === "e8"
-            ? `${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} (Quỹ FX)`
+            ? `${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} (Quỹ E8)`
             : (activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot")
         }
         accountName={
           currentPlatform === "e8"
-            ? "Quỹ FX (TradeLocker)"
+            ? "Quỹ E8 (TradeLocker)"
             : (accounts.find(a => a.id === (selectedAccount || effectiveAccId))?.name || (selectedAccount || effectiveAccId || "Mặc định"))
         }
         isLoading={currentPlatform === "e8" ? isStoppingPropBot : isStoppingBot}
