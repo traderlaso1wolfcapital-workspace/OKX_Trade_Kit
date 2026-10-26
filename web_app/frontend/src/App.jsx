@@ -2688,6 +2688,8 @@ function App() {
           risk={risk}
           setRisk={setRisk}
           isRunning={isRunning}
+          isOkxRunning={isOkxRunning}
+          isPropRunning={isPropRunning}
           onToggleMultiplyVolume={handleToggleMultiplyVolume}
           onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
         />

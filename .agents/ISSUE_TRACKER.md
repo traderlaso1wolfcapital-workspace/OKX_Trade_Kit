@@ -33,6 +33,33 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/10/2026]** - Nâng Cấp Dropdown Nền Tảng (Sàn OKX / Quỹ FX) Chuẩn Pill Badge & Tinh Chỉnh Màu Sắc Đồng Nhất Cho Dashboard:
+  - **Mô tả yêu cầu CEO:**
+    1. Đưa phong cách thiết kế nút Kênh Logs (pill badge phát sáng, status dot, live badge) xuống thay thế dropdown native `Sàn OKX / Quỹ FX` ở thanh bên trái nhưng vẫn giữ dạng dropdown có menu chọn.
+    2. Đổi màu sắc cho nhau giữa Sàn OKX (chuyển sang tông Vàng Gold `#fbbf24`) và Quỹ FX (chuyển sang tông Xanh dương `#60a5fa`).
+    3. Ẩn toàn bộ dòng thanh điều hướng Kênh Logs (gồm Sàn OKX, Quỹ FX và nút Sao chép) để tiết kiệm tối đa diện tích dọc cho màn hình console logs, do nền tảng đã được chuyển xuống dropdown bên trái.
+    4. Đặt lại nút Sao chép dưới dạng float nổi ở góc trên bên phải console logs, không chiếm diện tích hàng.
+    5. Tinh chỉnh màu Dashboard: đồng nhất một sắc thái màu cho từng hạng mục (không chia đậm/nhạt để tránh rối mắt); giữ `Vol :` ở màu xám mặc định như các chỉ số khác.
+    6. Lọc bỏ dòng đầu hiển thị đường dẫn file hệ thống `bot_sub*.py ...` (không cần thiết trên giao diện Web).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Custom Dropdown Nền Tảng (`SidebarLeft.jsx`):**
+       - Thay thế `<select>` native bằng container dropdown tương tác phản hồi với `isPlatformMenuOpen` và click-outside detector.
+       - Tráo đổi màu: Sàn OKX dùng viền và chữ vàng `#f59e0b` / `#fbbf24`, Quỹ FX dùng viền và chữ xanh `#3b82f6` / `#60a5fa`.
+       - Tích hợp menu thả xuống bóng mờ dark glassmorphism, hiển thị danh sách nền tảng kèm dấu tích `✓` và hover glow.
+       - Lắng nghe sự kiện `tls1_platform_changed` hai chiều để đồng bộ hoàn hảo với Kênh Logs.
+       - `App.jsx` truyền `isOkxRunning` và `isPropRunning` sang `SidebarLeft`.
+    2. **Bộ Lọc Màu Số Liệu Dashboard & Tối Ưu Diện Tích (`LogsTerminal.jsx`):**
+       - Hàm `renderDashboardLine()` tự động nhận diện và tô màu đồng nhất theo cột:
+         - `Gốc:` Đồng nhất 1 sắc thái Cyan/Blue `#38bdf8`.
+         - `Tổng:` Đồng nhất 1 sắc thái Vàng Gold `#fbbf24`.
+         - `PNL:` Đồng nhất 1 sắc thái Xanh lá `#4ade80` (khi dương) hoặc Đỏ Rose `#f87171` (khi âm).
+         - `Vol :` Giữ màu xám mặc định như các cột thông số khác.
+       - Loại bỏ hoàn toàn khối `logs-terminal-nav` giúp giải phóng ~40px chiều cao cho màn hình Terminal.
+       - Chuyển nút `📋 Sao chép` thành nút nổi góc phải (`position: absolute`, `top: 8px, right: 12px`), không tốn bất kỳ pixel chiều cao nào.
+       - Lọc bỏ dòng đầu `bot_sub*.py ...` bằng `cleanDashboardLines` trên giao diện Web và khi copy logs, giúp bảng dashboard bắt đầu ngay từ khung viền `=================` sạch đẹp.
+       - Duy trì cấu trúc text và khoảng trắng monospace tuyệt đối để giữ nguyên căn lề bảng `|`.
+    3. Đã chạy `npm run build` nghiệm thu bundle dist thành công.
+
 - **[25/10/2026]** - Sửa Lỗi Cloudflare 502 Bad Gateway (Lệch Cổng 5173 / 8080 & Crash Backend) Khi Deploy Lên Máy Mac Mini M1:
   - **Mô tả hiện tượng:**
     Khi CEO chạy lệnh `git pull origin main && bash start_web_server.sh` trên terminal máy Mac Mini M1 để cập nhật bản web mới, truy cập domain `https://autotrader.fun` bị lỗi Cloudflare `Bad gateway - Error code 502 (Host Error)`.

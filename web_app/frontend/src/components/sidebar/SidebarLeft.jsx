@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import NumberSpinBox from "../common/NumberSpinBox";
 import { useTranslation } from "../../i18n";
 
@@ -30,6 +30,8 @@ export default function SidebarLeft({
   risk,
   setRisk,
   isRunning = false,
+  isOkxRunning = false,
+  isPropRunning = false,
   onToggleMultiplyVolume,
   onOpenConnectModal,
 }) {
@@ -169,6 +171,31 @@ export default function SidebarLeft({
     };
   }, []);
 
+  const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
+  const platformDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (platformDropdownRef.current && !platformDropdownRef.current.contains(e.target)) {
+        setIsPlatformMenuOpen(false);
+      }
+    };
+    if (isPlatformMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isPlatformMenuOpen]);
+
+  useEffect(() => {
+    const handlePlatformChange = (e) => {
+      if (e.detail && (e.detail === "okx" || e.detail === "e8")) {
+        setTradingPlatform(e.detail);
+      }
+    };
+    window.addEventListener("tls1_platform_changed", handlePlatformChange);
+    return () => window.removeEventListener("tls1_platform_changed", handlePlatformChange);
+  }, []);
+
   const handlePlatformSwitch = (platform) => {
     setTradingPlatform(platform);
     localStorage.setItem("tls1_trading_platform", platform);
@@ -256,38 +283,190 @@ export default function SidebarLeft({
 
           {/* HÀNG 1: NGANG HÀNG NÚT SÀN/QUỸ, HƯỚNG DẪN VÀ CÀI ĐẶT */}
           <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
-            {/* Dropdown Nền Tảng: SÀN OKX / QUỸ E8 */}
-            <select
-              data-tour="platform-select"
-              value={tradingPlatform}
-              onChange={(e) => handlePlatformSwitch(e.target.value)}
-              className="styled-select"
-              style={{
-                flex: 1,
-                minWidth: 0,
-                height: "30px",
-                backgroundColor: "#181818",
-                border: "1px solid #383838",
-                borderRadius: "5px",
-                padding: "4px 24px 4px 10px",
-                fontSize: "12px",
-                fontWeight: "bold",
-                color: "#ffffff",
-                cursor: "pointer",
-                outline: "none",
-                transition: "all 0.15s ease",
-                appearance: "none",
-                WebkitAppearance: "none",
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 8px center",
-                backgroundSize: "13px 13px",
-              }}
-              title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ FX)"
-            >
-              <option value="okx" style={{ background: "#1e1e1e", color: "#ffffff" }}>Sàn OKX</option>
-              <option value="e8" style={{ background: "#1e1e1e", color: "#ffffff" }}>Quỹ FX</option>
-            </select>
+            {/* Custom Dropdown Nền Tảng: SÀN OKX / QUỸ FX (Thiết kế phong cách Pill Badge phát sáng đồng bộ Kênh Logs) */}
+            <div ref={platformDropdownRef} style={{ position: "relative", flex: 1, minWidth: 0 }}>
+              <button
+                type="button"
+                data-tour="platform-select"
+                onClick={() => setIsPlatformMenuOpen(!isPlatformMenuOpen)}
+                style={{
+                  width: "100%",
+                  height: "30px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "6px",
+                  padding: "0 8px 0 10px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  transition: "all 0.18s ease",
+                  background: tradingPlatform === "okx" ? "rgba(245, 158, 11, 0.22)" : "rgba(59, 130, 246, 0.22)",
+                  border: tradingPlatform === "okx" ? "1px solid #f59e0b" : "1px solid #3b82f6",
+                  color: tradingPlatform === "okx" ? "#fbbf24" : "#60a5fa",
+                  boxShadow: tradingPlatform === "okx" ? "0 0 10px rgba(245, 158, 11, 0.25)" : "0 0 10px rgba(59, 130, 246, 0.25)",
+                  outline: "none",
+                }}
+                title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ FX)"
+              >
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      background: (tradingPlatform === "okx" ? isOkxRunning : isPropRunning) ? "#22c55e" : "#64748b",
+                      boxShadow: (tradingPlatform === "okx" ? isOkxRunning : isPropRunning) ? "0 0 7px #22c55e" : "none",
+                    }}
+                  />
+                  <span>{tradingPlatform === "okx" ? "🌐 SÀN OKX" : "🏆 QUỸ FX"}</span>
+                  {(tradingPlatform === "okx" ? isOkxRunning : isPropRunning) && (
+                    <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>
+                  )}
+                </div>
+                <span
+                  style={{
+                    fontSize: "9px",
+                    color: tradingPlatform === "okx" ? "#fbbf24" : "#60a5fa",
+                    transform: isPlatformMenuOpen ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s ease",
+                    flexShrink: 0,
+                    marginLeft: "4px",
+                  }}
+                >
+                  ▼
+                </span>
+              </button>
+
+              {/* Popup Menu Danh Sách Lựa Chọn */}
+              {isPlatformMenuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    width: "100%",
+                    minWidth: "170px",
+                    zIndex: 100,
+                    background: "rgba(15, 23, 42, 0.96)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    borderRadius: "7px",
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
+                    padding: "4px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  {/* Mục 1: SÀN OKX (Tông Vàng Gold) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePlatformSwitch("okx");
+                      setIsPlatformMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      padding: "6px 8px",
+                      borderRadius: "5px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      background: tradingPlatform === "okx" ? "rgba(245, 158, 11, 0.22)" : "transparent",
+                      border: tradingPlatform === "okx" ? "1px solid #f59e0b" : "1px solid transparent",
+                      color: tradingPlatform === "okx" ? "#fbbf24" : "#cbd5e1",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (tradingPlatform !== "okx") {
+                        e.currentTarget.style.background = "rgba(245, 158, 11, 0.12)";
+                        e.currentTarget.style.color = "#fde68a";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (tradingPlatform !== "okx") {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "#cbd5e1";
+                      }
+                    }}
+                  >
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: isOkxRunning ? "#22c55e" : "#64748b",
+                          boxShadow: isOkxRunning ? "0 0 7px #22c55e" : "none",
+                        }}
+                      />
+                      <span>🌐 SÀN OKX</span>
+                      {isOkxRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
+                    </div>
+                    {tradingPlatform === "okx" && <span style={{ fontSize: "11px", color: "#fbbf24" }}>✓</span>}
+                  </button>
+
+                  {/* Mục 2: QUỸ FX (Tông Xanh dương) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePlatformSwitch("e8");
+                      setIsPlatformMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      padding: "6px 8px",
+                      borderRadius: "5px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      background: tradingPlatform === "e8" ? "rgba(59, 130, 246, 0.22)" : "transparent",
+                      border: tradingPlatform === "e8" ? "1px solid #3b82f6" : "1px solid transparent",
+                      color: tradingPlatform === "e8" ? "#60a5fa" : "#cbd5e1",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (tradingPlatform !== "e8") {
+                        e.currentTarget.style.background = "rgba(59, 130, 246, 0.12)";
+                        e.currentTarget.style.color = "#93c5fd";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (tradingPlatform !== "e8") {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "#cbd5e1";
+                      }
+                    }}
+                  >
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: isPropRunning ? "#22c55e" : "#64748b",
+                          boxShadow: isPropRunning ? "0 0 7px #22c55e" : "none",
+                        }}
+                      />
+                      <span>🏆 QUỸ FX</span>
+                      {isPropRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
+                    </div>
+                    {tradingPlatform === "e8" && <span style={{ fontSize: "11px", color: "#60a5fa" }}>✓</span>}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* 1. Nút Hướng Dẫn (nổi bật, đặt trước Cài Đặt, kích thước chuẩn bằng nút Cài Đặt) */}
             <button

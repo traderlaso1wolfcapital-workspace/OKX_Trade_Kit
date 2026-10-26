@@ -56,6 +56,45 @@ export default function LogsTerminal({
     return s;
   };
 
+  // 🎨 Định dạng màu sắc đồng nhất theo từng chủ đề cho Gốc, Tổng, PNL (không chia đậm/nhạt, Vol để màu xám chuẩn)
+  const renderDashboardLine = (line) => {
+    if (!line || typeof line !== "string") return line;
+
+    const hasGoc = line.includes("Gốc:");
+    const hasTong = line.includes("Tổng:");
+    const hasPnl = line.includes("PNL:");
+
+    if (!hasGoc && !hasTong && !hasPnl) {
+      return line;
+    }
+
+    const parts = line.split("|");
+    if (parts.length <= 1) return line;
+
+    return parts.map((col, idx) => {
+      let content = col;
+
+      if (col.includes("Gốc:")) {
+        // Gốc -> Đồng nhất sắc thái Cyan/Blue (#38bdf8)
+        content = <span style={{ color: "#38bdf8" }}>{col}</span>;
+      } else if (col.includes("Tổng:")) {
+        // Tổng -> Đồng nhất sắc thái Vàng Gold (#fbbf24)
+        content = <span style={{ color: "#fbbf24" }}>{col}</span>;
+      } else if (col.includes("PNL:")) {
+        // PNL -> Đồng nhất sắc thái: Xanh lá nếu dương (#4ade80), Đỏ nếu âm (#f87171)
+        const isNegative = col.includes("-");
+        content = <span style={{ color: isNegative ? "#f87171" : "#4ade80" }}>{col}</span>;
+      }
+
+      return (
+        <React.Fragment key={idx}>
+          {idx > 0 && <span style={{ color: "#475569" }}>|</span>}
+          {content}
+        </React.Fragment>
+      );
+    });
+  };
+
   // 📱 Tự động co dãn (Auto-Fit) kích thước chữ vừa khít 2 viền màn hình trên Mobile / iPhone Safari
   useEffect(() => {
     const el = terminalRef.current;
@@ -290,18 +329,28 @@ export default function LogsTerminal({
     return { dashboardLines: [], eventLogs: [] };
   }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs]);
 
+  // 🧹 Lọc bỏ dòng đường dẫn file hệ thống cục bộ bot_sub*.py (không cần thiết trên giao diện Web)
+  const cleanDashboardLines = React.useMemo(() => {
+    return dashboardLines.filter(l => 
+      !l.includes("bot_sub1.py") && 
+      !l.includes("bot_sub2.py") && 
+      !l.includes("bot_sub3.py") && 
+      !l.includes("sys_bot_")
+    );
+  }, [dashboardLines]);
+
   // Giữ vị trí cuộn đầu trang khi nạp Dashboard lần đầu
   const hasInitializedScrollRef = useRef(false);
   useEffect(() => {
-    if (!hasInitializedScrollRef.current && dashboardLines.length > 0 && terminalRef.current) {
+    if (!hasInitializedScrollRef.current && cleanDashboardLines.length > 0 && terminalRef.current) {
       terminalRef.current.scrollTop = 0;
       hasInitializedScrollRef.current = true;
     }
-  }, [dashboardLines.length]);
+  }, [cleanDashboardLines.length]);
 
   const handleCopy = () => {
     const parts = [];
-    if (dashboardLines.length > 0) parts.push(dashboardLines.join("\n"));
+    if (cleanDashboardLines.length > 0) parts.push(cleanDashboardLines.join("\n"));
     if (eventLogs.length > 0) parts.push("--- " + t("log_events_title", "NHẬT KÝ SỰ KIỆN TỨC THỜI") + " ---\n" + eventLogs.join("\n"));
     navigator.clipboard.writeText(parts.join("\n\n")).then(() => {
       alert(t("log_copied", "Đã sao chép toàn bộ logs vào Clipboard!"));
@@ -314,113 +363,42 @@ export default function LogsTerminal({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
-      {/* 🧭 THANH ĐIỀU HƯỚNG TÁCH BIỆT KÊNH LOGS (SÀN OKX / QUỸ FX) */}
-      <div
-        className="logs-terminal-nav"
+      {/* Nút Sao chép Logs nổi gọn gàng ở góc trên bên phải, không chiếm diện tích dòng thanh công cụ */}
+      <button
+        type="button"
+        onClick={handleCopy}
         style={{
-          display: "flex",
+          position: "absolute",
+          top: "8px",
+          right: "12px",
+          zIndex: 10,
+          padding: "3px 10px",
+          borderRadius: "5px",
+          background: "rgba(255, 255, 255, 0.08)",
+          backdropFilter: "blur(6px)",
+          border: "1px solid rgba(255, 255, 255, 0.15)",
+          color: "#cbd5e1",
+          fontSize: "11px",
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "inline-flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          padding: "7px 12px",
-          background: "rgba(15, 23, 42, 0.85)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-          flexShrink: 0,
-          gap: "8px",
-          flexWrap: "wrap",
+          gap: "5px",
+          transition: "all 0.15s ease",
+          opacity: 0.85,
         }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1";
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0.85";
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+        }}
+        title={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            {t("log_channel_label", "Kênh Logs:")}
-          </span>
-
-          {/* Nút Tab Kênh Sàn OKX */}
-          <button
-            type="button"
-            onClick={() => onSwitchPlatform && onSwitchPlatform("okx")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "4px 11px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              background: currentPlatform === "okx" ? "rgba(59, 130, 246, 0.22)" : "rgba(255, 255, 255, 0.04)",
-              border: currentPlatform === "okx" ? "1px solid #3b82f6" : "1px solid rgba(255, 255, 255, 0.1)",
-              color: currentPlatform === "okx" ? "#60a5fa" : "#94a3b8",
-            }}
-          >
-            <span
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                background: isOkxRunning ? "#22c55e" : "#64748b",
-                boxShadow: isOkxRunning ? "0 0 7px #22c55e" : "none",
-              }}
-            />
-            <span>🌐 SÀN OKX</span>
-            {isOkxRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
-          </button>
-
-          {/* Nút Tab Kênh Quỹ FX (TradeLocker) */}
-          <button
-            type="button"
-            onClick={() => onSwitchPlatform && onSwitchPlatform("e8")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "4px 11px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: 700,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              background: currentPlatform === "e8" ? "rgba(245, 158, 11, 0.22)" : "rgba(255, 255, 255, 0.04)",
-              border: currentPlatform === "e8" ? "1px solid #f59e0b" : "1px solid rgba(255, 255, 255, 0.1)",
-              color: currentPlatform === "e8" ? "#fbbf24" : "#94a3b8",
-            }}
-          >
-            <span
-              style={{
-                width: "7px",
-                height: "7px",
-                borderRadius: "50%",
-                background: isPropRunning ? "#22c55e" : "#64748b",
-                boxShadow: isPropRunning ? "0 0 7px #22c55e" : "none",
-              }}
-            />
-            <span>🏆 QUỸ FX (TRADELOCKER)</span>
-            {isPropRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
-          </button>
-        </div>
-
-        {/* Nút Sao chép Logs */}
-        <button
-          type="button"
-          onClick={handleCopy}
-          style={{
-            padding: "4px 10px",
-            borderRadius: "5px",
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            color: "#cbd5e1",
-            fontSize: "11px",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "5px",
-            transition: "all 0.15s ease",
-          }}
-          title={t("log_copy_tooltip", "Sao chép toàn bộ logs của kênh đang chọn")}
-        >
-          📋 {t("log_copy_btn", "Sao chép")}
-        </button>
-      </div>
+        📋 {t("log_copy_btn", "Sao chép")}
+      </button>
 
       {/* Vùng hiển thị Logs Terminal */}
       <div
@@ -436,14 +414,14 @@ export default function LogsTerminal({
           ...fitStyles,
         }}
       >
-        {dashboardLines.length === 0 && eventLogs.length === 0 ? (
+        {cleanDashboardLines.length === 0 && eventLogs.length === 0 ? (
           <div style={{ color: "#666", padding: "16px 0", fontStyle: "italic" }}>
             {t("log_waiting", "Đang đợi dữ liệu console từ bot {name}...").replace("{name}", displayBotName)}
           </div>
         ) : (
           <>
             {/* 1. KHU VỰC BẢNG TRẠNG THÁI DASHBOARD (CỐ ĐỊNH Ở TRÊN CÙNG - KHÔNG BAO GIỜ BỊ ĐẨY XUỐNG) */}
-            {dashboardLines.length > 0 && (
+            {cleanDashboardLines.length > 0 && (
               <div
                 className="log-dashboard-block"
                 style={{
@@ -453,7 +431,7 @@ export default function LogsTerminal({
                   WebkitTextSizeAdjust: "none",
                 }}
               >
-                {dashboardLines.map((l, i) => (
+                {cleanDashboardLines.map((l, i) => (
                   <div
                     key={i}
                     className="log-line"
@@ -465,7 +443,7 @@ export default function LogsTerminal({
                       WebkitTextSizeAdjust: "none",
                     }}
                   >
-                    {l}
+                    {renderDashboardLine(l)}
                   </div>
                 ))}
               </div>
@@ -476,16 +454,16 @@ export default function LogsTerminal({
               <div
                 className="log-events-block"
                 style={{
-                  marginTop: dashboardLines.length > 0 ? "14px" : "0",
-                  paddingTop: dashboardLines.length > 0 ? "10px" : "0",
-                  borderTop: dashboardLines.length > 0 ? "1px dashed rgba(255, 255, 255, 0.15)" : "none",
+                  marginTop: cleanDashboardLines.length > 0 ? "14px" : "0",
+                  paddingTop: cleanDashboardLines.length > 0 ? "10px" : "0",
+                  borderTop: cleanDashboardLines.length > 0 ? "1px dashed rgba(255, 255, 255, 0.15)" : "none",
                   minWidth: "fit-content",
                   fontSize: "inherit",
                   letterSpacing: "inherit",
                   WebkitTextSizeAdjust: "none",
                 }}
               >
-                {dashboardLines.length > 0 && (
+                {cleanDashboardLines.length > 0 && (
                   <div
                     style={{
                       fontSize: "11px",
