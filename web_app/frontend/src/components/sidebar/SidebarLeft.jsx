@@ -206,17 +206,23 @@ export default function SidebarLeft({
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
   const platformDropdownRef = useRef(null);
 
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountDropdownRef = useRef(null);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (platformDropdownRef.current && !platformDropdownRef.current.contains(e.target)) {
         setIsPlatformMenuOpen(false);
       }
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target)) {
+        setIsAccountMenuOpen(false);
+      }
     };
-    if (isPlatformMenuOpen) {
+    if (isPlatformMenuOpen || isAccountMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isPlatformMenuOpen]);
+  }, [isPlatformMenuOpen, isAccountMenuOpen]);
 
   useEffect(() => {
     const handlePlatformChange = (e) => {
@@ -584,72 +590,163 @@ export default function SidebarLeft({
 
             {tradingPlatform === "e8" ? (
               propAccounts.length > 0 ? (
-                /* Luôn hiển thị Dropdown Select tài khoản Quỹ FX */
-                <select
-                  className="styled-select"
-                  disabled={isRunning}
-                  style={{
-                    width: "auto",
-                    maxWidth: "100%",
-                    flexShrink: 0,
-                    background: isRunning ? "#1a1a1a" : "#2d2d2d",
-                    border: isRunning ? "1px solid #444444" : "1px solid #555555",
-                    color: isRunning ? "#888888" : "#ffffff",
-                    padding: "4px 24px 4px 8px",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                    height: "30px",
-                    outline: "none",
-                    cursor: isRunning ? "not-allowed" : "pointer",
-                    opacity: isRunning ? 0.65 : 1,
-                    transition: "all 0.2s ease",
-                    textAlign: "right",
-                    textAlignLast: "right",
-                    direction: "ltr",
-                    appearance: "none",
-                    WebkitAppearance: "none",
-                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "right 6px center",
-                    backgroundSize: "13px 13px",
-                  }}
-                  value={activePropId || (propAccounts[0] && propAccounts[0].id) || ""}
-                  onChange={(e) => {
-                    if (e.target.value === "__connect__") {
-                      onOpenConnectModal && onOpenConnectModal("tradelocker");
-                    } else {
-                      handleSelectPropAccount(e.target.value);
-                    }
-                  }}
-                  title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi Quỹ!" : "Chọn tài khoản Quỹ để giao dịch"}
-                >
-                  {propAccounts.map((acc) => (
-                    <option
-                      key={acc.id}
-                      value={acc.id}
-                      style={{
-                        background: "#1e1e1e",
-                        color: "#ffffff",
-                        textAlign: "right",
-                        padding: "6px 18px 6px 10px",
-                      }}
-                    >
-                      {acc.name || `Quỹ ${acc.firm} #${acc.account_id}`} (${Number(acc.balance || 0).toLocaleString()})
-                    </option>
-                  ))}
-                  <option
-                    value="__connect__"
-                    style={{
-                      background: "#1e1e1e",
-                      color: "#00e676",
-                      textAlign: "right",
-                      padding: "6px 18px 6px 10px",
-                    }}
-                  >
-                    + Kết nối thêm Quỹ mới...
-                  </option>
-                </select>
+                /* Custom Dropdown tài khoản Quỹ E8 */
+                <div ref={accountDropdownRef} style={{ position: "relative", flexShrink: 0 }}>
+                  {(() => {
+                    const curPropAcc = propAccounts.find((a) => a.id === activePropId) || propAccounts[0];
+                    const propDisplayText = curPropAcc
+                      ? `${curPropAcc.name || `Quỹ ${curPropAcc.firm} #${curPropAcc.account_id}`} ($${Number(curPropAcc.balance || 0).toLocaleString()})`
+                      : "Chọn Quỹ";
+
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => {
+                            if (!isRunning) setIsAccountMenuOpen(!isAccountMenuOpen);
+                          }}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "8px",
+                            background: isRunning ? "#1a1a1a" : "#2d2d2d",
+                            border: isRunning ? "1px solid #444444" : "1px solid #555555",
+                            color: isRunning ? "#888888" : "#ffffff",
+                            padding: "4px 8px 4px 10px",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            height: "30px",
+                            outline: "none",
+                            cursor: isRunning ? "not-allowed" : "pointer",
+                            opacity: isRunning ? 0.65 : 1,
+                            transition: "all 0.18s ease",
+                            maxWidth: "190px",
+                            boxSizing: "border-box",
+                          }}
+                          title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi Quỹ!" : "Chọn tài khoản Quỹ để giao dịch"}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {propDisplayText}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "9px",
+                              color: isRunning ? "#666666" : "#aaaaaa",
+                              transform: isAccountMenuOpen ? "rotate(180deg)" : "none",
+                              transition: "transform 0.2s ease",
+                              flexShrink: 0,
+                            }}
+                          >
+                            ▼
+                          </span>
+                        </button>
+
+                        {isAccountMenuOpen && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: "calc(100% + 4px)",
+                              right: 0,
+                              minWidth: "200px",
+                              maxWidth: "280px",
+                              zIndex: 110,
+                              background: "rgba(26, 26, 26, 0.98)",
+                              backdropFilter: "blur(8px)",
+                              border: "1px solid #444444",
+                              borderRadius: "6px",
+                              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
+                              padding: "4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "3px",
+                              maxHeight: "220px",
+                              overflowY: "auto",
+                            }}
+                          >
+                            {propAccounts.map((acc) => {
+                              const isSelected = acc.id === (activePropId || propAccounts[0]?.id);
+                              return (
+                                <button
+                                  key={acc.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleSelectPropAccount(acc.id);
+                                    setIsAccountMenuOpen(false);
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                    width: "100%",
+                                    padding: "6px 10px",
+                                    borderRadius: "4px",
+                                    fontSize: "11.5px",
+                                    fontWeight: isSelected ? 700 : 500,
+                                    cursor: "pointer",
+                                    background: isSelected ? "rgba(255, 255, 255, 0.1)" : "transparent",
+                                    border: "none",
+                                    color: isSelected ? "#ffffff" : "#d1d5db",
+                                    textAlign: "left",
+                                    transition: "background 0.15s ease",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                                      e.currentTarget.style.color = "#ffffff";
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) {
+                                      e.currentTarget.style.background = "transparent";
+                                      e.currentTarget.style.color = "#d1d5db";
+                                    }
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {acc.name || `Quỹ ${acc.firm} #${acc.account_id}`} (${Number(acc.balance || 0).toLocaleString()})
+                                  </span>
+                                  {isSelected && <span style={{ fontSize: "11px", color: "#00e676", fontWeight: "bold" }}>✓</span>}
+                                </button>
+                              );
+                            })}
+                            <div style={{ height: "1px", background: "#3a3a3a", margin: "2px 0" }} />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAccountMenuOpen(false);
+                                onOpenConnectModal && onOpenConnectModal("tradelocker");
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                width: "100%",
+                                padding: "6px 10px",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                background: "transparent",
+                                border: "none",
+                                color: "#00e676",
+                                textAlign: "left",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 230, 118, 0.12)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                            >
+                              <span>+</span>
+                              <span>Kết nối thêm Quỹ mới...</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
               ) : (
                 /* Chưa có tài khoản Quỹ */
                 <div
@@ -689,98 +786,208 @@ export default function SidebarLeft({
                 </div>
               )
             ) : (
-              <select
-                className="styled-select"
-                disabled={isRunning}
-                style={{
-                  width: "auto",
-                  maxWidth: "100%",
-                  flexShrink: 0,
-                  background: isRunning ? "#1a1a1a" : "#2d2d2d",
-                  border: isRunning ? "1px solid #444444" : "1px solid #555555",
-                  color: isRunning ? "#888888" : "#e0e0e0",
-                  padding: "4px 24px 4px 8px",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  height: "30px",
-                  outline: "none",
-                  cursor: isRunning ? "not-allowed" : "pointer",
-                  opacity: isRunning ? 0.65 : 1,
-                  transition: "all 0.2s ease",
-                  textAlign: "right",
-                  textAlignLast: "right",
-                  direction: "ltr",
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "right 6px center",
-                  backgroundSize: "13px 13px",
-                }}
-                value={effectiveAccId}
-                onChange={(e) => handleAccountSelect(e.target.value)}
-                title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!" : "Chọn tài khoản giao dịch"}
-              >
-                {!effectiveAccId && (
-                  <option
-                    value=""
-                    style={{
-                      color: "#888888",
-                      textAlign: "right",
-                      padding: "6px 18px 6px 10px",
-                    }}
-                  >
-                    {accounts.length === 0 ? "chưa có tài khoản" : "chọn tài khoản"}
-                  </option>
-                )}
-                {effectiveAccId && !accounts.some((a) => a.id === effectiveAccId || a.name === effectiveAccId) && (
-                  <option
-                    value={effectiveAccId}
-                    style={{
-                      textAlign: "right",
-                      padding: "6px 18px 6px 10px",
-                    }}
-                  >
-                    {effectiveAccId} {isRunning ? "🔒" : ""}
-                  </option>
-                )}
-                {accounts.map((acc) => {
-                  const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
-                  const isThisBotAccount = (acc.id === effectiveAccId || acc.name === effectiveAccId);
-                  const isRunningThisBot = isRunning && (isThisBotAccount || runningBotKey === activeBotTab);
-                  const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
-                  const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
-
-                  const getTargetBotName = (key) => {
-                    if (key === "sub1") return t("bot_ema200");
-                    if (key === "sub2") return t("bot_smc");
-                    return t("bot_liquidation");
-                  };
-
-                  let labelSuffix = "";
-                  if (isRunningThisBot) {
-                    labelSuffix = " 🔒";
-                  } else if (isRunningOnOtherBot) {
-                    labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
-                  } else if (assignedOtherBot) {
-                    labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
-                  }
+              /* Custom Dropdown tài khoản OKX */
+              <div ref={accountDropdownRef} style={{ position: "relative", flexShrink: 0 }}>
+                {(() => {
+                  const currentOkxAcc = accounts.find((a) => a.id === effectiveAccId || a.name === effectiveAccId);
+                  const okxDisplayText = currentOkxAcc
+                    ? currentOkxAcc.name
+                    : effectiveAccId
+                    ? effectiveAccId
+                    : accounts.length === 0
+                    ? "chưa có tài khoản"
+                    : "chọn tài khoản";
 
                   return (
-                    <option
-                      key={acc.id}
-                      value={acc.id}
-                      disabled={isRunningOnOtherBot}
-                      style={{
-                        textAlign: "right",
-                        padding: "6px 18px 6px 10px",
-                      }}
-                    >
-                      {acc.name}{labelSuffix}
-                    </option>
+                    <>
+                      <button
+                        type="button"
+                        disabled={isRunning}
+                        onClick={() => {
+                          if (!isRunning) setIsAccountMenuOpen(!isAccountMenuOpen);
+                        }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                          background: isRunning ? "#1a1a1a" : "#2d2d2d",
+                          border: isRunning ? "1px solid #444444" : "1px solid #555555",
+                          color: isRunning ? "#888888" : "#e0e0e0",
+                          padding: "4px 8px 4px 10px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          height: "30px",
+                          outline: "none",
+                          cursor: isRunning ? "not-allowed" : "pointer",
+                          opacity: isRunning ? 0.65 : 1,
+                          transition: "all 0.18s ease",
+                          maxWidth: "180px",
+                          boxSizing: "border-box",
+                        }}
+                        title={
+                          isRunning
+                            ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!"
+                            : "Chọn tài khoản giao dịch"
+                        }
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {okxDisplayText}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "9px",
+                            color: isRunning ? "#666666" : "#aaaaaa",
+                            transform: isAccountMenuOpen ? "rotate(180deg)" : "none",
+                            transition: "transform 0.2s ease",
+                            flexShrink: 0,
+                          }}
+                        >
+                          ▼
+                        </span>
+                      </button>
+
+                      {isAccountMenuOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 4px)",
+                            right: 0,
+                            minWidth: "180px",
+                            maxWidth: "260px",
+                            zIndex: 110,
+                            background: "rgba(26, 26, 26, 0.98)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid #444444",
+                            borderRadius: "6px",
+                            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
+                            padding: "4px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "3px",
+                            maxHeight: "220px",
+                            overflowY: "auto",
+                          }}
+                        >
+                          {accounts.length === 0 ? (
+                            <div
+                              style={{
+                                padding: "8px 10px",
+                                fontSize: "11.5px",
+                                color: "#888888",
+                                textAlign: "center",
+                                fontStyle: "italic",
+                              }}
+                            >
+                              chưa có tài khoản
+                            </div>
+                          ) : (
+                            accounts.map((acc) => {
+                              const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
+                              const isThisBotAccount = (acc.id === effectiveAccId || acc.name === effectiveAccId);
+                              const isRunningThisBot = isRunning && (isThisBotAccount || runningBotKey === activeBotTab);
+                              const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
+                              const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
+
+                              const getTargetBotName = (key) => {
+                                if (key === "sub1") return t("bot_ema200");
+                                if (key === "sub2") return t("bot_smc");
+                                return t("bot_liquidation");
+                              };
+
+                              let labelSuffix = "";
+                              if (isRunningThisBot) {
+                                labelSuffix = " 🔒";
+                              } else if (isRunningOnOtherBot) {
+                                labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
+                              } else if (assignedOtherBot) {
+                                labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
+                              }
+
+                              return (
+                                <button
+                                  key={acc.id}
+                                  type="button"
+                                  disabled={isRunningOnOtherBot}
+                                  onClick={() => {
+                                    if (isRunningOnOtherBot) return;
+                                    handleAccountSelect(acc.id);
+                                    setIsAccountMenuOpen(false);
+                                  }}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                    width: "100%",
+                                    padding: "6px 10px",
+                                    borderRadius: "4px",
+                                    fontSize: "11.5px",
+                                    fontWeight: isThisBotAccount ? 700 : 500,
+                                    cursor: isRunningOnOtherBot ? "not-allowed" : "pointer",
+                                    opacity: isRunningOnOtherBot ? 0.45 : 1,
+                                    background: isThisBotAccount ? "rgba(255, 255, 255, 0.1)" : "transparent",
+                                    border: "none",
+                                    color: isThisBotAccount ? "#ffffff" : isRunningOnOtherBot ? "#777777" : "#d1d5db",
+                                    textAlign: "left",
+                                    transition: "background 0.15s ease",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isRunningOnOtherBot && !isThisBotAccount) {
+                                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                                      e.currentTarget.style.color = "#ffffff";
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isRunningOnOtherBot && !isThisBotAccount) {
+                                      e.currentTarget.style.background = "transparent";
+                                      e.currentTarget.style.color = "#d1d5db";
+                                    }
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {acc.name}{labelSuffix}
+                                  </span>
+                                  {isThisBotAccount && <span style={{ fontSize: "11px", color: "#22c55e", fontWeight: "bold" }}>✓</span>}
+                                </button>
+                              );
+                            })
+                          )}
+                          <div style={{ height: "1px", background: "#3a3a3a", margin: "2px 0" }} />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAccountMenuOpen(false);
+                              onOpenConnectModal && onOpenConnectModal("fast");
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              width: "100%",
+                              padding: "6px 10px",
+                              borderRadius: "4px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              background: "transparent",
+                              border: "none",
+                              color: "#26a69a",
+                              textAlign: "left",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(38, 166, 154, 0.12)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                          >
+                            <span>+</span>
+                            <span>Kết nối tài khoản OKX...</span>
+                          </button>
+                        </div>
+                      )}
+                    </>
                   );
-                })}
-              </select>
+                })()}
+              </div>
             )}
           </div>
 

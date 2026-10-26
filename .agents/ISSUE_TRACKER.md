@@ -33,6 +33,28 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/10/2026]** - Thiết Kế Custom Dropdown Chọn Tài Khoản Chuẩn Giao Diện Tối Thay Thế Dropdown Mặc Định Của Trình Duyệt/HĐH:
+  - **Mô tả yêu cầu CEO:** Phần dropdown chọn tài khoản (`Chọn tài khoản:`) trên thanh Sidebar Left cần có khung dropdown được thiết kế riêng, loại bỏ hoàn toàn dropdown mặc định của Windows/Web/iOS (tránh vệt xanh highlight Windows `rgb(0, 102, 204)` xấu xí và popup thô của OS). Toàn bộ màu viền, màu nền, màu chữ giữ nguyên đồng bộ như hiện tại.
+  - **Giải pháp kỹ thuật đã triển khai (`SidebarLeft.jsx`):**
+    1. **Thay thế thẻ `<select>` mặc định bằng Custom React Dropdown:**
+       - Thay thế hoàn toàn thẻ `<select>` bằng nút kích hoạt (`button`) kết hợp popup container (`div`) mở nổi tuyệt đối (`position: absolute, top: calc(100% + 4px), right: 0, zIndex: 110`).
+       - Giữ nguyên 100% màu sắc và thông số kỹ thuật theo yêu cầu:
+         - Nền: `#2d2d2d` (trạng thái bình thường), `#1a1a1a` (khi bot đang chạy).
+         - Viền: `#555555` (bình thường), `#444444` (khi bot chạy).
+         - Màu chữ: `#ffffff`/`#e0e0e0` (bình thường), `#888888` (khi bot chạy).
+         - Chiều cao chuẩn `30px`, bo góc `4px`, font size `12px`.
+       - Mũi tên chevron tam giác `▼` tự động xoay lật 180° mượt mà khi đóng/mở menu.
+    2. **Thiết kế khung danh sách thả xuống (Popover Menu) đẳng cấp dark mode:**
+       - Nền: `rgba(26, 26, 26, 0.98)` kết hợp `backdropFilter: blur(8px)`.
+       - Viền: `1px solid #444444`, đổ bóng sâu `box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8)`.
+       - Hiệu ứng hover item: Nền phát sáng nhẹ `rgba(255, 255, 255, 0.06)`, chữ sáng trắng `#ffffff`.
+       - Tài khoản đang được chọn: Đánh dấu nổi bật bằng dấu tích xanh lá `✓` (`#22c55e` hoặc `#00e676`) ở đuôi dòng.
+       - Tích hợp nút tắt nhanh `+ Thêm/kết nối tài khoản mới...` ở đáy menu.
+       - Tự động đóng dropdown khi click ra ngoài (`handleClickOutside` với `accountDropdownRef`).
+    3. **Áp dụng đồng bộ cho cả 2 nền tảng:**
+       - Áp dụng cho cả bộ chọn tài khoản sàn **OKX** và tài khoản **Quỹ E8**.
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
 - **[26/10/2026]** - Đồng Bộ Hóa Viền & Nền Thẻ Quỹ E8 Demo Trong Cửa Sổ Kết Nối (Connect Modal):
   - **Mô tả yêu cầu CEO:** Thẻ `E8 Demo` có viền xanh lá và nền xanh nhẹ không cần thiết, làm lệch tông so với các thẻ khác. Yêu cầu đưa viền và nền của thẻ E8 Demo về đồng bộ hoàn toàn với các ô thẻ tài khoản hiện tại.
   - **Giải pháp kỹ thuật đã triển khai (`ConnectModal.jsx`):**
