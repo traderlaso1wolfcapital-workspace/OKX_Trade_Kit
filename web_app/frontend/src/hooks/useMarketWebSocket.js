@@ -2,22 +2,50 @@ import { useEffect, useRef } from "react";
 
 // Convert timeframe string to OKX candle channel name
 export const getOkxCandleChannel = (tf) => {
+  if (!tf) return "candle1H";
+  const str = String(tf).trim();
+  const lower = str.toLowerCase();
   const map = {
     "1": "candle1m",
+    "1m": "candle1m",
+    "m1": "candle1m",
     "3": "candle3m",
+    "3m": "candle3m",
+    "m3": "candle3m",
     "5": "candle5m",
+    "5m": "candle5m",
+    "m5": "candle5m",
     "15": "candle15m",
+    "15m": "candle15m",
+    "m15": "candle15m",
     "30": "candle30m",
-    "1H": "candle1H",
-    "2H": "candle2H",
-    "4H": "candle4H",
-    "6H": "candle6H",
-    "12H": "candle12H",
-    "1D": "candle1D",
-    "1W": "candle1W",
-    "1M": "candle1M",
+    "30m": "candle30m",
+    "m30": "candle30m",
+    "1h": "candle1H",
+    "h1": "candle1H",
+    "60": "candle1H",
+    "60m": "candle1H",
+    "2h": "candle2H",
+    "h2": "candle2H",
+    "120": "candle2H",
+    "120m": "candle2H",
+    "4h": "candle4H",
+    "h4": "candle4H",
+    "240": "candle4H",
+    "240m": "candle4H",
+    "6h": "candle6H",
+    "h6": "candle6H",
+    "12h": "candle12H",
+    "h12": "candle12H",
+    "1d": "candle1D",
+    "d1": "candle1D",
+    "d": "candle1D",
+    "1w": "candle1W",
+    "w1": "candle1W",
+    "w": "candle1W",
+    "1m_month": "candle1M",
   };
-  return map[tf] || "candle1H";
+  return map[lower] || map[str] || "candle1H";
 };
 
 export function useMarketWebSocket(instId, tf, onCandleUpdate) {

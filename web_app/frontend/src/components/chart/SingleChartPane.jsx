@@ -314,7 +314,7 @@ export default function SingleChartPane({
     if (!chartRef.current || !candlesRef.current || candlesRef.current.length === 0) return;
     const total = candlesRef.current.length;
     const candleCount = 60;
-    const rightOffset = 8;
+    const rightOffset = 18; // Cách biên phải 16-20 cây nến theo yêu cầu CEO
     try {
       chartRef.current.priceScale('right').applyOptions({
         autoScale: true,
@@ -1396,7 +1396,7 @@ export default function SingleChartPane({
         timeVisible: true,
         secondsVisible: false,
         ticksVisible: false,
-        rightOffset: 8,
+        rightOffset: 18,
         barSpacing: 12,
         minBarSpacing: 3,
         borderColor: '#2a2e39',
@@ -1568,6 +1568,9 @@ export default function SingleChartPane({
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
       scheduleDraw();
     });
+    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+      scheduleDraw();
+    });
 
     const handleUserInteraction = () => {
       if (!userInteractedRef.current) {
@@ -1577,9 +1580,61 @@ export default function SingleChartPane({
     };
 
     const containerEl = containerRef.current;
-    containerEl.addEventListener('wheel', handleUserInteraction, { passive: true });
-    containerEl.addEventListener('pointerdown', handleUserInteraction, { passive: true });
-    containerEl.addEventListener('touchstart', handleUserInteraction, { passive: true });
+
+    let isPointerDown = false;
+    let dragFrameId = null;
+
+    // Vòng lặp đồng bộ toạ độ 60fps/120fps theo thời gian thực khi đang kéo chuột/touch
+    const loopDragDraw = () => {
+      if (!isPointerDown) return;
+      scheduleDraw();
+      dragFrameId = requestAnimationFrame(loopDragDraw);
+    };
+
+    const onPointerDown = () => {
+      handleUserInteraction();
+      isPointerDown = true;
+      scheduleDraw();
+      if (dragFrameId) cancelAnimationFrame(dragFrameId);
+      dragFrameId = requestAnimationFrame(loopDragDraw);
+    };
+
+    const onPointerUp = () => {
+      if (isPointerDown) {
+        isPointerDown = false;
+        if (dragFrameId) cancelAnimationFrame(dragFrameId);
+        scheduleDraw();
+        setTimeout(scheduleDraw, 30);
+      }
+    };
+
+    const onWheel = () => {
+      handleUserInteraction();
+      scheduleDraw();
+      // Nhịp rAF liên tiếp trong 350ms bắt trọn trớn trượt zoom mượt của chuột và trackpad
+      let frames = 0;
+      const momentumLoop = () => {
+        scheduleDraw();
+        frames++;
+        if (frames < 22) {
+          requestAnimationFrame(momentumLoop);
+        }
+      };
+      requestAnimationFrame(momentumLoop);
+    };
+
+    const onDblClick = () => {
+      handleUserInteraction();
+      scheduleDraw();
+      setTimeout(scheduleDraw, 40);
+    };
+
+    containerEl.addEventListener('wheel', onWheel, { passive: true });
+    containerEl.addEventListener('pointerdown', onPointerDown, { passive: true });
+    containerEl.addEventListener('touchstart', onPointerDown, { passive: true });
+    containerEl.addEventListener('dblclick', onDblClick, { passive: true });
+    window.addEventListener('pointerup', onPointerUp, { passive: true });
+    window.addEventListener('touchend', onPointerUp, { passive: true });
 
     const resizeObserver = new ResizeObserver((entries) => {
       if (chartRef.current && entries.length > 0) {
@@ -1597,9 +1652,13 @@ export default function SingleChartPane({
     const dynSeries = dynamicSeriesRef.current;
 
     return () => {
-      containerEl.removeEventListener('wheel', handleUserInteraction);
-      containerEl.removeEventListener('pointerdown', handleUserInteraction);
-      containerEl.removeEventListener('touchstart', handleUserInteraction);
+      if (dragFrameId) cancelAnimationFrame(dragFrameId);
+      containerEl.removeEventListener('wheel', onWheel);
+      containerEl.removeEventListener('pointerdown', onPointerDown);
+      containerEl.removeEventListener('touchstart', onPointerDown);
+      containerEl.removeEventListener('dblclick', onDblClick);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('touchend', onPointerUp);
       resizeObserver.disconnect();
       if (dynSeries) dynSeries.clear();
       chart.remove();
@@ -1672,6 +1731,7 @@ export default function SingleChartPane({
   useMarketWebSocket(coin, tf, handleWsTick);
 
   // Quản lý dữ liệu nến: Khôi phục tức thì từ cache RAM (0ms) + Fetch ngầm cập nhật
+  // Quản lý dữ liệu nến: Khôi phục tức thì từ cache RAM (0ms) + Fetch ngầm cập nhật
   useEffect(() => {
     if (!isVisible) return;
 
@@ -1681,6 +1741,13 @@ export default function SingleChartPane({
     isAutoFitRef.current = true;
     setIsLogScale(true);
     isLogScaleRef.current = true;
+    prevLengthRef.current = 0;
+
+    // Dọn sạch ngay lập tức toàn bộ overlay vị thế của TF/Coin cũ để không đè lệch tỉ lệ
+    if (overlayRef.current) overlayRef.current.innerHTML = "";
+    if (liquidV5OverlayRef.current) liquidV5OverlayRef.current.innerHTML = "";
+    if (liquidV5BoxesOverlayRef.current) liquidV5BoxesOverlayRef.current.innerHTML = "";
+
     try {
       chartRef.current?.priceScale("right").applyOptions({ autoScale: true, mode: 1 });
       if (candleSeriesRef.current) {
@@ -1708,22 +1775,24 @@ export default function SingleChartPane({
       if (emaSeriesRef.current && cached.ema) {
         try { emaSeriesRef.current.setData(cached.ema); } catch { }
       }
-      if (!hasInitializedRef.current) {
-        hasInitializedRef.current = true;
-        setTimeout(() => {
-          if (isMounted) {
-            applyDefaultZoom();
-            updateIndicatorsRef.current?.();
-            scheduleDraw();
-          }
-        }, 15);
-      } else {
-        updateIndicatorsRef.current?.();
-      }
+      hasInitializedRef.current = true;
+      prevLengthRef.current = cached.candles.length;
+      applyDefaultZoom();
+      updateIndicatorsRef.current?.();
+      scheduleDraw();
     } else {
-      // Giữ biểu đồ mượt mà không chớp đen trong 0.15s chờ API 2-Pha phản hồi
-      if (overlayRef.current) overlayRef.current.innerHTML = "";
-      if (liquidV5OverlayRef.current) liquidV5OverlayRef.current.innerHTML = "";
+      // Nếu chưa có cache: dọn sạch nến cũ của TF trước đó để không bị lệch nến/chỉ báo
+      candlesRef.current = [];
+      activeObsRef.current = [];
+      if (candleSeriesRef.current) {
+        try { candleSeriesRef.current.setData([]); } catch { }
+      }
+      if (volumeSeriesRef.current) {
+        try { volumeSeriesRef.current.setData([]); } catch { }
+      }
+      if (emaSeriesRef.current) {
+        try { emaSeriesRef.current.setData([]); } catch { }
+      }
     }
 
     const fetchCandles = async () => {
@@ -1767,6 +1836,7 @@ export default function SingleChartPane({
           timestamp: Date.now()
         });
 
+        // Chỉ lấy prevRange khi đã khởi tạo xong trên CÙNG 1 coin và TF (dành cho background reconcile)
         let prevRange = null;
         if (chartRef.current && hasInitializedRef.current) {
           try {
@@ -1774,6 +1844,7 @@ export default function SingleChartPane({
           } catch { }
         }
 
+        const isInitialForThisTarget = !hasInitializedRef.current;
         candlesRef.current = unique;
         candleSeriesRef.current.setData(unique);
         if (volumeSeriesRef.current) volumeSeriesRef.current.setData(uniqueVolume);
@@ -1781,18 +1852,21 @@ export default function SingleChartPane({
         if (rd.ob_boxes) activeObsRef.current = rd.ob_boxes;
         updateIndicatorsRef.current?.();
 
-        if (!hasInitializedRef.current) {
-          hasInitializedRef.current = true;
-          prevLengthRef.current = unique.length;
-          setTimeout(() => {
-            if (!isMounted) return;
-            applyDefaultZoom();
-            updateIndicatorsRef.current?.();
-            scheduleDraw();
-          }, 30);
+        hasInitializedRef.current = true;
+        prevLengthRef.current = unique.length;
+
+        if (isInitialForThisTarget) {
+          // Khi lần đầu tải TF/Coin mới: LUÔN LUÔN zoom đúng 60 nến gần nhất ở bên phải
+          applyDefaultZoom();
+          scheduleDraw();
+          requestAnimationFrame(() => {
+            if (isMounted) {
+              applyDefaultZoom();
+              scheduleDraw();
+            }
+          });
         } else {
-          // Khi update thêm nến (sau 300 nến + tải Phase 2), nếu đang ở chế độ Auto (hoặc số lượng nến thay đổi lớn > 50 nến):
-          // Luôn gọi applyDefaultZoom() để nến hiện tại luôn nằm ở tầm nhìn 55 nến bên phải cùng, không bị nhảy mất nến!
+          // Background reconcile: Giữ tầm nhìn hiện tại nếu người dùng đang chủ động soi nến cũ
           const isHugeCandleJump = Math.abs(unique.length - (prevLengthRef.current || 0)) > 50;
           if (isAutoFitRef.current || !userInteractedRef.current || isHugeCandleJump) {
             applyDefaultZoom();
@@ -1801,11 +1875,7 @@ export default function SingleChartPane({
               chartRef.current.timeScale().setVisibleLogicalRange(prevRange);
             } catch { }
           }
-          prevLengthRef.current = unique.length;
-          setTimeout(() => {
-            if (!isMounted) return;
-            scheduleDraw();
-          }, 30);
+          scheduleDraw();
         }
 
         // PHA 2: Tự động tải nốt toàn bộ nến lịch sử sau 1.2s khi backend gom xong để vẽ trọn bộ các vị thế Long/Short quá khứ
@@ -2106,6 +2176,7 @@ export default function SingleChartPane({
                   userInteractedRef.current = false;
                   applyDefaultZoom();
                 }
+                scheduleDraw();
               }}
               style={{
                 width: "19px", height: "17px",
@@ -2127,6 +2198,7 @@ export default function SingleChartPane({
                 if (candleSeriesRef.current) {
                   candleSeriesRef.current.priceScale().applyOptions({ mode: next ? 1 : 0 });
                 }
+                scheduleDraw();
               }}
               style={{
                 width: "19px", height: "17px",

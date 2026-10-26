@@ -33,6 +33,44 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[26/10/2026]** - Tăng Khoảng Cách Cách Biên Phải Mặc Định Cho Chế Độ [ A ] [ L ] Lên 18 Cây Nến:
+  - **Mô tả yêu cầu CEO:** Hiện tại mặc định hai nút `[ A ] [ L ]` đang để nến cách mép biên trục giá bên phải khoảng 8 cây nến. Yêu cầu tăng khoảng dãn cách biên này lên tầm 16 - 20 cây nến để thoáng tầm nhìn phía trước, dễ quan sát hành vi giá và dự phóng các vùng OB/EMA200.
+  - **Giải pháp kỹ thuật đã triển khai (`SingleChartPane.jsx`):**
+    1. Cập nhật biến `rightOffset = 18` (nằm chính giữa dải 16-20 cây nến theo yêu cầu CEO) trong hàm căn chỉnh mặc định `applyDefaultZoom()`.
+    2. Đồng bộ hóa cấu hình trục thời gian `timeScale.rightOffset: 18` của thư viện Lightweight Charts.
+    3. Đảm bảo khi bấm `[ A ]` (Auto fit), `[ L ]` (Log scale) hoặc khi mở chart mới, cây nến hiện tại luôn giữ một khoảng lùi thoáng đãng 18 nến so với trục giá bên phải.
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
+- **[26/10/2026]** - Đồng Bộ Toạ Độ Chỉ Báo Long/Short Theo Thời Gian Thực (60 FPS) Khi Kéo Zoom / Co Giãn Trục Giá Trên Biểu Đồ:
+  - **Mô tả hiện tượng từ CEO:** Khi kéo zoom nến trên chart (đặc biệt khi kéo trục giá thẳng đứng hoặc cuộn chuột), nến và EMA200 co giãn theo nhau nhưng các khối box vị thế Long/Short bị khựng lại đứng yên ở toạ độ cũ. Phải đến khi dừng kéo và di chuyển chuột ngang một chút thì box vị thế mới nhảy bám lại vào toạ độ entry.
+  - **Nguyên nhân gốc rễ kỹ thuật:**
+    - Lightweight Charts chỉ cung cấp sự kiện `subscribeVisibleLogicalRangeChange` khi **trục thời gian nằm ngang** thay đổi. Khi người dùng kéo co giãn **trục giá thẳng đứng (price scale)** hoặc cuộn chuột nhanh, trục thời gian ngang không đổi nên Lightweight Charts hoàn toàn **không kích hoạt sự kiện** nào.
+    - Code trước đây chỉ lắng nghe `pointerdown` một lần trên container mà không có cơ chế lặp liên tục (`requestAnimationFrame`) trong suốt quá trình người dùng đang nhấn giữ kéo chuột/touch hoặc cuộn bánh xe chuột. Dẫn đến hàm vẽ `scheduleDraw()` không được gọi liên tục trong lúc kéo, khiến các thẻ DOM HTML của khối Long/Short bị đơ ở toạ độ cũ.
+  - **Giải pháp kỹ thuật đã triển khai (`SingleChartPane.jsx`):**
+    1. **Tích hợp vòng lặp đồng bộ `loopDragDraw` (60fps/120fps):**
+       - Khi có `pointerdown` (nhấn giữ chuột hoặc chạm màn hình kéo): Kích hoạt vòng lặp `requestAnimationFrame(loopDragDraw)` liên tục cập nhật toạ độ nến $\rightarrow$ pixel (`priceToCoordinate`) trong từng khung hình. Khối Long/Short di chuyển dính liền tuyệt đối theo thân nến theo thời gian thực (Zero Lag).
+       - Khi thả chuột (`pointerup` / `touchend` trên `window`): Tự động dừng vòng lặp và chốt toạ độ chuẩn xác.
+    2. **Tích hợp vòng lặp quán tính `momentumLoop` cho cuộn chuột (`wheel`):**
+       - Khi cuộn chuột/trackpad: Tự động chạy 22 frames liên tiếp (~350ms) để bám sát trớn co giãn mượt mà của biểu đồ.
+    3. **Bổ sung bắt sự kiện `dblclick` và nút `[ A ] [ L ]`:**
+       - Tự động gọi `scheduleDraw()` tức thì khi người dùng nhấp đúp đặt lại tỉ lệ trục giá hoặc bấm nút `[ A ]` (Auto) / `[ L ]` (Log scale).
+    4. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
+- **[26/10/2026]** - Khắc Phục Triệt Để Hiện Tượng Chart Load Chậm, Trắng Nến & Bị Kẹt Ở Quá Khứ 9 Ngày Khi Đổi Khung Thời Gian (TF) Hoặc Cặp Coin:
+  - **Mô tả hiện tượng từ CEO:** Khi đổi khung thời gian (ví dụ từ 15m sang 5m) hoặc đổi coin trên biểu đồ, nến biến mất hoàn toàn, biểu đồ bị kẹt hiển thị dải ngày cũ (từ ngày 17 đến ngày 25) và hiện khối box vị thế khổng lồ đè lên màn hình (như trong Ảnh 2). Khi F5 lại trang thì nến lại hiện bình thường.
+  - **Nguyên nhân gốc rễ kỹ thuật được phát hiện:**
+    1. **Lỗi khôi phục toạ độ `prevRange` chéo khung thời gian:** Khi người dùng click dropdown chọn TF/Coin, sự kiện click vô tình kích hoạt `userInteractedRef.current = true` và `isAutoFitRef.current = false`. Khi nến mới (5m) tải về, do `userInteractedRef` đang là `true`, code không gọi `applyDefaultZoom()` mà lại đi khôi phục `prevRange` của khung 15m trước đó (chỉ số nến 240 - 300). Áp toạ độ 240-300 vào 2500 nến 5m khiến biểu đồ bị ép nhìn vào dải nến 9 ngày trước (từ ngày 17 đến 25 tháng 10), trong khi nến hiện tại nằm ở vị trí số 2499 (ngoài mép phải màn hình) dẫn đến không nhìn thấy nến nào.
+    2. **Lỗi WebSocket OKX map sai channel:** Trong `useMarketWebSocket.js`, hàm `getOkxCandleChannel` chỉ có key `"5"`, `"15"`, `"30"` mà thiếu `"5m"`, `"15m"`, `"30m"`, khiến khi chọn TF 5m hay 15m thì WebSocket lại fallback đăng ký nhầm vào channel `candle1H`, phát dữ liệu tick 1H vào chart 5m làm rối loạn timeline.
+    3. **Dữ liệu nến cũ và box vị thế cũ bị lưu vết tạm thời:** Khi đổi TF, trong 0.2s chờ API nến mới về, `candlesRef.current` và các overlay cũ chưa được dọn sạch, khiến các thuật toán vẽ vị thế lấy nến 15m tính với tham số của 5m, làm văng box vị thế to đè kín màn hình.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **`SingleChartPane.jsx`:**
+       - Mỗi khi `coin` hoặc `tf` thay đổi: Ngay lập tức dọn sạch toàn bộ overlay vị thế cũ (`overlayRef`, `liquidV5OverlayRef`, `liquidV5BoxesOverlayRef`), reset nến `setData([])` nếu chưa có cache, reset `hasInitializedRef.current = false`, `userInteractedRef.current = false`, `isAutoFitRef.current = true`.
+       - Khi nạp nến mới: **Bắt buộc luôn gọi `applyDefaultZoom()`** (tuyệt đối không dùng `prevRange` của TF cũ) để đảm bảo 100% nến hiện tại luôn được đưa vào tầm nhìn 60 nến gần nhất ở mép phải, nến to rõ nét.
+       - Chỉ áp dụng `prevRange` khi background cập nhật trên CÙNG 1 coin và CÙNG 1 TF khi người dùng đang chủ động soi nến cũ.
+    2. **`useMarketWebSocket.js`:**
+       - Bổ sung toàn diện mapping cho tất cả các định dạng TF: `"1m"`, `"3m"`, `"5m"`, `"15m"`, `"30m"`, `"1H"`, `"2H"`, `"4H"`, `"1D"`, v.v. Đảm bảo WebSocket kết nối chính xác 100% channel của từng khung thời gian.
+    3. Kiểm thử bundle build `cmd /c "npm run build"` thành công code 0.
+
 - **[26/10/2026]** - Thiết Kế Custom Dropdown Chọn Tài Khoản Chuẩn Giao Diện Tối Thay Thế Dropdown Mặc Định Của Trình Duyệt/HĐH:
   - **Mô tả yêu cầu CEO:** Phần dropdown chọn tài khoản (`Chọn tài khoản:`) trên thanh Sidebar Left cần có khung dropdown được thiết kế riêng, loại bỏ hoàn toàn dropdown mặc định của Windows/Web/iOS (tránh vệt xanh highlight Windows `rgb(0, 102, 204)` xấu xí và popup thô của OS). Toàn bộ màu viền, màu nền, màu chữ giữ nguyên đồng bộ như hiện tại.
   - **Giải pháp kỹ thuật đã triển khai (`SidebarLeft.jsx`):**
