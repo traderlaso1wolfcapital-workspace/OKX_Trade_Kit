@@ -47,6 +47,33 @@ class MT5Client:
         self.last_sync_time = 0
         self._lock = threading.Lock()
 
+    @staticmethod
+    def _auto_detect_terminal() -> Optional[str]:
+        """Tự động tìm kiếm file terminal64.exe của MT5 trên Windows"""
+        candidates_bases = [
+            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+            r"C:\Program Files",
+            r"C:\Program Files (x86)",
+            r"D:\Program Files",
+            r"D:\MT5",
+            r"C:\MT5",
+        ]
+        for base in candidates_bases:
+            if not base or not os.path.exists(base):
+                continue
+            direct = os.path.join(base, "MetaTrader 5", "terminal64.exe")
+            if os.path.exists(direct):
+                return direct
+            try:
+                for sub in os.listdir(base):
+                    sub_p = os.path.join(base, sub, "terminal64.exe")
+                    if os.path.exists(sub_p):
+                        return sub_p
+            except Exception:
+                pass
+        return None
+
     def connect(self) -> Tuple[bool, str]:
         """Khởi tạo và đăng nhập vào terminal MT5"""
         if not MT5_AVAILABLE:
@@ -66,14 +93,22 @@ class MT5Client:
             try:
                 # 1. Khởi tạo terminal MT5
                 init_params = {"portable": True} if self.path else {}
+                init_ok = False
                 if self.path and os.path.exists(self.path):
                     init_ok = mt5.initialize(self.path, **init_params)
                 else:
                     init_ok = mt5.initialize()
 
+                # Nếu initialize mặc định không tìm thấy terminal, tự động quét thư mục cài đặt trên Windows
+                if not init_ok:
+                    detected_p = self._auto_detect_terminal()
+                    if detected_p:
+                        self.path = detected_p
+                        init_ok = mt5.initialize(detected_p, **init_params)
+
                 if not init_ok:
                     err = mt5.last_error()
-                    return False, f"Không thể khởi động Terminal MT5: {err}"
+                    return False, f"Không tìm thấy hoặc không thể khởi động Terminal MetaTrader 5 (Mã lỗi {err[0]}): {err[1]}. Vui lòng cài đặt MetaTrader 5 trên máy Windows!"
 
                 # 2. Đăng nhập vào tài khoản Quỹ
                 login_ok = mt5.login(login=self.login, password=self.password, server=self.server)

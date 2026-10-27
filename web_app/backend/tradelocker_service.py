@@ -890,7 +890,7 @@ class TradeLockerManager:
         acc_data["id"] = acc_id
         if not acc_data.get("name"):
             acc_data["name"] = f"{server} Demo #{acc_num}"
-        acc_data["firm"] = server
+        acc_data["firm"] = acc_data.get("firm") or server
 
         found = False
         for i, existing in enumerate(accounts):

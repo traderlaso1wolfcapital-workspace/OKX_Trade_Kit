@@ -11,7 +11,10 @@ export default function LogsTerminal({
   isPropRunning = false,
   activeBotTab, 
   loginUid, 
-  isAuthenticated 
+  isAuthenticated,
+  selectedAccount,
+  hasActiveAccount = false,
+  accountsCount = 0,
 }) {
   // Dual-mode: nếu App.jsx truyền logs prop sẵn → render từ nó (App tự quản lý WS)
   // Nếu truyền activeBotTab + isAuthenticated → tự kết nối WS riêng
@@ -331,13 +334,17 @@ export default function LogsTerminal({
 
   // 🧹 Lọc bỏ dòng đường dẫn file hệ thống cục bộ bot_sub*.py (không cần thiết trên giao diện Web)
   const cleanDashboardLines = React.useMemo(() => {
+    // 🛡️ Nếu ở sàn OKX mà chưa connect hoặc chưa chọn tài khoản trong dropdown -> TUYỆT ĐỐI KHÔNG HIỆN BẢNG THỢ SĂN EMA200
+    if (currentPlatform === "okx" && (!hasActiveAccount || !selectedAccount || accountsCount === 0)) {
+      return [];
+    }
     return dashboardLines.filter(l => 
       !l.includes("bot_sub1.py") && 
       !l.includes("bot_sub2.py") && 
       !l.includes("bot_sub3.py") && 
       !l.includes("sys_bot_")
     );
-  }, [dashboardLines]);
+  }, [dashboardLines, currentPlatform, hasActiveAccount, selectedAccount, accountsCount]);
 
   // Giữ vị trí cuộn đầu trang khi nạp Dashboard lần đầu
   const hasInitializedScrollRef = useRef(false);
@@ -414,7 +421,29 @@ export default function LogsTerminal({
           ...fitStyles,
         }}
       >
-        {cleanDashboardLines.length === 0 && eventLogs.length === 0 ? (
+        {currentPlatform === "okx" && (!hasActiveAccount || !selectedAccount || accountsCount === 0) ? (
+          <div
+            style={{
+              margin: "12px 4px",
+              padding: "16px 20px",
+              backgroundColor: "rgba(255, 153, 0, 0.08)",
+              border: "1px solid rgba(255, 153, 0, 0.25)",
+              borderRadius: "6px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              maxWidth: "600px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ff9900", fontWeight: "bold", fontSize: "12.5px" }}>
+              <span>⚠️</span>
+              <span>Chưa có tài khoản giao dịch nào được kết nối / chọn</span>
+            </div>
+            <p style={{ margin: 0, fontSize: "11.5px", color: "#cccccc", lineHeight: "1.5" }}>
+              Vui lòng kết nối tài khoản (bấm nút <strong>Connect</strong>) và chọn tài khoản trong danh sách để xem bảng trạng thái vị thế và lệnh của Bot.
+            </p>
+          </div>
+        ) : cleanDashboardLines.length === 0 && eventLogs.length === 0 ? (
           <div style={{ color: "#666", padding: "16px 0", fontStyle: "italic" }}>
             {t("log_waiting", "Đang đợi dữ liệu console từ bot {name}...").replace("{name}", displayBotName)}
           </div>

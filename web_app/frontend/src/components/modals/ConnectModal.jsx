@@ -4,6 +4,190 @@ import { ConfirmLogoutModal } from "./AccountPromptModals";
 import TradeLockerTab from "./TradeLockerTab";
 import { formatOkxAccountTag } from "../sidebar/SidebarLeft";
 
+// 🔴 Biểu tượng chính thức sàn Vantage Markets
+const VantageLogo = ({ size = 22 }) => (
+  <img
+    src="/vantage_logo.png"
+    alt="Vantage"
+    style={{
+      width: `${size}px`,
+      height: `${size}px`,
+      objectFit: "contain",
+      borderRadius: "4px",
+      flexShrink: 0,
+    }}
+  />
+);
+
+// 🟡 Biểu tượng chính thức sàn Exness
+const ExnessLogo = ({ size = 22 }) => (
+  <img
+    src="/exness_logo.png"
+    alt="Exness"
+    style={{
+      width: `${size}px`,
+      height: `${size}px`,
+      objectFit: "contain",
+      borderRadius: "4px",
+      flexShrink: 0,
+    }}
+  />
+);
+
+// 🔷 Biểu tượng chính thức MetaTrader 5 (MT5)
+const MT5Icon = ({ size = 20 }) => (
+  <img
+    src="/mt5_logo.png"
+    alt="MT5"
+    style={{
+      width: `${size}px`,
+      height: `${size}px`,
+      objectFit: "contain",
+      borderRadius: "4px",
+      flexShrink: 0,
+    }}
+  />
+);
+
+// Danh mục các sàn Forex cá nhân giao dịch MT5
+const MT5_BROKERS = [
+  {
+    key: "vantage",
+    name: "Vantage Markets (MT5)",
+    sub: "Khớp lệnh siêu tốc • Spread từ 0.0 pip",
+    defaultServer: "VantageFX-Live",
+    badgeText: "VANTAGE MT5",
+    badgeColor: "#ff4d4f",
+    badgeBg: "rgba(255, 59, 48, 0.2)",
+    badgeBorder: "rgba(255, 59, 48, 0.4)",
+    bannerTitle: "Vantage Markets • Khớp lệnh siêu tốc",
+    firm: "Vantage",
+    defaultFundSize: 1000,
+    defaultRiskTrade: 20,
+    defaultDailyLoss: 100,
+    servers: [
+      { value: "VantageFX-Live", label: "VantageFX-Live (Server Chính)" },
+      { value: "VantageFX-Live 2", label: "VantageFX-Live 2" },
+      { value: "VantageFX-Live 3", label: "VantageFX-Live 3" },
+      { value: "VantageFX-Live 4", label: "VantageFX-Live 4" },
+      { value: "VantageInternational-Live", label: "VantageInternational-Live" },
+      { value: "VantageInternational-Live 2", label: "VantageInternational-Live 2" },
+      { value: "VantageInternational-Live 3", label: "VantageInternational-Live 3" },
+      { value: "VantageFX-Demo", label: "VantageFX-Demo (Tài khoản Demo)" },
+      { value: "VantageInternational-Demo", label: "VantageInternational-Demo (Demo QT)" },
+      { value: "Other-MT5", label: "Máy chủ khác (Tùy biến)..." },
+    ],
+    accentColor: "#ff3b30",
+    badgeBg: "rgba(38, 166, 154, 0.12)",
+    badgeBorder: "rgba(38, 166, 154, 0.3)",
+    badgeColor: "#26a69a",
+  },
+  {
+    key: "exness",
+    name: "Exness (MT5)",
+    sub: "Nạp rút tức thì 24/7 • Đòn bẩy không giới hạn",
+    defaultServer: "Exness-MT5Real",
+    badgeText: "EXNESS MT5",
+    badgeColor: "#ffc700",
+    badgeBg: "rgba(255, 199, 0, 0.2)",
+    badgeBorder: "rgba(255, 199, 0, 0.4)",
+    bannerTitle: "Exness • Nạp rút tức thì 24/7",
+    firm: "Exness",
+    defaultFundSize: 1000,
+    defaultRiskTrade: 20,
+    defaultDailyLoss: 100,
+    servers: [
+      { value: "Exness-MT5Real", label: "Exness-MT5Real (Server 1)" },
+      { value: "Exness-MT5Real2", label: "Exness-MT5Real 2" },
+      { value: "Exness-MT5Real3", label: "Exness-MT5Real 3" },
+      { value: "Exness-MT5Real4", label: "Exness-MT5Real 4" },
+      { value: "Exness-MT5Real5", label: "Exness-MT5Real 5" },
+      { value: "Exness-MT5Real6", label: "Exness-MT5Real 6" },
+      { value: "Exness-MT5Real7", label: "Exness-MT5Real 7" },
+      { value: "Exness-MT5Real8", label: "Exness-MT5Real 8" },
+      { value: "Exness-MT5Real9", label: "Exness-MT5Real 9" },
+      { value: "Exness-MT5Real10", label: "Exness-MT5Real 10" },
+      { value: "Exness-MT5Real11", label: "Exness-MT5Real 11" },
+      { value: "Exness-MT5Real12", label: "Exness-MT5Real 12" },
+      { value: "Exness-MT5Real14", label: "Exness-MT5Real 14" },
+      { value: "Exness-MT5Real15", label: "Exness-MT5Real 15" },
+      { value: "Exness-MT5Real16", label: "Exness-MT5Real 16" },
+      { value: "Exness-MT5Real18", label: "Exness-MT5Real 18" },
+      { value: "Exness-MT5Real20", label: "Exness-MT5Real 20" },
+      { value: "Exness-MT5Trial", label: "Exness-MT5Trial (Tài khoản Thử nghiệm)" },
+      { value: "Exness-MT5Trial2", label: "Exness-MT5Trial 2" },
+      { value: "Other-MT5", label: "Máy chủ khác (Tùy biến)..." },
+    ],
+    accentColor: "#ffc700",
+    badgeBg: "rgba(38, 166, 154, 0.12)",
+    badgeBorder: "rgba(38, 166, 154, 0.3)",
+    badgeColor: "#26a69a",
+  },
+];
+
+// Danh mục các Quỹ cấp vốn Prop Firm (E8, FTMO...)
+const PROP_FIRMS = [
+  {
+    key: "e8",
+    name: "Quỹ E8 Markets",
+    sub: "Cấp vốn tới $200.000 • Chia sẻ lợi nhuận 80%",
+    defaultServer: "E8",
+    badgeText: "E8 MARKETS",
+    badgeColor: "#00e676",
+    badgeBg: "rgba(0, 230, 118, 0.2)",
+    badgeBorder: "rgba(0, 230, 118, 0.4)",
+    bannerTitle: "Quỹ E8 Markets • TradeLocker & MT5",
+    firm: "E8",
+    defaultFundSize: 5000,
+    defaultRiskTrade: 25,
+    defaultDailyLoss: 125,
+    servers: [
+      { value: "E8", label: "E8 (TradeLocker Demo - demo.tradelocker.com)" },
+      { value: "E8-Live", label: "E8-Live (TradeLocker Live - live.tradelocker.com)" },
+      { value: "E8Markets-Demo", label: "E8Markets-Demo (Tài khoản MT5 Demo)" },
+      { value: "E8Markets-Live", label: "E8Markets-Live (Tài khoản MT5 Live/Funded)" },
+      { value: "E8Markets-Server", label: "E8Markets-Server (Tài khoản MT5 Cầm Quỹ)" },
+      { value: "E8Funding-Demo", label: "E8Funding-Demo (Tài khoản MT5 Funding)" },
+      { value: "PurpleTrading-Demo", label: "PurpleTrading-Demo (Đối tác MT5 Demo)" },
+      { value: "PurpleTrading-Live", label: "PurpleTrading-Live (Đối tác MT5 Live)" },
+      { value: "Other-MT5", label: "Máy chủ khác (Tùy biến)..." },
+    ],
+    accentColor: "#00e676",
+    badgeBg: "rgba(38, 166, 154, 0.12)",
+    badgeBorder: "rgba(38, 166, 154, 0.3)",
+    badgeColor: "#26a69a",
+  },
+  {
+    key: "ftmo",
+    name: "Quỹ FTMO",
+    sub: "Quỹ số 1 toàn cầu • Chia sẻ lợi nhuận 90%",
+    defaultServer: "FTMO-Demo",
+    badgeText: "FTMO QUỸ",
+    badgeColor: "#3b82f6",
+    badgeBg: "rgba(59, 130, 246, 0.2)",
+    badgeBorder: "rgba(59, 130, 246, 0.4)",
+    bannerTitle: "Quỹ FTMO • Quỹ số 1 toàn cầu",
+    firm: "FTMO",
+    defaultFundSize: 10000,
+    defaultRiskTrade: 50,
+    defaultDailyLoss: 250,
+    servers: [
+      { value: "FTMO-Demo", label: "FTMO-Demo (Tài khoản Thi Quỹ MT5)" },
+      { value: "FTMO-Server", label: "FTMO-Server (Tài khoản Cầm Quỹ MT5)" },
+      { value: "FTMO-Server2", label: "FTMO-Server2 (Tài khoản Cầm Quỹ Server 2)" },
+      { value: "FTMO-Server3", label: "FTMO-Server3 (Tài khoản Cầm Quỹ Server 3)" },
+      { value: "Other-MT5", label: "Máy chủ khác (Tùy biến)..." },
+    ],
+    accentColor: "#3b82f6",
+    badgeBg: "rgba(38, 166, 154, 0.12)",
+    badgeBorder: "rgba(38, 166, 154, 0.3)",
+    badgeColor: "#26a69a",
+  },
+];
+
+// Toàn bộ các nhà môi giới & Quỹ hỗ trợ popup kết nối trực tiếp
+const ALL_CONNECT_PROVIDERS = [...MT5_BROKERS, ...PROP_FIRMS];
+
 export default function ConnectModal({
   isOpen,
   onClose,
@@ -53,6 +237,131 @@ export default function ConnectModal({
   const [activePropId, setActivePropId] = useState("");
   const [selectedPropId, setSelectedPropId] = useState(null);
 
+  // MT5 Broker Modal States (Vantage, Exness)
+  const [mt5BrokerModal, setMt5BrokerModal] = useState(null); // 'vantage' | 'exness' | null
+  const [mt5LoginVal, setMt5LoginVal] = useState("");
+  const [mt5PassVal, setMt5PassVal] = useState("");
+  const [mt5ServerVal, setMt5ServerVal] = useState("VantageFX-Live");
+  const [mt5CustomServer, setMt5CustomServer] = useState("");
+  const [mt5ShowPass, setMt5ShowPass] = useState(false);
+  const [mt5SavePass, setMt5SavePass] = useState(true);
+  const [mt5FundSize, setMt5FundSize] = useState(1000);
+  const [mt5RiskTrade, setMt5RiskTrade] = useState(20);
+  const [mt5DailyLoss, setMt5DailyLoss] = useState(100);
+  const [mt5Connecting, setMt5Connecting] = useState(false);
+  const [mt5Error, setMt5Error] = useState("");
+  const [mt5Success, setMt5Success] = useState("");
+
+  const handleOpenMt5Modal = (brokerKey, existingAccount = null) => {
+    setMt5BrokerModal(brokerKey);
+    setMt5Error("");
+    setMt5Success("");
+    setMt5ShowPass(false);
+    const brokerCfg = ALL_CONNECT_PROVIDERS.find((b) => b.key === brokerKey) || ALL_CONNECT_PROVIDERS[0];
+    const defaultSrv = brokerCfg.defaultServer || "VantageFX-Live";
+    const defaultFund = brokerCfg.defaultFundSize || 1000;
+    const defaultRisk = brokerCfg.defaultRiskTrade || 20;
+    const defaultLoss = brokerCfg.defaultDailyLoss || 100;
+
+    if (existingAccount) {
+      setMt5LoginVal(existingAccount.account_id || existingAccount.acc_num || "");
+      setMt5PassVal(existingAccount.password || "");
+      const isKnownServer = (brokerCfg.servers || []).some((s) => s.value === existingAccount.server);
+      if (isKnownServer) {
+        setMt5ServerVal(existingAccount.server);
+        setMt5CustomServer("");
+      } else if (existingAccount.server) {
+        setMt5ServerVal("Other-MT5");
+        setMt5CustomServer(existingAccount.server);
+      } else {
+        setMt5ServerVal(defaultSrv);
+        setMt5CustomServer("");
+      }
+      setMt5FundSize(existingAccount.fund_size || defaultFund);
+      setMt5RiskTrade(existingAccount.risk_per_trade || defaultRisk);
+      setMt5DailyLoss(existingAccount.daily_drawdown_limit || defaultLoss);
+    } else {
+      setMt5LoginVal("");
+      setMt5PassVal("");
+      setMt5ServerVal(defaultSrv);
+      setMt5CustomServer("");
+      setMt5FundSize(defaultFund);
+      setMt5RiskTrade(defaultRisk);
+      setMt5DailyLoss(defaultLoss);
+    }
+  };
+
+  const handleMt5Submit = async (e) => {
+    if (e) e.preventDefault();
+    if (!mt5LoginVal.trim() || !mt5PassVal) {
+      setMt5Error("Vui lòng nhập đầy đủ Số tài khoản (Login / ID) và Mật khẩu!");
+      return;
+    }
+    const finalServer = mt5ServerVal === "Other-MT5" ? (mt5CustomServer.trim() || "MetaQuotes-Demo") : mt5ServerVal;
+    setMt5Error("");
+    setMt5Success("");
+    setMt5Connecting(true);
+
+    try {
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      const token = localStorage.getItem("tls1_jwt_token");
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const brokerCfg = ALL_CONNECT_PROVIDERS.find((b) => b.key === mt5BrokerModal) || ALL_CONNECT_PROVIDERS[0];
+      const brokerFirm = brokerCfg.firm || (mt5BrokerModal === "vantage" ? "Vantage" : mt5BrokerModal === "exness" ? "Exness" : "MT5");
+      const isTradeLockerServer = finalServer === "E8" || finalServer === "E8-Live";
+      const platformType = isTradeLockerServer ? "tradelocker" : "mt5";
+      const envUrl = finalServer === "E8-Live" ? "https://live.tradelocker.com" : (isTradeLockerServer ? "https://demo.tradelocker.com" : "mt5");
+
+      const body = {
+        uid: curUid,
+        platform: platformType,
+        login: mt5LoginVal.trim(),
+        email: isTradeLockerServer
+          ? (mt5LoginVal.includes("@") ? mt5LoginVal.trim() : `${mt5LoginVal.trim()}@tradelocker.com`)
+          : `${mt5LoginVal.trim()}@mt5`,
+        password: mt5PassVal,
+        server: finalServer,
+        firm: brokerFirm,
+        environment: envUrl,
+        fund_size: Number(mt5FundSize) || (brokerCfg.defaultFundSize || 1000),
+        risk_per_trade: Number(mt5RiskTrade) || (brokerCfg.defaultRiskTrade || 20),
+        daily_drawdown_limit: Number(mt5DailyLoss) || (brokerCfg.defaultDailyLoss || 100),
+        daily_profit_cap: 100,
+        enabled_symbols: ["XAU", "BTC", "ETH"],
+        is_enabled: true,
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const res = await fetch("/api/tradelocker/connect", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && data.status === "success") {
+        setMt5Success(`✓ Đăng nhập ${brokerCfg.name} thành công! Số dư: $${Number(data.balance || mt5FundSize).toLocaleString("vi-VN")} USD`);
+        fetchPropAccounts();
+        window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: data.account_id }));
+        setTimeout(() => {
+          setMt5BrokerModal(null);
+        }, 1200);
+      } else {
+        setMt5Error(data?.detail || "Không thể kết nối tài khoản. Vui lòng kiểm tra lại Login, Password và Server.");
+      }
+    } catch (err) {
+      setMt5Error("Lỗi kết nối máy chủ hoặc quá thời gian chờ.");
+    } finally {
+      setMt5Connecting(false);
+    }
+  };
+
   const fetchPropAccounts = () => {
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
     const token = localStorage.getItem("tls1_jwt_token");
@@ -85,7 +394,26 @@ export default function ConnectModal({
       .catch(() => {});
   };
 
-  // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập, đồng thời tải trạng thái các Quỹ
+  const [okxBalances, setOkxBalances] = useState({});
+
+  const fetchOkxBalances = () => {
+    const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    if (!accounts || accounts.length === 0 || !curUid || curUid === "default") return;
+    accounts.forEach((acc) => {
+      const aid = acc.id || acc.account_id;
+      if (!aid) return;
+      fetch(`/api/bot/balance?uid=${encodeURIComponent(curUid)}&account_id=${encodeURIComponent(aid)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && data.status === "success" && data.availBal !== undefined) {
+            setOkxBalances((prev) => ({ ...prev, [aid]: Number(data.availBal) }));
+          }
+        })
+        .catch(() => {});
+    });
+  };
+
+  // Khi mở modal: luôn làm mới trạng thái chọn tài khoản và trắng 3 ô nhập, đồng thời tải trạng thái các Quỹ & số dư OKX
   useEffect(() => {
     if (!isOpen) return;
     setModalAccountId("");
@@ -93,6 +421,7 @@ export default function ConnectModal({
     setLocalSecretKey("");
     setLocalPassphrase("");
     fetchPropAccounts();
+    fetchOkxBalances();
   }, [isOpen, currentUid, connectTab]);
 
   const handleSelectAccount = (accId) => {
@@ -413,93 +742,36 @@ export default function ConnectModal({
                   padding: "6px 8px 6px 4px",
                 }}
               >
-                {/* 1. THẺ MẶC ĐỊNH: TẠO KẾT NỐI TÀI KHOẢN OKX MỚI (Cố định ở trên cùng) */}
-                <div
-                  onClick={() => {
-                    if (isConnecting) return;
-                    if (!okxOAuthUrl) return;
-                    if (handleFastConnectClick) handleFastConnectClick();
-                    window.location.href = okxOAuthUrl;
-                  }}
-                  className="connect-card"
-                  style={{ opacity: isConnecting ? 0.7 : 1, cursor: isConnecting ? "not-allowed" : "pointer" }}
-                  title="Bấm vào để kết nối thêm tài khoản OKX mới"
-                >
-                  {/* Authentic OKX Logo Box */}
-                  <div
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      background: "#000000",
-                      border: "1px solid #333333",
-                      borderRadius: "6px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isConnecting ? (
-                      <span className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></span>
-                    ) : (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
-                        <rect x="2" y="2" width="6" height="6" rx="1" />
-                        <rect x="16" y="2" width="6" height="6" rx="1" />
-                        <rect x="9" y="9" width="6" height="6" rx="1" />
-                        <rect x="2" y="16" width="6" height="6" rx="1" />
-                        <rect x="16" y="16" width="6" height="6" rx="1" />
-                      </svg>
-                    )}
-                  </div>
-
-                  {/* Card Content */}
-                  <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                      {isConnecting ? t("saving_btn") : t("okx_connect_title")}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
-                      {t("okx_connect_sub")}
-                    </div>
-                  </div>
-
-                  {/* Action Badge [Mở App ➔] chuẩn ban đầu với hiệu ứng đổi màu xanh ngọc & đổ bóng */}
-                  <span
-                    className="connect-action-badge"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isConnecting) return;
-                      if (!okxOAuthUrl) return;
-                      if (handleFastConnectClick) handleFastConnectClick();
-                      window.location.href = okxOAuthUrl;
-                    }}
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      color: "#26a69a",
-                      background: "rgba(38, 166, 154, 0.12)",
-                      border: "1px solid rgba(38, 166, 154, 0.3)",
-                      padding: "4px 9px",
-                      borderRadius: "4px",
-                      whiteSpace: "nowrap",
-                      transition: "all 0.18s ease",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                    title="Bấm vào để mở App OKX kết nối"
-                  >
-                    {t("open_app") || "Mở App ➔"}
+                {/* PHÂN KHU 1: CRYPTO */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "4px 0 2px 0" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: "#888888", letterSpacing: "0.6px", textTransform: "uppercase" }}>
+                    Crypto
                   </span>
+                  <div style={{ flex: 1, height: "1px", background: "#2e2e2e" }}></div>
                 </div>
 
-                {/* 2. CÁC THẺ ĐÃ KẾT NỐI: Giữ lại hiệu ứng di chuột viền vàng như cũ, nút Disconnect viền đỏ */}
-                {accounts.map((acc, idx) => (
+                {/* 1. THẺ HỢP NHẤT SÀN OKX (DUY NHẤT 1 THẺ) */}
+                <div
+                  className="connect-card"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0px",
+                    cursor: "default",
+                    padding: "12px 14px",
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                  title="Thẻ sàn OKX"
+                >
+                  {/* Header: Logo OKX + Tiêu đề + Nút [Mở App ➔] */}
                   <div
-                    key={acc.id || idx}
-                    className="connect-card"
-                    style={{ cursor: "pointer" }}
-                    title={`Tài khoản đã kết nối: ${acc.name || "OKX"}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      width: "100%",
+                    }}
                   >
                     {/* Authentic OKX Logo Box */}
                     <div
@@ -515,238 +787,545 @@ export default function ConnectModal({
                         flexShrink: 0,
                       }}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
-                        <rect x="2" y="2" width="6" height="6" rx="1" />
-                        <rect x="16" y="2" width="6" height="6" rx="1" />
-                        <rect x="9" y="9" width="6" height="6" rx="1" />
-                        <rect x="2" y="16" width="6" height="6" rx="1" />
-                        <rect x="16" y="16" width="6" height="6" rx="1" />
-                      </svg>
+                      {isConnecting ? (
+                        <span className="spinner" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></span>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#ffffff">
+                          <rect x="2" y="2" width="6" height="6" rx="1" />
+                          <rect x="16" y="2" width="6" height="6" rx="1" />
+                          <rect x="9" y="9" width="6" height="6" rx="1" />
+                          <rect x="2" y="16" width="6" height="6" rx="1" />
+                          <rect x="16" y="16" width="6" height="6" rx="1" />
+                        </svg>
+                      )}
                     </div>
 
                     {/* Card Content */}
                     <div style={{ flex: 1, textAlign: "left" }}>
-                      <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff", display: "flex", alignItems: "center", gap: "6px" }}>
                         {t("okx_connect_title")}
+                        {accounts && accounts.length > 0 && (
+                          <span style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "3px", background: "rgba(38, 166, 154, 0.15)", color: "#26a69a", fontWeight: "bold" }}>
+                            {accounts.length} TK
+                          </span>
+                        )}
                       </div>
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          fontStyle: "italic",
-                          color: "#4ade80",
-                          marginTop: "2px",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {(() => {
-                          const raw = formatOkxAccountTag(acc);
-                          return `Đã Connect #${raw}`;
-                        })()}
+                      <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
+                        {t("okx_connect_sub")}
                       </div>
                     </div>
 
-                    {/* Delete button badge (viền đỏ #ff4d4f) kích thước gần lớn bằng nút Mở App */}
+                    {/* Action Badge [Mở App ➔] */}
                     <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onDisconnectAccount) onDisconnectAccount(acc.id);
+                      className="connect-action-badge"
+                      onClick={() => {
+                        if (isConnecting) return;
+                        if (!okxOAuthUrl) return;
+                        if (handleFastConnectClick) handleFastConnectClick();
+                        window.location.href = okxOAuthUrl;
                       }}
                       style={{
                         fontSize: "11px",
                         fontWeight: "700",
-                        color: "#ff4d4f",
-                        background: "rgba(255, 77, 79, 0.08)",
-                        border: "1px solid #ff4d4f",
-                        padding: "4px 14px",
+                        color: "#26a69a",
+                        background: "rgba(38, 166, 154, 0.12)",
+                        border: "1px solid rgba(38, 166, 154, 0.3)",
+                        padding: "4px 9px",
                         borderRadius: "4px",
                         whiteSpace: "nowrap",
+                        transition: "all 0.18s ease",
+                        cursor: isConnecting ? "not-allowed" : "pointer",
                         display: "inline-flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        userSelect: "none",
-                        cursor: "pointer",
-                        transition: "all 0.18s ease",
+                        gap: "4px",
                       }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
-                      }}
-                      title="Xóa tài khoản này (Delete)"
+                      title="Bấm vào để kết nối thêm tài khoản OKX"
                     >
-                      Delete
+                      {isConnecting ? t("saving_btn") : "Kết Nối ➔"}
                     </span>
                   </div>
-                ))}
 
-                {/* 2b. THẺ QUỸ FX & PROP FIRM (E8 Markets, FTMO...) */}
-                {[
-                  { key: "e8", name: "Quỹ E8 Markets (TradeLocker)", defaultServer: "E8" },
-                  { key: "ftmo", name: "Quỹ FTMO (TradeLocker)", defaultServer: "FTMO" },
-                ].map((firm) => {
-                  const connectedAccs = (propAccounts || []).filter((a) =>
-                    (a.firm || a.server || "").toLowerCase().includes(firm.key)
-                  );
-
-                  if (connectedAccs.length > 0) {
-                    return connectedAccs.map((pAcc) => {
-                      const isActive = pAcc.id === activePropId;
-                      return (
-                        <div
-                          key={pAcc.id}
-                          className="connect-card"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => {
-                            setSelectedPropId(pAcc.id);
-                            handleTabSwitch("tradelocker");
-                          }}
-                          title="Nhấp để xem bảng điều khiển và thiết lập Quỹ"
-                        >
+                  {/* Danh sách các tài khoản OKX đã kết nối */}
+                  {accounts && accounts.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        paddingTop: "8px",
+                        borderTop: "1px solid #2d2d2d",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                        width: "100%",
+                      }}
+                    >
+                      {accounts.map((acc, idx) => {
+                        const raw = formatOkxAccountTag(acc);
+                        return (
                           <div
+                            key={acc.id || idx}
                             style={{
-                              width: "36px",
-                              height: "36px",
-                              background: "#000000",
-                              border: "1px solid #333333",
-                              borderRadius: "6px",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
+                              justifyContent: "space-between",
+                              padding: "4px 8px 4px 6px",
+                              background: "rgba(255, 255, 255, 0.02)",
+                              borderRadius: "4px",
+                              border: "1px solid rgba(255, 255, 255, 0.05)",
                             }}
                           >
-                            {firm.key === "e8" ? (
-                              <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                            ) : firm.key === "the5ers" ? (
-                              <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "28px", height: "28px", objectFit: "contain", borderRadius: "3px" }} />
-                            ) : (
-                              <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
-                            )}
-                          </div>
-
-                          <div style={{ flex: 1, textAlign: "left" }}>
-                            <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                              {firm.key === "e8" ? "Quỹ E8 Connect" : firm.key === "ftmo" ? "Quỹ FTMO Connect" : `${firm.name} Connect`}
-                            </div>
-                            <div
+                            {/* Dòng chữ màu xanh nghiêng Đã Connect #Bot-m15 - 4.935,71 USDT */}
+                            <span
                               style={{
                                 fontSize: "11px",
                                 fontStyle: "italic",
                                 color: "#4ade80",
-                                marginTop: "2px",
                                 fontWeight: "600",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "5px",
                               }}
                             >
-                              {(() => {
-                                const accNum = pAcc.account_id || pAcc.id;
-                                const balStr = pAcc.balance !== undefined && pAcc.balance !== null
-                                  ? ` - $${Number(pAcc.balance).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                              <span
+                                style={{
+                                  width: "5px",
+                                  height: "5px",
+                                  borderRadius: "50%",
+                                  background: "#4ade80",
+                                  display: "inline-block",
+                                  boxShadow: "0 0 6px #4ade80",
+                                }}
+                              ></span>
+                              {`Đã Connect #${raw}${(() => {
+                                const b = okxBalances[acc.id] ?? acc.balance ?? acc.equity ?? acc.availBal ?? null;
+                                return (b !== null && !isNaN(Number(b)))
+                                  ? ` - ${Number(b).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
                                   : "";
-                                return `Đã Connect #${accNum}${balStr}`;
-                              })()}
-                            </div>
-                          </div>
+                              })()}`}
+                            </span>
 
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            {/* Nút Delete size nhỏ vừa phải kích thước chữ này */}
                             <span
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeletePropAccount(pAcc.id);
+                                if (onDisconnectAccount) onDisconnectAccount(acc.id);
                               }}
                               style={{
-                                fontSize: "11px",
-                                fontWeight: "700",
+                                fontSize: "10px",
+                                fontWeight: "600",
                                 color: "#ff4d4f",
                                 background: "rgba(255, 77, 79, 0.08)",
-                                border: "1px solid #ff4d4f",
-                                padding: "4px 12px",
-                                borderRadius: "4px",
+                                border: "1px solid rgba(255, 77, 79, 0.45)",
+                                padding: "2px 8px",
+                                borderRadius: "3px",
                                 whiteSpace: "nowrap",
                                 display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 userSelect: "none",
                                 cursor: "pointer",
-                                transition: "all 0.18s ease",
+                                transition: "all 0.15s ease",
+                                lineHeight: "1.2",
                               }}
                               onMouseOver={(e) => {
                                 e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
+                                e.currentTarget.style.borderColor = "#ff4d4f";
                               }}
                               onMouseOut={(e) => {
                                 e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
+                                e.currentTarget.style.borderColor = "rgba(255, 77, 79, 0.45)";
                               }}
-                              title="Xóa tài khoản Quỹ này (Delete)"
+                              title={`Đăng xuất tài khoản #${raw}`}
                             >
-                              Delete
+                              Đăng Xuất
                             </span>
                           </div>
-                        </div>
-                      );
-                    });
-                  }
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
-                  // Chưa kết nối Quỹ này
+                {/* PHÂN KHU 2: FOREX */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "10px 0 2px 0" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: "#888888", letterSpacing: "0.6px", textTransform: "uppercase" }}>
+                    Forex
+                  </span>
+                  <div style={{ flex: 1, height: "1px", background: "#2e2e2e" }}></div>
+                </div>
+
+                {/* 2. THẺ HỢP NHẤT SÀN FOREX MT5 CÁ NHÂN (Vantage Markets, Exness...) */}
+                {MT5_BROKERS.map((broker) => {
+                  const connectedAccs = (propAccounts || []).filter((a) => {
+                    const text = (a.firm || a.server || a.name || "").toLowerCase();
+                    return text.includes(broker.key);
+                  });
+
+                  return (
+                    <div
+                      key={broker.key}
+                      className="connect-card"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0px",
+                        cursor: "default",
+                        padding: "12px 14px",
+                        width: "100%",
+                        boxSizing: "border-box",
+                      }}
+                      title={`Thẻ sàn ${broker.name}`}
+                    >
+                      {/* Header Row */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          width: "100%",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            background: "#000000",
+                            border: "1px solid #333333",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {broker.key === "vantage" ? <VantageLogo size={24} /> : <ExnessLogo size={24} />}
+                        </div>
+
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff", display: "flex", alignItems: "center", gap: "6px" }}>
+                            {broker.name}
+                            {connectedAccs.length > 0 && (
+                              <span style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "3px", background: "rgba(38, 166, 154, 0.15)", color: "#26a69a", fontWeight: "bold" }}>
+                                {connectedAccs.length} TK
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
+                            {broker.sub}
+                          </div>
+                        </div>
+
+                        <span
+                          className="connect-action-badge"
+                          onClick={() => handleOpenMt5Modal(broker.key)}
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            color: "#26a69a",
+                            background: "rgba(38, 166, 154, 0.12)",
+                            border: "1px solid rgba(38, 166, 154, 0.3)",
+                            padding: "4px 9px",
+                            borderRadius: "4px",
+                            whiteSpace: "nowrap",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            cursor: "pointer",
+                            transition: "all 0.18s ease",
+                          }}
+                          title={`Kết nối thêm tài khoản MT5 ${broker.name}`}
+                        >
+                          Kết Nối ➔
+                        </span>
+                      </div>
+
+                      {/* Danh sách các tài khoản MT5 đã kết nối của sàn này */}
+                      {connectedAccs.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            paddingTop: "8px",
+                            borderTop: "1px solid #2d2d2d",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            width: "100%",
+                          }}
+                        >
+                          {connectedAccs.map((pAcc) => {
+                            const accNum = pAcc.account_id || pAcc.id;
+                            const balStr = pAcc.balance !== undefined && pAcc.balance !== null
+                              ? ` - ${Number(pAcc.balance).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                              : "";
+                            return (
+                              <div
+                                key={pAcc.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "4px 8px 4px 6px",
+                                  background: "rgba(255, 255, 255, 0.02)",
+                                  borderRadius: "4px",
+                                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                                }}
+                              >
+                                {/* Dòng chữ màu xanh nghiêng */}
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontStyle: "italic",
+                                    color: "#4ade80",
+                                    fontWeight: "600",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: "5px",
+                                      height: "5px",
+                                      borderRadius: "50%",
+                                      background: "#4ade80",
+                                      display: "inline-block",
+                                      boxShadow: "0 0 6px #4ade80",
+                                    }}
+                                  ></span>
+                                  {`Đã Connect #${accNum}${balStr}`}
+                                </span>
+
+                                {/* Nút Delete size nhỏ vừa phải */}
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePropAccount(pAcc.id);
+                                  }}
+                                  style={{
+                                    fontSize: "10px",
+                                    fontWeight: "600",
+                                    color: "#ff4d4f",
+                                    background: "rgba(255, 77, 79, 0.08)",
+                                    border: "1px solid rgba(255, 77, 79, 0.45)",
+                                    padding: "2px 8px",
+                                    borderRadius: "3px",
+                                    whiteSpace: "nowrap",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    userSelect: "none",
+                                    cursor: "pointer",
+                                    transition: "all 0.15s ease",
+                                    lineHeight: "1.2",
+                                  }}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
+                                    e.currentTarget.style.borderColor = "#ff4d4f";
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
+                                    e.currentTarget.style.borderColor = "rgba(255, 77, 79, 0.45)";
+                                  }}
+                                  title={`Đăng xuất tài khoản MT5 #${accNum}`}
+                                >
+                                  Đăng Xuất
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* PHÂN KHU 3: QUỸ PROP FIRM */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "10px 0 2px 0" }}>
+                  <span style={{ fontSize: "11px", fontWeight: "700", color: "#888888", letterSpacing: "0.6px", textTransform: "uppercase" }}>
+                    Quỹ Prop Firm
+                  </span>
+                  <div style={{ flex: 1, height: "1px", background: "#2e2e2e" }}></div>
+                </div>
+
+                {/* 3. THẺ HỢP NHẤT QUỸ FX & PROP FIRM (E8 Markets, FTMO...) */}
+                {PROP_FIRMS.map((firm) => {
+                  const connectedAccs = (propAccounts || []).filter((a) =>
+                    (a.firm || a.server || a.name || "").toLowerCase().includes(firm.key)
+                  );
+
                   return (
                     <div
                       key={firm.key}
-                      onClick={() => {
-                        setSelectedPropId("__new__");
-                        handleTabSwitch("tradelocker");
-                      }}
                       className="connect-card"
-                      style={{ cursor: "pointer" }}
-                      title={`Bấm vào để kết nối ${firm.name}`}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0px",
+                        cursor: "default",
+                        padding: "12px 14px",
+                        width: "100%",
+                        boxSizing: "border-box",
+                      }}
+                      title={`Thẻ sàn ${firm.name}`}
                     >
+                      {/* Header Row */}
                       <div
                         style={{
-                          width: "36px",
-                          height: "36px",
-                          background: "#000000",
-                          border: "1px solid #333333",
-                          borderRadius: "6px",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
+                          gap: "12px",
+                          width: "100%",
                         }}
                       >
-                        {firm.key === "e8" ? (
-                          <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
-                        ) : firm.key === "the5ers" ? (
-                          <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "28px", height: "28px", objectFit: "contain", borderRadius: "3px" }} />
-                        ) : (
-                          <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
-                        )}
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            background: "#000000",
+                            border: "1px solid #333333",
+                            borderRadius: "6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {firm.key === "e8" ? (
+                            <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                          ) : firm.key === "the5ers" ? (
+                            <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "28px", height: "28px", objectFit: "contain", borderRadius: "3px" }} />
+                          ) : (
+                            <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff", display: "flex", alignItems: "center", gap: "6px" }}>
+                            {firm.name}
+                            {connectedAccs.length > 0 && (
+                              <span style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "3px", background: "rgba(38, 166, 154, 0.15)", color: "#26a69a", fontWeight: "bold" }}>
+                                {connectedAccs.length} TK
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
+                            {firm.sub}
+                          </div>
+                        </div>
+
+                        <span
+                          className="connect-action-badge"
+                          onClick={() => handleOpenMt5Modal(firm.key)}
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: "700",
+                            color: "#26a69a",
+                            background: "rgba(38, 166, 154, 0.12)",
+                            border: "1px solid rgba(38, 166, 154, 0.3)",
+                            padding: "4px 9px",
+                            borderRadius: "4px",
+                            whiteSpace: "nowrap",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            cursor: "pointer",
+                            transition: "all 0.18s ease",
+                          }}
+                          title={`Kết nối thêm tài khoản ${firm.name}`}
+                        >
+                          Kết Nối ➔
+                        </span>
                       </div>
 
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                          {firm.name}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#888888", marginTop: "2px" }}>
-                          TradeLocker API • Tự động tính Lots & Cầu dao
-                        </div>
-                      </div>
+                      {/* Danh sách các tài khoản Quỹ đã kết nối */}
+                      {connectedAccs.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: "10px",
+                            paddingTop: "8px",
+                            borderTop: "1px solid #2d2d2d",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            width: "100%",
+                          }}
+                        >
+                          {connectedAccs.map((pAcc) => {
+                            const accNum = pAcc.account_id || pAcc.id;
+                            const balStr = pAcc.balance !== undefined && pAcc.balance !== null
+                              ? ` - ${Number(pAcc.balance).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                              : "";
+                            return (
+                              <div
+                                key={pAcc.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "4px 8px 4px 6px",
+                                  background: "rgba(255, 255, 255, 0.02)",
+                                  borderRadius: "4px",
+                                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                                }}
+                              >
+                                {/* Dòng chữ màu xanh nghiêng */}
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontStyle: "italic",
+                                    color: "#4ade80",
+                                    fontWeight: "600",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: "5px",
+                                      height: "5px",
+                                      borderRadius: "50%",
+                                      background: "#4ade80",
+                                      display: "inline-block",
+                                      boxShadow: "0 0 6px #4ade80",
+                                    }}
+                                  ></span>
+                                  {`Đã Connect #${accNum}${balStr}`}
+                                </span>
 
-                      <span
-                        className="connect-action-badge"
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: "700",
-                          color: "#00e676",
-                          background: "rgba(0, 230, 118, 0.12)",
-                          border: "1px solid rgba(0, 230, 118, 0.3)",
-                          padding: "4px 9px",
-                          borderRadius: "4px",
-                          whiteSpace: "nowrap",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                      >
-                        Kết Nối ➔
-                      </span>
+                                {/* Cài đặt ⚙ & Delete */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePropAccount(pAcc.id);
+                                    }}
+                                    style={{
+                                      fontSize: "10px",
+                                      fontWeight: "600",
+                                      color: "#ff4d4f",
+                                      background: "rgba(255, 77, 79, 0.08)",
+                                      border: "1px solid rgba(255, 77, 79, 0.45)",
+                                      padding: "2px 8px",
+                                      borderRadius: "3px",
+                                      whiteSpace: "nowrap",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      userSelect: "none",
+                                      cursor: "pointer",
+                                      lineHeight: "1.2",
+                                    }}
+                                    title="Đăng xuất tài khoản Quỹ này"
+                                  >
+                                    Đăng Xuất
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -754,8 +1333,8 @@ export default function ConnectModal({
                 {/* Các Quỹ khác ngoài E8, The 5%ers, FTMO (nếu có kết nối) */}
                 {(propAccounts || [])
                   .filter((a) => {
-                    const firmLower = (a.firm || a.server || "").toLowerCase();
-                    return !firmLower.includes("e8") && !firmLower.includes("the5ers") && !firmLower.includes("ftmo");
+                    const firmLower = (a.firm || a.server || a.name || "").toLowerCase();
+                    return !firmLower.includes("e8") && !firmLower.includes("the5ers") && !firmLower.includes("ftmo") && !firmLower.includes("vantage") && !firmLower.includes("exness");
                   })
                   .map((pAcc) => {
                     const isActive = pAcc.id === activePropId;
@@ -857,35 +1436,15 @@ export default function ConnectModal({
                             onMouseOut={(e) => {
                               e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
                             }}
-                            title="Xóa tài khoản Quỹ này (Delete)"
+                            title="Đăng xuất tài khoản Quỹ này"
                           >
-                            Delete
+                            Đăng Xuất
                           </span>
                         </div>
                       </div>
                     );
                   })}
 
-                {/* Nút thêm Quỹ mới */}
-                <div
-                  onClick={() => {
-                    setSelectedPropId("__new__");
-                    handleTabSwitch("tradelocker");
-                  }}
-                  className="connect-card"
-                  style={{
-                    cursor: "pointer",
-                    border: "1px dashed #444444",
-                    background: "rgba(255, 255, 255, 0.02)",
-                    justifyContent: "center",
-                    padding: "10px",
-                  }}
-                  title="Kết nối thêm tài khoản Quỹ khác (E8, The5ers, FTMO...)"
-                >
-                  <span style={{ fontSize: "12px", color: "#00e676", fontWeight: "600" }}>
-                    + Kết Nối Thêm Tài Khoản Quỹ Mới (E8 Markets, FTMO...)
-                  </span>
-                </div>
 
                 {/* Divider for Multi-exchange & Web3 ready */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "4px 0" }}>
@@ -1221,91 +1780,7 @@ export default function ConnectModal({
             </div>
           )}
 
-          {/* FOOTER: THÔNG TIN TÀI KHOẢN & NÚT ĐĂNG XUẤT */}
-          <div
-            style={{
-              marginTop: "4px",
-              paddingTop: "12px",
-              borderTop: "1px solid #333333",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#888888" }}>
-              <span
-                style={{
-                  width: "9px",
-                  height: "9px",
-                  borderRadius: "50%",
-                  background: (isPropTab ? isPropConnected : isConnected) ? "#26a69a" : "#ff4d4f",
-                  display: "inline-block",
-                  boxShadow: (isPropTab ? isPropConnected : isConnected) ? "0 0 10px #26a69a, 0 0 4px #26a69a" : "0 0 10px #ff4d4f, 0 0 4px #ff4d4f",
-                  transition: "all 0.3s ease",
-                }}
-              ></span>
-              <span>
-                {isPropTab ? (
-                  isPropConnected ? (
-                    <>
-                      Quỹ FX:{" "}
-                      <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>
-                        {activePropAcc ? `${activePropAcc.name || (activePropAcc.server + " Demo #" + activePropAcc.account_id)}` : "Đã kết nối"}
-                      </strong>
-                    </>
-                  ) : (
-                    <>
-                      Quỹ FX:{" "}
-                      <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Chưa kết nối</strong>
-                      <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
-                        (Vui lòng kết nối để kích hoạt)
-                      </span>
-                    </>
-                  )
-                ) : (
-                  <>
-                    UID:{" "}
-                    {isConnected ? (
-                      <strong style={{ color: "#ffffff", letterSpacing: "0.4px" }}>{effectiveUid}</strong>
-                    ) : (
-                      <>
-                        <strong style={{ color: "#ff4d4f", fontWeight: "700" }}>Đã ngắt kết nối</strong>
-                        <span style={{ fontSize: "11px", color: "#888888", marginLeft: "6px" }}>
-                          (Vui lòng kết nối để kích hoạt)
-                        </span>
-                      </>
-                    )}
-                  </>
-                )}
-              </span>
-            </div>
-
-            {isConnected && !isPropTab && (
-              <button
-                type="button"
-                onClick={() => setShowConfirmLogout(true)}
-                style={{
-                  backgroundColor: "transparent",
-                  border: "1px solid #ff4d4f",
-                  color: "#ff4d4f",
-                  padding: "4px 12px",
-                  borderRadius: "4px",
-                  fontSize: "11.5px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.15)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {t("logout")}
-              </button>
-            )}
-          </div>
+          {/* Footer đã được loại bỏ hoàn toàn nút Đăng Xuất lớn thừa thãi, chuyển về nút Đăng Xuất riêng trên từng thẻ tài khoản */}
         </div>
       </div>
 
@@ -1325,6 +1800,442 @@ export default function ConnectModal({
           }
         }}
       />
+
+      {/* 🔷 CLASSIC MT5 LOGIN DIALOG (CHUẨN 100% GIAO DIỆN METATRADER 5) */}
+      {mt5BrokerModal && (() => {
+        const currentBroker = ALL_CONNECT_PROVIDERS.find((b) => b.key === mt5BrokerModal) || ALL_CONNECT_PROVIDERS[0];
+        return (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.78)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "center",
+              zIndex: 10005,
+              padding: "16px",
+              paddingTop: "max(92px, 10.5vh)",
+              boxSizing: "border-box",
+            }}
+            onClick={() => {
+              if (!mt5Connecting) setMt5BrokerModal(null);
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: "460px",
+                minHeight: "520px",
+                backgroundColor: "#202020",
+                border: "1px solid #3d3d3d",
+                borderRadius: "8px",
+                boxShadow: "0 24px 60px rgba(0, 0, 0, 0.95), 0 0 1px 1px rgba(255, 255, 255, 0.08)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+                animation: "modalFadeIn 0.15s ease-out",
+                fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", sans-serif',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const isPropFirm = currentBroker.key === "e8" || currentBroker.key === "ftmo";
+                const isTradeLockerServer = mt5ServerVal === "E8" || mt5ServerVal === "E8-Live";
+
+                return (
+                  <>
+                    {/* Modal Title Bar */}
+                    <div
+                      style={{
+                        backgroundColor: "#181818",
+                        borderBottom: "1px solid #333333",
+                        padding: "10px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <MT5Icon size={20} />
+                        <span style={{ fontSize: "13px", fontWeight: "bold", color: "#ffffff", letterSpacing: "0.3px" }}>
+                          {isPropFirm ? "Kết Nối Tài Khoản Quỹ (Prop Firm)" : "Đăng Nhập Tài Khoản MT5"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: "bold",
+                            padding: "2px 6px",
+                            borderRadius: "3px",
+                            background: currentBroker.badgeBg || "rgba(38, 166, 154, 0.2)",
+                            color: currentBroker.badgeColor || "#26a69a",
+                            border: `1px solid ${currentBroker.badgeBorder || "rgba(38, 166, 154, 0.4)"}`,
+                          }}
+                        >
+                          {currentBroker.badgeText || currentBroker.name}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!mt5Connecting) setMt5BrokerModal(null);
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#888888",
+                          fontSize: "18px",
+                          cursor: "pointer",
+                          lineHeight: 1,
+                          padding: "2px",
+                          transition: "color 0.15s",
+                        }}
+                        onMouseOver={(e) => (e.currentTarget.style.color = "#ffffff")}
+                        onMouseOut={(e) => (e.currentTarget.style.color = "#888888")}
+                        title="Đóng"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Sub-header Banner */}
+                    <div
+                      style={{
+                        padding: "10px 16px",
+                        background: "linear-gradient(90deg, #162436 0%, #1a1a1a 100%)",
+                        borderBottom: "1px solid #2a2a2a",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "36px",
+                          height: "36px",
+                          background: "#000000",
+                          borderRadius: "6px",
+                          border: "1px solid #333333",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {mt5BrokerModal === "vantage" ? (
+                          <VantageLogo size={24} />
+                        ) : mt5BrokerModal === "exness" ? (
+                          <ExnessLogo size={24} />
+                        ) : mt5BrokerModal === "e8" ? (
+                          <img src="/e8_logo.png" alt="E8" style={{ width: "22px", height: "22px", objectFit: "contain" }} />
+                        ) : (
+                          <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "24px", height: "24px", objectFit: "contain", borderRadius: "3px" }} />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontSize: "12.5px", fontWeight: "bold", color: "#ffffff" }}>
+                          {currentBroker.bannerTitle || `${currentBroker.name} • Kết nối tài khoản`}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "1px" }}>
+                          {isPropFirm
+                            ? "Nhập Email/Tài khoản và mật khẩu do Quỹ cấp để bot giao dịch"
+                            : "Nhập số tài khoản MT5 & mật khẩu do sàn cấp để bot giao dịch"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Form Body (Chuẩn hóa 3 ô nhập liệu theo TradeLocker & MT5) */}
+                    <form onSubmit={handleMt5Submit} style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: "14px", flex: 1, boxSizing: "border-box" }}>
+                      {/* Dòng 1: Login / Email / ID */}
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: "bold", color: "#cccccc", marginBottom: "4px" }}>
+                          {isPropFirm ? "Email / Đăng nhập (Login):" : "Số tài khoản MT5 (Login / ID):"}
+                        </label>
+                        <input
+                          type="text"
+                          className="connect-input"
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            letterSpacing: "0.5px",
+                            padding: "8px 10px",
+                          }}
+                          value={mt5LoginVal}
+                          onChange={(e) => setMt5LoginVal(e.target.value)}
+                          placeholder={
+                            isPropFirm
+                              ? "Nhập Email đăng ký hoặc ID tài khoản Quỹ cấp..."
+                              : "Nhập số tài khoản MT5 sàn cấp (ví dụ: 1083921)..."
+                          }
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Dòng 2: Password */}
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: "bold", color: "#cccccc", marginBottom: "4px" }}>
+                          Mật khẩu giao dịch (Password):
+                        </label>
+                        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                          <input
+                            type={mt5ShowPass ? "text" : "password"}
+                            className="connect-input"
+                            style={{
+                              fontSize: "13px",
+                              padding: "8px 36px 8px 10px",
+                            }}
+                            value={mt5PassVal}
+                            onChange={(e) => setMt5PassVal(e.target.value)}
+                            placeholder={isPropFirm ? "Mật khẩu tài khoản Quỹ cấp..." : "Mật khẩu giao dịch MT5 do sàn cấp..."}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setMt5ShowPass(!mt5ShowPass)}
+                            style={{
+                              position: "absolute",
+                              right: "8px",
+                              background: "transparent",
+                              border: "none",
+                              color: mt5ShowPass ? "#00e676" : "#888888",
+                              fontSize: "13px",
+                              cursor: "pointer",
+                              padding: "4px",
+                            }}
+                            title={mt5ShowPass ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                          >
+                            {mt5ShowPass ? "👁" : "👁‍🗨"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Dòng 3: Server */}
+                      <div>
+                        <label style={{ display: "block", fontSize: "11.5px", fontWeight: "bold", color: "#cccccc", marginBottom: "4px" }}>
+                          {isPropFirm ? "Máy chủ Quỹ (Server):" : "Máy chủ sàn MT5 (Server):"}
+                        </label>
+                        <select
+                          className="styled-select"
+                          style={{
+                            width: "100%",
+                            background: "#181818",
+                            border: "1px solid #333333",
+                            color: "#ffffff",
+                            padding: "8px 10px",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            outline: "none",
+                          }}
+                          value={mt5ServerVal}
+                          onChange={(e) => setMt5ServerVal(e.target.value)}
+                        >
+                          {currentBroker.servers.map((srv) => (
+                            <option key={srv.value} value={srv.value} style={{ background: "#222222", color: "#ffffff" }}>
+                              {srv.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {mt5ServerVal === "Other-MT5" && (
+                          <input
+                            type="text"
+                            className="connect-input"
+                            style={{ marginTop: "6px", fontSize: "12px" }}
+                            placeholder="Nhập tên server chính xác do sàn/quỹ cung cấp..."
+                            value={mt5CustomServer}
+                            onChange={(e) => setMt5CustomServer(e.target.value)}
+                          />
+                        )}
+
+                        {/* Thẻ Ghi Chú Nền Tảng (TradeLocker / MT5) */}
+                        {isTradeLockerServer ? (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              padding: "8px 12px",
+                              background: "rgba(38, 166, 154, 0.08)",
+                              border: "1px solid rgba(38, 166, 154, 0.25)",
+                              borderRadius: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              fontSize: "11px",
+                              color: "#26a69a",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span>🌐 Nền tảng: <strong>TradeLocker</strong></span>
+                              <span style={{ color: "#555" }}>•</span>
+                              <span style={{ color: "#aaaaaa" }}>Đồng bộ Webtrader</span>
+                            </div>
+                            <a
+                              href={mt5ServerVal === "E8-Live" ? "https://live.tradelocker.com" : "https://demo.tradelocker.com"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#26a69a", textDecoration: "underline", fontWeight: "bold" }}
+                            >
+                              {mt5ServerVal === "E8-Live" ? "live.tradelocker.com ↗" : "demo.tradelocker.com ↗"}
+                            </a>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              marginTop: "8px",
+                              padding: "8px 12px",
+                              background: "rgba(25, 118, 210, 0.08)",
+                              border: "1px solid rgba(25, 118, 210, 0.25)",
+                              borderRadius: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              fontSize: "11px",
+                              color: "#64b5f6",
+                            }}
+                          >
+                            <MT5Icon size={14} />
+                            <span>
+                              Nền tảng: <strong>MetaTrader 5 (MT5)</strong> • Khớp lệnh & theo dõi thời gian thực trên App MT5
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Checkbox Save Password (Chuẩn MT5) */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                        <input
+                          type="checkbox"
+                          id="mt5-save-password-check"
+                          checked={mt5SavePass}
+                          onChange={(e) => setMt5SavePass(e.target.checked)}
+                          style={{ cursor: "pointer", accentColor: "#1976d2", width: "14px", height: "14px" }}
+                        />
+                        <label
+                          htmlFor="mt5-save-password-check"
+                          style={{ fontSize: "11.5px", color: "#aaaaaa", cursor: "pointer", userSelect: "none" }}
+                        >
+                          Lưu mật khẩu (Save password)
+                        </label>
+                      </div>
+
+                      {/* Error & Success Alerts */}
+                      {mt5Error && (
+                        <div
+                          style={{
+                            backgroundColor: "rgba(255, 77, 79, 0.12)",
+                            border: "1px solid rgba(255, 77, 79, 0.4)",
+                            color: "#ff7875",
+                            fontSize: "11.5px",
+                            padding: "8px 10px",
+                            borderRadius: "4px",
+                            lineHeight: "1.4",
+                          }}
+                        >
+                          {mt5Error}
+                        </div>
+                      )}
+                      {mt5Success && (
+                        <div
+                          style={{
+                            backgroundColor: "rgba(0, 230, 118, 0.12)",
+                            border: "1px solid rgba(0, 230, 118, 0.4)",
+                            color: "#00e676",
+                            fontSize: "11.5px",
+                            padding: "8px 10px",
+                            borderRadius: "4px",
+                            lineHeight: "1.4",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {mt5Success}
+                        </div>
+                      )}
+
+                      {/* Action Buttons (OK / Cancel) */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: "10px",
+                          marginTop: "auto",
+                          paddingTop: "14px",
+                          borderTop: "1px solid #333333",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          disabled={mt5Connecting}
+                          onClick={() => setMt5BrokerModal(null)}
+                          style={{
+                            background: "#2a2a2a",
+                            border: "1px solid #444444",
+                            color: "#cccccc",
+                            padding: "8px 16px",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            cursor: mt5Connecting ? "not-allowed" : "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseOver={(e) => {
+                            if (!mt5Connecting) e.currentTarget.style.backgroundColor = "#333333";
+                          }}
+                          onMouseOut={(e) => {
+                            if (!mt5Connecting) e.currentTarget.style.backgroundColor = "#2a2a2a";
+                          }}
+                        >
+                          Hủy (Cancel)
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={mt5Connecting}
+                          style={{
+                            background: "linear-gradient(180deg, #1976d2 0%, #1565c0 100%)",
+                            border: "1px solid #1e88e5",
+                            color: "#ffffff",
+                            padding: "8px 20px",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: mt5Connecting ? "not-allowed" : "pointer",
+                            boxShadow: "0 2px 8px rgba(25, 118, 210, 0.4)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseOver={(e) => {
+                            if (!mt5Connecting) e.currentTarget.style.boxShadow = "0 4px 14px rgba(25, 118, 210, 0.6)";
+                          }}
+                          onMouseOut={(e) => {
+                            if (!mt5Connecting) e.currentTarget.style.boxShadow = "0 2px 8px rgba(25, 118, 210, 0.4)";
+                          }}
+                        >
+                          {mt5Connecting ? (
+                            <>
+                              <span className="spinner" style={{ width: "12px", height: "12px", borderWidth: "2px" }}></span>
+                              {isPropFirm ? "Đang kết nối Quỹ..." : "Đang kết nối MT5..."}
+                            </>
+                          ) : (
+                            isPropFirm ? "KẾT NỐI QUỸ (OK)" : "ĐĂNG NHẬP MT5 (OK)"
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

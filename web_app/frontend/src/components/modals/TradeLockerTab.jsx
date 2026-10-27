@@ -17,6 +17,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   const [mt5Login, setMt5Login] = useState("");
   const [mt5Password, setMt5Password] = useState("");
   const [mt5Server, setMt5Server] = useState("E8Markets-Demo");
+  const [customMt5Server, setCustomMt5Server] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -156,7 +157,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
         login: platform === "mt5" ? mt5Login : undefined,
         email: platform === "mt5" ? `${mt5Login}@mt5` : email,
         password: platform === "mt5" ? mt5Password : password,
-        server: platform === "mt5" ? mt5Server : server,
+        server: platform === "mt5" ? (mt5Server === "Other-MT5" ? (customMt5Server.trim() || "MetaQuotes-Demo") : mt5Server) : server,
         environment: platform === "mt5" ? "mt5" : environment,
         fund_size: Number(fundSize) || 5000,
         risk_per_trade: Number(riskPerTrade) || 25,
@@ -633,17 +634,35 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       className="connect-input"
                       style={{ cursor: "pointer" }}
                     >
-                      <optgroup label="E8 Markets (Khuyên dùng)">
+                      <optgroup label="Tài Khoản Quỹ (Prop Firm)">
                         <option value="E8Markets-Demo">E8 Markets (Tài khoản Thi Quỹ - Demo MT5)</option>
                         <option value="E8Markets-Live">E8 Markets (Tài khoản Cầm Quỹ - Live/Funded MT5)</option>
-                      </optgroup>
-                      <optgroup label="FTMO & Quỹ Lớn Khác">
-                        <option value="FTMO-MT5">FTMO (MetaTrader 5 Demo / Live)</option>
+                        <option value="E8Markets-Server">E8 Markets (Tài khoản MT5 Cầm Quỹ Server)</option>
+                        <option value="FTMO-Demo">FTMO Demo (Thi Quỹ MT5)</option>
+                        <option value="FTMO-Server">FTMO Live (Cầm Quỹ MT5)</option>
+                        <option value="FTMO-Server2">FTMO Live 2 (Cầm Quỹ Server 2)</option>
                         <option value="The5ers-MT5">The 5%ers (MetaTrader 5)</option>
                         <option value="FundingPips-MT5">Funding Pips (MetaTrader 5)</option>
-                        <option value="Other-MT5">Máy chủ MT5 khác...</option>
+                        <option value="FundedNext-Demo">FundedNext (Demo MT5)</option>
+                        <option value="FundedNext-Server">FundedNext (Live MT5)</option>
+                      </optgroup>
+                      <optgroup label="Khác & Test">
+                        <option value="MetaQuotes-Demo">MetaQuotes-Demo (Demo tiêu chuẩn MT5)</option>
+                        <option value="Other-MT5">Máy chủ Quỹ MT5 khác...</option>
                       </optgroup>
                     </select>
+                    {mt5Server === "Other-MT5" && (
+                      <div style={{ marginTop: "6px" }}>
+                        <input
+                          type="text"
+                          required
+                          value={customMt5Server}
+                          onChange={(e) => setCustomMt5Server(e.target.value)}
+                          placeholder="Nhập tên Server MT5 (ví dụ: Exness-MT5Real, ICMarketsSC-Demo...)"
+                          className="connect-input"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -784,26 +803,33 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "4px" }}>
                 <div>
                   <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
-                    Quy mô gói Quỹ:
+                    Quy mô Vốn / Gói Quỹ:
                   </label>
                   <select
                     value={fundSize}
                     onChange={(e) => {
                       const size = Number(e.target.value);
                       setFundSize(size);
-                      setRiskPerTrade(Math.round(size * 0.005));
+                      setRiskPerTrade(Math.max(5, Math.round(size * 0.005)));
                       setDailyDrawdownLimit(Math.round(size * 0.025));
                       setDailyProfitCap(Math.round(size * 0.02));
                     }}
                     className="connect-input"
                     style={{ cursor: "pointer" }}
                   >
-                    <option value="5000">$5,000 USD (E8 Starter)</option>
-                    <option value="10000">$10,000 USD</option>
-                    <option value="25000">$25,000 USD</option>
-                    <option value="50000">$50,000 USD</option>
-                    <option value="100000">$100,000 USD</option>
-                    <option value="200000">$200,000 USD</option>
+                    <optgroup label="Sàn Cá Nhân (Vốn Thật: Vantage, Exness...)">
+                      <option value="500">$500 USD (Vốn cá nhân)</option>
+                      <option value="1000">$1,000 USD (Vốn cá nhân)</option>
+                      <option value="2000">$2,000 USD (Vốn cá nhân)</option>
+                    </optgroup>
+                    <optgroup label="Tài Khoản Quỹ (Prop Firm)">
+                      <option value="5000">$5,000 USD (E8 Starter)</option>
+                      <option value="10000">$10,000 USD</option>
+                      <option value="25000">$25,000 USD</option>
+                      <option value="50000">$50,000 USD</option>
+                      <option value="100000">$100,000 USD</option>
+                      <option value="200000">$200,000 USD</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -847,10 +873,10 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
           >
             {loading ? (
               <>
-                <span className="spinner"></span> Đang xác thực với Quỹ...
+                <span className="spinner"></span> {platform === "mt5" ? "Đang xác thực với máy chủ MT5..." : "Đang xác thực với Quỹ..."}
               </>
             ) : (
-              "KẾT NỐI VÀ KIỂM TRA TÀI KHOẢN QUỸ"
+              platform === "mt5" ? "KẾT NỐI VÀ KIỂM TRA TÀI KHOẢN MT5" : "KẾT NỐI VÀ KIỂM TRA TÀI KHOẢN QUỸ"
             )}
           </button>
         </form>

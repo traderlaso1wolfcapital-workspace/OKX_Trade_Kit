@@ -33,7 +33,74 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[27/10/2026]** - Khắc Phục Lỗi Fast API OKX Kết Nối Đè Tài Khoản Phụ (Connect Tài Khoản 2 #5156 Làm Mất Thẻ Tài Khoản 1 #4531):
+- **[27/10/2026]** - Phân Tích Cơ Chế Fast Connect Đa Thiết Bị & Khắc Phục Triệt Để Chồng Chéo Lợi Nhuận Khi Xóa Tài Khoản:
+  - **Phân tích cơ chế Fast Connect đa thiết bị:**
+    1. Khi Fast Connect tài khoản OKX trên thiết bị mới: OKX OAuth yêu cầu thu hồi API Key OAuth cũ trên sàn để cấp Fast API Key mới (`TLS1_{timestamp}`).
+    2. Nếu thiết bị cũ đang chạy Bot ngầm với API Key cũ: Khi API Key cũ bị OKX hủy, tiến trình bot sẽ nhận lỗi xác thực và dừng lại. Trên cả 2 thiết bị (kết nối cùng Backend), nút sẽ thể hiện `CHẠY BOT` (màu xanh lá), yêu cầu người dùng bấm lại để Bot nạp bộ API Key mới vào RAM.
+    3. **Bảo toàn vị thế & Lệnh đã khớp:** Toàn bộ lệnh đã khớp, số dư, và TP/SL đều được lưu 24/7 trực tiếp trên máy chủ sàn OKX. Khi thiết bị mới truy cập, hệ thống tự động tải lại 100% vị thế thật từ OKX. Các lệnh Limit chờ cũ sẽ được Startup Cleanup dọn dẹp và đặt lại chính xác theo nến thị trường hiện tại.
+  - **Bản vá chống chồng chéo Lợi nhuận & Vốn gốc ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+    - Khi xóa tài khoản OKX:
+      - Tự động kill tiến trình Bot nếu tài khoản đó đang chạy, xóa bỏ file `.running_account`.
+      - Xóa sạch `wallet_stats` (Vốn gốc, PNL) trong toàn bộ các file tiến hóa `{strategy}_du_lieu_tien_hoa.json` và `{strategy}_evolution_data.json` của cả 3 bot (sub1, sub2, sub3).
+      - Tự động phát cờ `reset_wallet_{strategy}.flag` để khi tài khoản tiếp theo được kích hoạt, Bot sẽ lấy số dư thực tế làm mốc Vốn Gốc ban đầu (PNL = 0.00 $, xóa sạch tình trạng âm méo mó -1,086 $).
+  - **Trạng thái:** Đã kiểm thử cú pháp AST thành công và đồng bộ mã nguồn.
+
+- **[27/10/2026]** - Chuẩn Hóa Logic Kết Nối 3 Dòng Chung Cho Toàn Bộ Sàn Forex (MT5) & Quỹ Prop Firm (TradeLocker / MT5):
+  - **Bối cảnh & Xác nhận Logic:**
+    1. **Khẳng định logic chuẩn 100%:** Các sàn Forex cá nhân (Vantage, Exness...) cấp tài khoản giao dịch **MetaTrader 5 (MT5)** gồm: Số tài khoản ID (dạng số), Mật khẩu (Password) và Máy chủ (Server do sàn chỉ định). Khi người dùng nhập thông tin vào TLS1, Bot kết nối trực tiếp đến MT5 server để giao dịch, đồng thời mọi lệnh mở/đóng, trailing stop, số dư đều **đồng bộ tức thời 100% về ứng dụng MT5 trên điện thoại và máy tính** để người dùng theo dõi và quản lý.
+    2. **Quỹ Prop Firm (E8 Markets, FTMO...):** Tùy thuộc vào quỹ cấp:
+       - E8 Markets: Mặc định cấp tài khoản giao dịch qua **TradeLocker** (Email đăng ký làm Login, Mật khẩu, Server `E8`, Webtrader `demo.tradelocker.com` hoặc MT5 nếu thi MT5).
+       - FTMO: Cấp tài khoản qua MT5 (Login dạng số, Mật khẩu, Server `FTMO-Demo` / `FTMO-Server`).
+  - **Cải tiến Giao diện Kết nối Chung ([ConnectModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx)):**
+    - Quy hoạch toàn bộ về đúng **3 ô nhập liệu cốt lõi**:
+      1. **Dòng 1: Đăng nhập (Login / Email / Số tài khoản):**
+         - Forex MT5: `Số tài khoản MT5 (Login / ID):` (placeholder: `Nhập số tài khoản MT5 sàn cấp (ví dụ: 1083921)...`)
+         - Quỹ Prop Firm: `Email / Đăng nhập (Login):` (placeholder: `Nhập Email đăng ký hoặc ID tài khoản Quỹ cấp...`)
+      2. **Dòng 2: Mật khẩu (Password):** Có nút 👁 bật/tắt xem mật khẩu.
+      3. **Dòng 3: Máy chủ (Server):** Dropdown máy chủ tương ứng. Đặt mặc định Quỹ E8 là server `E8` (TradeLocker Demo) chuẩn xác theo email cấp tài khoản.
+    - **Thẻ Thông Tin Nền Tảng (Platform Info Box):** Tự động nhận diện và hiển thị trực quan dưới ô Server:
+      - Khi chọn server TradeLocker (`E8`, `E8-Live`): Hiện thẻ cyan `🌐 Nền tảng: TradeLocker • Webtrader: demo.tradelocker.com ↗`
+      - Khi chọn server MT5 (Vantage, Exness, FTMO, E8 MT5): Hiện thẻ xanh dương `⚡ Nền tảng: MetaTrader 5 (MT5) • Khớp lệnh & theo dõi thời gian thực trên App MT5`
+    - Sửa triệt để lỗi fallback chọn server của Vantage khiến dropdown bị rơi vào "Máy chủ khác (Tùy biến)...".
+  - **Trạng thái:** Đã kiểm thử và build Vite production thành công 100% trong 256ms.
+
+- **[27/10/2026]** - Chuẩn Hóa Toàn Bộ Nút "Kết Nối ➔", Slogan Thương Hiệu Sàn/Quỹ FX & Tinh Gọn Modal Đăng Nhập MT5:
+  - **Yêu cầu & Giải pháp:**
+    1. **Slogan thực tế của sàn:** Thay đổi phụ đề generic thành slogan đặc trưng thực tế:
+       - Vantage Markets: `Khớp lệnh siêu tốc • Spread từ 0.0 pip`
+       - Exness: `Nạp rút tức thì 24/7 • Đòn bẩy không giới hạn`
+       - Quỹ E8 Markets: `Cấp vốn tới $200.000 • Chia sẻ lợi nhuận 80%`
+       - Quỹ FTMO: `Quỹ số 1 toàn cầu • Chia sẻ lợi nhuận 90%`
+    2. **Độ cao & vị trí Modal MT5:** Đưa `mt5BrokerModal` về cùng `minHeight: 520px` và `paddingTop: max(92px, 10.5vh)`, ghim action buttons xuống đáy (`marginTop: auto`) khớp hoàn hảo với chiều cao chung của các tab khác trong `ConnectModal`.
+    3. **Đồng nhất nút hành động:** Chuyển toàn bộ các nút `Mở App ➔`, `Đăng Nhập MT5 ➔` trên tất cả các thẻ thành một tên duy nhất: `Kết Nối ➔` màu Teal `#26a69a` tinh tế, trực quan.
+    4. **Loại bỏ trùng lặp trong Tab Quỹ FX Connect:** Gỡ bỏ nhóm `Sàn Forex Cá Nhân (Đánh Tiền Thật)` (Vantage, Exness, IC Markets, XM Global...) khỏi dropdown máy chủ MT5 trong `TradeLockerTab.jsx`, trả lại tab Quỹ FX thuần túy chỉ dành riêng cho các quỹ cấp vốn Prop Firm.
+    5. **Tích hợp Modal Popup trực tiếp cho Quỹ E8 Markets & Quỹ FTMO:** Khi bấm nút "Kết Nối ➔" trên thẻ Quỹ E8 hoặc FTMO tại tab Fast Connect, hệ thống mở ngay modal popup tại chỗ (với logo, server E8 Demo/Live MT5/TradeLocker, badge riêng), không còn bị gián đoạn hay văng sang tab Quỹ FX Connect.
+    6. **Chuẩn hóa cột Ký Quỹ & PNL sàn Forex/Quỹ ([PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx)):** Cột Ký Quỹ bên FX/Quỹ hiển thị số Lot tổng kèm ký tự `L` (ví dụ `0.01 L` thay vì số tiền ký quỹ `$801.96`), và PNL hiển thị đơn vị `USD` chuẩn thay cho `USDT` của coin.
+    7. **Phân chia ranh giới 3 phân khu thẻ rõ ràng ([ConnectModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx)):** Thêm các đường kẻ phân khu có nhãn nằm ở đầu dòng bên trái (`Crypto` ➔ `Forex` ➔ `Quỹ Prop Firm`), tạo sự khác biệt tinh tế với phân khu `SẮP HỖ TRỢ` căn giữa ở đáy. Dọn dẹp các nút nét đứt thừa.
+  - **Trạng thái:** Đã kiểm thử và build Vite production thành công 100%.
+
+- **[27/10/2026]** - Tối Ưu Toàn Diện Giao Diện Thẻ Fast Connect & Tinh Gọn Hộp Thoại Đăng Nhập MT5 (Chuẩn Hóa Logo Nền Trong Suốt, Đồng Bộ Nút Bấm, Số Tiền Tổng USDT/USD):
+  - **Yêu cầu từ CEO:**
+    1. Tách nền trong suốt (transparent) cho các logo sàn Vantage, Exness, MT5 và đặt trong ô đen bo góc `#000000` đồng nhất như OKX và Quỹ E8.
+    2. Rút gọn phụ đề dưới tiêu đề các sàn (tránh rớt dòng làm to thẻ không cần thiết).
+    3. Badge số lượng tài khoản đổi thành ô nhỏ gọn `1 TK` (thay vì chữ dài `ĐÃ LIÊN KẾT (1)` hay `MT5 LIVE (1)`).
+    4. Đồng bộ màu sắc và hiệu ứng nút hành động (`Đăng Nhập MT5 ➔`, `Kết Nối ➔`) sang màu Teal `#26a69a` giống hệt nút `Mở App ➔` của OKX.
+    5. Hiển thị số tiền tổng hiện có trong tài khoản giao dịch:
+       - Thẻ Coin / OKX: `🟢 Đã Connect #Bot-m15 - 4.935,71 USDT`
+       - Thẻ FX / Quỹ FX: `🟢 Đã Connect #2534591 - 4.935,71 USD` (bỏ ký tự `$` ở đầu số).
+    6. Xóa bỏ nút `Cài đặt ⚙` trên thẻ MT5 và Quỹ, chỉ giữ nút `Delete` nhỏ gọn.
+    7. Loại bỏ hoàn toàn cụm `CẤU HÌNH BOT AUTO TRADER (VỐN & RỦI RO)` (Vốn, Rủi ro, Cầu dao) trong hộp thoại đăng nhập MT5 để giữ form đăng nhập chuẩn 100% MetaTrader 5 thực tế.
+  - **Các bước triển khai kỹ thuật:**
+    1. **Xử lý ảnh logo (Pillow/NumPy):** Tách nền xanh của Vantage thành transparent, crop riêng biểu tượng `ex` vàng của Exness thành transparent, tách nền lưới xanh của MT5 thành transparent. Đặt logo trong ô bo góc nền đen `#000000` viền `#333333`.
+    2. **Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):** Bổ sung endpoint `GET /api/bot/balance` lấy số dư khả dụng USDT tức thì của từng tài khoản OKX.
+    3. **Frontend ([ConnectModal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/ConnectModal.jsx)):**
+       - Thêm `okxBalances` state và tự động fetch số dư USDT khi mở modal.
+       - Cập nhật dòng kết nối hiển thị định dạng số tiền chuẩn: OKX kèm `USDT`, Forex/Quỹ kèm `USD` (bỏ `$`).
+       - Thay thế badge thành `[count] TK` tinh gọn.
+       - Đồng bộ nút bấm hành động về tone màu Teal `#26a69a` sang trọng.
+       - Xóa bỏ Section 2 cấu hình vốn trong modal đăng nhập MT5, giữ form sạch sẽ, thuần khiết.
+    4. **Kiểm thử nghiệm thu:** Build Vite thành công 100% (`dist/assets/index-*.js`, 0 lỗi).
+
   - **Mô tả hiện tượng từ CEO:** Khi kết nối Fast API với tài khoản 1 `#4531`, sau đó kết nối Fast API với tài khoản 2 thì tài khoản 1 bị đá ra, không còn thẻ `#4531` nữa mà bị thay bằng thẻ `#5156`. Yêu cầu xác minh đây là lỗi hay cơ chế của OKX và khắc phục để có thể kết nối đồng thời nhiều tài khoản phụ thông qua Fast API.
   - **Kết luận bản chất:** **Không phải do sàn OKX giới hạn!** OKX OAuth (Fast API) hoàn toàn cho phép authorize không giới hạn tài khoản phụ độc lập, mỗi sub-account sinh ra API Key riêng với `api_uid` riêng biệt. Vấn đề tài khoản 1 bị đá ra là do **lỗi logic định danh và ghi đè của Web App local**.
   - **Nguyên nhân gốc rễ (Root Cause):**
@@ -444,6 +511,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     4. **Điều chỉnh màu nền ô chọn sàn/quỹ đậm màu hơn so với nền ngoài (`SidebarLeft.jsx`):**
        - Áp dụng màu nền tối đậm có chiều sâu (`rgba(18, 14, 6, 0.92)` cho OKX và `rgba(8, 14, 26, 0.92)` cho Quỹ FX) kết hợp bóng đổ chìm `boxShadow: inset 0 1px 4px rgba(0, 0, 0, 0.6)`. Nền bên trong ô tối và đậm hơn rõ rệt so với nền ngoài của Sidebar, làm nổi bật đường viền phát sáng và chữ.
     5. Kiểm thử `npm run build` thành công code 0, không có lỗi runtime.
+
+- **[27/10/2026]** - Triệt Tiêu Cơ Chế SHADOW MODE, Bảo Toàn Profile Hiệu Suất Theo UID/Account ID & Tối Ưu Hiển Thị Bảng Thợ Săn EMA200:
+  - **Mô tả yêu cầu CEO:**
+    1. Xác nhận và loại bỏ cơ chế SHADOW MODE chạy ngầm (vốn gây race condition và lỗi số dư thiếu margin).
+    2. Chỉ khi đã connect tài khoản và chọn dropdown tài khoản đó thì mới hiện bảng Dashboard `Thợ săn EMA200`. Nếu chưa chọn hoặc tài khoản bị xóa thì tuyệt đối không hiện bảng logs cũ.
+    3. Ẩn dòng chấm đỏ/xanh `UID: Đã ngắt kết nối(Vui lòng kết nối để kích hoạt)` ở footer `ConnectModal` vì đã có trạng thái riêng trên từng thẻ.
+    4. Phân tích vòng đời Fast Connect đa thiết bị và cơ chế lưu trữ Profile: Khi Delete tài khoản trên UI, toàn bộ số liệu Gốc, Tổng, PNL, Winrate không bị xóa mất mà được bảo toàn nguyên vẹn trong Profile riêng theo UID/Account ID; chỉ khi người dùng bấm nút "RESET Vốn Gốc (Audit)" thì mới tính toán lại mốc mới từ số dư thực tế sàn.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Loại bỏ SHADOW MODE ➔ Thay bằng Clean Process Shutdown (`main.py`):**
+       - Khi bấm Dừng Bot: Dùng `psutil` diệt sạch tiến trình Python chạy ngầm, giải phóng 100% RAM. Hủy toàn bộ lệnh Limit chưa khớp và bảo lưu 100% TP/SL của các vị thế mở.
+       - Khi khởi động lại bot, sử dụng cơ chế Replay K-line tải nến siêu tốc ~1.5s từ sàn OKX.
+    2. **Bảo Toàn Profile Dữ Liệu Hiệu Suất Khi Delete Tài Khoản (`main.py`):**
+       - Trong `delete_bot_account`, hệ thống dừng bot và chỉ xóa file API Key credentials (`.api_{account_id}`).
+       - Tuyệt đối bảo lưu file `{account_id}_evolution_data.json` và `{account_id}_du_lieu_tien_hoa.json` trong kho lưu trữ riêng của tài khoản đó.
+       - Không phát cờ `reset_wallet` đại trà. Chỉ khi người dùng bấm nút "RESET Vốn Gốc (Audit)" thì hàm `reset_capital` mới quét số dư thực tế từ sàn và cập nhật mốc vốn gốc mới.
+    3. **Điều Kiện Hiển Thị Bảng Dashboard Thợ Săn EMA200 (`LogsTerminal.jsx` & `App.jsx`):**
+       - `App.jsx` truyền `selectedAccount`, `hasActiveAccount`, `accountsCount`, `isAuthenticated` vào `LogsTerminal`.
+       - Trong `LogsTerminal`, hàm `cleanDashboardLines` kiểm tra: Nếu `currentPlatform === "okx"` mà `!hasActiveAccount || !selectedAccount || accountsCount === 0`, mảng `cleanDashboardLines` trả về rỗng `[]` và hiển thị thông báo hướng dẫn kết nối/chọn tài khoản.
+       - Khi xóa tài khoản hoặc chuyển đổi tài khoản, state `logs` lập tức được dọn sạch về rỗng.
+    4. **Ẩn Dòng UID Thừa Thãi & Hợp Nhất Nút Đăng Xuất (`ConnectModal.jsx`):**
+       - Đã loại bỏ hoàn toàn chấm xanh/đỏ đơn lẻ và dòng `UID: Đã ngắt kết nối...` ở footer `ConnectModal`.
+       - **Loại bỏ nút "Đăng Xuất" lớn ở đáy modal:** Do nút này là tàn dư từ thời hệ thống Single-Account cũ, gây nhầm lẫn khi người dùng kết nối nhiều tài khoản.
+       - **Đổi nút "Delete" nhỏ trên từng thẻ thành chữ "Đăng Xuất":** Mỗi tài khoản (OKX, E8, Exness MT5...) giờ đây có nút `Đăng Xuất` riêng biệt, rõ ràng và chuẩn ngữ nghĩa tiếng Việt. Đáy modal trở nên gọn gàng, sạch sẽ 100%.
+    5. Đã build kiểm thử Vite thành công (`dist/index-BcFQQ8f1.js`, 280ms).
 
 - **[26/10/2026]** - Nâng Cấp Dropdown Nền Tảng (Sàn OKX / Quỹ FX) Chuẩn Pill Badge & Tinh Chỉnh Màu Sắc Đồng Nhất Cho Dashboard:
   - **Mô tả yêu cầu CEO:**

@@ -240,6 +240,16 @@ export default function PositionsTable({
               const upl = parseFloat(pos.upl || "0");
               const margin = parseFloat(pos.margin || "0");
               const isChild = pos.is_child;
+              const isFxOrProp =
+                pos.is_prop ||
+                pos.platform === "tradelocker" ||
+                pos.platform === "mt5" ||
+                (localStorage.getItem("tls1_trading_platform") === "e8") ||
+                (pos.lots !== undefined && pos.lots !== null);
+              const lotVal =
+                pos.lots !== undefined && pos.lots !== null
+                  ? parseFloat(pos.lots)
+                  : parseFloat(pos.pos) || 0.01;
 
               return (
                 <tr
@@ -364,7 +374,7 @@ export default function PositionsTable({
                       fontWeight: "400",
                     }}
                   >
-                    {margin.toFixed(2)} $
+                    {isFxOrProp ? `${lotVal.toFixed(2)} L` : `${margin.toFixed(2)} $`}
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
                     {pos.is_limit ? (
@@ -387,7 +397,7 @@ export default function PositionsTable({
                           >
                             <span style={{ fontWeight: "400", fontSize: "14.2px" }}>
                               {upl >= 0 ? "+" : ""}
-                              {upl.toFixed(2)} USDT
+                              {upl.toFixed(2)} {isFxOrProp ? "USD" : "USDT"}
                             </span>
                             <span style={{ fontSize: "11.5px" }}>
                               ({roi > 0 ? "+" : ""}

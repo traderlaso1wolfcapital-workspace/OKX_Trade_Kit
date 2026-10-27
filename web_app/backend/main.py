@@ -2011,7 +2011,7 @@ def reset_nen(uid: str, strategy: str = "sub1"):
 
 @app.post("/api/bot/stop")
 async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
-    """Dừng bot (chuyển về Shadow mode). Hủy toàn bộ limit chưa khớp trên sàn, bảo lưu 100% TP/SL."""
+    """Dừng bot hoàn toàn (Clean Process Shutdown). Hủy toàn bộ limit chưa khớp trên sàn, bảo lưu 100% TP/SL."""
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
     if target_acc in ["e8_prop", "e8"]:
         return tradelocker_stop_bot(uid)
@@ -2020,36 +2020,55 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
 
-    # 1. Ghi stop flag & dry_run flag TRƯỚC TIÊN → để tiến trình bot chuyển ngay về DRY_RUN ngầm, cấm đặt lệnh mới
-    try:
-        with open(os.path.join(flag_dir, f"stop_{acc_name}.flag"), "w") as f:
-            f.write("stop")
-        with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
-            f.write("1")
-    except Exception:
-        pass
+    # 1. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (bảo lưu 100% TP/SL của các vị thế đang chạy)
+    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
 
-    # Xóa activate flag nếu có (tránh race condition)
-    activate_flag = os.path.join(flag_dir, f"activate_{acc_name}.flag")
-    if os.path.exists(activate_flag):
-        try: os.remove(activate_flag)
-        except: pass
-
-    # Đợi 0.5s để tiến trình bot nhận cờ DRY_RUN và không nhảy vào EMERGENCY RE-PLACE
-    await asyncio.sleep(0.5)
-
-    # 2. Xóa running_account_{strategy} để không còn đánh dấu là tài khoản đang chạy live
+    # 2. Xóa running_account_{strategy}
     data_dir = get_user_data_dir(uid)
     running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
     if os.path.exists(running_acc_file):
         try: os.remove(running_acc_file)
         except: pass
 
-    # 3. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (giữ nguyên TP/SL)
-    canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
+    # 3. Dọn dẹp cờ flag
+    for fname in [f"stop_{acc_name}.flag", f"activate_{acc_name}.flag", f"dry_run_{acc_name}.flag"]:
+        fp = os.path.join(flag_dir, fname)
+        if os.path.exists(fp):
+            try: os.remove(fp)
+            except: pass
 
-    msg = f"Bot {strategy} đã dừng! Toàn bộ lệnh Limit chưa khớp đã được hủy ({canceled_orders} lệnh). TP/SL của các vị thế đang chạy được giữ nguyên 100%."
-    return {"message": msg, "status": "SHADOW", "canceled_count": canceled_orders}
+    # 4. KILL HOÀN TOÀN TIẾN TRÌNH PYTHON CŨ (Giải phóng 100% RAM, chấm dứt triệt để Shadow Mode ngầm)
+    proc = get_nested(bot_processes, uid, strategy)
+    pid = get_running_pid(uid, strategy)
+    if proc or pid > 0:
+        if proc:
+            try:
+                import psutil
+                parent = psutil.Process(proc.pid)
+                for child in parent.children(recursive=True):
+                    try: child.kill()
+                    except: pass
+                parent.kill()
+            except:
+                try: proc.kill()
+                except: pass
+        elif pid > 0:
+            try:
+                import psutil
+                parent = psutil.Process(pid)
+                for child in parent.children(recursive=True):
+                    try: child.kill()
+                    except: pass
+                parent.kill()
+            except: pass
+        del_nested(bot_processes, uid, strategy)
+
+    # 5. Dọn sạch queue logs cũ trong RAM
+    if uid in bot_log_queues and strategy in bot_log_queues[uid]:
+        bot_log_queues[uid][strategy].clear()
+
+    msg = f"Bot {strategy} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
+    return {"message": msg, "status": "STOPPED", "canceled_count": canceled_orders}
 
 @app.post("/api/bot/shadow/start")
 async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -2464,7 +2483,47 @@ def delete_bot_account(account_id: str, uid: str):
         except Exception:
             pass
             
-    # Xoá file .api và file dữ liệu tín hiệu của tài khoản này
+    # 1. Nếu tài khoản bị xoá đang là tài khoản đang chạy của bot, dừng tiến trình bot ngay
+    for strategy in ["sub1", "sub2", "sub3"]:
+        running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+        is_running_this = False
+        if os.path.exists(running_acc_file):
+            try:
+                with open(running_acc_file, "r") as f:
+                    cur_acc = f.read().strip()
+                    if cur_acc == account_id or cur_acc.replace("#", "") == account_id.replace("#", ""):
+                        is_running_this = True
+            except: pass
+            
+        if is_running_this:
+            proc = get_nested(bot_processes, uid, strategy)
+            pid = get_running_pid(uid, strategy)
+            if proc or pid > 0:
+                if proc:
+                    try:
+                        import psutil
+                        parent = psutil.Process(proc.pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: proc.kill()
+                elif pid > 0:
+                    try:
+                        import psutil
+                        parent = psutil.Process(pid)
+                        for child in parent.children(recursive=True): child.kill()
+                        parent.kill()
+                    except: pass
+                del_nested(bot_processes, uid, strategy)
+            try: os.remove(running_acc_file)
+            except: pass
+
+        # 2. Xóa hàng đợi log trong bộ nhớ để không bắn log cũ lên client
+        if uid in bot_log_queues and strategy in bot_log_queues[uid]:
+            bot_log_queues[uid][strategy].clear()
+
+    # 3. Xoá file .api credentials của tài khoản này để ngắt quyền truy cập
+    # Lưu ý: BẢO LƯU file {account_id}_evolution_data.json và dữ liệu thống kê trong Profile riêng
+    # để bảo toàn lịch sử PNL/Winrate, chỉ reset khi người dùng bấm nút "RESET Vốn Gốc (Audit)"
     paths_to_remove = [
         os.path.join(data_dir, f"bots/{account_id}", f".api_{account_id}"),
         os.path.join(data_dir, f"accounts/{account_id}", f".api_{account_id}"),
@@ -2472,11 +2531,9 @@ def delete_bot_account(account_id: str, uid: str):
     ]
     
     for strategy in ["sub1", "sub2", "sub3"]:
-        paths_to_remove.extend([
-            os.path.join(data_dir, f"bots/{strategy}", f".api_{account_id}"),
-            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_du_lieu_tien_hoa.json"),
-            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{account_id}_evolution_data.json")
-        ])
+        paths_to_remove.append(
+            os.path.join(data_dir, f"bots/{strategy}", f".api_{account_id}")
+        )
     
     for p in paths_to_remove:
         if os.path.exists(p):
@@ -3419,6 +3476,10 @@ def get_account_balance(uid: str, strategy: str = "sub1", account_id: str = None
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/bot/balance")
+def api_get_bot_balance(uid: str, account_id: str = "", strategy: str = "sub1", ccy: str = "USDT"):
+    return get_account_balance(uid=uid, strategy=strategy, account_id=account_id, ccy=ccy)
+
 @app.post("/api/trade/order")
 def place_manual_order(req: OrderRequest, uid: str, strategy: str = "sub1", account_id: str = None):
     target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
@@ -4064,6 +4125,7 @@ class TradeLockerConnectReq(BaseModel):
     environment: Optional[str] = "https://demo.tradelocker.com"
     platform: Optional[str] = "tradelocker"
     login: Optional[str] = None
+    firm: Optional[str] = None
     fund_size: Optional[float] = 5000.0
     risk_per_trade: Optional[float] = 25.0
     daily_drawdown_limit: Optional[float] = 125.0
@@ -4116,7 +4178,24 @@ def tradelocker_connect(req: TradeLockerConnectReq, jwt_data: Optional[dict] = D
             print(f"[MT5] Lỗi kết nối MT5: {e}", flush=True)
 
         srv_up = (req.server or "").upper()
-        firm_label = "E8" if "E8" in srv_up else ("The5ers" if "5" in srv_up else ("FTMO" if "FTMO" in srv_up else req.server))
+        if req.firm:
+            firm_label = req.firm
+        elif "VANTAGE" in srv_up:
+            firm_label = "Vantage"
+        elif "EXNESS" in srv_up:
+            firm_label = "Exness"
+        elif "ICMARKETS" in srv_up or "IC MARKETS" in srv_up:
+            firm_label = "ICMarkets"
+        elif "XM" in srv_up:
+            firm_label = "XM"
+        elif "E8" in srv_up:
+            firm_label = "E8"
+        elif "5" in srv_up or "FIVE" in srv_up:
+            firm_label = "The5ers"
+        elif "FTMO" in srv_up:
+            firm_label = "FTMO"
+        else:
+            firm_label = req.server or "MT5"
         config = {
             "platform": "mt5",
             "email": req.email or f"{acc_num}@mt5",

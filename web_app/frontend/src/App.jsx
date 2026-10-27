@@ -2168,8 +2168,10 @@ function App() {
         localStorage.removeItem("tls1_account_name");
         setIsAuthenticated(false);
         localStorage.removeItem("tls1_auth");
+        setLogs({ dashboardLines: [], eventLogs: ["🔌 Đã xoá tài khoản cuối cùng. Vui lòng kết nối để tiếp tục."] });
         addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản cuối cùng`);
       } else {
+        setLogs({ dashboardLines: [], eventLogs: [`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}". Đang chuyển sang tài khoản kế tiếp.`] });
         addSystemLog(`🗑️ [ACCOUNT] Đã xoá tài khoản: "${accName}"`);
       }
 
@@ -2222,6 +2224,7 @@ function App() {
         localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
         return next;
       });
+      setLogs({ dashboardLines: [], eventLogs: [`🗑️ [ACCOUNT] Đã xóa tài khoản: "${accName}". Đang chuyển sang tài khoản ${nextAcc.name || nextAcc.id}.`] });
       addSystemLog(`🗑️ [ACCOUNT] Đã xóa tài khoản: "${accName}"`);
     } else {
       setApiKey("");
@@ -2234,6 +2237,7 @@ function App() {
       localStorage.setItem("tls1_bot_accounts", JSON.stringify({}));
       setIsAuthenticated(false);
       localStorage.removeItem("tls1_auth");
+      setLogs({ dashboardLines: [], eventLogs: ["🔌 Đã ngắt kết nối toàn bộ tài khoản OKX."] });
       addSystemLog(`🔌 [ACCOUNT] Đã ngắt kết nối tài khoản OKX cuối cùng`);
     }
 
@@ -3329,6 +3333,10 @@ function App() {
                         isOkxRunning={isOkxRunning}
                         isPropRunning={isPropRunning}
                         activeBotTab={activeBotTab} 
+                        selectedAccount={effectiveAccId}
+                        hasActiveAccount={Boolean(effectiveAccId && accounts && accounts.length > 0 && accounts.some(a => a.id === effectiveAccId || a.name === effectiveAccId))}
+                        accountsCount={accounts ? accounts.length : 0}
+                        isAuthenticated={isAuthenticated}
                       />
                     )}
 
