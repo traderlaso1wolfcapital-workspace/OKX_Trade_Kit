@@ -174,21 +174,30 @@ function App() {
     }
   }, [wsActiveAccounts]);
 
+  const prevBotTabRef = useRef(activeBotTab);
+
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
-    setBotAccountMap(prev => {
-      const next = { ...prev };
-      if (accId) {
-        for (const b in next) {
-          if (b !== activeBotTab && next[b] === accId) {
-            next[b] = "";
+
+    // Nếu bot ở tab hiện tại CHƯA chạy, lưu gán vào botAccountMap
+    // Nếu bot đang chạy, việc chọn tài khoản trong dropdown là để XEM (view) tài khoản phụ khác,
+    // giữ nguyên mapping tài khoản đang chạy trên server
+    const runningAcc = mergedActiveAccounts[activeBotTab];
+    if (!runningAcc) {
+      setBotAccountMap(prev => {
+        const next = { ...prev };
+        if (accId) {
+          for (const b in next) {
+            if (b !== activeBotTab && next[b] === accId) {
+              next[b] = "";
+            }
           }
         }
-      }
-      next[activeBotTab] = accId;
-      try { localStorage.setItem("tls1_bot_accounts", JSON.stringify(next)); } catch {}
-      return next;
-    });
+        next[activeBotTab] = accId;
+        try { localStorage.setItem("tls1_bot_accounts", JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
 
     if (accId) {
       const curUid = localStorage.getItem("tls1_uid") || loginUid;
@@ -210,34 +219,45 @@ function App() {
       setPositions([]);
       setClosedPositions([]);
     }
-  }, [activeBotTab, loginUid, setPositions, setClosedPositions]);
+  }, [activeBotTab, loginUid, mergedActiveAccounts, setPositions, setClosedPositions]);
 
   useEffect(() => {
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
-    const runningAcc = mergedActiveAccounts[activeBotTab];
-    let target = "";
-    if (runningAcc) {
-      const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
-      target = matched ? matched.id : runningAcc;
-    } else if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
-      target = botAccountMap[activeBotTab];
-    }
+    const isTabSwitch = prevBotTabRef.current !== activeBotTab;
+    prevBotTabRef.current = activeBotTab;
 
-    if (target) {
-      setSelectedAccount(target);
-      if (runningAcc && botAccountMap[activeBotTab] !== target) {
-        setBotAccountMap(prev => {
-          const next = { ...prev, [activeBotTab]: target };
-          localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-          return next;
-        });
+    // Chỉ tự động điều chỉnh selectedAccount khi:
+    // 1. Chuyển đổi giữa các tab bot (sub1, sub2, sub3)
+    // 2. Hoặc ban đầu chưa có tài khoản nào được chọn (!selectedAccount)
+    // Tuyệt đối KHÔNG ghi đè khi người dùng đang chủ động chọn xem một tài khoản phụ khác!
+    if (isTabSwitch || !selectedAccount) {
+      const runningAcc = mergedActiveAccounts[activeBotTab];
+      let target = "";
+      if (runningAcc) {
+        const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
+        target = matched ? matched.id : runningAcc;
+      } else if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
+        target = botAccountMap[activeBotTab];
+      } else if (accounts.length > 0) {
+        target = accounts[0].id;
       }
-    } else {
-      setSelectedAccount("");
-      setPositions([]);
-      setClosedPositions([]);
+
+      if (target) {
+        setSelectedAccount(target);
+        if (runningAcc && botAccountMap[activeBotTab] !== target) {
+          setBotAccountMap(prev => {
+            const next = { ...prev, [activeBotTab]: target };
+            localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
+            return next;
+          });
+        }
+      } else {
+        setSelectedAccount("");
+        setPositions([]);
+        setClosedPositions([]);
+      }
     }
-  }, [activeBotTab, mergedActiveAccounts, botAccountMap, accounts, setPositions, setClosedPositions]);
+  }, [activeBotTab, mergedActiveAccounts, accounts]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);

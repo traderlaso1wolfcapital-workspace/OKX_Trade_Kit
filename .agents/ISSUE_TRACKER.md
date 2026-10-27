@@ -33,6 +33,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Khắc Phục Lỗi Không Chuyển Được Tài Khoản Phụ OKX (#7829) Và Tự Động Bị Nhảy Về Tài Khoản Đang Chạy Bot (#9892):
+  - **Hiện tượng & Báo cáo từ CEO:** Người dùng kết nối 2 tài khoản phụ OKX (TK 1 #9892 có 1,122 USDT đang chạy bot EMA200; TK 2 #7829 có 26 USDT). Khi bấm dropdown chọn xem TK #7829, giao diện không chuyển được mà liên tục tải lại và nhảy ngược về TK #9892. Trong khi đó Quỹ E8 chuyển tài khoản bình thường.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. Trong `App.jsx`, `useEffect` lắng nghe `[activeBotTab, mergedActiveAccounts, botAccountMap, accounts]` bị phụ thuộc vòng lặp vào `mergedActiveAccounts`. Mỗi khi WebSocket hoặc HTTP polling cập nhật trạng thái bot mỗi 2 giây, `mergedActiveAccounts` thay đổi làm kích hoạt lại `useEffect`. Trong `useEffect`, code kiểm tra `runningAcc = mergedActiveAccounts[activeBotTab]` (#9892), và nếu có thì cưỡng bức gọi `setSelectedAccount(runningAcc)` và ghi đè `botAccountMap[activeBotTab] = runningAcc`, làm mất hoàn toàn lựa chọn tài khoản mà người dùng vừa chọn.
+    2. Trong `handleAssignAccountToActiveBot`, khi bot đang chạy ở tab hiện tại, việc gán thẳng `next[activeBotTab] = accId` gây xung đột với tài khoản đang chạy live trên server.
+    3. Trong `SidebarLeft.jsx`, hàm `getOkxRunningBot` và biến `isThisAccRunning` có fallback lỏng lẻo `(!okxRunningStrat && isOkxRunning && isSelected)` khiến cho tài khoản đang được xem (dù không chạy bot) cũng bị hiển thị nhãn `LIVE` sai lệch.
+  - **Giải pháp xử lý triệt để:**
+    1. **Tách biệt Trạng thái XEM (View) và Trạng thái Chạy Bot:**
+       - Trong `App.jsx`, dùng `prevBotTabRef = useRef(activeBotTab)`. Chỉ tự động chuyển `selectedAccount` khi người dùng bấm đổi tab bot (`activeBotTab` thay đổi: sub1 -> sub2 -> sub3) hoặc khi ban đầu chưa có tài khoản nào được chọn (`!selectedAccount`).
+       - Khi người dùng đang ở tab hiện tại và chủ động chọn TK phụ khác (#7829), `selectedAccount` được giữ nguyên vẹn 100%, không bị `mergedActiveAccounts` hay polling 2 giây đè ngược lại.
+       - Khi bot ở tab hiện tại đang chạy trên server (#9892), việc chọn tài khoản khác trong dropdown chỉ đóng vai trò chuyển góc nhìn (VIEW) sang xem số dư, biểu đồ và vị thế của TK đó mà không phá vỡ liên kết của bot đang chạy.
+    2. **Đồng bộ chuẩn xác Huy hiệu [LIVE] trong Menu:**
+       - Tinh chỉnh `getOkxRunningBot` và `isThisAccRunning` trong `SidebarLeft.jsx`: Chỉ hiện huy hiệu `LIVE` màu xanh lá cây trên đúng tài khoản thực sự đang chạy bot trên server (#9892). Tài khoản phụ đang xem (#7829) hiển thị dấu tích chọn `✓` và không bị gắn mác chạy nhầm.
+  - **Kết quả:** Đã kiểm thử `npm run build` thành công xuất sắc (288ms). Sếp có thể tự do chuyển đổi qua lại giữa các tài khoản phụ OKX (#9892, #7829) để xem số dư, chart, vị thế mượt mà như bên Quỹ E8.
+
+
 - **[27/10/2026]** - Triển Khai Toàn Diện Lựa Chọn B: Rải Full Lưới Đa Khung Cho Quỹ TradeLocker (E8 Markets) Giống Hệt Sàn OKX:
   - **Yêu cầu từ CEO:** Áp dụng chuẩn Lựa chọn B: Cho phép Bot đặt full lưới đa khung M15, M30, H1, H2, H4 đồng thời lên TradeLocker giống như sàn OKX hiện tại.
   - **Triển khai kỹ thuật ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py)):**

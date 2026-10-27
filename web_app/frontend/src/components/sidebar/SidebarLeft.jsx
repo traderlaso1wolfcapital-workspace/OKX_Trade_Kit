@@ -253,7 +253,7 @@ export default function SidebarLeft({
         }
       }
     }
-    if (isOkxRunning && (accId === effectiveAccId || accName === effectiveAccId)) {
+    if (isOkxRunning && (!activeAccounts || !activeAccounts[activeBotTab]) && (accId === effectiveAccId || accName === effectiveAccId)) {
       return activeBotTab;
     }
     return null;
@@ -442,7 +442,7 @@ export default function SidebarLeft({
             }
 
             const okxRunningStrat = getOkxRunningBot(currentOkxAcc);
-            const isThisOkxRunning = isOkx && (okxRunningStrat === activeBotTab || (!okxRunningStrat && isOkxRunning));
+            const isThisOkxRunning = isOkx && (okxRunningStrat === activeBotTab || (!okxRunningStrat && isOkxRunning && (!activeAccounts || !activeAccounts[activeBotTab])));
             const otherOkxRunningStrat = (isOkx && okxRunningStrat && okxRunningStrat !== activeBotTab) ? okxRunningStrat : null;
 
             const propRunningStrat = getPropRunningBot(currentPropAcc);
@@ -557,7 +557,7 @@ export default function SidebarLeft({
                           const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
                           const tag = formatOkxAccountTag(acc);
                           const accRunningStrat = getOkxRunningBot(acc);
-                          const isThisAccRunning = accRunningStrat === activeBotTab || (!accRunningStrat && isOkxRunning && isSelected);
+                          const isThisAccRunning = accRunningStrat === activeBotTab || (!accRunningStrat && isOkxRunning && isSelected && (!activeAccounts || !activeAccounts[activeBotTab]));
                           const otherAccRunning = (accRunningStrat && accRunningStrat !== activeBotTab) ? accRunningStrat : null;
 
                           return (
