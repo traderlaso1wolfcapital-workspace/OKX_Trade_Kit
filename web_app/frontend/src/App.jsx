@@ -155,6 +155,8 @@ function App() {
   const [isStartingPropBot, setIsStartingPropBot] = useState(false);
   const [isStoppingPropBot, setIsStoppingPropBot] = useState(false);
   const [overridePropBotRunning, setOverridePropBotRunning] = useState(null);
+  const [propBotMap, setPropBotMap] = useState({});
+  const [runningPropBots, setRunningPropBots] = useState({});
 
   // Bảng vị thế: Tách riêng tuyệt đối giữa Sàn OKX và Quỹ FX, chống hoàn toàn giật/flicker
   const positions = useMemo(() => {
@@ -162,11 +164,7 @@ function App() {
   }, [currentPlatform, propPositions, wsPositions]);
 
   const setPositions = useCallback((val) => {
-    if ((localStorage.getItem("tls1_trading_platform") || "okx") === "e8") {
-      setPropPositions(val);
-    } else {
-      setWsPositions(val);
-    }
+    setWsPositions(val);
   }, [setWsPositions]);
 
   useEffect(() => {
@@ -690,10 +688,14 @@ function App() {
     } catch { }
   };
 
-  // Close Position Handler
+  // Close Position / Cancel Limit Order Handler
   const handleClosePosition = async (pos, coin) => {
     const coinName = (coin && coin.label) ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
-    if (!window.confirm(`Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`)) return;
+    const isLimitOrder = pos?.is_limit || String(pos?.ticket_id || "").startsWith("ord_");
+    const confirmMsg = isLimitOrder 
+      ? `Bạn có chắc chắn muốn HỦY LỆNH LIMIT ${coinName} không?`
+      : `Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`;
+    if (!window.confirm(confirmMsg)) return;
     try {
       if (pos.platform === "tradelocker" || pos.is_prop) {
         const curUid = localStorage.getItem('tls1_uid') || currentUid || "default";
@@ -703,15 +705,16 @@ function App() {
           body: JSON.stringify({
             position_id: pos.position_id || pos.ticket_id,
             uid: curUid,
-            qty: pos.lots || parseFloat(pos.pos)
+            qty: pos.lots || parseFloat(pos.pos || 0),
+            is_limit: Boolean(isLimitOrder)
           })
         });
         const data = await res.json();
         if (res.ok) {
-          alert(`✅ Đã đóng vị thế Quỹ ${coinName} thành công!`);
-          fetchPositions();
+          alert(isLimitOrder ? `✅ Đã hủy lệnh Limit Quỹ ${coinName} thành công!` : `✅ Đã đóng vị thế Quỹ ${coinName} thành công!`);
+          fetchPropPositions();
         } else {
-          alert(`❌ Lỗi khi đóng vị thế Quỹ: ` + (data.detail || data.message || "Lỗi máy chủ"));
+          alert(`❌ Lỗi khi đóng/hủy Quỹ: ` + (data.detail || data.message || "Lỗi máy chủ"));
         }
         return;
       }
@@ -1791,22 +1794,22 @@ function App() {
   const handleStartBotClick = async () => {
     const curPlatform = localStorage.getItem("tls1_trading_platform") || "okx";
     if (curPlatform === "e8") {
-      // Kiểm tra trạng thái kết nối Quỹ FX
+      // Kiểm tra xem đã có ít nhất 1 tài khoản Quỹ FX nào được kết nối hay chưa
       const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
       const token = localStorage.getItem("tls1_jwt_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      let isPropConn = false;
+      let hasPropAcc = false;
       try {
-        const res = await fetch(`/api/tradelocker/account?uid=${encodeURIComponent(curUid)}`, { headers });
+        const res = await fetch(`/api/tradelocker/accounts?uid=${encodeURIComponent(curUid)}`, { headers });
         if (res.ok) {
           const d = await res.json();
-          if (d && d.is_connected && d.status === "success") {
-            isPropConn = true;
+          if (d && d.status === "success" && Array.isArray(d.accounts) && d.accounts.length > 0) {
+            hasPropAcc = true;
           }
         }
       } catch { }
 
-      if (!isPropConn) {
+      if (!hasPropAcc) {
         setConnectModalTab("tradelocker");
         setShowConnectModal(true);
       } else {
@@ -1862,13 +1865,13 @@ function App() {
     try {
       setIsStoppingPropBot(true);
       const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-      const r = await fetch(`/api/tradelocker/bot/stop?uid=${encodeURIComponent(botUid)}`, {
+      const r = await fetch(`/api/tradelocker/bot/stop?uid=${encodeURIComponent(botUid)}&strategy=${activeBotTab}`, {
         method: "POST"
       });
       if (r.ok) {
         setOverridePropBotRunning(false);
         setPropBotStatus("STOPPED");
-        addSystemLog(`🛑 [QUỸ FX] Đã dừng Bot Quỹ FX (TradeLocker).`);
+        addSystemLog(`🛑 [QUỸ FX] Đã dừng ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} cho Quỹ TradeLocker.`);
         fetchPropPositions();
         await new Promise(resolve => setTimeout(resolve, 600));
         setIsStoppingPropBot(false);
@@ -1905,6 +1908,19 @@ function App() {
       alert(`⚠️ Vui lòng cấu hình API Key OKX cho tài khoản đang chọn (${accounts.find(a => a.id === currentAcc)?.name || currentAcc}) trước khi chạy bot!`);
       setShowSettings(true);
       setSettingsTab("api");
+      return;
+    }
+
+    // 🛡️ KHÓA ĐỘC QUYỀN SÀN OKX: 1 Tài khoản chỉ được chạy 1 phương pháp Bot duy nhất
+    const runningBotStrat = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => {
+      return strat !== activeBotTab && (id === currentAcc || String(id).replace(/^#/, "") === String(currentAcc).replace(/^#/, ""));
+    });
+    if (runningBotStrat) {
+      const otherStrat = runningBotStrat[0];
+      const otherBotName = otherStrat === "sub1" ? "EMA200 Bot" : otherStrat === "sub2" ? "SMC Bot" : "Liquidation Bot";
+      const thisBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
+      const accName = accounts.find(a => a.id === currentAcc)?.name || currentAcc;
+      alert(`⚠️ Tài khoản OKX '${accName}' đang chạy độc quyền bởi ${otherBotName}!\n\nTheo nguyên tắc an toàn vốn, mỗi tài khoản chỉ được chạy duy nhất 1 phương pháp Bot.\n\nVui lòng chọn tài khoản phụ khác cho ${thisBotName} hoặc bấm DỪNG BOT bên ${otherBotName} trước khi khởi động!`);
       return;
     }
 
@@ -2592,13 +2608,26 @@ function App() {
     }
   }, [logs, propLogs, currentPlatform]);
 
+  const prevPropPosRef = useRef([]);
+  const emptyConfirmCountRef = useRef(0);
+
   const fetchPropPositions = useCallback(async () => {
     try {
       const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
       const rProp = await fetch(`/api/tradelocker/positions?uid=${encodeURIComponent(curUid)}`);
       if (rProp.ok) {
         const propPos = await rProp.json();
-        setPropPositions(Array.isArray(propPos) ? propPos : []);
+        if (Array.isArray(propPos)) {
+          // 🛡️ Chống flicker: Nếu trước đó đang có vị thế (>=1 lệnh) mà kết quả trả về đột ngột rỗng [],
+          // xác nhận thêm 1 chu kỳ để tránh các nhịp glitch mạng chập chờn
+          if (propPos.length === 0 && prevPropPosRef.current.length > 0 && emptyConfirmCountRef.current < 1) {
+            emptyConfirmCountRef.current += 1;
+            return;
+          }
+          emptyConfirmCountRef.current = 0;
+          prevPropPosRef.current = propPos;
+          setPropPositions(propPos);
+        }
       }
     } catch { }
   }, [loginUid]);
@@ -2606,13 +2635,15 @@ function App() {
   const fetchPropBotStatus = useCallback(async () => {
     try {
       const curUid = localStorage.getItem('tls1_uid') || loginUid || "default";
-      const r = await fetch(`/api/tradelocker/bot/status?uid=${encodeURIComponent(curUid)}`);
+      const r = await fetch(`/api/tradelocker/bot/status?uid=${encodeURIComponent(curUid)}&strategy=${activeBotTab}`);
       if (r.ok) {
         const d = await r.json();
         setPropBotStatus(d.status || (d.is_running ? "RUNNING" : "STOPPED"));
+        if (d.bot_prop_map) setPropBotMap(d.bot_prop_map);
+        if (d.running_prop_bots) setRunningPropBots(d.running_prop_bots);
       }
     } catch { }
-  }, [loginUid]);
+  }, [loginUid, activeBotTab]);
 
   const fetchPositions = useCallback(async () => {
     try {
@@ -2878,6 +2909,8 @@ function App() {
           isRunning={isRunning}
           isOkxRunning={isOkxRunning}
           isPropRunning={isPropRunning}
+          propBotMap={propBotMap}
+          runningPropBots={runningPropBots}
           onToggleMultiplyVolume={handleToggleMultiplyVolume}
           onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
         />

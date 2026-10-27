@@ -692,7 +692,7 @@ class TradeLockerManager:
             return [], ""
 
     @classmethod
-    def save_raw_data(cls, uid: str, accounts: List[Dict[str, Any]], active_id: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
+    def save_raw_data(cls, uid: str, accounts: List[Dict[str, Any]], active_id: str, user_base_dir_fn = None, fernet_instance = None, bot_prop_map: Optional[Dict[str, str]] = None) -> bool:
         """
         Lưu danh sách tài khoản Quỹ vào file JSON, mã hóa an toàn mật khẩu.
         """
@@ -703,6 +703,14 @@ class TradeLockerManager:
 
         file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
         try:
+            existing_data = {}
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as rf:
+                        existing_data = json.load(rf)
+                except Exception:
+                    existing_data = {}
+
             safe_accounts = []
             for acc in accounts:
                 item = dict(acc)
@@ -711,6 +719,8 @@ class TradeLockerManager:
 
             payload = {
                 "active_id": active_id,
+                "bot_prop_map": bot_prop_map if bot_prop_map is not None else existing_data.get("bot_prop_map", {}),
+                "running_prop_bots": existing_data.get("running_prop_bots", {}),
                 "accounts": safe_accounts,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }
@@ -719,6 +729,112 @@ class TradeLockerManager:
             return True
         except Exception:
             return False
+
+    @classmethod
+    def get_prop_bindings(cls, uid: str, user_base_dir_fn = None) -> Tuple[Dict[str, str], Dict[str, bool]]:
+        """Lấy bản đồ gán bot_prop_map (Strategy -> Prop Account ID) và running_prop_bots (Strategy -> True/False)"""
+        file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
+        if not os.path.exists(file_path):
+            if uid != "default":
+                default_path = cls.get_user_creds_file("default", user_base_dir_fn)
+                if os.path.exists(default_path):
+                    file_path = default_path
+            if not os.path.exists(file_path):
+                return {}, {}
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            bot_map = raw.get("bot_prop_map", {}) if isinstance(raw, dict) else {}
+            running_bots = raw.get("running_prop_bots", {}) if isinstance(raw, dict) else {}
+            return bot_map, running_bots
+        except Exception:
+            return {}, {}
+
+    @classmethod
+    def save_prop_bindings(cls, uid: str, bot_prop_map: Optional[Dict[str, str]] = None, running_prop_bots: Optional[Dict[str, bool]] = None, user_base_dir_fn = None) -> bool:
+        """Cập nhật bản đồ gán bot_prop_map và trạng thái chạy running_prop_bots"""
+        file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
+        try:
+            raw = {}
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            if not isinstance(raw, dict):
+                raw = {}
+            if bot_prop_map is not None:
+                raw["bot_prop_map"] = bot_prop_map
+            if running_prop_bots is not None:
+                raw["running_prop_bots"] = running_prop_bots
+            raw["updated_at"] = datetime.now(timezone.utc).isoformat()
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(raw, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def can_start_prop_bot(cls, uid: str, strategy: str, target_acc_id: str, user_base_dir_fn = None, fernet_instance = None) -> Tuple[bool, str]:
+        """
+        Kiểm tra khóa độc quyền: 1 Tài khoản Quỹ chỉ được chạy duy nhất 1 phương pháp Bot.
+        Nếu tài khoản Quỹ này đang chạy ở một bot khác -> Chặn lại và báo lý do rõ ràng.
+        """
+        bot_map, running_bots = cls.get_prop_bindings(uid, user_base_dir_fn)
+        accounts, _ = cls.load_raw_data(uid, user_base_dir_fn, fernet_instance)
+
+        target_name = target_acc_id
+        for acc in accounts:
+            if acc.get("id") == target_acc_id:
+                target_name = acc.get("name") or f"Quỹ #{acc.get('account_id') or target_acc_id}"
+                break
+
+        strat_labels = {
+            "sub1": "EMA200 Bot",
+            "sub2": "SMC Bot",
+            "sub3": "Liquidation Bot"
+        }
+
+        # Quét kiểm tra xem có bot khác đang chạy với tài khoản Quỹ này không
+        for other_strat, is_running in running_bots.items():
+            if other_strat != strategy and is_running:
+                other_acc = bot_map.get(other_strat)
+                if other_acc == target_acc_id:
+                    other_label = strat_labels.get(other_strat, other_strat)
+                    return False, f"Tài khoản {target_name} đang được chạy bởi {other_label}! Mỗi tài khoản Quỹ chỉ được chạy duy nhất 1 phương pháp Bot để tránh xung đột lệnh. Vui lòng dừng bot ở {other_label} hoặc chọn tài khoản Quỹ khác."
+
+        return True, ""
+
+    @classmethod
+    def is_strategy_bot_running(cls, uid: str, strategy: str = "sub1", user_base_dir_fn = None, fernet_instance = None) -> bool:
+        """Kiểm tra xem Bot Quỹ cho Strategy cụ thể có đang chạy hay không"""
+        _, running_bots = cls.get_prop_bindings(uid, user_base_dir_fn)
+        if strategy in running_bots:
+            return bool(running_bots[strategy])
+        return cls.is_bot_running(uid, user_base_dir_fn, fernet_instance)
+
+    @classmethod
+    def set_strategy_bot_running(cls, uid: str, strategy: str, running: bool, account_id: Optional[str] = None, user_base_dir_fn = None, fernet_instance = None) -> bool:
+        """Bật/Tắt Bot Quỹ độc quyền cho từng Strategy (sub1, sub2, sub3)"""
+        bot_map, running_bots = cls.get_prop_bindings(uid, user_base_dir_fn)
+        if account_id:
+            bot_map[strategy] = account_id
+        running_bots[strategy] = bool(running)
+
+        # Cập nhật is_bot_running tổng thể (True nếu có ít nhất 1 bot strategy đang chạy)
+        any_running = any(running_bots.values())
+        cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance) or {}
+        cfg["is_bot_running"] = any_running
+        cls.save_user_config(uid, cfg, user_base_dir_fn, fernet_instance)
+
+        saved = cls.save_prop_bindings(uid, bot_prop_map=bot_map, running_prop_bots=running_bots, user_base_dir_fn=user_base_dir_fn)
+        strat_labels = {"sub1": "EMA200 Bot", "sub2": "SMC Bot", "sub3": "Liquidation Bot"}
+        strat_name = strat_labels.get(strategy, strategy)
+        target_acc_label = bot_map.get(strategy, account_id or "Active")
+        if saved:
+            if running:
+                cls.log_event(uid, f"🚀 [QUỸ FX] Đã khởi động {strat_name} độc quyền cho Quỹ #{target_acc_label}")
+            else:
+                cls.log_event(uid, f"🛑 [QUỸ FX] Đã dừng {strat_name} cho Quỹ #{target_acc_label}")
+        return saved
 
     @classmethod
     def load_user_config(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -801,26 +917,42 @@ class TradeLockerManager:
     @classmethod
     def delete_account(cls, uid: str, account_id: str, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """
-        Xóa 1 tài khoản Quỹ cụ thể.
+        Xóa 1 tài khoản Quỹ cụ thể với so sánh linh hoạt (soft-match) và dọn sạch cả thư mục default để không bị hồi sinh.
         """
+        target = str(account_id).strip()
+        def is_target(a):
+            a_id = str(a.get("id") or "").strip()
+            a_acc = str(a.get("account_id") or "").strip()
+            a_num = str(a.get("acc_num") or "").strip()
+            return target in (a_id, a_acc, a_num, f"e8_{target}", f"prop_e8_{target}", f"e8_{a_acc}") or a_acc == target or a_id == target
+
         accounts, active_id = cls.load_raw_data(uid, user_base_dir_fn, fernet_instance)
-        new_accounts = [a for a in accounts if a.get("id") != account_id]
-        
-        client_key = f"{uid}:{account_id}"
-        if client_key in cls._clients:
-            del cls._clients[client_key]
-        if uid in cls._clients:
-            del cls._clients[uid]
+        new_accounts = [a for a in accounts if not is_target(a)]
 
-        if not new_accounts:
-            file_path = cls.get_user_creds_file(uid, user_base_dir_fn)
-            if os.path.exists(file_path):
-                try: os.remove(file_path)
-                except Exception: pass
-            return True
+        for k in list(cls._clients.keys()):
+            if k.startswith(f"{uid}:") or k == uid:
+                del cls._clients[k]
 
-        new_active = active_id if any(a.get("id") == active_id for a in new_accounts) else new_accounts[0]["id"]
-        return cls.save_raw_data(uid, new_accounts, new_active, user_base_dir_fn, fernet_instance)
+        bot_map, running_bots = cls.get_prop_bindings(uid, user_base_dir_fn)
+        for st in list(bot_map.keys()):
+            if bot_map[st] == target or is_target({"id": bot_map[st], "account_id": bot_map[st]}):
+                del bot_map[st]
+
+        new_active = ""
+        if new_accounts:
+            new_active = active_id if any(a.get("id") == active_id for a in new_accounts) else new_accounts[0].get("id", "")
+
+        # Luôn ghi lại file rỗng cho UID này thay vì xóa file, để load_raw_data không bao giờ fallback về default
+        cls.save_raw_data(uid, new_accounts, new_active, user_base_dir_fn, fernet_instance, bot_prop_map=bot_map)
+
+        # Xóa đồng thời nếu tài khoản này có trong thư mục default
+        if uid != "default":
+            def_accounts, def_active = cls.load_raw_data("default", user_base_dir_fn, fernet_instance)
+            new_def = [a for a in def_accounts if not is_target(a)]
+            new_def_active = def_active if any(a.get("id") == def_active for a in new_def) else (new_def[0].get("id", "") if new_def else "")
+            cls.save_raw_data("default", new_def, new_def_active, user_base_dir_fn, fernet_instance)
+
+        return True
 
     @classmethod
     def get_client(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Optional[TradeLockerClient]:
@@ -998,7 +1130,8 @@ class TradeLockerManager:
         tp_price: Optional[float] = None,
         dry_run: bool = False,
         user_base_dir_fn = None,
-        fernet_instance = None
+        fernet_instance = None,
+        strategy: Optional[str] = None
     ) -> Tuple[bool, str]:
         """
         Bộ điều phối tín hiệu chiến lược từ Bot sang tài khoản Quỹ TradeLocker (E8 Markets)
@@ -1010,6 +1143,7 @@ class TradeLockerManager:
         5. Tự động tính SL/TP fallback theo tỷ lệ cấu hình (mặc định 1.2%)
         6. Tự động vá SL/TP cho các vị thế đang trần (naked positions)
         7. Cầu Dao An Toàn ngắt sớm (Circuit Breakers: Static DD 8%, Daily DD 2.5%, Daily Profit Cap)
+        8. Khóa Độc Quyền Bot: Mỗi tài khoản Quỹ chỉ chạy duy nhất 1 phương pháp Bot (EMA200 / SMC)
         """
         with cls._dispatch_lock:
             clean_uid = uid.strip() if (uid and uid not in ["guest", "undefined", "null"]) else "default"
@@ -1018,19 +1152,27 @@ class TradeLockerManager:
             if not fernet_instance:
                 fernet_instance = cls._get_default_fernet()
 
-            cfg = cls.load_user_config(clean_uid, user_base_dir_fn, fernet_instance)
-            if not cfg or not cfg.get("is_enabled", True):
-                return False, "TradeLocker chưa được kích hoạt hoặc chưa kết nối"
+            # 🛑 KIỂM TRA TRẠNG THÁI CHẠY BOT QUỸ THEO STRATEGY ĐỘC LẬP:
+            bot_map, running_bots = cls.get_prop_bindings(clean_uid, user_base_dir_fn)
+            target_acc_id = None
+            if strategy:
+                if not running_bots.get(strategy, False):
+                    return False, f"Bot Quỹ cho chiến lược {strategy} đang DỪNG — Bỏ qua đặt lệnh Quỹ"
+                target_acc_id = bot_map.get(strategy)
+            else:
+                cfg_all = cls.load_user_config(clean_uid, user_base_dir_fn, fernet_instance)
+                if not cfg_all or not cfg_all.get("is_bot_running", False):
+                    return False, "Bot Quỹ FX đang DỪNG — Bỏ qua đặt lệnh Quỹ"
 
-            # 🛑 KIỂM TRA TRẠNG THÁI CHẠY BOT QUỸ FX:
-            if not cfg.get("is_bot_running", False):
-                return False, "Bot Quỹ FX đang DỪNG — Bỏ qua đặt lệnh Quỹ"
+            cfg = cls.load_user_config(clean_uid, user_base_dir_fn, fernet_instance, account_id=target_acc_id)
+            if not cfg or not cfg.get("is_enabled", True):
+                return False, f"Tài khoản Quỹ {target_acc_id or 'mặc định'} chưa được kích hoạt hoặc chưa kết nối"
 
             # Kiểm tra mã giao dịch có được bật đánh Quỹ không
             enabled_syms = cfg.get("enabled_symbols", ["XAU", "BTC", "ETH"])
             clean_base = symbol.upper().replace("-", "").replace("_", "").replace("USDT", "").replace("USD", "").replace("SWAP", "")
             if clean_base not in [s.upper() for s in enabled_syms]:
-                return False, f"Mã {symbol} ({clean_base}) không nằm trong danh sách bật trade quỹ"
+                return False, f"Mã {symbol} ({clean_base}) không nằm trong danh sách bật trade quỹ của tài khoản {target_acc_id or 'mặc định'}"
 
             # ⏳ KHÓA COOLDOWN CHỐNG BẮN LIÊN TỤC (Tối thiểu 45s mỗi mã):
             now_time = time.time()
@@ -1044,9 +1186,9 @@ class TradeLockerManager:
             # Cập nhật cooldown ngay dưới lock để chặn ngay các luồng đồng thời tiếp theo
             cls._symbol_cooldowns[clean_base] = now_time
 
-            client = cls.get_client(clean_uid, user_base_dir_fn, fernet_instance)
+            client = cls.get_client(clean_uid, user_base_dir_fn, fernet_instance, account_id=target_acc_id)
             if not client:
-                return False, "Không khởi tạo được TradeLocker client"
+                return False, f"Không khởi tạo được TradeLocker client cho tài khoản {target_acc_id or 'mặc định'}"
 
             # 🛡️ KIỂM TRA VỊ THẾ ĐANG MỞ (POSITION SAFETY CHECK):
             # Quy tắc an toàn Quỹ: Mỗi coin chỉ duy nhất 1 vị thế!
@@ -1237,7 +1379,8 @@ class TradeLockerManager:
         price: float,
         sl_price: Optional[float] = None,
         tp_price: Optional[float] = None,
-        dry_run: bool = False
+        dry_run: bool = False,
+        strategy: Optional[str] = None
     ):
         """Chạy dispatch sang TradeLocker trong luồng ngầm daemon không gây block bot loop"""
         import threading
@@ -1250,17 +1393,19 @@ class TradeLockerManager:
                     price=price,
                     sl_price=sl_price,
                     tp_price=tp_price,
-                    dry_run=dry_run
+                    dry_run=dry_run,
+                    strategy=strategy
                 )
+                strat_tag = f"[{strategy.upper()}]" if strategy else "[ALL]"
                 if ok:
-                    print(f"🏆 [TRADELOCKER E8 DISPATCH] {msg}", flush=True)
+                    print(f"🏆 [TRADELOCKER E8 DISPATCH] {strat_tag} {msg}", flush=True)
                 else:
-                    if "chưa được kích hoạt" not in msg and "không nằm trong danh sách" not in msg:
-                        print(f"⚠️ [TRADELOCKER E8 DISPATCH THẤT BẠI]: {msg}", flush=True)
+                    if "chưa được kích hoạt" not in msg and "không nằm trong danh sách" not in msg and "đang DỪNG" not in msg:
+                        print(f"⚠️ [TRADELOCKER E8 DISPATCH THẤT BẠI] {strat_tag}: {msg}", flush=True)
             except Exception as e:
                 print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI]: {e}", flush=True)
 
-        t = threading.Thread(target=_worker, daemon=True, name="TL_Dispatch_Worker")
+        t = threading.Thread(target=_worker, daemon=True, name=f"TL_Dispatch_{strategy or 'Worker'}")
         t.start()
 
 # z1956 | Khắc phục triệt để lỗi spam lệnh TradeLocker: kiểm tra vị thế mở cùng chiều, khóa cooldown 45s, tự động tính SL/TP bắt buộc và tự động vá SL/TP cho các vị thế đang trần

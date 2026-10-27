@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 
-export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelectedId = null, onAccountsUpdated }) {
+export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelectedId = null, activeBotTab = "sub1", onAccountsUpdated }) {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [accountsList, setAccountsList] = useState([]);
   const [activeId, setActiveId] = useState("");
+  const [botPropMap, setBotPropMap] = useState({});
+  const [runningPropBots, setRunningPropBots] = useState({});
   const [selectedId, setSelectedId] = useState(initialSelectedId || null);
   const [accountData, setAccountData] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -14,7 +16,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   const [platform, setPlatform] = useState("mt5"); // 'mt5' (chính) | 'tradelocker' (phụ)
   const [mt5Login, setMt5Login] = useState("");
   const [mt5Password, setMt5Password] = useState("");
-  const [mt5Server, setMt5Server] = useState("E8-Platform5");
+  const [mt5Server, setMt5Server] = useState("E8Markets-Demo");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +30,14 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   const [isEnabled, setIsEnabled] = useState(true);
 
   const effectiveUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+
+  // Chế độ Master-Detail: Thêm mới (Ảnh 2) hay Xem chi tiết tài khoản đã có (Ảnh 1)
+  const isNewAccountMode = selectedId === "__new__" || accountsList.length === 0;
+  const currentAccount = accountsList.find((a) => a.id === selectedId) || (accountsList.length > 0 ? accountsList[0] : null);
+  const displayAccount = {
+    ...(currentAccount || {}),
+    ...(accountData || {}),
+  };
 
   // 1. Tải danh sách tất cả các tài khoản Quỹ đã kết nối
   const fetchAccountsList = async (targetIdToSelect = null) => {
@@ -44,6 +54,8 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
         if (data && data.status === "success" && Array.isArray(data.accounts)) {
           setAccountsList(data.accounts);
           setActiveId(data.active_id || "");
+          if (data.bot_prop_map) setBotPropMap(data.bot_prop_map);
+          if (data.running_prop_bots) setRunningPropBots(data.running_prop_bots);
 
           if (targetIdToSelect) {
             setSelectedId(targetIdToSelect);
@@ -202,7 +214,22 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
     }
   };
 
-  // Chọn tài khoản này làm Quỹ active đang giao dịch
+  const getAccRunningBot = (item) => {
+    if (!item) return null;
+    const itId = item.id;
+    const itAccId = item.account_id ? String(item.account_id) : "";
+    for (const st of ["sub1", "sub2", "sub3"]) {
+      if (runningPropBots[st]) {
+        const mapped = botPropMap[st];
+        if (mapped && (mapped === itId || mapped === itAccId || `prop_${(item.server || "e8").toLowerCase()}_${mapped}` === itId)) {
+          return st;
+        }
+      }
+    }
+    return null;
+  };
+
+  // Gán tài khoản này cho Bot hiện tại
   const handleSelectActive = async (accId) => {
     try {
       const token = localStorage.getItem("tls1_jwt_token");
@@ -213,11 +240,12 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
       const res = await fetch("/api/tradelocker/select_account", {
         method: "POST",
         headers,
-        body: JSON.stringify({ uid: effectiveUid, account_id: accId }),
+        body: JSON.stringify({ uid: effectiveUid, account_id: accId, strategy: activeBotTab }),
       });
       if (res.ok) {
         setActiveId(accId);
-        setSuccessMsg("Đã kích hoạt tài khoản Quỹ này cho bot!");
+        const stratName = activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation";
+        setSuccessMsg(`Đã gán tài khoản Quỹ này cho ${stratName}!`);
         fetchAccountsList(accId);
         window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: accId }));
       }
@@ -271,7 +299,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   // Xóa tài khoản Quỹ đang xem
   const handleDeleteAccount = async () => {
     if (!selectedId || selectedId === "__new__") return;
-    const targetName = accountData?.name || `Quỹ #${accountData?.account_id}`;
+    const targetName = displayAccount?.name || `Quỹ #${displayAccount?.account_id || selectedId}`;
     if (!window.confirm(`Bạn có chắc chắn muốn ngắt kết nối và xóa ${targetName}?`)) return;
 
     setLoading(true);
@@ -320,6 +348,9 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
           {accountsList.map((acc) => {
             const isSel = acc.id === selectedId;
             const isAct = acc.id === activeId || acc.is_active;
+            const runningStrat = getAccRunningBot(acc);
+            const isAssignedToThisBot = (botPropMap[activeBotTab] === acc.account_id || botPropMap[activeBotTab] === acc.id) || (!botPropMap[activeBotTab] && acc.id === activeId);
+
             return (
               <button
                 key={acc.id}
@@ -351,11 +382,21 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                   <span style={{ fontSize: "10px", fontWeight: "bold" }}>●</span>
                 )}
                 <span>{acc.name || `Quỹ ${acc.server} #${acc.account_id}`}</span>
-                {isAct && (
-                  <span style={{ fontSize: "8.5px", background: "#00e676", color: "#000", padding: "1px 4px", borderRadius: "2px", fontWeight: "bold" }}>
-                    TRADE
+                {runningStrat ? (
+                  runningStrat === activeBotTab ? (
+                    <span style={{ fontSize: "8px", background: "rgba(0, 230, 118, 0.2)", border: "1px solid #00e676", color: "#00e676", padding: "1px 4px", borderRadius: "2px", fontWeight: "bold", letterSpacing: "0.3px" }}>
+                      ● TRADE
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "8px", background: "rgba(245, 158, 11, 0.2)", border: "1px solid #f59e0b", color: "#f59e0b", padding: "1px 4px", borderRadius: "2px", fontWeight: "bold" }}>
+                      🔒 {runningStrat === "sub1" ? "EMA200" : runningStrat === "sub2" ? "SMC" : "LIQUIDATION"}
+                    </span>
+                  )
+                ) : isAssignedToThisBot ? (
+                  <span style={{ fontSize: "8px", background: "rgba(96, 165, 250, 0.15)", border: "1px solid rgba(96, 165, 250, 0.5)", color: "#60a5fa", padding: "1px 4px", borderRadius: "2px", fontWeight: "bold" }}>
+                    GÁN
                   </span>
-                )}
+                ) : null}
               </button>
             );
           })}
@@ -386,47 +427,76 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
         </div>
       )}
 
-      {fetching ? (
-        <div style={{ padding: "30px", textAlign: "center", color: "#888888", fontSize: "13px" }}>
-          <span className="spinner" style={{ marginRight: "8px" }}></span> Đang tải thông tin tài khoản Quỹ...
-        </div>
-      ) : selectedId && selectedId !== "__new__" && accountData ? (
-        /* TRƯỜNG HỢP 1: XEM CHI TIẾT & CẤU HÌNH TÀI KHOẢN ĐANG CHỌN */
+      {/* HIỂN THỊ: CHI TIẾT TÀI KHOẢN (ẢNH 1) HOẶC FORM THÊM MỚI (ẢNH 2) */}
+      {!isNewAccountMode && currentAccount ? (
+        /* TRƯỜNG HỢP 1: XEM CHI TIẾT & CẤU HÌNH TÀI KHOẢN ĐANG CHỌN (ẢNH 1) */
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           {/* Header Card: Thông tin tài khoản */}
-          <div style={{ backgroundColor: "#151515", border: accountData.id === activeId ? "1px solid #00e676" : "1px solid #333333", borderRadius: "6px", padding: "14px" }}>
+          <div style={{ backgroundColor: "#151515", border: displayAccount.id === activeId ? "1px solid #00e676" : "1px solid #333333", borderRadius: "6px", padding: "14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  {accountData.id === activeId ? (
-                    <span style={{ fontSize: "10px", fontWeight: "bold", padding: "2px 6px", borderRadius: "3px", backgroundColor: "#00e676", color: "#000" }}>
-                      ĐANG GIAO DỊCH
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleSelectActive(accountData.id)}
-                      style={{ fontSize: "10px", fontWeight: "bold", padding: "2px 6px", borderRadius: "3px", backgroundColor: "#222222", border: "1px solid #555", color: "#00e676", cursor: "pointer" }}
-                      title="Chọn tài khoản này làm Quỹ nhận lệnh từ Bot"
-                    >
-                      Kích hoạt cho Bot
-                    </button>
-                  )}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <span style={{ fontSize: "13px", fontWeight: "bold", color: "#ffffff", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    {accountData.server?.toUpperCase().includes("E8") && (
+                    {displayAccount.server?.toUpperCase().includes("E8") && (
                       <img src="/e8_logo.png" alt="E8" style={{ width: "16px", height: "16px", objectFit: "contain", borderRadius: "2px" }} />
                     )}
-                    {accountData.server?.toUpperCase().includes("5") && (
+                    {displayAccount.server?.toUpperCase().includes("5") && (
                       <img src="/the5ers_logo.png" alt="The 5%ers" style={{ width: "18px", height: "18px", objectFit: "contain", borderRadius: "2px" }} />
                     )}
-                    {accountData.server?.toUpperCase().includes("FTMO") && (
+                    {displayAccount.server?.toUpperCase().includes("FTMO") && (
                       <img src="/ftmo_logo.png" alt="FTMO" style={{ width: "16px", height: "16px", objectFit: "contain", borderRadius: "2px" }} />
                     )}
-                    {accountData.name || `Quỹ ${accountData.server} TradeLocker`}
+                    {displayAccount.name || `Quỹ ${displayAccount.server || "E8"}`}
                   </span>
+
+                  {(() => {
+                    const dispRunningStrat = getAccRunningBot(displayAccount);
+                    const isDispAssigned = (botPropMap[activeBotTab] === displayAccount.account_id || botPropMap[activeBotTab] === displayAccount.id) || (!botPropMap[activeBotTab] && displayAccount.id === activeId);
+                    const stratLabel = activeBotTab === "sub1" ? "Bot EMA200" : activeBotTab === "sub2" ? "Bot SMC" : "Bot Liquidation";
+
+                    if (dispRunningStrat) {
+                      if (dispRunningStrat === activeBotTab) {
+                        return (
+                          <span style={{ fontSize: "9px", fontWeight: "600", padding: "2px 7px", borderRadius: "3px", backgroundColor: "rgba(0, 230, 118, 0.12)", border: "1px solid rgba(0, 230, 118, 0.4)", color: "#00e676", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#00e676" }}></span> Đang chạy {stratLabel}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span style={{ fontSize: "9px", fontWeight: "600", padding: "2px 7px", borderRadius: "3px", backgroundColor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.45)", color: "#f59e0b", display: "inline-flex", alignItems: "center", gap: "4px" }} title="Tài khoản Quỹ này đang chạy độc quyền">
+                          <span style={{ width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "#f59e0b" }}></span> 🔒 Đang chạy độc quyền bởi {dispRunningStrat === "sub1" ? "Bot EMA200" : dispRunningStrat === "sub2" ? "Bot SMC" : "Bot Liquidation"}
+                        </span>
+                      );
+                    }
+
+                    if (isDispAssigned) {
+                      return (
+                        <span style={{ fontSize: "9px", fontWeight: "600", padding: "2px 7px", borderRadius: "3px", backgroundColor: "rgba(59, 130, 246, 0.15)", border: "1px solid rgba(59, 130, 246, 0.4)", color: "#60a5fa", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          ✓ Đã gán cho {stratLabel}
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectActive(displayAccount.id)}
+                        style={{ fontSize: "9.5px", fontWeight: "bold", padding: "2px 8px", borderRadius: "3px", backgroundColor: "#1e293b", border: "1px solid #3b82f6", color: "#60a5fa", cursor: "pointer" }}
+                        title={`Gán tài khoản Quỹ này cho ${stratLabel}`}
+                      >
+                        Gán cho {stratLabel}
+                      </button>
+                    );
+                  })()}
+
+                  {fetching && (
+                    <span style={{ fontSize: "10px", color: "#888888", display: "inline-flex", alignItems: "center", gap: "3px", marginLeft: "2px" }}>
+                      <span className="spinner" style={{ width: "8px", height: "8px" }}></span> Đồng bộ...
+                    </span>
+                  )}
                 </div>
-                <div style={{ fontSize: "11px", color: "#888888", marginTop: "5px" }}>
-                  ID: <strong style={{ color: "#ffffff" }}>{accountData.account_id}</strong> | Email: {accountData.email}
+                <div style={{ fontSize: "11px", color: "#888888", marginTop: "4px" }}>
+                  Email: <span style={{ color: "#dddddd" }}>{displayAccount.email || "N/A"}</span>
                 </div>
               </div>
               <button
@@ -446,13 +516,13 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
               <div>
                 <div style={{ fontSize: "11px", color: "#888888" }}>Số dư (Balance):</div>
                 <div style={{ fontSize: "16px", fontWeight: "bold", color: "#00e676" }}>
-                  ${Number(accountData.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  ${Number(displayAccount.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: "11px", color: "#888888" }}>Vốn khả dụng (Equity):</div>
                 <div style={{ fontSize: "16px", fontWeight: "bold", color: "#ffffff" }}>
-                  ${Number(accountData.equity || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  ${Number(displayAccount.equity !== undefined ? displayAccount.equity : (displayAccount.balance || 0)).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
@@ -461,34 +531,34 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
           {/* Bảng Giám Sát Mục Tiêu Quỹ */}
           <div style={{ backgroundColor: "#181818", border: "1px solid #2d2d2d", borderRadius: "6px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
             <div style={{ fontSize: "12px", fontWeight: "bold", color: "#ff9900", borderBottom: "1px solid #282828", paddingBottom: "6px" }}>
-              TIẾN ĐỘ THI QUỸ {accountData.server?.toUpperCase() || "E8 MARKETS"}
+              TIẾN ĐỘ THI QUỸ {displayAccount.server?.toUpperCase() || "E8 MARKETS"}
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px" }}>
               <span style={{ color: "#aaaaaa" }}>Mục tiêu lợi nhuận (8%):</span>
               <span style={{ fontWeight: "bold", color: "#ffffff" }}>
-                ${Number(accountData.profit || 0).toFixed(2)} / ${Number(accountData.profit_target || 400).toFixed(2)} US$
+                ${Number(displayAccount.profit || 0).toFixed(2)} / ${Number(displayAccount.profit_target || ((displayAccount.fund_size || 5000) * 0.08)).toFixed(2)} US$
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px" }}>
               <span style={{ color: "#aaaaaa" }}>Lỗ tối đa tổng (Static 8%):</span>
               <span style={{ color: "#ffffff" }}>
-                Ngưỡng vi phạm: <strong style={{ color: "#ff4d4f" }}>${Number(accountData.loss_level || 4600).toFixed(2)} US$</strong>
+                Ngưỡng vi phạm: <strong style={{ color: "#ff4d4f" }}>${Number(displayAccount.loss_level || ((displayAccount.fund_size || 5000) * 0.92)).toFixed(2)} US$</strong>
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px" }}>
               <span style={{ color: "#aaaaaa" }}>Lỗ tối đa trong ngày (2.5%):</span>
               <span style={{ fontWeight: "bold", color: "#ffb300" }}>
-                Tối đa: -${Number(accountData.daily_loss_limit || 125).toFixed(2)} US$
+                Tối đa: -${Number(displayAccount.daily_loss_limit || 125).toFixed(2)} US$
               </span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px" }}>
               <span style={{ color: "#aaaaaa" }}>Trần lãi tối đa / ngày:</span>
               <span style={{ color: "#00e676", fontWeight: "bold" }}>
-                ${Number(accountData.daily_profit_cap || 100).toFixed(2)} US$ / ngày
+                ${Number(displayAccount.daily_profit_cap || 100).toFixed(2)} US$ / ngày
               </span>
             </div>
           </div>
@@ -497,12 +567,8 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
         /* TRƯỜNG HỢP 2: FORM KẾT NỐI QUỸ MỚI */
         <form onSubmit={handleConnect} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div style={{ backgroundColor: "#181818", border: "1px solid #2c2c2c", borderRadius: "6px", padding: "12px" }}>
-            <p style={{ margin: "0 0 10px 0", fontSize: "12px", color: "#aaaaaa", lineHeight: "1.5" }}>
-              Kết nối trực tiếp tài khoản <strong>Quỹ Prop Firm (E8 Markets, The 5%ers, FTMO...)</strong> của bạn. Bot sẽ dùng chung tín hiệu chiến lược hiện tại (SMC / EMA200) và tự động tính toán số Lot an toàn để giao dịch.
-            </p>
-
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {/* CHỌN NỀN TẢNG GIAO DỊCH (MT5 LÀ CHÍNH, TRADELOCKER LÀ PHỤ) */}
+              {/* CHỌN NỀN TẢNG GIAO DỊCH */}
               <div>
                 <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "6px" }}>
                   Nền tảng giao dịch (Platform):
@@ -513,10 +579,9 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                     onClick={() => setPlatform("mt5")}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "4px",
+                      gap: "6px",
                       padding: "8px 10px",
                       borderRadius: "5px",
                       cursor: "pointer",
@@ -528,12 +593,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span>🔵 MetaTrader 5 (MT5)</span>
-                    </div>
-                    <span style={{ fontSize: "9px", background: "#1890ff", color: "#ffffff", padding: "1px 5px", borderRadius: "2px", fontWeight: "bold" }}>
-                      CHÍNH / KHUYÊN DÙNG
-                    </span>
+                    <span>🔵 MetaTrader 5 (MT5)</span>
                   </button>
 
                   <button
@@ -541,10 +601,9 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                     onClick={() => setPlatform("tradelocker")}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "4px",
+                      gap: "6px",
                       padding: "8px 10px",
                       borderRadius: "5px",
                       cursor: "pointer",
@@ -556,12 +615,7 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span>🟢 TradeLocker</span>
-                    </div>
-                    <span style={{ fontSize: "9px", background: "#333333", color: "#aaaaaa", padding: "1px 5px", borderRadius: "2px" }}>
-                      PHỤ / CLOUD WEB
-                    </span>
+                    <span>🟢 TradeLocker</span>
                   </button>
                 </div>
               </div>
@@ -580,9 +634,8 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       style={{ cursor: "pointer" }}
                     >
                       <optgroup label="E8 Markets (Khuyên dùng)">
-                        <option value="E8-Platform5">E8 Markets (Platform 5 / MT5 - Classic Markets)</option>
-                        <option value="E8Markets-Demo">E8 Markets (Demo Server MT5)</option>
-                        <option value="E8Markets-Live">E8 Markets (Live / Funded MT5)</option>
+                        <option value="E8Markets-Demo">E8 Markets (Tài khoản Thi Quỹ - Demo MT5)</option>
+                        <option value="E8Markets-Live">E8 Markets (Tài khoản Cầm Quỹ - Live/Funded MT5)</option>
                       </optgroup>
                       <optgroup label="FTMO & Quỹ Lớn Khác">
                         <option value="FTMO-MT5">FTMO (MetaTrader 5 Demo / Live)</option>
@@ -640,24 +693,6 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       </button>
                     </div>
                   </div>
-
-                  {/* BANNER HƯỚNG DẪN THÔNG MINH E8 MARKETS & MT5 */}
-                  <div style={{
-                    background: "rgba(24, 144, 255, 0.08)",
-                    border: "1px solid rgba(24, 144, 255, 0.25)",
-                    borderRadius: "5px",
-                    padding: "8px 10px",
-                    fontSize: "11px",
-                    lineHeight: "1.5",
-                    color: "#b0d5f8",
-                  }}>
-                    <div style={{ color: "#40a9ff", fontWeight: "bold", marginBottom: "3px" }}>
-                      💡 Lưu ý quan trọng từ Quỹ E8 Markets:
-                    </div>
-                    <div>• <strong>Tên gọi:</strong> Trên hệ thống E8, MT5 có thể hiển thị dưới tên <strong>"Platform 5"</strong> (do chính sách bản quyền MetaQuotes).</div>
-                    <div>• <strong>Loại gói:</strong> MT5 khả dụng cho danh mục <strong>Classic Markets (Forex & CFD)</strong> tại Việt Nam / Quốc tế (không áp dụng cho IP Mỹ).</div>
-                    <div>• <strong>Hỗ trợ đổi nền tảng:</strong> Nếu lúc mua bạn vô tình chọn nhầm Crypto/Perpetual, hãy mở Live Chat trên trang chủ E8 để yêu cầu hỗ trợ đổi sang MT5 miễn phí (khi tài khoản chưa mở lệnh).</div>
-                  </div>
                 </>
               ) : (
                 <>
@@ -681,17 +716,16 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                       style={{ cursor: "pointer" }}
                     >
                       <optgroup label="E8 Markets">
-                        <option value="E8">E8 Markets (Demo - demo.tradelocker.com)</option>
-                        <option value="E8-Live">E8 Markets (Live / Funded - live.tradelocker.com)</option>
+                        <option value="E8">E8 Markets (Tài khoản Thi Quỹ - demo.tradelocker.com)</option>
+                        <option value="E8-Live">E8 Markets (Tài khoản Cầm Quỹ - live.tradelocker.com)</option>
                       </optgroup>
                       <optgroup label="The 5%ers">
                         <option value="The5ers">The 5%ers (Demo - demo.tradelocker.com)</option>
                         <option value="The5ers-Live">The 5%ers (Live / Funded - live.tradelocker.com)</option>
                       </optgroup>
-                      <optgroup label="FTMO & Quỹ Khác">
-                        <option value="FTMO">FTMO (TradeLocker Demo)</option>
-                        <option value="FunderPro">FunderPro (TradeLocker)</option>
+                      <optgroup label="Quỹ Khác">
                         <option value="FundingPips">Funding Pips (TradeLocker)</option>
+                        <option value="FunderPro">FunderPro (TradeLocker)</option>
                       </optgroup>
                     </select>
                   </div>
@@ -742,18 +776,6 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
                         {showPassword ? "Ẩn" : "Hiện"}
                       </button>
                     </div>
-                  </div>
-
-                  <div style={{
-                    background: "rgba(0, 230, 118, 0.06)",
-                    border: "1px solid rgba(0, 230, 118, 0.2)",
-                    borderRadius: "5px",
-                    padding: "8px 10px",
-                    fontSize: "11px",
-                    lineHeight: "1.5",
-                    color: "#a7f3d0",
-                  }}>
-                    💡 TradeLocker là nền tảng Cloud hiện đại, phù hợp với các gói Crypto / Perpetuals hoặc trader muốn tự động hóa trên Web mà không cần cài phần mềm máy tính.
                   </div>
                 </>
               )}

@@ -1215,6 +1215,7 @@ export default function ConnectModal({
                 currentUid={effectiveUid}
                 t={t}
                 initialSelectedId={selectedPropId}
+                activeBotTab={activeBotTab}
                 onAccountsUpdated={fetchPropAccounts}
               />
             </div>
@@ -1279,7 +1280,7 @@ export default function ConnectModal({
               </span>
             </div>
 
-            {isConnected && (
+            {isConnected && !isPropTab && (
               <button
                 type="button"
                 onClick={() => setShowConfirmLogout(true)}

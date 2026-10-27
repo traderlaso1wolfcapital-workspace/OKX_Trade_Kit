@@ -89,7 +89,8 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
                 price=price,
                 sl_price=sl_price,
                 tp_price=tp_price,
-                dry_run=dry_run
+                dry_run=dry_run,
+                strategy="sub2"
             )
     except Exception as e:
         print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side}: {e}", flush=True)

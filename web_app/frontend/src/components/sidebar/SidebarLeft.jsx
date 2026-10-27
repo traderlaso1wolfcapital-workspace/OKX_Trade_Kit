@@ -123,6 +123,8 @@ export default function SidebarLeft({
   isRunning = false,
   isOkxRunning = false,
   isPropRunning = false,
+  propBotMap = {},
+  runningPropBots = {},
   onToggleMultiplyVolume,
   onOpenConnectModal,
 }) {
@@ -131,6 +133,8 @@ export default function SidebarLeft({
   const [e8Account, setE8Account] = useState(null);
   const [propAccounts, setPropAccounts] = useState([]);
   const [activePropId, setActivePropId] = useState("");
+  const [localBotPropMap, setLocalBotPropMap] = useState({});
+  const [localRunningPropBots, setLocalRunningPropBots] = useState({});
   const [e8Lot, setE8Lot] = useState(() => {
     const saved = localStorage.getItem("tls1_e8_lot");
     if (!saved || saved === "0.03" || Number(saved) === 0.03) {
@@ -183,6 +187,8 @@ export default function SidebarLeft({
           if (d.active_id) {
             setActivePropId(d.active_id);
           }
+          if (d.bot_prop_map) setLocalBotPropMap(d.bot_prop_map);
+          if (d.running_prop_bots) setLocalRunningPropBots(d.running_prop_bots);
         }
       })
       .catch(() => {});
@@ -224,6 +230,50 @@ export default function SidebarLeft({
       .catch(() => {});
   };
 
+  const effectiveBotMap = (propBotMap && Object.keys(propBotMap).length > 0) ? propBotMap : localBotPropMap;
+  const effectiveRunningBots = (runningPropBots && Object.keys(runningPropBots).length > 0) ? runningPropBots : localRunningPropBots;
+
+  const getOkxRunningBot = (acc) => {
+    if (!acc) return null;
+    const accId = String(acc.id || "").trim();
+    const accName = String(acc.name || "").trim();
+    const cleanAccName = accName.replace(/^#/, "").toLowerCase();
+
+    for (const st of ["sub1", "sub2", "sub3"]) {
+      const runningTarget = activeAccounts ? activeAccounts[st] : null;
+      if (runningTarget) {
+        const targetStr = String(runningTarget).trim();
+        const cleanTarget = targetStr.replace(/^#/, "").toLowerCase();
+        if (
+          targetStr === accId ||
+          targetStr === accName ||
+          (cleanTarget && (cleanTarget === cleanAccName || cleanTarget === accId.toLowerCase()))
+        ) {
+          return st;
+        }
+      }
+    }
+    if (isOkxRunning && (accId === effectiveAccId || accName === effectiveAccId)) {
+      return activeBotTab;
+    }
+    return null;
+  };
+
+  const getPropRunningBot = (pAcc) => {
+    if (!pAcc) return null;
+    const pId = pAcc.id;
+    const pAccId = pAcc.account_id ? String(pAcc.account_id) : "";
+    for (const st of ["sub1", "sub2", "sub3"]) {
+      if (effectiveRunningBots[st]) {
+        const mapped = effectiveBotMap[st];
+        if (mapped && (mapped === pId || mapped === pAccId || `prop_${(pAcc.firm || "e8").toLowerCase()}_${mapped}` === pId)) {
+          return st;
+        }
+      }
+    }
+    return null;
+  };
+
   const handleSelectPropAccount = (accId) => {
     if (accId === "__connect__") {
       onOpenConnectModal && onOpenConnectModal("tradelocker");
@@ -238,7 +288,7 @@ export default function SidebarLeft({
     fetch("/api/tradelocker/select_account", {
       method: "POST",
       headers,
-      body: JSON.stringify({ uid: curUid, account_id: accId })
+      body: JSON.stringify({ uid: curUid, account_id: accId, strategy: activeBotTab })
     })
       .then((r) => r.json())
       .then((d) => {
@@ -391,15 +441,13 @@ export default function SidebarLeft({
               }
             }
 
-            const isThisOkxRunning = isOkx && currentOkxAcc && (
-              Object.values(activeAccounts || {}).includes(currentOkxAcc.id) ||
-              Object.values(activeAccounts || {}).includes(currentOkxAcc.name) ||
-              isOkxRunning
-            );
-            const isThisPropRunning = !isOkx && isPropRunning && (
-              currentPropAcc?.id === activePropId || propAccounts.length <= 1
-            );
-            const isCurrentRunning = isOkx ? isThisOkxRunning : isThisPropRunning;
+            const okxRunningStrat = getOkxRunningBot(currentOkxAcc);
+            const isThisOkxRunning = isOkx && (okxRunningStrat === activeBotTab || (!okxRunningStrat && isOkxRunning));
+            const otherOkxRunningStrat = (isOkx && okxRunningStrat && okxRunningStrat !== activeBotTab) ? okxRunningStrat : null;
+
+            const propRunningStrat = getPropRunningBot(currentPropAcc);
+            const isThisPropRunning = !isOkx && (propRunningStrat === activeBotTab || (!propRunningStrat && isPropRunning && (currentPropAcc?.id === activePropId || propAccounts.length <= 1)));
+            const otherPropRunningStrat = (!isOkx && propRunningStrat && propRunningStrat !== activeBotTab) ? propRunningStrat : null;
 
             return (
               <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "10px" }}>
@@ -440,9 +488,24 @@ export default function SidebarLeft({
                       {displayAccountTag && (
                         <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{displayAccountTag}</span>
                       )}
-                      {isCurrentRunning && (
+                      {isOkx && isThisOkxRunning && (
                         <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                           LIVE
+                        </span>
+                      )}
+                      {isOkx && otherOkxRunningStrat && (
+                        <span style={{ fontSize: "9px", color: "#f59e0b", fontWeight: 800, background: "rgba(245, 158, 11, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title={`Tài khoản này đang chạy độc quyền bởi ${otherOkxRunningStrat === "sub1" ? "Bot EMA200" : otherOkxRunningStrat === "sub2" ? "Bot SMC" : "Bot Liquidation"}`}>
+                          🔒 {otherOkxRunningStrat === "sub1" ? "EMA200" : otherOkxRunningStrat === "sub2" ? "SMC" : "LIQUIDATION"}
+                        </span>
+                      )}
+                      {!isOkx && isThisPropRunning && (
+                        <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                          LIVE
+                        </span>
+                      )}
+                      {!isOkx && otherPropRunningStrat && (
+                        <span style={{ fontSize: "9px", color: "#f59e0b", fontWeight: 800, background: "rgba(245, 158, 11, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title={`Tài khoản này đang chạy độc quyền bởi ${otherPropRunningStrat === "sub1" ? "Bot EMA200" : otherPropRunningStrat === "sub2" ? "Bot SMC" : "Bot Liquidation"}`}>
+                          🔒 {otherPropRunningStrat === "sub1" ? "EMA200" : otherPropRunningStrat === "sub2" ? "SMC" : "LIQUIDATION"}
                         </span>
                       )}
                     </div>
@@ -488,9 +551,9 @@ export default function SidebarLeft({
                         accounts.map((acc) => {
                           const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
                           const tag = formatOkxAccountTag(acc);
-                          const isAccRunning = Object.values(activeAccounts || {}).includes(acc.id) ||
-                                               Object.values(activeAccounts || {}).includes(acc.name) ||
-                                               (isOkxRunning && isSelected);
+                          const accRunningStrat = getOkxRunningBot(acc);
+                          const isThisAccRunning = accRunningStrat === activeBotTab || (!accRunningStrat && isOkxRunning && isSelected);
+                          const otherAccRunning = (accRunningStrat && accRunningStrat !== activeBotTab) ? accRunningStrat : null;
 
                           return (
                             <button
@@ -534,9 +597,14 @@ export default function SidebarLeft({
                                 <OkxLogo size={13} />
                                 <span>SÀN OKX</span>
                                 <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
-                                {isAccRunning && (
+                                {isThisAccRunning && (
                                   <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                                     LIVE
+                                  </span>
+                                )}
+                                {otherAccRunning && (
+                                  <span style={{ fontSize: "9px", color: "#f59e0b", fontWeight: 800, background: "rgba(245, 158, 11, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title={`Đang chạy độc quyền bởi ${otherAccRunning === "sub1" ? "Bot EMA200" : otherAccRunning === "sub2" ? "Bot SMC" : "Bot Liquidation"}`}>
+                                    🔒 {otherAccRunning === "sub1" ? "EMA200" : otherAccRunning === "sub2" ? "SMC" : "LIQUIDATION"}
                                   </span>
                                 )}
                               </div>
@@ -583,7 +651,9 @@ export default function SidebarLeft({
                           const firmUpper = (pAcc.firm || "E8").toUpperCase();
                           const rawTag = (pAcc.account_id || pAcc.id || "").toString();
                           const tag = rawTag.replace(/^#/, "");
-                          const isThisPropAccRunning = isPropRunning && (pAcc.id === activePropId || propAccounts.length <= 1);
+                          const pRunningStrat = getPropRunningBot(pAcc);
+                          const isThisPropAccRunning = pRunningStrat === activeBotTab || (!pRunningStrat && isPropRunning && (pAcc.id === activePropId || propAccounts.length <= 1));
+                          const otherPAccRunning = (pRunningStrat && pRunningStrat !== activeBotTab) ? pRunningStrat : null;
 
                           return (
                             <button
@@ -630,6 +700,11 @@ export default function SidebarLeft({
                                 {isThisPropAccRunning && (
                                   <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                                     LIVE
+                                  </span>
+                                )}
+                                {otherPAccRunning && (
+                                  <span style={{ fontSize: "9px", color: "#f59e0b", fontWeight: 800, background: "rgba(245, 158, 11, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title={`Tài khoản này đang chạy độc quyền bởi ${otherPAccRunning === "sub1" ? "Bot EMA200" : otherPAccRunning === "sub2" ? "Bot SMC" : "Bot Liquidation"}`}>
+                                    🔒 {otherPAccRunning === "sub1" ? "EMA200" : otherPAccRunning === "sub2" ? "SMC" : "LIQUIDATION"}
                                   </span>
                                 )}
                               </div>

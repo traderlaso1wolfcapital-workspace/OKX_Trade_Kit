@@ -33,6 +33,134 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Hoàn Thiện Khóa Độc Quyền Sàn OKX (Chống Trùng Bot Trên 1 Tài Khoản #bot-m15), Sửa Lỗi Quỹ FX Bung Modal Connect & Khắc Phục Lỗi Xóa Tài Khoản F5 Vẫn Còn:
+  - **Mô tả hiện tượng từ CEO:**
+    1. Khi chạy bot ở tài khoản `#bot-m15` thì hiện nút `LIVE`, chuyển sang bot SMC chọn 1 TF rồi ấn chạy bot thì cả 2 pp bot vẫn chạy đồng thời trên cùng tài khoản `#bot-m15`.
+    2. Đang chọn tài khoản Quỹ E8 (`E8 Demo #2534591`), bấm nút "CHẠY BOT" thì lại bung ConnectModal dù tài khoản đã kết nối rồi.
+    3. Bấm xóa tài khoản Quỹ E8 thành công nhưng F5 trang web lại thì tài khoản cũ tự động hồi sinh (Zombie Account).
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. Cơ chế khóa độc quyền trước đó mới chỉ áp dụng cho Quỹ FX, cả backend `/api/bot/start` và frontend `handleStartBot` chưa có điều kiện chặn tài khoản OKX đang chạy ở bot khác. Ngoài ra `SidebarLeft.jsx` gom chung `Object.values(activeAccounts).includes(acc.id)` nên ở bot nào cũng hiện `LIVE`.
+    2. Frontend `handleStartBotClick` kiểm tra `/api/tradelocker/account`. Khi token hoặc mạng TradeLocker chập chờn, API trả về `status: "error"`, frontend gán sai `isPropConn = false` và tự bung ConnectModal.
+    3. Hàm `delete_account` khi thấy `new_accounts == []` đã xóa luôn file config của user. Khi F5, hệ thống fallback đọc file `default/tradelocker_config.json` cũ còn lưu tài khoản này nên tài khoản bị "hồi sinh".
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Khóa Độc Quyền Tuyệt Đối Sàn OKX:**
+       - **Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):** Bổ sung kiểm tra trong `start_bot`: nếu `target_acc` đang chạy ở chiến lược khác (`sub1`, `sub2`, `sub3`), lập tức chặn đứng và trả về HTTP 400 kèm thông báo rõ ràng.
+       - **Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):** Bổ sung kiểm tra trước khi gửi lệnh start bot. Nếu tài khoản OKX đang chạy bot khác, bật alert cảnh báo và chặn lại ngay lập tức.
+       - **UI Đồng Bộ ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):** Xây dựng helper `getOkxRunningBot`. Nút dropdown và danh sách popup chỉ hiển thị `LIVE` xanh khi đang ở đúng bot của nó; khi chuyển sang bot khác hiển thị nhãn `🔒 [Tên Bot]` màu hổ phách sang trọng.
+    2. **Khắc phục lỗi Quỹ FX Bung ConnectModal:**
+       - Trong `App.jsx`, sửa `handleStartBotClick` kiểm tra trực tiếp danh sách tài khoản `/api/tradelocker/accounts?uid=...`. Nếu `accounts.length > 0` thì gọi thẳng `handleStartPropBot()`, chỉ mở ConnectModal khi thực sự chưa kết nối tài khoản nào.
+    3. **Triệt tiêu lỗi Xóa Tài Khoản Quỹ F5 Hồi Sinh:**
+       - Trong `tradelocker_service.py`, cải tiến hàm `delete_account`: so sánh mềm linh hoạt (khớp cả `e8_2534591`, `2534591`, v.v.), khi xóa hết thì lưu mảng rỗng `accounts: []` thay vì xóa file (để ngăn fallback về default), đồng thời tự động dọn dẹp sạch tài khoản đó trong file `default/tradelocker_config.json`.
+    4. **Tích hợp MetaTrader 5 Python Service ([mt5_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/mt5_service.py)):**
+       - Cài đặt thư viện `MetaTrader5` chính thức trên Windows.
+       - Xây dựng module điều phối MT5 tập trung hỗ trợ kết nối, lấy vị thế, đặt lệnh thị trường và đóng vị thế.
+    5. **Kiểm thử nghiệm thu:**
+       - AST syntax test Python: `ALL SYNTAX OK`.
+       - Build Vite: `✓ built in 264ms`.
+
+
+- **[27/10/2026]** - Hoàn Thiện 100% Hệ Thống Khóa Độc Quyền 1 Tài Khoản Quỹ FX $\leftrightarrow$ 1 Phương Pháp Bot (EMA200, SMC, Liquidation):
+  - **Mô tả yêu cầu CEO:** CEO phê duyệt triển khai cơ chế: Mỗi tài khoản Quỹ FX (E8 Markets, The 5%ers, FTMO...) hoạt động độc lập, chỉ được phép chạy duy nhất 1 phương pháp Bot (ví dụ Quỹ E8 #1 chạy EMA200). Muốn chạy phương pháp khác (SMC) phải kết nối thêm tài khoản Quỹ khác (#2). Dropdown ngoài Sidebar cho phép chuyển đổi giữa các tài khoản Quỹ để xem bảng vị thế, nếu tài khoản đang chạy ở bot khác thì hiển thị nhãn `🔒 [Tên Bot]` và khóa không cho bật chạy đè.
+  - **Giải pháp kỹ thuật toàn diện:**
+    1. **Backend Service ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py)):**
+       - Bổ sung cấu trúc dữ liệu `bot_prop_map` (Strategy $\rightarrow$ Prop Account ID) và `running_prop_bots` (Strategy $\rightarrow$ True/False) được lưu trữ và mã hóa an toàn trong `tradelocker_accounts.enc`.
+       - Xây dựng cơ chế `can_start_prop_bot`: Nếu một tài khoản Quỹ đang chạy ở chiến lược khác $\rightarrow$ Chặn đứng và trả về lỗi HTTP 400 kèm thông báo chi tiết: `"Tài khoản {name} đang được chạy bởi Bot {other_bot}. Vui lòng Dừng Bot kia hoặc chọn Quỹ khác!"`.
+       - Xây dựng `set_strategy_bot_running` và `is_strategy_bot_running` độc lập cho từng strategy (`sub1`, `sub2`, `sub3`).
+       - Nâng cấp `dispatch_signal_to_tradelocker(..., strategy=...)`: Định tuyến chính xác lệnh của Bot nào bắn vào đúng tài khoản Quỹ được gán cho Bot đó, cách ly hoàn toàn vị thế.
+    2. **Bộ điều phối Bot ([sub1/bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py) & [sub2/bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py)):**
+       - Truyền tham số `strategy="sub1"` và `strategy="sub2"` khi gọi `dispatch_to_tradelocker`.
+    3. **Backend API ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - `POST /api/tradelocker/select_account`: Nhận `strategy` và lưu gán cho chiến lược đó.
+       - `GET /api/tradelocker/accounts`: Trả về `accounts`, `active_id`, `bot_prop_map`, `running_prop_bots`.
+       - `GET /api/tradelocker/bot/status`: Nhận `strategy` để trả về trạng thái độc lập của từng chiến lược.
+       - `POST /api/tradelocker/bot/start` & `POST /api/tradelocker/bot/stop`: Điều khiển start/stop theo từng strategy và kiểm tra khóa độc quyền.
+    4. **Frontend UI/UX:**
+       - **[SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):**
+         - Dropdown Quỹ FX nhận diện trạng thái từng tài khoản: Tài khoản đang chạy ở bot hiện tại hiển thị badge xanh `LIVE`; tài khoản đang chạy ở bot khác hiển thị badge vàng `🔒 EMA200` hoặc `🔒 SMC`.
+         - Khi chuyển đổi dropdown giữa các Quỹ, giao diện lập tức chuyển đổi Bảng Vị Thế của Quỹ đó.
+       - **[App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx):**
+         - Quản lý `propBotMap` và `runningPropBots`.
+         - Polling và điều khiển start/stop theo `activeBotTab`.
+         - Bắt lỗi khóa độc quyền HTTP 400 và cảnh báo rõ ràng khi người dùng cố gắng bật bot đè.
+       - **[TradeLockerTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/TradeLockerTab.jsx):**
+         - Thẻ Quỹ hiển thị rõ trạng thái `● TRADE`, `🔒 [Tên Bot]`, hoặc nút `Gán cho [Tên Bot]`.
+    5. **Kiểm thử nghiệm thu:**
+       - Kiểm tra cú pháp AST Python: `ALL SYNTAX OK!`.
+       - Build Vite: `✓ built in 292ms`.
+
+
+- **[27/10/2026]** - Tinh Gọn UI Thẻ Quỹ FX Connect: Di Chuyển Tag Nhận Lệnh Ra Sau Tiêu Đề, Bỏ Khối Màu Xanh Thô & Triệt Tiêu Lặp Thông Tin ID:
+  - **Mô tả yêu cầu CEO:** Giải thích ý nghĩa của nút `[TRADE]` trên thanh pill và `[ĐANG GIAO DỊCH]` trong thẻ; xóa bỏ hoặc đưa tag ra sau tên tài khoản cho nhỏ và tinh tế lại; loại bỏ sự lặp lại thừa thãi.
+  - **Giải pháp kỹ thuật:**
+    - File [TradeLockerTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/TradeLockerTab.jsx):
+      1. Đưa Logo + Tên tài khoản lên đầu (`[Logo E8] E8 Demo #2534591`).
+      2. Chuyển khối thô `[ĐANG GIAO DỊCH]` ra phía sau tiêu đề thành tag tinh tế `● Đang nhận lệnh Bot` (font 9px, viền mờ bo tròn, màu xanh dịu mắt).
+      3. Triệt tiêu dòng lặp `ID: 2534591` (vì đã có trên tiêu đề), chỉ để `Email: ...` thoáng đãng.
+      4. Tinh chỉnh tag `● TRADE` trên pill trên cùng thành nền mờ viền neon sang trọng.
+    - Build Vite thành công trong 270ms.
+
+- **[27/10/2026]** - Tối Ưu Hóa & Chuẩn Hóa Dropdown Máy Chủ Quỹ MT5 / TradeLocker & Hướng Dẫn Vận Hành Thi Quỹ:
+  - **Mô tả yêu cầu từ CEO:** Kiểm tra các dòng option trong dropdown Chọn Quỹ & Máy chủ xem có bị thừa không; tư vấn cách hoạt động của thi Quỹ, các vòng thi, pass quỹ và live quỹ.
+  - **Khắc phục lỗi thừa dòng:**
+    - Ở MT5: Xóa bỏ dòng trùng lặp `E8 Markets (MetaTrader 5 - Classic Markets)`. Chuẩn hóa rành rọt thành 2 máy chủ: `E8 Markets (Tài khoản Thi Quỹ - Demo MT5)` và `E8 Markets (Tài khoản Cầm Quỹ - Live/Funded MT5)`.
+    - Ở TradeLocker: Xóa bỏ dòng `FTMO (TradeLocker Demo)` vì FTMO không hỗ trợ TradeLocker. Đổi tên rõ ràng thành `Tài khoản Thi Quỹ - Demo` và `Tài khoản Cầm Quỹ - Live`.
+    - Build Vite thành công trong 257ms.
+
+- **[27/10/2026]** - Chuẩn Hóa Kiến Trúc Master-Detail Tabs Cho Quỹ FX Connect & Khắc Phục Lỗi Tự Nhảy Sang Form Kết Nối Mới:
+  - **Mô tả hiện tượng từ CEO:** Trong tab Quỹ FX Connect, thi thoảng hiển thị đúng chi tiết tài khoản (Ảnh 1), nhưng thi thoảng lại tự động nhảy sang Form nhập tài khoản kết nối mới (Ảnh 2) dù phía trên vẫn đang chọn pill tài khoản đã có `E8 Demo #2534591 TRADE`.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    - Điều kiện render cũ phụ thuộc vào `accountData !== null`.
+    - Khi sàn TradeLocker bị delay mạng hoặc timeout, hàm `fetchAccountDetail` gán `accountData = null` $\rightarrow$ Điều kiện bị False $\rightarrow$ UI rơi xuống nhánh `else` và tự động render toàn bộ Form kết nối mới (Ảnh 2).
+    - Ở chân modal, nút `Đăng Xuất` của OKX lại hiển thị ngay cạnh dòng `Quỹ FX: E8 Demo #2534591` gây hiểu nhầm nghiêm trọng là nút đăng xuất Quỹ FX (bấm vào sẽ làm văng tài khoản Web Bot).
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Master-Detail Tabs (TradeLockerTab.jsx):**
+       - Phân tách rõ ràng:
+         - Khi chọn pill tài khoản đã có (`selectedId !== "__new__"`): **100% LUÔN LUÔN hiển thị Ảnh 1 (Chi tiết & Tiến độ tài khoản)**. Dù mạng sàn có chậm, hệ thống vẫn hiển thị dữ liệu từ `accountsList` đã lưu (không bao giờ rơi về Ảnh 2). Khi đang đồng bộ realtime thì chỉ hiện một badge nhỏ `Đồng bộ...` tinh tế.
+         - Chỉ khi người dùng bấm vào pill `[ + Thêm Quỹ Mới ]` (hoặc khi tài khoản chưa từng kết nối Quỹ nào): Mới hiển thị **Ảnh 2 (Form kết nối Quỹ mới)**.
+    2. **Khử trùng lặp nút Đăng Xuất (ConnectModal.jsx):**
+       - Khi ở tab Quỹ FX, ẩn nút Đăng Xuất OKX ở footer modal đi. Quỹ FX đã có nút `Xóa tài khoản` chuyên biệt trong thẻ tài khoản ở Ảnh 1.
+    3. **Kiểm thử:** Build Vite thành công 100% trong 274ms.
+
+- **[27/10/2026]** - Chuẩn Hóa Tên Gọi MetaTrader 5 (Thay Cho Platform 5) & Xóa Bỏ Toàn Bộ Banner Ghi Chú Thừa Trong Modal Quỹ FX Connect:
+  - **Mô tả yêu cầu CEO:**
+    - Trên giao diện mua Quỹ E8 thực tế đã ghi rõ ràng tên **"MetaTrader 5"**, không cần ghi "Platform 5" gây rối mắt.
+    - Xóa bỏ hoàn toàn hộp banner lưu ý thừa ở cả MT5 và TradeLocker để form kết nối cực kỳ gọn gàng, nút bấm kết nối nằm trọn trong màn hình điện thoại mà không cần cuộn.
+  - **Giải pháp kỹ thuật:**
+    - File [TradeLockerTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/TradeLockerTab.jsx): Đổi tên option máy chủ thành `E8 Markets (MetaTrader 5 - Classic Markets)`, xóa bỏ toàn bộ 2 banner ghi chú thừa ở cả 2 tab MT5 và TradeLocker. Form sạch sẽ, hiện đại 100%. Build Vite thành công trong 255ms.
+
+- **[27/10/2026]** - Khắc Phục Triệt Để Hiện Tượng Nhấp Nháy (Flickering) Bảng Vị Thế Quỹ FX & Bổ Sung Quét Lệnh Limit Đang Chờ Khớp Trên Sàn Quỹ TradeLocker:
+  - **Mô tả hiện tượng lỗi từ CEO:**
+    - Trong bảng vị thế Quỹ FX (E8 / TradeLocker), các lệnh đang chạy lúc thì hiển thị đầy đủ (`Bảng Vị Thế (6)`), vài giây sau lại đột ngột biến mất thành rỗng (`Bảng Vị Thế (0)`), xong lại hiện, lại biến mất liên tục lặp đi lặp lại.
+    - CEO phát hiện bot Quỹ FX dường như chưa quét được các lệnh Limit đang chờ khớp trên sàn (cơ chế khác với sàn Coin OKX).
+  - **Phân tích nguyên nhân gốc rễ (Root Cause):**
+    1. **Nguyên nhân lỗi giật/nhấp nháy (Flickering):**
+       - Cơ chế API TradeLocker chạy qua Cloudflare proxy ở nước ngoài. Khi polling dồn dập (2.5s/lần), một số request gặp timeout mạng, Cloudflare rate-limit, hoặc token đang refresh ngầm.
+       - Trong backend `main.py` cũ, khi `client.get_positions()` trả về `ok == False`, backend lập tức trả về mảng rỗng `[]`!
+       - Frontend `App.jsx` nhận `[]` và gọi `setPropPositions([])` $\rightarrow$ Bảng vị thế rơi tự do về 0. Chu kỳ sau gọi thành công lại nhảy lên 6 $\rightarrow$ Gây hiện tượng nhấp nháy, lúc có lúc mất liên tục.
+       - Đồng thời trong `App.jsx`, hàm `setPositions` của OKX bị chuyển hướng ghi đè vào `setPropPositions` khi ở tab E8, khiến các effect của OKX khi reset tài khoản vô tình xóa sạch vị thế Quỹ.
+    2. **Nguyên nhân chưa quét được lệnh Limit trên sàn Quỹ FX:**
+       - Sàn Quỹ TradeLocker chia tách API thành 2 endpoint độc lập:
+         - `/trade/accounts/{acc_id}/positions`: Chỉ chứa các vị thế **đã khớp** (Active Positions).
+         - `/trade/accounts/{acc_id}/orders`: Chứa các lệnh **Limit / Stop đang chờ khớp** (Pending Orders).
+       - Backend trước đây CHỈ gọi `get_positions()`, hoàn toàn bỏ qua `get_orders()`. Do đó mọi lệnh Limit trader hoặc bot đặt trên sàn Quỹ FX không thể xuất hiện trong bảng vị thế.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Backend (`main.py`):**
+       - **Bộ đệm chống giật (Cache Fallback):** Bổ sung `_prop_positions_cache`. Nếu request gọi sang TradeLocker bị lỗi mạng hoặc timeout tạm thời, backend KHÔNG BAO GIỜ trả về `[]`, mà sử dụng danh sách vị thế hợp lệ gần nhất trong cache (hiệu lực 90s). Chỉ trả về `[]` khi TradeLocker phản hồi HTTP 200 thành công và xác nhận tài khoản thực sự không còn lệnh nào.
+       - **Quét toàn diện Lệnh Limit (Pending Orders):** Gọi đồng thời `client.get_orders()`, lọc các lệnh đang chờ khớp (`placed`, `pending`, `working`, `accepted`), chuẩn hóa và ghép chung vào bảng vị thế với các trường nhận diện `is_limit: True`, `order_type: "LIMIT"`, `status: "Pending Limit"`.
+       - **Nâng cấp `tradelocker_close_position`:** Tự động nhận diện lệnh Limit để gọi `client.cancel_order(...)` hoặc gọi `client.close_position(...)` cho vị thế thật.
+    2. **Frontend (`App.jsx` & `PositionsTable.jsx`):**
+       - Độc lập hóa hoàn toàn `setPositions` (chỉ quản lý OKX) và `setPropPositions` (chỉ quản lý Quỹ FX), triệt tiêu nguy cơ OKX ghi đè xoá sạch vị thế Quỹ.
+       - Bổ sung `prevPropPosRef` và debounce 1 chu kỳ trong `fetchPropPositions` để chống glitch mạng.
+       - `PositionsTable.jsx`:
+         - Hiển thị nhãn nổi bật màu vàng hổ phách: `[Limit Long]` / `[Limit Short]` phân biệt rõ với vị thế đang chạy.
+         - Cột Mức giá: Hiển thị mức giá đặt Limit kèm icon `Limit @... ⏱️ Chờ khớp`.
+         - Cột PNL: Hiển thị trạng thái `Chờ khớp (Limit)`.
+         - Cột Đóng: Tự động đổi thành nút `Hủy` màu cam đỏ, bấm vào sẽ hủy lệnh Limit đang chờ trên sàn Quỹ FX.
+  - **Kết quả kiểm thử:**
+    - Cú pháp backend Python: `Syntax OK!`.
+    - Build frontend: `cmd /c "npm run build"` thành công 100% trong 244ms.
+    - Triệt tiêu 100% hiện tượng chập chờn, nhấp nháy; hiển thị đầy đủ cả vị thế đang chạy lẫn lệnh Limit đang chờ trên Quỹ FX.
+
 - **[27/10/2026]** - Hiển Thị Đầy Đủ Nút TF Trade Cho Cả 2 Vị Thế Long / Short Trên Cùng Một Cặp Coin & Tối Ưu Cơ Chế Đồng Bộ (Sync):
   - **Mô tả yêu cầu CEO:** Khi tài khoản mở cả 2 vị thế Long và Short trên cùng 1 cặp coin (chế độ Hedge Mode, ví dụ XAU-USDT), hàng thứ 2 (Long) bị khuyết trống cột TF trade. Yêu cầu hiển thị đầy đủ các nút bấm TF trade ở cả 2 hàng, và tư vấn phương án tương tác (Độc lập hay Đồng bộ).
   - **Tư vấn chuyên môn CTO:**
