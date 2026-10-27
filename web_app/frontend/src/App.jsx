@@ -159,6 +159,92 @@ function App() {
   const [overridePropBotRunning, setOverridePropBotRunning] = useState(null);
   const [propBotMap, setPropBotMap] = useState({});
   const [runningPropBots, setRunningPropBots] = useState({});
+  const [propAccounts, setPropAccounts] = useState([]);
+  const [activePropId, setActivePropId] = useState("");
+
+  const fetchE8Accounts = useCallback(() => {
+    const rawUid = localStorage.getItem("tls1_uid") || loginUid;
+    const curUid = (rawUid && rawUid !== "undefined" && rawUid !== "null") ? rawUid : "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch(`/api/tradelocker/accounts?uid=${encodeURIComponent(curUid)}`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.status === "success" && Array.isArray(d.accounts)) {
+          setPropAccounts(d.accounts);
+          if (d.accounts.length > 0) {
+            if (d.active_id) setActivePropId(d.active_id);
+            if (d.bot_prop_map) setPropBotMap(d.bot_prop_map);
+            if (d.running_prop_bots) setRunningPropBots(d.running_prop_bots);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [loginUid]);
+
+  useEffect(() => {
+    fetchE8Accounts();
+    const handlePlatformChange = (e) => {
+      if (e?.detail) setCurrentPlatform(e.detail);
+    };
+    const handlePropChange = (e) => {
+      if (e?.detail) setActivePropId(e.detail);
+      fetchE8Accounts();
+    };
+    window.addEventListener("tls1_platform_changed", handlePlatformChange);
+    window.addEventListener("tls1_prop_account_changed", handlePropChange);
+    const interval = setInterval(fetchE8Accounts, 15000);
+    return () => {
+      window.removeEventListener("tls1_platform_changed", handlePlatformChange);
+      window.removeEventListener("tls1_prop_account_changed", handlePropChange);
+      clearInterval(interval);
+    };
+  }, [fetchE8Accounts]);
+
+  const handleSelectPropAccount = useCallback((accId) => {
+    if (accId === "__connect__") {
+      setShowConnectModal(true);
+      setConnectModalTab("tradelocker");
+      return;
+    }
+    const curUid = localStorage.getItem("tls1_uid") || loginUid || "default";
+    const token = localStorage.getItem("tls1_jwt_token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+    fetch("/api/tradelocker/select_account", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ uid: curUid, account_id: accId, strategy: activeBotTab })
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.status === "success") {
+          setActivePropId(accId);
+          fetchE8Accounts();
+          window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: accId }));
+        }
+      })
+      .catch(() => {});
+  }, [loginUid, activeBotTab, fetchE8Accounts]);
+
+  const handleSwitchPlatform = useCallback((platform) => {
+    setCurrentPlatform(platform);
+    try { localStorage.setItem("tls1_trading_platform", platform); } catch {}
+    window.dispatchEvent(new CustomEvent("tls1_platform_changed", { detail: platform }));
+  }, []);
+
+  const handleSelectBotTab = useCallback((strat) => {
+    setActiveBotTab(strat);
+    try {
+      localStorage.setItem("tls1_active_bot_tab", strat);
+      if (effectiveAccId) {
+        localStorage.setItem(`tls1_bot_strat_${effectiveAccId}`, strat);
+      }
+    } catch {}
+  }, [effectiveAccId]);
 
   // Bảng vị thế: Tách riêng tuyệt đối giữa Sàn OKX và Quỹ FX, chống hoàn toàn giật/flicker
   const positions = useMemo(() => {
@@ -194,6 +280,16 @@ function App() {
 
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
+
+    // Tự động khôi phục chiến thuật bot mà tài khoản này đã chọn trước đó
+    if (accId) {
+      try {
+        const savedStrat = localStorage.getItem(`tls1_bot_strat_${accId}`);
+        if (savedStrat && ["sub1", "sub2", "sub3"].includes(savedStrat)) {
+          setActiveBotTab(savedStrat);
+        }
+      } catch {}
+    }
 
     // Nếu bot ở tab hiện tại CHƯA chạy, lưu gán vào botAccountMap
     // Nếu bot đang chạy, việc chọn tài khoản trong dropdown là để XEM (view) tài khoản phụ khác,
@@ -1109,7 +1205,7 @@ function App() {
   // Load bot configuration (enabled TFs, coins)
   useEffect(() => {
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
-    fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}`)
+    fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}&account_id=${effectiveAccId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) return;
@@ -1188,7 +1284,7 @@ function App() {
         }
       })
       .catch(() => { });
-  }, [isAuthenticated, activeBotTab, currentUid]);
+  }, [isAuthenticated, activeBotTab, currentUid, effectiveAccId]);
 
   // Load admin closed positions for backtest stats
   useEffect(() => {
@@ -2981,6 +3077,7 @@ function App() {
         {/* SIDEBAR LEFT */}
         <SidebarLeft
           activeBotTab={activeBotTab}
+          onSelectBotTab={handleSelectBotTab}
           effectiveAccId={effectiveAccId}
           accounts={accounts}
           botAccountMap={botAccountMap}
@@ -3000,14 +3097,28 @@ function App() {
           runningPropBots={runningPropBots}
           onToggleMultiplyVolume={handleToggleMultiplyVolume}
           onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
+          tradingPlatform={currentPlatform}
+          propAccounts={propAccounts}
+          activePropId={activePropId}
         />
 
         {/* MAIN SECTION */}
         <div className="main-section">
           {/* TOP HEADER */}
           <AppHeader
+            accounts={accounts}
+            effectiveAccId={effectiveAccId}
+            onSelectAccount={handleAssignAccountToActiveBot}
+            tradingPlatform={currentPlatform}
+            onSwitchPlatform={handleSwitchPlatform}
+            propAccounts={propAccounts}
+            activePropId={activePropId}
+            onSelectPropAccount={handleSelectPropAccount}
+            isOkxRunning={isOkxRunning}
+            isPropRunning={isPropRunning}
+            activeAccounts={mergedActiveAccounts}
+            onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
             activeBotTab={activeBotTab}
-            onSelectBotTab={setActiveBotTab}
             slotCount={slotCount}
             maxSlots={100}
           />

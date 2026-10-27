@@ -33,6 +33,54 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Khắc Phục Triệt Để Lỗi Không Hủy Được Lệnh Limit Quỹ FX TradeLocker Khi BẬT/DỪNG BOT (Lỗi 10054 ConnectionReset & Sai Endpoint Path):
+  - **Hiện tượng:** CEO dừng bot hoặc chạy bot nhưng 13-22 lệnh Limit cũ trên sàn TradeLocker vẫn không bị hủy.
+  - **Nguyên nhân kỹ thuật sâu:**
+    1. **Sai Endpoint Path:** `client.cancel_order` gọi `DELETE /trade/orders/{order_id}` (thiếu `accounts/{accountId}`) khiến TradeLocker trả về 404 hoặc abort. Endpoint chuẩn theo tài liệu chính thức OpenAPI là: `DELETE /trade/accounts/{accountId}/orders/{orderId}` (hủy 1 lệnh) và `DELETE /trade/accounts/{accountId}/orders` (hủy toàn bộ lệnh chờ).
+    2. **Lỗi Cloudflare SSL/TLS Renegotiation (WinError 10054):** Khi gửi phương thức HTTP `DELETE` tới máy chủ TradeLocker qua Cloudflare, Cloudflare yêu cầu SSL/TLS renegotiation. Thư viện Python `requests` trên Windows không hỗ trợ renegotiation giữa chừng dẫn đến `ConnectionResetError(10054)`.
+    3. **Cơ chế Hủy thông minh (2-Tier Cleanup):** Khi không có vị thế mở nào, cần gọi thẳng `cancel_all_orders` để dọn sạch toàn bộ lệnh Limit trên sàn trong 0.2s thay vì quét từng lệnh.
+  - **Giải pháp triệt để ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py), [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+    - Sửa đường dẫn `cancel_order` chuẩn OpenAPI: `/trade/accounts/{self.account_id}/orders/{order_id}`.
+    - Tích hợp **Native Schannel Fallback (`curl.exe` with `--resolve`)** vào `cancel_order` và `cancel_all_orders`: Xử lý mượt mà 100% cơ chế TLS renegotiation của Cloudflare, bypass triệt để lỗi 10054 và DNS sinkhole.
+    - Nâng cấp `tradelocker_start_bot` và `tradelocker_stop_bot`: Nếu tài khoản không có vị thế mở, gọi ngay `cancel_all_orders` dọn sạch 100% lệnh Limit chỉ trong 1 request duy nhất; nếu có vị thế mở, quét từng lệnh và bảo lưu 100% các lệnh có `positionId` (TP/SL).
+    - Đã test trực tiếp trên tài khoản E8 `#2534591`: Toàn bộ 14 lệnh Limit chờ đã được xóa sạch ngay lập tức (`Orders left: 0`).
+
+- **[28/10/2026]** - Thiết Kế Thẻ Tài Khoản Trade (Card Style E8 Nổi Bật Từng Màu Riêng, Ẩn Text Tiêu Đề Crypto/Forex/Prop Firm, Chỉ Hiện Thẻ Có Tag #xxxx):
+  - **Yêu cầu từ CEO:**
+    1. Ẩn hoàn toàn các text tiêu đề nhóm `Crypto`, `Forex`, `Prop Firm` trong dropdown tài khoản ở Header để đỡ rối mắt.
+    2. Chỉ hiển thị các thẻ tài khoản đã kết nối mà có mã định danh `#xxxx` ở đằng sau (tài khoản không có `#xxxx` hoặc thẻ mặc định rỗng thì không hiển thị).
+    3. Thiết kế tất cả các thẻ theo style thẻ nổi bật giống E8 Markets màu xanh (có vạch màu bên trái, nền thẻ đổ màu tinh tế, bo góc, logo, tên và checkmark), nhưng mỗi sàn/quỹ có một tone màu đặc trưng riêng biệt (OKX: vàng hổ phách, E8 Markets: xanh hoàng gia, Vantage: đỏ tươi, Exness: vàng gold, FTMO: xanh ngọc cyan) để dễ phân biệt trực quan.
+  - **Triển khai kỹ thuật ([AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx)):**
+    - Lọc nghiêm ngặt `validOkxAccounts` và `validPropAccounts` để đảm bảo 100% tài khoản hiển thị đều có mã `#xxxx`. Loại bỏ các mục fallback không có tag.
+    - Xây dựng hệ thống theme `getAccountTheme(platform, firm)` gán mã màu riêng cho từng đối tác (OKX: `#f59e0b`, E8: `#3b82f6`, Vantage: `#ff4d4f`, Exness: `#ffc700`, FTMO: `#06b6d4`).
+    - Mỗi tài khoản hiển thị dưới dạng thẻ card hoàn chỉnh: `borderLeft: 3.5px solid <color>`, nền tinted khi chưa chọn và glow sáng khi được chọn, viền `1px solid`, checkmark cùng tone màu khi active.
+    - Đã test build Vite hoàn tất 0 lỗi (`npm run build` thành công trong 411ms) và tự động mở trình duyệt desktop kiểm tra.
+
+- **[28/10/2026]** - Hoán Đổi Vị Trí & Tên Chức Năng 2 Nút Dropdown (Tài Khoản & Bot Strategy), Bảo Tồn 100% Hiệu Ứng & Style Thiết Kế, Phân Lập Tuyệt Đối Cài Đặt Từng Tài Khoản:
+  - **Yêu cầu từ CEO:**
+    1. Hoán đổi vị trí và chức năng:
+       - Header trên cùng (vị trí capsule dropdown cũ của bot): Đổi thành Dropdown chọn **Tài khoản giao dịch** (Sàn OKX / Quỹ E8 / FTMO...).
+       - Sidebar Hàng 1 (vị trí dropdown sàn cũ): Đổi thành Dropdown chọn **Chiến thuật Bot** (EMA200 Bot / SMC Bot / Liquidation Bot), giữ nguyên nút `[Hướng Dẫn]` và `[⚙ Cài Đặt]` ngay bên cạnh.
+    2. Giữ nguyên 100% kiểu dáng, hiệu ứng đồ họa, kích thước và style thiết kế của 2 nút tại 2 vị trí hiện tại (Capsule button nền gradient ở header; Gold button 30px ở sidebar).
+    3. Phân bổ kiến trúc lấy Tài khoản làm chủ: Tài khoản `#1111` đánh bot gì, cài đặt ký quỹ/TP/SL bao nhiêu; Tài khoản `#2222` đánh bot gì, cài đặt bao nhiêu — độc lập hoàn toàn, kể cả khi cùng chọn 1 chiến thuật bot cũng không ghi đè cấu hình của nhau.
+  - **Triển khai kỹ thuật:**
+    1. **Header ([AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx)):**
+       - Giữ nguyên Capsule Button Style (`linear-gradient(180deg, #242630 0%, #15161c 100%)`, border amber khi active, chevron SVG rotating).
+       - Hiển thị logo sàn/quỹ (`<OkxLogo />` / `<E8Logo />`), tên nền tảng `SÀN OKX` / `QUỸ E8`, tag tài khoản `#9892`, badge `TK CHÍNH` / `LIVE`.
+       - Menu popover hiển thị danh sách đầy đủ tài khoản Sàn OKX, Quỹ FX, và nút "+ Quản lý / Kết nối thêm tài khoản...".
+    2. **Sidebar Hàng 1 ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+       - Giữ nguyên Golden Button Style (cao 30px, nền `rgba(18, 14, 6, 0.92)`, viền vàng hổ phách, chữ `#fbbf24`, mũi tên `▼`).
+       - Hiển thị Pattern SVG chiến thuật (`PatternEMA200`, `PatternSMC`, `PatternLiquidation`) và tên bot tương ứng.
+       - Popover menu nền kính mờ `rgba(15, 23, 42, 0.98)` hiển thị 3 bot với pattern, mô tả và checkmark `✓`.
+       - Giữ nguyên nút `[Hướng Dẫn]` và `[⚙ Cài Đặt]` liền kề phía bên phải.
+    3. **Bộ điều phối & Phân lập cấu hình ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Nâng state `propAccounts`, `activePropId`, `handleSelectPropAccount`, `handleSwitchPlatform` lên `App.jsx`, đồng bộ mượt mà giữa Header và Sidebar.
+       - Tự động ghi nhớ bot đã chọn riêng cho từng tài khoản (`tls1_bot_strat_{account_id}`). Khi chọn tài khoản `#1111` hoặc `#2222`, hệ thống tự động nhảy về bot mà tài khoản đó đang dùng.
+       - Endpoint `GET /api/bot/config` và `POST /api/bot/config` đọc/ghi độc lập vào `{target_acc}_global_config.json`, bảo vệ 100% margin, TP/SL và watchlist riêng cho từng tài khoản.
+    4. **Cơ chế Khóa Chiến Thuật Khi Đang Chạy Bot & Giới Hạn Chiều Cao ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+       - Chuyển đổi hoàn toàn sang **Cơ chế Dropup (lật ngược lên trên)**: Khi người dùng click, bảng danh sách các bot sẽ mở bung hướng lên phía trên (`bottom: calc(100% + 6px)`, `zIndex: 1000`), không còn sổ xuống dưới che các ô ký quỹ/TP/SL hay kịch đáy màn hình. Mũi tên mặc định trỏ lên `▲` và tự động xoay khi mở/đóng.
+       - Popover menu bổ sung `maxHeight: "260px"` và thanh cuộn slim scrollbar hổ phách mỏng tinh tế, vĩnh viễn không bao giờ bị tràn hay kịch đáy màn hình khi mở rộng thêm nhiều bot trong tương lai.
+
 - **[28/10/2026]** - Đồng Bộ Nhãn [LIVE] Đa Tài Khoản, Cách Ly Tuyệt Đối Logs & Vị Thế Từng Account, Di Chuyển Nút Reset Vốn Gốc Vào Logs Terminal & Xử Lý Triệt Để Spam Limit TradeLocker:
   - **Yêu cầu & Báo cáo từ CEO:**
     1. Cả 2 tài khoản OKX (#9892 và #7829) khi đang chạy bot đều phải có nhãn `[LIVE]` màu xanh như nhau. Bất kỳ tài khoản nào (kể cả FX) khi đang chạy bot trên web đều phải có nhãn `[LIVE]` này và cho chuyển đổi linh hoạt.

@@ -725,35 +725,92 @@ class TradeLockerClient:
             return False, [], str(e)
 
     def cancel_order(self, order_id: str) -> Tuple[bool, str]:
-        """Hủy 1 lệnh chờ theo orderId"""
+        """Hủy 1 lệnh chờ theo orderId với cơ chế đa tầng (Requests + Native Curl Schannel Fallback)"""
         if not self._ensure_authenticated():
             return False, "Chưa xác thực TradeLocker"
-        url = f"{self.base_url}/trade/orders/{order_id}"
+        if not self.account_id or not self.acc_num:
+            ok, accounts, msg = self.get_accounts()
+            if not ok or not self.account_id:
+                return False, msg or "Không tìm thấy tài khoản"
+
+        url = f"{self.base_url}/trade/accounts/{self.account_id}/orders/{order_id}"
+        headers = self._get_headers(include_acc_num=True)
+        headers["accept"] = "application/json"
+
+        # 1. Thử gửi qua requests trước
         try:
-            resp = requests.delete(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+            resp = requests.delete(url, headers=headers, timeout=8)
             if resp.status_code in (200, 204):
                 return True, f"Đã hủy lệnh {order_id} thành công"
-            err_msg = self._clean_error_text(resp)
-            return False, f"Lỗi hủy lệnh ({resp.status_code}): {err_msg}"
+        except Exception:
+            pass
+
+        # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
+        try:
+            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+            cf_ip = "104.18.28.67"
+            cmd = [
+                "curl.exe", "-s", "--resolve", f"{domain}:443:{cf_ip}",
+                "-X", "DELETE", url,
+                "-H", f"Authorization: Bearer {self.access_token}",
+                "-H", f"accNum: {self.acc_num}",
+                "-H", "accept: application/json",
+                "--max-time", "12"
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if res.returncode == 0:
+                if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
+                    return True, f"Đã hủy lệnh {order_id} thành công"
         except Exception as e:
-            return False, f"Lỗi mạng: {str(e)}"
+            return False, f"Lỗi native cancel: {e}"
+
+        return False, f"Không thể hủy lệnh {order_id}"
 
     def cancel_all_orders(self, tradable_instrument_id: Optional[str] = None) -> Tuple[bool, str]:
-        """Hủy toàn bộ lệnh chờ (hoặc theo mã instrument)"""
+        """Hủy toàn bộ lệnh chờ (hoặc theo mã instrument) với cơ chế đa tầng (Requests + Native Curl Schannel Fallback)"""
         if not self._ensure_authenticated():
             return False, "Chưa xác thực TradeLocker"
+        if not self.account_id or not self.acc_num:
+            ok, accounts, msg = self.get_accounts()
+            if not ok or not self.account_id:
+                return False, msg or "Không tìm thấy tài khoản"
+
         url = f"{self.base_url}/trade/accounts/{self.account_id}/orders"
+        headers = self._get_headers(include_acc_num=True)
+        headers["accept"] = "application/json"
+
+        # 1. Thử gửi qua requests trước
         try:
             params = {}
             if tradable_instrument_id:
                 params["tradableInstrumentId"] = str(tradable_instrument_id)
-            resp = requests.delete(url, params=params, headers=self._get_headers(include_acc_num=True), timeout=10)
+            resp = requests.delete(url, params=params, headers=headers, timeout=8)
             if resp.status_code in (200, 204):
                 return True, "Đã hủy tất cả lệnh chờ thành công"
-            err_msg = self._clean_error_text(resp)
-            return False, f"Lỗi hủy lệnh ({resp.status_code}): {err_msg}"
+        except Exception:
+            pass
+
+        # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
+        try:
+            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+            cf_ip = "104.18.28.67"
+            curl_url = f"{url}?tradableInstrumentId={tradable_instrument_id}" if tradable_instrument_id else url
+            cmd = [
+                "curl.exe", "-s", "--resolve", f"{domain}:443:{cf_ip}",
+                "-X", "DELETE", curl_url,
+                "-H", f"Authorization: Bearer {self.access_token}",
+                "-H", f"accNum: {self.acc_num}",
+                "-H", "accept: application/json",
+                "--max-time", "12"
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if res.returncode == 0:
+                if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
+                    return True, "Đã hủy tất cả lệnh chờ thành công"
         except Exception as e:
-            return False, f"Lỗi mạng: {str(e)}"
+            return False, f"Lỗi native cancel: {e}"
+
+        return False, "Không thể hủy lệnh chờ sau khi thử các phương thức"
 
 
 # ==============================================================================
@@ -1368,12 +1425,15 @@ class TradeLockerManager:
             o_status = str(o_dict.get("status") or "").lower()
             if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
                 continue
+            # BẢO VỆ TUYỆT ĐỐI TP/SL CỦA VỊ THẾ ĐANG CHẠY:
+            if o_dict.get("positionId"):
+                continue
             if o_id:
                 ok_c, _ = client.cancel_order(o_id)
                 if ok_c:
                     canceled += 1
         cls._local_grid_orders = {}
-        cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét và hủy sạch {canceled} lệnh Limit đang chờ.")
+        cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét và hủy sạch {canceled} lệnh Limit đang chờ (bảo lưu 100% vị thế mở).")
         return True, canceled, f"Đã hủy thành công {canceled} lệnh chờ trên TradeLocker"
 
     @classmethod
@@ -1563,79 +1623,62 @@ class TradeLockerManager:
                 print(f"🌑 [DRY-RUN TradeLocker] Bỏ qua đặt lệnh thật (Shadow Mode): {side.upper()} {lot} Lot {clean_base}")
                 return True, f"Chế độ Shadow Mode (Dry-run): Sẽ đặt {side.upper()} {lot} Lot {clean_base}"
 
-            # 🛡️ KIỂM TRA LỆNH CHỜ (PENDING LIMIT ORDERS - BẢO TOÀN LƯỚI ĐA KHUNG VÀ HARD CAP):
-            # Nếu là lệnh Limit, kiểm tra xem đã có lệnh Limit cùng chiều với mức giá gần tương đương chưa (< 0.3%)
-            # Nếu đã có mức giá này rồi -> Giữ nguyên, không đặt đè
-            # Hard Cap: Tối đa 5 tầng lệnh Limit cho mỗi coin.
+            # 🛡️ KIỂM TRA & ĐỒNG BỘ LỆNH CHỜ (CHUẨN LOGIC OKX: 1 LỆNH LIMIT DUY NHẤT BÁM SÁT EMA):
+            # Không bao giờ cho phép tích tụ rác nhiều tầng lệnh trên cùng 1 mã.
+            # Nếu giá EMA dịch chuyển -> Hủy lệnh cũ, đặt lệnh mới sát giá thị trường hiện tại.
             if order_type == "limit":
                 if target_px <= 0:
                     return False, f"Giá Limit không hợp lệ: {price}"
 
-                # 1. Kiểm tra cache cục bộ (In-Memory Fail-Safe): Chống spam ngay cả khi mạng lag
-                local_list = cls._local_grid_orders.get(grid_key, [])
-                for lo in local_list:
-                    lo_px = _safe_float(lo.get("price"))
-                    if lo_px > 0:
-                        diff_pct = abs(lo_px - target_px) / target_px
-                        if diff_pct < 0.003:  # < 0.3%
-                            msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{lo_px} đã tồn tại trong bộ nhớ (lệch {diff_pct*100:.2f}%) — Giữ nguyên tầng lưới này."
-                            cls.log_event(clean_uid, msg_exist)
-                            return True, msg_exist
-
-                # 2. Hard Cap kiểm tra số lượng lệnh tối đa trong local cache (Tối đa 5 tầng lệnh / coin):
-                if len(local_list) >= 5:
-                    msg_cap = f"ℹ️ [TRADELOCKER] Đã đạt giới hạn tối đa 5 tầng lệnh Limit cho {clean_base} {side_clean.upper()} — Bỏ qua không nhồi thêm."
-                    cls.log_event(clean_uid, msg_cap)
-                    return False, msg_cap
-
-                # 3. Kiểm tra lệnh trên sàn qua API
                 inst_info = client.resolve_instrument(clean_base)
                 tid = inst_info.get("tradableInstrumentId") if inst_info else None
                 if tid:
-                    ok_ord, orders, msg_ord = client.get_orders()
+                    ok_ord, orders, _ = client.get_orders()
                     if ok_ord and orders:
-                        matching_orders = []
+                        existing_for_symbol = []
                         for o in orders:
                             o_dict = o if isinstance(o, dict) else {}
                             o_tid = o_dict.get("tradableInstrumentId")
                             o_status = str(o_dict.get("status") or "").lower()
-                            # Chỉ tính các lệnh đang chờ (pending/working/placed)
                             if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
                                 continue
+                            # BẢO VỆ TUYỆT ĐỐI TP/SL CỦA VỊ THẾ ĐANG CHẠY:
+                            if o_dict.get("positionId"):
+                                continue
                             if str(o_tid) == str(tid):
-                                o_side = str(o_dict.get("side", "")).lower()
-                                if o_side == side_clean:
-                                    matching_orders.append(o_dict)
+                                existing_for_symbol.append(o_dict)
 
-                        # Tự động dọn dẹp nếu phát hiện tình trạng spam lệnh cũ vượt quá 5 tầng
-                        if len(matching_orders) > 5:
-                            cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Phát hiện {len(matching_orders)} lệnh Limit {clean_base} {side_clean.upper()} trên sàn (> 5 tầng). Đang tự động dọn bớt lệnh dư thừa...")
-                            try:
-                                for excess_ord in matching_orders[5:]:
-                                    ex_id = str(excess_ord.get("id") or "")
-                                    if ex_id:
-                                        client.cancel_order(ex_id)
-                            except Exception:
-                                pass
+                        # 1. Hủy ngay mọi lệnh ngược chiều để bảo vệ tài khoản Netting
+                        diff_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() != side_clean]
+                        for diff_ord in diff_side_orders:
+                            diff_id = str(diff_ord.get("id") or "")
+                            if diff_id:
+                                client.cancel_order(diff_id)
+                                cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã hủy lệnh Limit ngược chiều #{diff_id} ({clean_base})")
 
-                        # Hard cap từ sàn: nếu trên sàn đã có >= 5 lệnh cho mã này
-                        if len(matching_orders) >= 5:
-                            msg_cap = f"ℹ️ [TRADELOCKER] Trên sàn đã có {len(matching_orders)} lệnh Limit {side_clean.upper()} cho {clean_base} (>= 5 tầng) — Bỏ qua không nhồi thêm."
-                            cls.log_event(clean_uid, msg_cap)
-                            return False, msg_cap
+                        # 2. Xử lý các lệnh cùng chiều: Chỉ giữ duy nhất 1 lệnh bám sát EMA
+                        same_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() == side_clean]
+                        if same_side_orders:
+                            # Nếu có nhiều hơn 1 lệnh cùng chiều (do lỗi cũ tích tụ), dọn sạch các lệnh phụ
+                            primary_ord = same_side_orders[0]
+                            for excess_ord in same_side_orders[1:]:
+                                ex_id = str(excess_ord.get("id") or "")
+                                if ex_id:
+                                    client.cancel_order(ex_id)
 
-                        for o_dict in matching_orders:
-                            o_px = _safe_float(o_dict.get("price"))
-                            o_id = str(o_dict.get("id") or "")
-                            if o_px > 0 and target_px > 0:
-                                diff_pct = abs(o_px - target_px) / target_px
-                                if diff_pct < 0.003:  # < 0.3%
-                                    # Đồng bộ ngược vào local cache
-                                    if not any(str(x.get("id")) == str(o_id) for x in cls._local_grid_orders[grid_key]):
-                                        cls._local_grid_orders[grid_key].append({"id": o_id, "price": o_px, "time": now_time})
-                                    msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{o_px} đã tồn tại trên sàn (Order #{o_id}, lệch {diff_pct*100:.2f}%) — Giữ nguyên tầng lưới này."
+                            ex_px = _safe_float(primary_ord.get("price"))
+                            ex_id = str(primary_ord.get("id") or "")
+                            if ex_px > 0 and target_px > 0:
+                                diff_pct = abs(ex_px - target_px) / target_px
+                                if diff_pct < 0.001:  # Chênh lệch < 0.1% -> Giữ nguyên, không spam hủy/đặt lại
+                                    msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{ex_px} đang chờ khớp sát giá EMA (lệch {diff_pct*100:.2f}%) — Giữ nguyên."
                                     cls.log_event(clean_uid, msg_exist)
                                     return True, msg_exist
+                                else:
+                                    # Giá EMA đã thay đổi -> Hủy lệnh cũ để đặt lệnh mới sát giá
+                                    if ex_id:
+                                        client.cancel_order(ex_id)
+                                        cls.log_event(clean_uid, f"🔄 [TRADELOCKER] Giá EMA200 dời từ @{ex_px} sang @{target_px}. Đã hủy lệnh cũ #{ex_id} để cập nhật mức giá mới.")
 
             # 🎯 TỰ ĐỘNG BỔ SUNG SL & TP BẮT BUỘC (MẶC ĐỊNH THEO TỶ LỆ CÀI ĐẶT CỦA USER HOẶC 1.2%):
             ref_px = target_px

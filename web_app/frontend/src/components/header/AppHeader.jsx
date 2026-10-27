@@ -1,70 +1,27 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "../../i18n";
-
-console.log("AppHeader loaded! Force HMR");
-
-// Pattern 1: Bot EMA200 - Đường sóng trung bình động uốn lượn qua nến
-const PatternEMA200 = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0 }}>
-    <line x1="5.5" y1="4" x2="5.5" y2="16" stroke="#26a69a" strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
-    <rect x="4" y="7" width="3" height="6" rx="0.5" fill="#26a69a" opacity="0.85" />
-    <line x1="14.5" y1="4" x2="14.5" y2="16" stroke="#ef5350" strokeWidth="1.2" strokeLinecap="round" opacity="0.7" />
-    <rect x="13" y="6" width="3" height="6" rx="0.5" fill="#ef5350" opacity="0.85" />
-    <path d="M1.5 15 C 6 15, 7.5 7.5, 12.5 7.5 C 15.5 7.5, 16.5 4.5, 18.5 4.5" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-// Pattern 2: Bot SMC - Vùng khối hộp Order Block nét đứt & phản ứng hồi quy
-const PatternSMC = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0 }}>
-    <rect x="2.5" y="10" width="15" height="7.5" rx="1.5" fill="rgba(41, 98, 255, 0.2)" stroke="#3b82f6" strokeWidth="1.3" strokeDasharray="2.5 1.5" />
-    <path d="M2.5 6 L 7.5 4 L 11 10 L 16.5 4" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="11" cy="10" r="1.8" fill="#f59e0b" />
-  </svg>
-);
-
-// Pattern 3: Bot Liquidation - Quét râu thanh khoản xuyên cản & đảo chiều
-const PatternLiquidation = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0 }}>
-    <line x1="1.5" y1="8.5" x2="18.5" y2="8.5" stroke="#94a3b8" strokeWidth="1.2" strokeDasharray="2 1.5" opacity="0.6" />
-    <line x1="10" y1="2" x2="10" y2="18" stroke="#f43f5e" strokeWidth="1.6" strokeLinecap="round" />
-    <rect x="8" y="11" width="4" height="5" rx="0.6" fill="#f43f5e" />
-    <path d="M14 4.5 L 10 1.5 L 6 4.5" stroke="#fb7185" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+import { OkxLogo, E8Logo, FtmoLogo, formatOkxAccountTag } from "../sidebar/SidebarLeft";
 
 export default function AppHeader({
-  activeBotTab,
-  onSelectBotTab,
+  accounts = [],
+  effectiveAccId,
+  onSelectAccount,
+  tradingPlatform = "okx",
+  onSwitchPlatform,
+  propAccounts = [],
+  activePropId = "",
+  onSelectPropAccount,
+  isOkxRunning = false,
+  isPropRunning = false,
+  activeAccounts = {},
+  onOpenConnectModal,
+  activeBotTab = "sub1",
   slotCount = 10,
   maxSlots = 100,
 }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
-
-  const BOT_OPTIONS = [
-    {
-      id: "sub1",
-      name: t("bot_ema200"),
-      desc: t("desc_ema200"),
-      pattern: <PatternEMA200 />,
-    },
-    {
-      id: "sub2",
-      name: t("bot_smc"),
-      desc: t("desc_smc"),
-      pattern: <PatternSMC />,
-    },
-    {
-      id: "sub3",
-      name: t("bot_liquidation"),
-      desc: t("desc_liquidation"),
-      pattern: <PatternLiquidation />,
-    },
-  ];
-
-  const currentBot = BOT_OPTIONS.find((b) => b.id === activeBotTab) || BOT_OPTIONS[0];
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -80,10 +37,123 @@ export default function AppHeader({
     };
   }, []);
 
+  const isOkx = tradingPlatform === "okx";
+  const currentOkxAcc = accounts.find((a) => a.id === effectiveAccId || a.name === effectiveAccId) || accounts[0];
+  const currentPropAcc = propAccounts.find((a) => a.id === activePropId) || propAccounts[0];
+
+  const validOkxAccounts = (accounts || []).filter((acc) => {
+    const rawTag = formatOkxAccountTag(acc);
+    return Boolean(rawTag && rawTag.trim().length > 0 && rawTag.toLowerCase() !== "okx");
+  });
+
+  const validPropAccounts = (propAccounts || []).filter((pAcc) => {
+    const rawTag = (pAcc.account_id || pAcc.id || "").toString().replace(/^#/, "").trim();
+    return Boolean(rawTag && rawTag.length > 0);
+  });
+
+  const getPropFirmName = (firm) => {
+    const f = (firm || "E8").toString().trim();
+    if (f.toLowerCase().includes("vantage")) return "Vantage Markets";
+    if (f.toLowerCase().includes("exness")) return "Exness";
+    if (f.toLowerCase().includes("e8")) return "E8 Markets";
+    if (f.toLowerCase().includes("ftmo")) return "FTMO";
+    return f.toUpperCase();
+  };
+
+  const renderAccountLogo = (firm) => {
+    const f = (firm || "").toLowerCase();
+    if (f.includes("vantage")) {
+      return <img src="/vantage_logo.png" alt="Vantage" style={{ width: "14px", height: "14px", objectFit: "contain", borderRadius: "3px", flexShrink: 0 }} />;
+    }
+    if (f.includes("exness")) {
+      return <img src="/exness_logo.png" alt="Exness" style={{ width: "14px", height: "14px", objectFit: "contain", borderRadius: "3px", flexShrink: 0 }} />;
+    }
+    if (f.includes("ftmo")) return <FtmoLogo size={14} />;
+    return <E8Logo size={14} />;
+  };
+
+  const getAccountTheme = (platform, firm = "") => {
+    if (platform === "okx") {
+      return {
+        name: "OKX",
+        color: "#f59e0b",
+        bg: "rgba(245, 158, 11, 0.08)",
+        bgHover: "rgba(245, 158, 11, 0.16)",
+        bgActive: "rgba(245, 158, 11, 0.22)",
+        borderColor: "rgba(245, 158, 11, 0.25)",
+        borderActive: "rgba(245, 158, 11, 0.65)",
+        logo: <OkxLogo size={14} />,
+      };
+    }
+    const f = (firm || "").toLowerCase();
+    if (f.includes("vantage")) {
+      return {
+        name: "Vantage Markets",
+        color: "#ff4d4f",
+        bg: "rgba(255, 77, 79, 0.08)",
+        bgHover: "rgba(255, 77, 79, 0.16)",
+        bgActive: "rgba(255, 77, 79, 0.22)",
+        borderColor: "rgba(255, 77, 79, 0.25)",
+        borderActive: "rgba(255, 77, 79, 0.65)",
+        logo: renderAccountLogo("vantage"),
+      };
+    }
+    if (f.includes("exness")) {
+      return {
+        name: "Exness",
+        color: "#ffc700",
+        bg: "rgba(255, 199, 0, 0.08)",
+        bgHover: "rgba(255, 199, 0, 0.16)",
+        bgActive: "rgba(255, 199, 0, 0.22)",
+        borderColor: "rgba(255, 199, 0, 0.25)",
+        borderActive: "rgba(255, 199, 0, 0.65)",
+        logo: renderAccountLogo("exness"),
+      };
+    }
+    if (f.includes("ftmo")) {
+      return {
+        name: "FTMO",
+        color: "#06b6d4",
+        bg: "rgba(6, 182, 212, 0.08)",
+        bgHover: "rgba(6, 182, 212, 0.16)",
+        bgActive: "rgba(6, 182, 212, 0.22)",
+        borderColor: "rgba(6, 182, 212, 0.25)",
+        borderActive: "rgba(6, 182, 212, 0.65)",
+        logo: renderAccountLogo("ftmo"),
+      };
+    }
+    return {
+      name: getPropFirmName(firm) || "E8 Markets",
+      color: "#3b82f6",
+      bg: "rgba(59, 130, 246, 0.08)",
+      bgHover: "rgba(59, 130, 246, 0.16)",
+      bgActive: "rgba(59, 130, 246, 0.22)",
+      borderColor: "rgba(59, 130, 246, 0.25)",
+      borderActive: "rgba(59, 130, 246, 0.65)",
+      logo: renderAccountLogo(firm || "e8"),
+    };
+  };
+
+  const displayPlatformName = isOkx ? "OKX" : getPropFirmName(currentPropAcc?.firm || currentPropAcc?.server);
+  let displayAccountTag = "";
+  if (isOkx) {
+    if (currentOkxAcc) {
+      displayAccountTag = formatOkxAccountTag(currentOkxAcc);
+    }
+  } else {
+    if (currentPropAcc) {
+      const rawTag = (currentPropAcc.account_id || currentPropAcc.id || "").toString();
+      displayAccountTag = rawTag ? rawTag.replace(/^#/, "") : "";
+    }
+  }
+
+  const isThisOkxRunning = isOkx && isOkxRunning;
+  const isThisPropRunning = !isOkx && isPropRunning;
+
   return (
     <header className="bot-tabs-bar">
-      <div className="bot-tabs-group" data-tour="bot-selector" ref={dropdownRef} style={{ position: "relative" }}>
-        {/* Command Capsule Button */}
+      <div className="bot-tabs-group" data-tour="account-selector" ref={dropdownRef} style={{ position: "relative" }}>
+        {/* Command Capsule Button - GIỮ NGUYÊN 100% STYLE THIẾT KẾ & HIỆU ỨNG */}
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
@@ -104,24 +174,47 @@ export default function AppHeader({
             outline: "none",
             userSelect: "none"
           }}
+          title="Chọn tài khoản giao dịch (Crypto / Forex / Prop Firm...)"
         >
-          {/* Pattern đại diện chiến lược */}
+          {/* Logo đại diện sàn hoặc quỹ */}
           <span style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {currentBot.pattern}
+            {isOkx ? (
+              <OkxLogo size={14} />
+            ) : (
+              renderAccountLogo(currentPropAcc?.firm || currentPropAcc?.server || "")
+            )}
           </span>
 
-          {/* Tên Bot căn giữa chuẩn */}
+          {/* Tên Sàn/Quỹ + Mã Tag tài khoản */}
           <span
             style={{
               fontSize: "13.5px",
               fontWeight: 800,
               color: "#ffffff",
               letterSpacing: "0.2px",
-              textAlign: "center"
+              textAlign: "center",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px"
             }}
           >
-            {currentBot.name}
+            <span>{displayPlatformName}</span>
+            {displayAccountTag && (
+              <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "12px" }}>#{displayAccountTag}</span>
+            )}
           </span>
+
+          {/* Badges: TK CHÍNH / LIVE */}
+          {isOkx && (currentOkxAcc?.is_main || currentOkxAcc?.name === "Tài khoản chính" || (currentOkxAcc?.name && currentOkxAcc.name.toLowerCase().startsWith("tài khoản chính"))) && (
+            <span style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 700, background: "rgba(148, 163, 184, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+              TK CHÍNH
+            </span>
+          )}
+          {((isOkx && isThisOkxRunning) || (!isOkx && isThisPropRunning)) && (
+            <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+              LIVE
+            </span>
+          )}
 
           {/* Pure SVG Dropdown Arrow */}
           <svg
@@ -143,93 +236,193 @@ export default function AppHeader({
           </svg>
         </button>
 
-        {/* Custom Popover Dropdown Menu */}
+        {/* Custom Popover Dropdown Menu - GIỮ NGUYÊN 100% STYLE MENU HEADER */}
         {isOpen && (
           <div
             style={{
               position: "absolute",
               top: "calc(100% + 5px)",
               left: 0,
-              minWidth: "230px",
+              minWidth: "250px",
+              maxWidth: "320px",
               backgroundColor: "#181920",
               border: "1px solid #3a3c48",
               borderRadius: "6px",
               boxShadow: "0 8px 24px rgba(0,0,0,0.65), 0 2px 6px rgba(0,0,0,0.4)",
               zIndex: 1000,
-              padding: "4px",
+              padding: "6px",
               display: "flex",
               flexDirection: "column",
-              gap: "2px"
+              gap: "3px",
+              maxHeight: "360px",
+              overflowY: "auto",
             }}
           >
-            {BOT_OPTIONS.map((bot) => {
-              const isActive = bot.id === activeBotTab;
+            {/* DANH SÁCH THẺ TÀI KHOẢN ĐÃ KẾT NỐI (CHỈ HIỆN KHI CÓ MÃ #XXXX) */}
+            {validOkxAccounts.map((acc) => {
+              const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
+              const tag = formatOkxAccountTag(acc);
+              const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
+              const isThisAccRunning = !isAccMain && (isOkxRunning || acc.is_running);
+              const theme = getAccountTheme("okx");
+
               return (
                 <div
-                  key={bot.id}
+                  key={acc.id}
                   onClick={() => {
-                    onSelectBotTab(bot.id);
+                    if (onSwitchPlatform && tradingPlatform !== "okx") onSwitchPlatform("okx");
+                    if (onSelectAccount) onSelectAccount(acc.id);
                     setIsOpen(false);
                   }}
                   style={{
                     padding: "8px 10px",
-                    borderRadius: "4px",
+                    borderRadius: "5px",
                     cursor: "pointer",
-                    backgroundColor: isActive ? "rgba(245, 158, 11, 0.12)" : "transparent",
-                    borderLeft: isActive ? "3px solid #f59e0b" : "3px solid transparent",
+                    backgroundColor: isSelected ? theme.bgActive : theme.bg,
+                    borderLeft: `3.5px solid ${theme.color}`,
+                    borderTop: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    borderRight: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    borderBottom: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    boxShadow: isSelected ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${theme.bgActive}` : "none",
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
-                    transition: "background-color 0.15s ease"
+                    justifyContent: "space-between",
+                    transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)";
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = theme.bgHover;
+                      e.currentTarget.style.borderColor = theme.borderActive;
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = theme.bg;
+                      e.currentTarget.style.borderColor = theme.borderColor;
+                    }
                   }}
                 >
-                  {/* Pattern trong dropdown */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {bot.pattern}
-                  </div>
-
-                  {/* Tên và tóm tắt bot căn giữa */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", gap: "2px" }}>
-                    <span
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: isActive ? 800 : 600,
-                        color: isActive ? "#ffffff" : "#d1d4dc"
-                      }}
-                    >
-                      {bot.name}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {theme.logo}
+                    <span style={{ fontSize: "12.5px", fontWeight: isSelected ? 800 : 700, color: "#ffffff" }}>
+                      {theme.name}
                     </span>
-                    <span style={{ fontSize: "9.5px", color: "#8a8f9d" }}>
-                      {bot.desc}
-                    </span>
-                  </div>
-
-                  {/* Dấu checkmark nếu active */}
-                  <div style={{ width: "14px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    {isActive && (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#f59e0b"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                    <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                    {isAccMain && (
+                      <span style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 700, background: "rgba(148, 163, 184, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                        TK CHÍNH
+                      </span>
+                    )}
+                    {isThisAccRunning && (
+                      <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                        LIVE
+                      </span>
                     )}
                   </div>
+                  {isSelected && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
                 </div>
               );
             })}
+
+            {validPropAccounts.map((pAcc) => {
+              const isSelected = !isOkx && (pAcc.id === activePropId || (!activePropId && propAccounts[0]?.id === pAcc.id));
+              const rawTag = (pAcc.account_id || pAcc.id || "").toString();
+              const tag = rawTag.replace(/^#/, "");
+              const isThisPropAccRunning = isPropRunning || pAcc.is_bot_running;
+              const theme = getAccountTheme("prop", pAcc.firm || pAcc.server);
+
+              return (
+                <div
+                  key={pAcc.id}
+                  onClick={() => {
+                    if (onSwitchPlatform && tradingPlatform !== "e8") onSwitchPlatform("e8");
+                    if (onSelectPropAccount) onSelectPropAccount(pAcc.id);
+                    setIsOpen(false);
+                  }}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    backgroundColor: isSelected ? theme.bgActive : theme.bg,
+                    borderLeft: `3.5px solid ${theme.color}`,
+                    borderTop: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    borderRight: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    borderBottom: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
+                    boxShadow: isSelected ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${theme.bgActive}` : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = theme.bgHover;
+                      e.currentTarget.style.borderColor = theme.borderActive;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = theme.bg;
+                      e.currentTarget.style.borderColor = theme.borderColor;
+                    }
+                  }}
+                >
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {theme.logo}
+                    <span style={{ fontSize: "12.5px", fontWeight: isSelected ? 800 : 700, color: "#ffffff" }}>
+                      {theme.name}
+                    </span>
+                    <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                    {isThisPropAccRunning && (
+                      <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+              );
+            })}
+
+            {validOkxAccounts.length === 0 && validPropAccounts.length === 0 && (
+              <div style={{ padding: "10px", fontSize: "11.5px", color: "#9ca3af", textAlign: "center" }}>
+                Chưa có tài khoản có mã thẻ (#xxxx)
+              </div>
+            )}
+
+            {/* 3. NÚT KẾT NỐI THÊM TÀI KHOẢN MỚI */}
+            <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.1)", margin: "4px 0" }} />
+            <div
+              onClick={() => {
+                setIsOpen(false);
+                if (onOpenConnectModal) onOpenConnectModal("fast");
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 10px",
+                borderRadius: "4px",
+                fontSize: "11.5px",
+                fontWeight: 600,
+                cursor: "pointer",
+                color: "#26a69a",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(38, 166, 154, 0.12)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              <span style={{ fontSize: "14px", fontWeight: "bold" }}>+</span>
+              <span>Quản lý / Kết nối thêm tài khoản...</span>
+            </div>
           </div>
         )}
       </div>

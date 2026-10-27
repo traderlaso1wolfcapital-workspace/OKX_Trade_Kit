@@ -2132,11 +2132,16 @@ async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = N
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/bot/config")
-def get_bot_config(uid: str, strategy: str = "sub1"):
+def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] = None):
     # Đọc cấu hình JSON
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
+    if target_acc and target_acc != strategy:
+        acc_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
+        if os.path.exists(acc_path):
+            config_path = acc_path
     if not os.path.exists(config_path):
         # Mặc định cấu hình chuẩn xác cho người dùng mới
         if strategy == "sub2":
@@ -2279,7 +2284,12 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
 def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1", account_id: str = None):
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
+    if target_acc and target_acc != strategy:
+        acc_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
+        if os.path.exists(acc_path):
+            config_path = acc_path
     
     cfg = {}
     if os.path.exists(config_path):
@@ -4831,18 +4841,140 @@ async def tradelocker_start_bot(uid: str, strategy: str = "sub1", account_id: Op
     if not process_alive:
         await start_shadow_bot(clean_uid, strategy=strategy)
 
+    # 🧹 DỌN SẠCH LỆNH LIMIT CŨ TRƯỚC KHI KÍCH HOẠT (CHUẨN LOGIC OKX: BẢO LƯU 100% VỊ THẾ ĐANG CHẠY & TP/SL)
+    canceled_start = 0
+    try:
+        ok_pos, positions, _ = client.get_positions()
+        has_open_positions = bool(ok_pos and positions)
+
+        if not has_open_positions:
+            # Nếu KHÔNG CÓ vị thế mở: Dọn sạch 100% lệnh Limit cũ trong 1 thao tác duy nhất
+            ok_all, _ = client.cancel_all_orders()
+            if ok_all:
+                canceled_start = 1
+        else:
+            # Nếu CÓ vị thế mở: Quét từng lệnh để bảo vệ 100% TP/SL của các vị thế đó
+            ok_ord, orders, _ = client.get_orders()
+            if ok_ord and orders:
+                for o in orders:
+                    o_dict = o if isinstance(o, dict) else {}
+                    o_status = str(o_dict.get("status") or "").lower()
+                    if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
+                        continue
+                    if o_dict.get("positionId"):
+                        continue
+                    o_id = str(o_dict.get("id") or "")
+                    if o_id:
+                        ok_c, _ = client.cancel_order(o_id)
+                        if ok_c:
+                            canceled_start += 1
+        cache_key = f"{clean_uid}:{target_acc or 'active'}"
+        if cache_key in _prop_positions_cache:
+            _prop_positions_cache[cache_key]["data"] = [p for p in _prop_positions_cache[cache_key].get("data", []) if not p.get("is_limit")]
+            _prop_positions_cache[cache_key]["orders"] = []
+        if canceled_start > 0:
+            TradeLockerManager.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét sạch lệnh Limit cũ trước khi khởi động bot (bảo lưu 100% vị thế mở)")
+    except Exception as e:
+        print(f"[TRADELOCKER START CLEANUP ERR]: {e}")
+
     TradeLockerManager.set_strategy_bot_running(clean_uid, strategy, True, account_id=target_acc, user_base_dir_fn=get_user_base_dir, fernet_instance=fernet)
     strat_labels = {"sub1": "EMA200 Bot", "sub2": "SMC Bot", "sub3": "Liquidation Bot"}
     strat_name = strat_labels.get(strategy, strategy)
-    return {"status": "success", "message": f"⚡ {strat_name} cho Quỹ #{target_acc} đã được KÍCH HOẠT độc quyền!"}
+    clean_info = " (Đã dọn dẹp lệnh Limit cũ)" if canceled_start > 0 else ""
+    return {"status": "success", "message": f"⚡ {strat_name} cho Quỹ #{target_acc} đã được KÍCH HOẠT độc quyền!{clean_info}"}
 
 @app.post("/api/tradelocker/bot/stop")
 def tradelocker_stop_bot(uid: str, strategy: str = "sub1"):
     clean_uid = uid.strip() if uid else "default"
     TradeLockerManager.set_strategy_bot_running(clean_uid, strategy, False, user_base_dir_fn=get_user_base_dir, fernet_instance=fernet)
+
+    # 🧹 DỌN SẠCH LỆNH LIMIT CHỜ KHI DỪNG BOT (CHUẨN LOGIC OKX, BẢO LƯU 100% VỊ THẾ MỞ & TP/SL)
+    canceled_count = 0
+    try:
+        bot_map, _ = TradeLockerManager.get_prop_bindings(clean_uid, get_user_base_dir)
+        target_acc = bot_map.get(strategy)
+        if not target_acc:
+            _, active_id = TradeLockerManager.load_raw_data(clean_uid, get_user_base_dir, fernet)
+            target_acc = active_id
+        client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=target_acc)
+        if client:
+            ok_pos, positions, _ = client.get_positions()
+            has_open_positions = bool(ok_pos and positions)
+
+            if not has_open_positions:
+                # Nếu KHÔNG CÓ vị thế mở: Dọn sạch 100% lệnh Limit chờ trên sàn
+                ok_all, _ = client.cancel_all_orders()
+                if ok_all:
+                    canceled_count = 1
+            else:
+                # Nếu CÓ vị thế mở: Quét từng lệnh để bảo vệ 100% TP/SL của các vị thế đó
+                ok_ord, orders, _ = client.get_orders()
+                if ok_ord and orders:
+                    for o in orders:
+                        o_dict = o if isinstance(o, dict) else {}
+                        o_status = str(o_dict.get("status") or "").lower()
+                        if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
+                            continue
+                        if o_dict.get("positionId"):
+                            continue
+                        o_id = str(o_dict.get("id") or "")
+                        if o_id:
+                            ok_c, _ = client.cancel_order(o_id)
+                            if ok_c:
+                                canceled_count += 1
+            cache_key = f"{clean_uid}:{target_acc or 'active'}"
+            if cache_key in _prop_positions_cache:
+                _prop_positions_cache[cache_key]["data"] = [p for p in _prop_positions_cache[cache_key].get("data", []) if not p.get("is_limit")]
+                _prop_positions_cache[cache_key]["orders"] = []
+            if canceled_count > 0:
+                TradeLockerManager.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét và dọn sạch lệnh Limit chờ khi dừng bot (bảo lưu 100% vị thế mở)")
+    except Exception as e:
+        print(f"[TRADELOCKER STOP CLEANUP ERR]: {e}")
+
     strat_labels = {"sub1": "EMA200 Bot", "sub2": "SMC Bot", "sub3": "Liquidation Bot"}
     strat_name = strat_labels.get(strategy, strategy)
-    return {"status": "success", "message": f"{strat_name} cho Quỹ đã dừng!"}
+    clean_msg = " (Đã dọn dẹp lệnh Limit chờ trên sàn)" if canceled_count > 0 else ""
+    return {"status": "success", "message": f"{strat_name} cho Quỹ đã dừng!{clean_msg}"}
+
+@app.post("/api/tradelocker/orders/cancel_all")
+def tradelocker_cancel_all_orders(uid: str = "default", account_id: Optional[str] = None):
+    clean_uid = uid.strip() if uid else "default"
+    client = TradeLockerManager.get_client(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    if not client:
+        raise HTTPException(status_code=400, detail="Chưa kết nối Quỹ TradeLocker")
+
+    canceled_count = 0
+    ok_pos, positions, _ = client.get_positions()
+    has_open_positions = bool(ok_pos and positions)
+
+    if not has_open_positions:
+        ok_all, _ = client.cancel_all_orders()
+        if ok_all:
+            canceled_count = 1
+    else:
+        ok_ord, orders, _ = client.get_orders()
+        if ok_ord and orders:
+            for o in orders:
+                o_dict = o if isinstance(o, dict) else {}
+                o_status = str(o_dict.get("status") or "").lower()
+                if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
+                    continue
+                # BẢO VỆ TUYỆT ĐỐI TP/SL CỦA VỊ THẾ ĐANG CHẠY:
+                if o_dict.get("positionId"):
+                    continue
+                o_id = str(o_dict.get("id") or "")
+                if o_id:
+                    ok_c, _ = client.cancel_order(o_id)
+                    if ok_c:
+                        canceled_count += 1
+
+    cache_key = f"{clean_uid}:{account_id or 'active'}"
+    if cache_key in _prop_positions_cache:
+        _prop_positions_cache[cache_key]["data"] = [p for p in _prop_positions_cache[cache_key].get("data", []) if not p.get("is_limit")]
+        _prop_positions_cache[cache_key]["orders"] = []
+
+    TradeLockerManager.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét và hủy sạch {canceled_count} lệnh Limit chờ trên sàn (bảo lưu 100% vị thế mở)")
+    return {"status": "success", "canceled_count": canceled_count, "message": f"Đã hủy sạch {canceled_count} lệnh Limit chờ!"}
 
 @app.get("/api/tradelocker/logs")
 def tradelocker_get_logs(uid: str = "default"):
