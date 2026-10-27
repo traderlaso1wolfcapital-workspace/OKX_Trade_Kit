@@ -1316,6 +1316,8 @@ function App() {
           line.startsWith("===") || 
           line.startsWith("---") ||
           line.includes("Thợ săn EMA200") ||
+          line.includes("Quỹ E8") ||
+          line.includes("Quỹ FX") ||
           line.includes("Mode:") ||
           line.includes("Gốc:") ||
           line.includes("Lợi nhuận") ||

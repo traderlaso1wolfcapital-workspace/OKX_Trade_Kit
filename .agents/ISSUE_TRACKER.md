@@ -33,6 +33,42 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Triển Khai Toàn Diện Lựa Chọn B: Rải Full Lưới Đa Khung Cho Quỹ TradeLocker (E8 Markets) Giống Hệt Sàn OKX:
+  - **Yêu cầu từ CEO:** Áp dụng chuẩn Lựa chọn B: Cho phép Bot đặt full lưới đa khung M15, M30, H1, H2, H4 đồng thời lên TradeLocker giống như sàn OKX hiện tại.
+  - **Triển khai kỹ thuật ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py)):**
+    1. **Cooldown theo Từng Mức Giá:** Đổi khóa Cooldown từ toàn bộ symbol sang `cool_key = f"{clean_base}_{side}_{px_key}"` (10s). Các tầng giá khác nhau ở các khung M15, M30, H1, H2, H4 được phép đặt lệnh ngay lập tức mà không bị chặn.
+    2. **Cho Phép Nhồi Lưới Cùng Chiều Khi Đã Có Vị Thế:** Nếu coin đã khớp vị thế mở, bot vẫn cho phép đặt thêm các lệnh Limit cùng chiều ở các tầng giá cao/thấp hơn theo chiến lược bình quân giá EMA200 (chỉ chặn lệnh Market bừa bãi hoặc lệnh ngược chiều).
+    3. **Bảo Toàn Toàn Bộ Các Tầng Lưới:** Loại bỏ hoàn toàn lệnh `cancel_all_orders` khi có giá mới. Hệ thống chỉ giữ nguyên lệnh nếu mức giá lệch < 0.2% (tránh spam đè), còn các mức giá mới thuộc các tầng lưới khác nhau đều được đẩy thẳng lên sổ lệnh TradeLocker để rải full lưới đa khung.
+  - **Trạng thái:** Đã kiểm thử cú pháp AST thành công và tự động kích hoạt mở trình duyệt Desktop cho CEO.
+
+- **[27/10/2026]** - Tích Hợp Toàn Diện Bộ Hardcoded Instruments Fallback Cho Quỹ E8, Cơ Chế Auto-Retry Chống 10054 Và Ẩn Dropdown Hệ Số Nhân Bên FX:
+  - **Bối cảnh & Lỗi thực tế từ Log:**
+    - Lệnh ETH đặt thành công lên TradeLocker E8 (`Ticket #360287970215348570`), nhưng lệnh BTC bị ngắt kết nối (`ConnectionResetError 10054`) do mạng chập chờn / DPI của nhà mạng, và lệnh XAU báo lỗi `Không tìm thấy mã giao dịch phù hợp`.
+    - Dropdown `Cố định / Nhân hệ số` ở thanh điều khiển bên trái thừa thãi khi ở tab Quỹ FX vì Quỹ luôn đánh theo Fixed Lot cố định.
+  - **Triển khai kỹ thuật:**
+    1. **Bảo đảm 100% không rớt mã giao dịch ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py)):**
+       - Tích hợp bộ từ điển chuẩn E8 Markets `HARDCODED_E8_INSTRUMENTS` (đã trích xuất và kiểm chứng trực tiếp từ API TradeLocker E8: `XAUUSD+` ID 6102, `BTCUSD+` ID 6142, `ETHUSD+` ID 6140, `SOLUSD+` ID 6141, Route 948735).
+       - Tự động nạp và lưu cache ra file đĩa `e8_instruments_cache.json` (46 mã giao dịch).
+       - Nâng cấp `resolve_instrument` ưu tiên map thẳng XAU, BTC, ETH, SOL, đảm bảo không bao giờ bị trả về `None`.
+    2. **Cơ chế Auto-Retry chống đứt mạng 10054:**
+       - Nâng cấp hàm `place_order` tự động thử lại tối đa 3 lần với backoff 0.5s khi gặp `ConnectionResetError 10054` hoặc Timeout, giúp lệnh được đẩy lên sàn TradeLocker trơn tru ngay cả khi mạng Việt Nam bị chập chờn.
+       - Nâng cấp phân giải DNS trong `_tradelocker_getaddrinfo` ưu tiên IPv6 Cloudflare sạch (`2606:4700::6812:1c43`), tránh triệt để việc ISP Việt Nam sinkhole `demo.tradelocker.com` về `127.0.0.1`.
+    3. **Giao diện Sidebar Left ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+       - Bọc điều kiện `tradingPlatform !== "e8"`: Ẩn hoàn toàn dropdown `Cố định / Nhân hệ số` khi xem tab Quỹ FX, chỉ giữ lại nhãn `Khối lượng: [LOT]` và ô nhập `0.01 L` cố định.
+  - **Kiểm thử xác minh:**
+    - Test trực tiếp tài khoản OKX `#bot m15`: Status 200, Total Equity $26.23 USD (25.44 USDT khả dụng), API hoạt động hoàn hảo.
+    - Test trực tiếp tài khoản Quỹ E8 TradeLocker (`baotranlc020.ido@gmail.com`): Đăng nhập thành công, nhận diện tài khoản `#2534591` ($4,935.71 USD).
+    - Test map symbol: XAU, BTC, ETH, SOL đều phân giải chính xác 100% kèm `tradableInstrumentId` và `tradeRouteId`.
+    - Build Frontend: `npm run build` thành công mã code 0 (299ms).
+
+- **[27/10/2026]** - Tinh Gọn Nút Sao Chép Logs Terminal Thành Icon Tinh Tế:
+  - **Yêu cầu từ CEO:** Nút sao chép logs ở góc trên bên phải bảng terminal chỉ cần để icon `📋`, không cần hiển thị chữ `Sao chép` nữa.
+  - **Triển khai kỹ thuật ([LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx)):**
+    - Cập nhật nút copy sang dạng icon-only hình vuông `28x28px`, căn giữa biểu tượng clipboard `📋`.
+    - Loại bỏ chữ thừa, tối ưu viền kính mờ `rgba(255, 255, 255, 0.15)` và hover feedback mượt mà.
+    - Giữ nguyên tooltip giải thích rõ ràng khi di chuột qua (`Sao chép toàn bộ logs`).
+  - **Trạng thái:** Đã kiểm thử và build Vite production thành công 100% trong 244ms.
+
 - **[27/10/2026]** - Phân Tích Cơ Chế Fast Connect Đa Thiết Bị & Khắc Phục Triệt Để Chồng Chéo Lợi Nhuận Khi Xóa Tài Khoản:
   - **Phân tích cơ chế Fast Connect đa thiết bị:**
     1. Khi Fast Connect tài khoản OKX trên thiết bị mới: OKX OAuth yêu cầu thu hồi API Key OAuth cũ trên sàn để cấp Fast API Key mới (`TLS1_{timestamp}`).
@@ -534,7 +570,19 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
        - Đã loại bỏ hoàn toàn chấm xanh/đỏ đơn lẻ và dòng `UID: Đã ngắt kết nối...` ở footer `ConnectModal`.
        - **Loại bỏ nút "Đăng Xuất" lớn ở đáy modal:** Do nút này là tàn dư từ thời hệ thống Single-Account cũ, gây nhầm lẫn khi người dùng kết nối nhiều tài khoản.
        - **Đổi nút "Delete" nhỏ trên từng thẻ thành chữ "Đăng Xuất":** Mỗi tài khoản (OKX, E8, Exness MT5...) giờ đây có nút `Đăng Xuất` riêng biệt, rõ ràng và chuẩn ngữ nghĩa tiếng Việt. Đáy modal trở nên gọn gàng, sạch sẽ 100%.
-    5. Đã build kiểm thử Vite thành công (`dist/index-BcFQQ8f1.js`, 280ms).
+    5. **Chuẩn Hóa Đơn Vị Ký Quỹ & Tách Biệt Dashboard Quỹ FX (`LogsTerminal.jsx`):**
+       - Làm rõ nguyên nhân: Bảng logs của Quỹ E8 trước đó hiển thị nhiều lệnh khớp và limit kèm chữ `U` (USDT) do giao diện lấy phần thân vị thế của bot sàn OKX ghép vào dưới Header Quỹ E8.
+       - Viết hàm `convertUtoLot`: Chuyển đổi toàn bộ đơn vị tiền tệ từ `U` (USDT) sang **`L`** (Lots, ví dụ `0.01 L`) cho mọi vị thế và lệnh limit khi xem ở tab Quỹ FX.
+       - Khẳng định nguyên tắc **Cố Định Ký Quỹ (Fixed Lot = 0.01 L)**: Với Quỹ FX, đòn bẩy Crypto thấp (1 lệnh 0.01 BTC tốn tới $1,603 margin), tuyệt đối không nhân hệ số đa khung để tránh cạn kiệt margin và bảo vệ quy định Max Drawdown của Quỹ.
+    6. **Thiết Kế Lại Header Quỹ FX 4 Cột Ngang Chuẩn Hóa (`tradelocker_service.py` & `LogsTerminal.jsx`):**
+       - Thay thế khối dọc 7 dòng cũ bằng bảng 4 cột ngang 78 ký tự chuẩn mực y hệt bên Coin:
+         - Cột 1: `🏆 Quỹ E8 Markets` | Thời gian | `TK: #{acc_num}`
+         - Cột 2: `💰 Lợi nhuận` | `Gốc: {fund_size} $` (tô màu Cyan `#38bdf8`) | `PNL: {pnl} $` (tô màu Xanh/Đỏ)
+         - Cột 3: `🏦 Tài khoản` | `Tổng: {balance} $` (tô màu Vàng Gold `#fbbf24`) | `Vol : {fixed_lot} L`
+         - Cột 4: `🎯 Hiệu suất` | `Win: ...` | `Bot: RUNNING/STOPPED`
+       - Bổ sung nhận diện `Quỹ E8` và `Quỹ FX` vào `isDashboardLine` trong `LogsTerminal.jsx` và `App.jsx`.
+       - Rút gọn chiều cao màn hình, hiển thị khoa học và kích hoạt đồng bộ màu sắc nhận diện tự động.
+    7. Đã build kiểm thử Vite thành công (`dist/index-BHXwqWC0.js`, 279ms).
 
 - **[26/10/2026]** - Nâng Cấp Dropdown Nền Tảng (Sàn OKX / Quỹ FX) Chuẩn Pill Badge & Tinh Chỉnh Màu Sắc Đồng Nhất Cho Dashboard:
   - **Mô tả yêu cầu CEO:**

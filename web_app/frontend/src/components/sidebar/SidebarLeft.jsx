@@ -947,67 +947,69 @@ export default function SidebarLeft({
                     )}
                   </div>
 
-                  {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) */}
-                  <div
-                    style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-                    title={
-                      isRunning
-                        ? "Vui lòng dừng bot để thay đổi thiết lập này"
-                        : risk.multiplyVolumeByTf
-                        ? "Đang BẬT: Khối lượng ký quỹ nhân theo hệ số TF (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0)"
-                        : "Đang TẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian"
-                    }
-                  >
+                  {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) - Chỉ hiển thị ở Sàn Coin OKX, Quỹ FX mặc định cố định theo Lot */}
+                  {tradingPlatform !== "e8" && (
                     <div
-                      className={`risk-mult-badge ${risk.multiplyVolumeByTf ? "active" : ""}`}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "3px",
-                        padding: "1px 5px",
-                        fontSize: "10px",
-                        fontWeight: "bold",
-                        borderRadius: "4px",
-                        border: "1px solid #444",
-                        background: "#222",
-                        cursor: isRunning ? "not-allowed" : "pointer",
-                        userSelect: "none",
-                        whiteSpace: "nowrap",
-                        transition: "all 0.15s ease",
-                      }}
+                      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+                      title={
+                        isRunning
+                          ? "Vui lòng dừng bot để thay đổi thiết lập này"
+                          : risk.multiplyVolumeByTf
+                          ? "Đang BẬT: Khối lượng ký quỹ nhân theo hệ số TF (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0)"
+                          : "Đang TẮT: Cố định 1 mức ký quỹ cơ sở ban đầu cho tất cả các khung thời gian"
+                      }
                     >
-                      <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#dddddd" }}>
-                        {risk.multiplyVolumeByTf ? t("multiply_tf") : t("fixed")}
-                      </span>
-                      <span className="risk-mult-arrow" style={{ fontSize: "8px", opacity: 0.95, color: risk.multiplyVolumeByTf ? "#26a69a" : "#ffffff" }}>▼</span>
-                    </div>
+                      <div
+                        className={`risk-mult-badge ${risk.multiplyVolumeByTf ? "active" : ""}`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                          padding: "1px 5px",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          borderRadius: "4px",
+                          border: "1px solid #444",
+                          background: "#222",
+                          cursor: isRunning ? "not-allowed" : "pointer",
+                          userSelect: "none",
+                          whiteSpace: "nowrap",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span className="risk-mult-text" style={{ color: risk.multiplyVolumeByTf ? "#26a69a" : "#dddddd" }}>
+                          {risk.multiplyVolumeByTf ? t("multiply_tf") : t("fixed")}
+                        </span>
+                        <span className="risk-mult-arrow" style={{ fontSize: "8px", opacity: 0.95, color: risk.multiplyVolumeByTf ? "#26a69a" : "#ffffff" }}>▼</span>
+                      </div>
 
-                    <select
-                      value={risk.multiplyVolumeByTf ? "multiply" : "fixed"}
-                      disabled={isRunning}
-                      onChange={(e) => {
-                        if (isRunning) return;
-                        const nextVal = e.target.value === "multiply";
-                        if (onToggleMultiplyVolume) {
-                          onToggleMultiplyVolume(nextVal);
-                        } else {
-                          setRisk((r) => ({ ...r, multiplyVolumeByTf: nextVal }));
-                        }
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
-                        opacity: 0,
-                        cursor: isRunning ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <option value="fixed" style={{ background: "#222", color: "#fff" }}>{t("fixed")}</option>
-                      <option value="multiply" style={{ background: "#222", color: "#26a69a" }}>{t("multiply_margin_tf")}</option>
-                    </select>
-                  </div>
+                      <select
+                        value={risk.multiplyVolumeByTf ? "multiply" : "fixed"}
+                        disabled={isRunning}
+                        onChange={(e) => {
+                          if (isRunning) return;
+                          const nextVal = e.target.value === "multiply";
+                          if (onToggleMultiplyVolume) {
+                            onToggleMultiplyVolume(nextVal);
+                          } else {
+                            setRisk((r) => ({ ...r, multiplyVolumeByTf: nextVal }));
+                          }
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          opacity: 0,
+                          cursor: isRunning ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <option value="fixed" style={{ background: "#222", color: "#fff" }}>{t("fixed")}</option>
+                        <option value="multiply" style={{ background: "#222", color: "#26a69a" }}>{t("multiply_margin_tf")}</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {tradingPlatform === "e8" ? (

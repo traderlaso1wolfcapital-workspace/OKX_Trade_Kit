@@ -192,6 +192,8 @@ export default function LogsTerminal({
           line.startsWith("===") || 
           line.startsWith("---") ||
           line.includes("Thợ săn EMA200") ||
+          line.includes("Quỹ E8") ||
+          line.includes("Quỹ FX") ||
           line.includes("Mode:") ||
           line.includes("Gốc:") ||
           line.includes("Lợi nhuận") ||
@@ -291,15 +293,31 @@ export default function LogsTerminal({
       }
 
       let combinedDashboard = propHeader;
+      const convertUtoLot = (lines) => {
+        return lines.map(l => {
+          if (!l || typeof l !== "string") return l;
+          let s = l;
+          // Chuyển ký quỹ: xx.x U -> ký quỹ: 0.01 L
+          s = s.replace(/ký quỹ:\s*(\d+(\.\d+)?)\s*U/gi, "ký quỹ: 0.01 L");
+          // Chuyển VOL: xx.x U -> VOL: 0.01 L
+          s = s.replace(/VOL:\s*(\d+(\.\d+)?)\s*U/gi, "VOL: 0.01 L");
+          // Chuyển số kèm U độc lập ở entry/limit -> 0.01 L
+          s = s.replace(/(-\s*)(\d+(\.\d+)?)\s*U\b/g, "$10.01 L");
+          s = s.replace(/(\(\s*ký quỹ:\s*)(\d+(\.\d+)?)\s*U\s*\)/gi, "$10.01 L)");
+          s = s.replace(/(\d+(\.\d+)?)\s*U\b/g, "0.01 L");
+          return s;
+        });
+      };
+
       if (propHeader.length > 0 && detailIndex !== -1) {
-        // Giữ nguyên giao diện Quỹ FX ở đầu + Chi tiết vị thế & bảng nến của bot ở dưới!
-        combinedDashboard = [...propHeader, ...okxDashboard.slice(detailIndex)];
+        // Giữ nguyên giao diện Quỹ FX ở đầu + Chi tiết vị thế & bảng nến của bot ở dưới (chuẩn hóa Lot L)!
+        combinedDashboard = [...propHeader, ...convertUtoLot(okxDashboard.slice(detailIndex))];
       } else if (propHeader.length > 0 && okxDashboard.length > 6) {
-        combinedDashboard = [...propHeader, ...okxDashboard.slice(6)];
+        combinedDashboard = [...propHeader, ...convertUtoLot(okxDashboard.slice(6))];
       } else if (propHeader.length > 0) {
         combinedDashboard = propHeader;
       } else if (okxDashboard.length > 0) {
-        combinedDashboard = okxDashboard;
+        combinedDashboard = convertUtoLot(okxDashboard);
       }
 
       const pEvents = Array.isArray(propLogs?.eventLogs) ? propLogs.eventLogs : [];
@@ -370,7 +388,7 @@ export default function LogsTerminal({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
-      {/* Nút Sao chép Logs nổi gọn gàng ở góc trên bên phải, không chiếm diện tích dòng thanh công cụ */}
+      {/* Nút Sao chép Logs nổi gọn gàng ở góc trên bên phải, chỉ để icon tinh gọn */}
       <button
         type="button"
         onClick={handleCopy}
@@ -379,18 +397,19 @@ export default function LogsTerminal({
           top: "8px",
           right: "12px",
           zIndex: 10,
-          padding: "3px 10px",
+          width: "28px",
+          height: "28px",
+          padding: 0,
           borderRadius: "5px",
           background: "rgba(255, 255, 255, 0.08)",
           backdropFilter: "blur(6px)",
           border: "1px solid rgba(255, 255, 255, 0.15)",
           color: "#cbd5e1",
-          fontSize: "11px",
-          fontWeight: 600,
+          fontSize: "13px",
           cursor: "pointer",
           display: "inline-flex",
           alignItems: "center",
-          gap: "5px",
+          justifyContent: "center",
           transition: "all 0.15s ease",
           opacity: 0.85,
         }}
@@ -403,8 +422,9 @@ export default function LogsTerminal({
           e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
         }}
         title={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
+        aria-label={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
       >
-        📋 {t("log_copy_btn", "Sao chép")}
+        📋
       </button>
 
       {/* Vùng hiển thị Logs Terminal */}

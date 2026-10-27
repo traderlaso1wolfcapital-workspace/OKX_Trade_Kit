@@ -1,0 +1,370 @@
+{
+  "XAUUSD+": {
+    "id": 6713,
+    "tradableInstrumentId": 6102,
+    "tradeRouteId": 948735,
+    "name": "XAUUSD+",
+    "description": "Gold vs US Dollar - Spot",
+    "type": "EQUITY_CFD"
+  },
+  "ETHUSD+": {
+    "id": 6751,
+    "tradableInstrumentId": 6140,
+    "tradeRouteId": 948735,
+    "name": "ETHUSD+",
+    "description": "Ethereum vs USD",
+    "type": "CRYPTO"
+  },
+  "BTCUSD+": {
+    "id": 6753,
+    "tradableInstrumentId": 6142,
+    "tradeRouteId": 948735,
+    "name": "BTCUSD+",
+    "description": "Bitcoin vs USD",
+    "type": "CRYPTO"
+  },
+  "SOLUSD+": {
+    "id": 6752,
+    "tradableInstrumentId": 6141,
+    "tradeRouteId": 948735,
+    "name": "SOLUSD+",
+    "description": "Solana vs USD",
+    "type": "CRYPTO"
+  },
+  "EURUSD+": {
+    "id": 6730,
+    "tradableInstrumentId": 6119,
+    "tradeRouteId": 948735,
+    "name": "EURUSD+",
+    "description": "Euro vs US Dollar",
+    "type": "FOREX"
+  },
+  "GBPUSD+": {
+    "id": 6727,
+    "tradableInstrumentId": 6116,
+    "tradeRouteId": 948735,
+    "name": "GBPUSD+",
+    "description": "Great Britain Pound vs US Dollar",
+    "type": "FOREX"
+  },
+  "XAGUSD+": {
+    "id": 6712,
+    "tradableInstrumentId": 6101,
+    "tradeRouteId": 948735,
+    "name": "XAGUSD+",
+    "description": "Silver vs US Dollar - Spot",
+    "type": "EQUITY_CFD"
+  },
+  "ASX+": {
+    "id": 6714,
+    "tradableInstrumentId": 6103,
+    "tradeRouteId": 948735,
+    "name": "ASX+",
+    "description": "Australia 200 Index",
+    "type": "EQUITY_CFD"
+  },
+  "NSDQ+": {
+    "id": 6715,
+    "tradableInstrumentId": 6104,
+    "tradeRouteId": 948735,
+    "name": "NSDQ+",
+    "description": "Nasdaq 100 Index",
+    "type": "EQUITY_CFD"
+  },
+  "DAX+": {
+    "id": 6716,
+    "tradableInstrumentId": 6105,
+    "tradeRouteId": 948735,
+    "name": "DAX+",
+    "description": "Germany 40 Index",
+    "type": "EQUITY_CFD"
+  },
+  "SP+": {
+    "id": 6717,
+    "tradableInstrumentId": 6106,
+    "tradeRouteId": 948735,
+    "name": "SP+",
+    "description": "S&P 500 Index",
+    "type": "EQUITY_CFD"
+  },
+  "DOW+": {
+    "id": 6718,
+    "tradableInstrumentId": 6107,
+    "tradeRouteId": 948735,
+    "name": "DOW+",
+    "description": "Dow Jones 30 Index",
+    "type": "EQUITY_CFD"
+  },
+  "NIKKEI+": {
+    "id": 6719,
+    "tradableInstrumentId": 6108,
+    "tradeRouteId": 948735,
+    "name": "NIKKEI+",
+    "description": "Japan 225 Index",
+    "type": "EQUITY_CFD"
+  },
+  "GBPCAD+": {
+    "id": 6720,
+    "tradableInstrumentId": 6109,
+    "tradeRouteId": 948735,
+    "name": "GBPCAD+",
+    "description": "Great Britan Pound vs Canadian Dollar",
+    "type": "FOREX"
+  },
+  "NZDJPY+": {
+    "id": 6721,
+    "tradableInstrumentId": 6110,
+    "tradeRouteId": 948735,
+    "name": "NZDJPY+",
+    "description": "New Zealand Dollar vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "EURJPY+": {
+    "id": 6722,
+    "tradableInstrumentId": 6111,
+    "tradeRouteId": 948735,
+    "name": "EURJPY+",
+    "description": "Euro vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "NZDUSD+": {
+    "id": 6723,
+    "tradableInstrumentId": 6112,
+    "tradeRouteId": 948735,
+    "name": "NZDUSD+",
+    "description": "New Zealand Dollar vs US Dollar",
+    "type": "FOREX"
+  },
+  "AUDNZD+": {
+    "id": 6724,
+    "tradableInstrumentId": 6113,
+    "tradeRouteId": 948735,
+    "name": "AUDNZD+",
+    "description": "Australian Dollar vs New Zealand Dollar",
+    "type": "FOREX"
+  },
+  "GBPCHF+": {
+    "id": 6725,
+    "tradableInstrumentId": 6114,
+    "tradeRouteId": 948735,
+    "name": "GBPCHF+",
+    "description": "Great Britain Pound vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "CADJPY+": {
+    "id": 6726,
+    "tradableInstrumentId": 6115,
+    "tradeRouteId": 948735,
+    "name": "CADJPY+",
+    "description": "Canadian Dollar vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "AUDJPY+": {
+    "id": 6728,
+    "tradableInstrumentId": 6117,
+    "tradeRouteId": 948735,
+    "name": "AUDJPY+",
+    "description": "Australian Dollar vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "CADCHF+": {
+    "id": 6729,
+    "tradableInstrumentId": 6118,
+    "tradeRouteId": 948735,
+    "name": "CADCHF+",
+    "description": "Canadian Dollar vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "AUDUSD+": {
+    "id": 6731,
+    "tradableInstrumentId": 6120,
+    "tradeRouteId": 948735,
+    "name": "AUDUSD+",
+    "description": "Australian Dollar vs US Dollar",
+    "type": "FOREX"
+  },
+  "GBPAUD+": {
+    "id": 6732,
+    "tradableInstrumentId": 6121,
+    "tradeRouteId": 948735,
+    "name": "GBPAUD+",
+    "description": "Great Britain Pound vs Australian Dollar",
+    "type": "FOREX"
+  },
+  "EURAUD+": {
+    "id": 6733,
+    "tradableInstrumentId": 6122,
+    "tradeRouteId": 948735,
+    "name": "EURAUD+",
+    "description": "Euro vs Australian Dollar",
+    "type": "FOREX"
+  },
+  "AUDCHF+": {
+    "id": 6734,
+    "tradableInstrumentId": 6123,
+    "tradeRouteId": 948735,
+    "name": "AUDCHF+",
+    "description": "Australian Dollar vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "AUDCAD+": {
+    "id": 6735,
+    "tradableInstrumentId": 6124,
+    "tradeRouteId": 948735,
+    "name": "AUDCAD+",
+    "description": "Australian Dollar vs Canadian Dollar",
+    "type": "FOREX"
+  },
+  "USDCAD+": {
+    "id": 6736,
+    "tradableInstrumentId": 6125,
+    "tradeRouteId": 948735,
+    "name": "USDCAD+",
+    "description": "US Dollar vs Canadian Dollar",
+    "type": "FOREX"
+  },
+  "EURCHF+": {
+    "id": 6737,
+    "tradableInstrumentId": 6126,
+    "tradeRouteId": 948735,
+    "name": "EURCHF+",
+    "description": "Euro vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "USDCHF+": {
+    "id": 6738,
+    "tradableInstrumentId": 6127,
+    "tradeRouteId": 948735,
+    "name": "USDCHF+",
+    "description": "US Dollar vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "EURCAD+": {
+    "id": 6739,
+    "tradableInstrumentId": 6128,
+    "tradeRouteId": 948735,
+    "name": "EURCAD+",
+    "description": "Euro vs Canadian Dollar",
+    "type": "FOREX"
+  },
+  "NZDCAD+": {
+    "id": 6740,
+    "tradableInstrumentId": 6129,
+    "tradeRouteId": 948735,
+    "name": "NZDCAD+",
+    "description": "New Zealand Dollar vs Canadian Dollar",
+    "type": "FOREX"
+  },
+  "GBPJPY+": {
+    "id": 6741,
+    "tradableInstrumentId": 6130,
+    "tradeRouteId": 948735,
+    "name": "GBPJPY+",
+    "description": "Great Britain Pound vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "USDJPY+": {
+    "id": 6742,
+    "tradableInstrumentId": 6131,
+    "tradeRouteId": 948735,
+    "name": "USDJPY+",
+    "description": "US Dollar vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "NZDCHF+": {
+    "id": 6743,
+    "tradableInstrumentId": 6132,
+    "tradeRouteId": 948735,
+    "name": "NZDCHF+",
+    "description": "New Zealand Dollar vs Swiss Franc",
+    "type": "FOREX"
+  },
+  "GBPNZD+": {
+    "id": 6744,
+    "tradableInstrumentId": 6133,
+    "tradeRouteId": 948735,
+    "name": "GBPNZD+",
+    "description": "Great Britan Pound vs New Zealand Dollar",
+    "type": "FOREX"
+  },
+  "CHFJPY+": {
+    "id": 6745,
+    "tradableInstrumentId": 6134,
+    "tradeRouteId": 948735,
+    "name": "CHFJPY+",
+    "description": "Swiss Franc vs Japanese Yen",
+    "type": "FOREX"
+  },
+  "EURNZD+": {
+    "id": 6746,
+    "tradableInstrumentId": 6135,
+    "tradeRouteId": 948735,
+    "name": "EURNZD+",
+    "description": "Euro vs New Zealand Dollar",
+    "type": "FOREX"
+  },
+  "EURGBP+": {
+    "id": 6747,
+    "tradableInstrumentId": 6136,
+    "tradeRouteId": 948735,
+    "name": "EURGBP+",
+    "description": "Euro vs Great Britain Pound",
+    "type": "FOREX"
+  },
+  "WTI+": {
+    "id": 6748,
+    "tradableInstrumentId": 6137,
+    "tradeRouteId": 948735,
+    "name": "WTI+",
+    "description": "Crude Oil (WTI) vs US Dollar - Spot",
+    "type": "EQUITY_CFD"
+  },
+  "BRENT+": {
+    "id": 6749,
+    "tradableInstrumentId": 6138,
+    "tradeRouteId": 948735,
+    "name": "BRENT+",
+    "description": "Brent Crude Oil vs US Dollar- Spot",
+    "type": "EQUITY_CFD"
+  },
+  "LTCUSD+": {
+    "id": 6750,
+    "tradableInstrumentId": 6139,
+    "tradeRouteId": 948735,
+    "name": "LTCUSD+",
+    "description": "Litecoin vs USD",
+    "type": "CRYPTO"
+  },
+  "XRPUSD+": {
+    "id": 6754,
+    "tradableInstrumentId": 6143,
+    "tradeRouteId": 948735,
+    "name": "XRPUSD+",
+    "description": "Ripple vs USD",
+    "type": "CRYPTO"
+  },
+  "ADAUSD+": {
+    "id": 6755,
+    "tradableInstrumentId": 6144,
+    "tradeRouteId": 948735,
+    "name": "ADAUSD+",
+    "description": "Cardano vs USD",
+    "type": "CRYPTO"
+  },
+  "BCHUSD+": {
+    "id": 6756,
+    "tradableInstrumentId": 6145,
+    "tradeRouteId": 948735,
+    "name": "BCHUSD+",
+    "description": "Bitcoin Cash vs USD",
+    "type": "CRYPTO"
+  },
+  "BNBUSD+": {
+    "id": 6757,
+    "tradableInstrumentId": 6146,
+    "tradeRouteId": 948735,
+    "name": "BNBUSD+",
+    "description": "Binance Coin vs USD",
+    "type": "CRYPTO"
+  }
+}
