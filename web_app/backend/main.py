@@ -14,6 +14,7 @@ except ImportError:
 import logging
 logger = logging.getLogger("tls1_app")
 import json
+import re
 import time
 import random
 import asyncio
@@ -258,6 +259,8 @@ class ConfigUpdate(BaseModel):
     dynamic_risk_pct: Optional[float] = None
     scalping_tp_pct: Optional[float] = None
     scalping_sl_pct: Optional[float] = None
+    ob_rr_ratio_trend: Optional[float] = None
+    ob_rr_ratio_counter: Optional[float] = None
     strategy_config: Optional[Dict[str, Any]] = None
     enable_pyramid_dca: Optional[bool] = None
     enable_negative_dca: Optional[bool] = None
@@ -594,7 +597,8 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                     _save_env_file(os.path.join(base_dir, f"bots/{req.strategy}", f".api_{req.strategy}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
 
                 # Cập nhật hoặc lưu vào accounts.json của chính UID này
-                updated_accounts = sync_account_name_in_storage(uid, acc, detected_name)
+                fast_api_label = acc_info.get("label", "") if acc_info else ""
+                updated_accounts = sync_account_name_in_storage(uid, acc, detected_name, api_label=fast_api_label)
                 
                 return {
                     "status": "success",
@@ -1227,11 +1231,17 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
 
                 detected_name = ""
                 if label and not label.startswith("TLS1_"):
+                    # Tên mã API người dùng tự đặt thủ công (ví dụ: Bot-m15)
                     detected_name = label
+                elif label and label.startswith("TLS1_"):
+                    # Mã API Fast Connect (OAuth): TLS1_1790574999 -> lấy 4 số cuối của mã API
+                    suffix = re.sub(r"\D", "", label.replace("TLS1_", ""))
+                    last4 = suffix[-4:] if len(suffix) >= 4 else suffix
+                    detected_name = f"#{last4}" if last4 else "Fast API"
                 elif is_main:
-                    detected_name = f"Tài khoản chính ({main_uid[-4:]})" if main_uid else "Tài khoản chính"
+                    detected_name = f"#{main_uid[-4:]}" if main_uid else "Tài khoản chính"
                 else:
-                    detected_name = f"Tài khoản phụ ({api_uid[-4:]})" if api_uid else "Tài khoản phụ"
+                    detected_name = f"#{api_uid[-4:]}" if api_uid else "Tài khoản phụ"
 
                 return {
                     "status": "ok",
@@ -1245,7 +1255,7 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
         print(f"[DETECT OKX ACC ERROR] {e}", flush=True)
     return None
 
-def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, force_rename: bool = False):
+def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, force_rename: bool = False, api_label: str = ""):
     """
     Cập nhật hoặc đặt tên cho tài khoản trong accounts.json:
     - Nếu tài khoản chưa được tạo bằng dấu + với tên thủ công riêng (is_manual != True),
@@ -1281,6 +1291,8 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
             is_generic = (not is_manual) or (current_name in ["Tài khoản 1", "Tài khoản 2", "Tài khoản 3", "sub1", "sub2", "sub3"]) or current_name.startswith("Tài khoản ")
             if is_generic or force_rename:
                 acc["name"] = detected_name
+                if api_label:
+                    acc["api_label"] = api_label
             break
 
     # 2. Nếu chưa tìm thấy theo ID, tìm theo tên để tái sử dụng tài khoản cũ thay vì tạo trùng lặp
@@ -1289,15 +1301,20 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
             if acc.get("name", "").strip().lower() == detected_name.strip().lower():
                 found = True
                 target_acc = acc.get("id", target_acc)
+                if api_label:
+                    acc["api_label"] = api_label
                 break
 
     # 3. Nếu chưa từng tồn tại tài khoản nào cùng ID hoặc cùng Tên thì mới tạo mới
     if not found:
-        accounts.append({
+        new_acc = {
             "id": target_acc,
             "name": detected_name,
             "is_manual": False
-        })
+        }
+        if api_label:
+            new_acc["api_label"] = api_label
+        accounts.append(new_acc)
 
     # 4. Tự động khử trùng lặp (Deduplicate) theo tên và ID
     deduped = []
@@ -1952,33 +1969,64 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
     os.makedirs(config_dir, exist_ok=True)
     config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
     if not os.path.exists(config_path):
-        # Mặc định cấu hình chuẩn xác cho người dùng mới (khớp 100% hình 1)
-        default_cfg = {
-            "ENABLED_TFS": {},
-            "ENABLED_COINS": ["BTC", "ETH", "XAU"],
-            "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
-            "VOL_UNIT": "USDT",
-            "POSITION_VOLUME_USDT": 0.4,
-            "POSITION_VOLUME_PCT": 0.1,
-            "USE_DYNAMIC_RISK": False,
-            "DYNAMIC_RISK_PCT": 0.001,
-            "SCALPING_TP_PCT": 0.006,
-            "SCALPING_SL_PCT": 0.006,
-            "ENABLE_TF_VOLUME_MULTIPLIER": False,
-            "ENABLE_STRATEGY_MAIN": True,
-            "ENABLE_PYRAMID_DCA": False,
-            "ENABLE_NEGATIVE_DCA": False,
-            "ENABLE_MULTITF_GRID": True,
-            "ENABLE_STRATEGY_HEDGE": False,
-            "ENABLE_DYNAMIC_EMA200_TP": False,
-            "ALTCOIN_FOLLOW_BTC_EMA": False,
-            "ENTRY_OFFSET_PCT": 0.05,
-            "DCA_GAP_PCT": 0.20,
-            "CONFLUENCE_PCT": 0.23,
-            "ACCUM_CANDLES": 60,
-            "ETH_VOL_MULT": 1.30,
-            "ETH_VOLATILITY_FACTOR": 1.30
-        }
+        # Mặc định cấu hình chuẩn xác cho người dùng mới
+        if strategy == "sub2":
+            default_cfg = {
+                "ENABLED_TFS": {},
+                "ENABLED_COINS": ["BTC", "ETH", "XAU"],
+                "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
+                "VOL_UNIT": "USDT",
+                "POSITION_VOLUME_USDT": 0.4,
+                "POSITION_VOLUME_PCT": 0.1,
+                "USE_DYNAMIC_RISK": False,
+                "DYNAMIC_RISK_PCT": 0.001,
+                "OB_RR_RATIO_TREND": 5.0,
+                "OB_RR_RATIO_COUNTER": 1.0,
+                "SCALPING_TP_PCT": 0.05,
+                "SCALPING_SL_PCT": 0.01,
+                "ENABLE_TF_VOLUME_MULTIPLIER": False,
+                "ENABLE_STRATEGY_MAIN": True,
+                "ENABLE_STRATEGY_SMC": True,
+                "ENABLE_PYRAMID_DCA": False,
+                "ENABLE_NEGATIVE_DCA": False,
+                "ENABLE_MULTITF_GRID": True,
+                "ENABLE_STRATEGY_HEDGE": False,
+                "ENABLE_DYNAMIC_EMA200_TP": False,
+                "ALTCOIN_FOLLOW_BTC_EMA": False,
+                "ENTRY_OFFSET_PCT": 0.05,
+                "DCA_GAP_PCT": 0.20,
+                "CONFLUENCE_PCT": 0.23,
+                "ACCUM_CANDLES": 60,
+                "ETH_VOL_MULT": 1.30,
+                "ETH_VOLATILITY_FACTOR": 1.30
+            }
+        else:
+            default_cfg = {
+                "ENABLED_TFS": {},
+                "ENABLED_COINS": ["BTC", "ETH", "XAU"],
+                "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
+                "VOL_UNIT": "USDT",
+                "POSITION_VOLUME_USDT": 0.4,
+                "POSITION_VOLUME_PCT": 0.1,
+                "USE_DYNAMIC_RISK": False,
+                "DYNAMIC_RISK_PCT": 0.001,
+                "SCALPING_TP_PCT": 0.006,
+                "SCALPING_SL_PCT": 0.006,
+                "ENABLE_TF_VOLUME_MULTIPLIER": False,
+                "ENABLE_STRATEGY_MAIN": True,
+                "ENABLE_PYRAMID_DCA": False,
+                "ENABLE_NEGATIVE_DCA": False,
+                "ENABLE_MULTITF_GRID": True,
+                "ENABLE_STRATEGY_HEDGE": False,
+                "ENABLE_DYNAMIC_EMA200_TP": False,
+                "ALTCOIN_FOLLOW_BTC_EMA": False,
+                "ENTRY_OFFSET_PCT": 0.05,
+                "DCA_GAP_PCT": 0.20,
+                "CONFLUENCE_PCT": 0.23,
+                "ACCUM_CANDLES": 60,
+                "ETH_VOL_MULT": 1.30,
+                "ETH_VOLATILITY_FACTOR": 1.30
+            }
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(default_cfg, f, indent=4, ensure_ascii=False)
@@ -2006,12 +2054,26 @@ def get_bot_config(uid: str, strategy: str = "sub1"):
         if "POSITION_VOLUME_PCT" not in cfg:
             cfg["POSITION_VOLUME_PCT"] = 0.1
             dirty = True
-        if "SCALPING_TP_PCT" not in cfg:
-            cfg["SCALPING_TP_PCT"] = 0.006
-            dirty = True
-        if "SCALPING_SL_PCT" not in cfg:
-            cfg["SCALPING_SL_PCT"] = 0.006
-            dirty = True
+        if strategy == "sub2":
+            if "OB_RR_RATIO_TREND" not in cfg or float(cfg.get("OB_RR_RATIO_TREND", 0)) in (0.6, 1.5):
+                cfg["OB_RR_RATIO_TREND"] = 5.0
+                dirty = True
+            if "OB_RR_RATIO_COUNTER" not in cfg or float(cfg.get("OB_RR_RATIO_COUNTER", 0)) in (0.6, 1.5):
+                cfg["OB_RR_RATIO_COUNTER"] = 1.0
+                dirty = True
+            if cfg.get("SCALPING_TP_PCT") in (0.006, 0.015) or "SCALPING_TP_PCT" not in cfg:
+                cfg["SCALPING_TP_PCT"] = float(cfg["OB_RR_RATIO_TREND"]) / 100.0
+                dirty = True
+            if cfg.get("SCALPING_SL_PCT") in (0.006, 0.015) or "SCALPING_SL_PCT" not in cfg:
+                cfg["SCALPING_SL_PCT"] = float(cfg["OB_RR_RATIO_COUNTER"]) / 100.0
+                dirty = True
+        else:
+            if "SCALPING_TP_PCT" not in cfg:
+                cfg["SCALPING_TP_PCT"] = 0.006
+                dirty = True
+            if "SCALPING_SL_PCT" not in cfg:
+                cfg["SCALPING_SL_PCT"] = 0.006
+                dirty = True
         if "ENABLE_TF_VOLUME_MULTIPLIER" not in cfg:
             cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = False
             dirty = True
@@ -2081,8 +2143,20 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
     if update_data.scalping_tp_pct is not None:
         cfg["SCALPING_TP_PCT"] = update_data.scalping_tp_pct
         cfg["TP_TARGET_OPTIMAL"] = str(update_data.scalping_tp_pct)
+        if strategy == "sub2":
+            cfg["OB_RR_RATIO_TREND"] = float(round(update_data.scalping_tp_pct * 100, 2))
     if update_data.scalping_sl_pct is not None:
         cfg["SCALPING_SL_PCT"] = update_data.scalping_sl_pct
+        if strategy == "sub2":
+            cfg["OB_RR_RATIO_COUNTER"] = float(round(update_data.scalping_sl_pct * 100, 2))
+    if update_data.ob_rr_ratio_trend is not None:
+        cfg["OB_RR_RATIO_TREND"] = update_data.ob_rr_ratio_trend
+        if strategy == "sub2":
+            cfg["SCALPING_TP_PCT"] = update_data.ob_rr_ratio_trend / 100.0
+    if update_data.ob_rr_ratio_counter is not None:
+        cfg["OB_RR_RATIO_COUNTER"] = update_data.ob_rr_ratio_counter
+        if strategy == "sub2":
+            cfg["SCALPING_SL_PCT"] = update_data.ob_rr_ratio_counter / 100.0
     if update_data.strategy_config is not None:
         for k, v in update_data.strategy_config.items():
             cfg[k] = v
@@ -2106,8 +2180,16 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
 
-        # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh để bắt đầu chu trình chạy bot mới (bảo lưu 100% TP/SL)
         target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+        if target_acc and target_acc != strategy:
+            acc_config_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
+            try:
+                with open(acc_config_path, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, indent=4, ensure_ascii=False)
+            except Exception:
+                pass
+
+        # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh để bắt đầu chu trình chạy bot mới (bảo lưu 100% TP/SL)
         canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")
 
         return {"message": "Config updated successfully.", "config": cfg, "canceled_count": canceled_orders}
@@ -2391,11 +2473,17 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                 # Quét và nhận diện tên tài khoản từ sàn OKX
                 detected_name = ""
                 if label and not label.startswith("TLS1_"):
+                    # Tên mã API người dùng tự đặt (ví dụ: Bot-m15)
                     detected_name = label
+                elif label and label.startswith("TLS1_"):
+                    # Fast Connect API: TLS1_1790574999 -> lấy 4 số cuối của mã API
+                    suffix = re.sub(r"\D", "", label.replace("TLS1_", ""))
+                    last4 = suffix[-4:] if len(suffix) >= 4 else suffix
+                    detected_name = f"#{last4}" if last4 else "Fast API"
                 elif is_main:
-                    detected_name = f"Tài khoản chính ({owner_uid[-4:]})" if owner_uid else "Tài khoản chính"
+                    detected_name = f"#{owner_uid[-4:]}" if owner_uid else "Tài khoản chính"
                 else:
-                    detected_name = f"Tài khoản phụ ({api_uid[-4:]})" if api_uid else "Tài khoản phụ"
+                    detected_name = f"#{api_uid[-4:]}" if api_uid else "Tài khoản phụ"
             else:
                 okx_msg = res_data.get("msg", "Không rõ lỗi")
                 raise HTTPException(status_code=400, detail=f"API Key không hợp lệ. OKX phản hồi: {okx_msg}")
@@ -2440,10 +2528,10 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
         if strategy:
             _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-        sync_account_name_in_storage(uid, target_acc, detected_name)
+        sync_account_name_in_storage(uid, target_acc, detected_name, api_label=label)
         
     # Đồng bộ tên quét được từ sàn OKX vào accounts.json của riêng UID này
-    updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name)
+    updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name, api_label=label)
 
     data_dir = get_user_data_dir(owner_uid)
     running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
@@ -3805,10 +3893,12 @@ from tradelocker_service import TradeLockerManager, TradeLockerClient
 
 class TradeLockerConnectReq(BaseModel):
     uid: str
-    email: str
+    email: Optional[str] = ""
     password: str
     server: str = "E8"
-    environment: str = "https://demo.tradelocker.com"
+    environment: Optional[str] = "https://demo.tradelocker.com"
+    platform: Optional[str] = "tradelocker"
+    login: Optional[str] = None
     fund_size: Optional[float] = 5000.0
     risk_per_trade: Optional[float] = 25.0
     daily_drawdown_limit: Optional[float] = 125.0
@@ -3838,6 +3928,40 @@ def tradelocker_connect(req: TradeLockerConnectReq, jwt_data: Optional[dict] = D
         raise HTTPException(status_code=400, detail="UID không được để trống")
     if jwt_data and jwt_data.get("uid") and jwt_data["uid"] != clean_uid and not jwt_data.get("is_admin"):
         raise HTTPException(status_code=403, detail="Forbidden")
+
+    # 🔵 HỖ TRỢ NỀN TẢNG CHÍNH METATRADER 5 (MT5 / PLATFORM 5)
+    if req.platform == "mt5":
+        acc_num = str(req.login or req.email).strip()
+        if not acc_num or not req.password:
+            raise HTTPException(status_code=400, detail="Vui lòng nhập đầy đủ Số tài khoản (Login) và Mật khẩu MT5")
+        srv_up = (req.server or "").upper()
+        firm_label = "E8" if "E8" in srv_up else ("The5ers" if "5" in srv_up else ("FTMO" if "FTMO" in srv_up else req.server))
+        config = {
+            "platform": "mt5",
+            "email": req.email or f"{acc_num}@mt5",
+            "password": req.password,
+            "server": req.server or "E8-Platform5",
+            "firm": firm_label,
+            "name": f"{firm_label} MT5 #{acc_num}",
+            "environment": "mt5",
+            "fund_size": req.fund_size or 5000.0,
+            "risk_per_trade": req.risk_per_trade or 25.0,
+            "daily_drawdown_limit": req.daily_drawdown_limit or 125.0,
+            "daily_profit_cap": req.daily_profit_cap or 100.0,
+            "enabled_symbols": req.enabled_symbols or ["XAU", "BTC", "ETH"],
+            "is_enabled": req.is_enabled if req.is_enabled is not None else True,
+            "account_id": acc_num,
+            "acc_num": acc_num,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        acc_id = TradeLockerManager.upsert_account(clean_uid, config, get_user_base_dir, fernet)
+        return {
+            "status": "success",
+            "account_id": acc_id,
+            "name": config["name"],
+            "balance": req.fund_size or 5000.0,
+            "currency": "USD"
+        }
 
     try:
         client = TradeLockerClient(

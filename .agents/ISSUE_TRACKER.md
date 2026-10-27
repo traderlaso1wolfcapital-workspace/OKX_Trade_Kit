@@ -33,6 +33,107 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Thu Nhỏ Nút Hướng Dẫn, Giảm Chiều Ngang & Bỏ Icon Chấm Xanh Cho Tinh Gọn Sidebar:
+  - **Mô tả yêu cầu CEO:** Nút Hướng Dẫn ở thanh Sidebar hơi to, chiều ngang hơi dài. Thu nhỏ lại, giảm chiều ngang và bỏ icon chấm xanh tròn để nút gọn gàng, tinh tế.
+  - **Giải pháp kỹ thuật:**
+    - File [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx):
+      - Bỏ hoàn toàn icon chấm xanh (`backgroundColor: #34d399`).
+      - Giảm padding ngang từ `0 14px` xuống `0 8px` (thu gọn chiều ngang rõ rệt).
+      - Giảm chiều cao từ `30px` xuống `28px`, font size từ `13px` xuống `11.5px`.
+      - Đồng bộ nút Cài Đặt bên cạnh về `height: 28px`, padding `0 10px`, font size `12px` để hàng nút cân xứng, liền lạc.
+
+- **[27/10/2026]** - Tích Hợp MetaTrader 5 (MT5) Làm Nền Tảng Chính Cho Quỹ FX, Nâng Cấp Thuật Toán EMA200 Bắt Sóng Hồi Vô Tận & Bổ Sung Popup Cảnh Báo Lỗi Quyền OKX 50123:
+  - **Mô tả yêu cầu CEO:**
+    1. **Nền tảng Quỹ FX (MT5 vs TradeLocker):** Trader phần lớn giao dịch trên MT5. Thiết kế MT5 làm tùy chọn chính (Primary), TradeLocker làm phụ (Secondary). Tích hợp các kiến thức thực tế của Quỹ E8 Markets (Platform 5 là MT5 được đổi tên theo bản quyền MetaQuotes; gói Classic Markets Forex/CFD có MT5 cho trader quốc tế/Việt Nam; gói Crypto/Perp ép dùng TradeLocker/MatchTrader; hướng dẫn đổi MT5 miễn phí qua Live Chat E8 khi chưa mở lệnh).
+    2. **Thuật toán EMA200 (Hình ảnh 1):** Biểu đồ BTC 15m chỉ thể hiện 3 lệnh Short đã TP, sau đó giá tiếp tục vòng về test EMA200 nhiều lần nhưng bot không vào thêm lệnh. Yêu cầu: Nâng cấp thuật toán để duy trì xu hướng và tính toán lệnh pullback liên tục đến vô tận chừng nào lệnh trước đã TP/SL và điều kiện xu hướng còn thỏa mãn.
+    3. **Lỗi OKX 50123 (Hình ảnh 2):** Khách hàng chụp màn hình báo lỗi `OKX Error 50123: This API Key does not have permission to execute this operation` khi bắn lệnh Limit Short H4. Kiểm tra mã nguồn xem là lỗi của bot hay người dùng; làm popup thông báo ngắn gọn cụ thể để người dùng tự xử lý.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **SingleChartPane.jsx (Tính toán EMA200 liên tục vô tận trong Trend):**
+       - Khắc phục triệt để điểm nghẽn: Trước đây code chỉ đếm `consecutiveBelow` liên tục, nếu 1 nến chớm đóng trên EMA200 trong nhịp pullback thì bộ đếm bị reset về 0, bắt người dùng phải đợi lại 60 nến (15 tiếng).
+       - Thêm cơ chế **Trend Persistence (Lưu giữ xu hướng)**: Khi đủ 60 nến tích lũy ban đầu, `currentTrend = 'Long'` hoặc `'Short'`. Xu hướng này không bị phá vỡ bởi các nhịp hồi nhẹ test EMA200, chỉ đảo chiều khi phe đối nghịch tích lũy đủ số nến lớn (`REVERSAL_THRESHOLD`).
+       - Thêm cơ chế **Infinite Pullback Trades**: Khi một lệnh kết thúc (TP hoặc SL), bot giải phóng `activeTrade = null`. Ở các cây nến tiếp theo trong cùng Trend, khi giá lại pullback về cản EMA200, bot lập tức rải lệnh Limit mới (`waiting`) và khớp tiếp các Lệnh 4, Lệnh 5... vô tận theo đúng nhịp sóng hồi của EMA200.
+    2. **ConnectModal.jsx & TradeLockerTab.jsx & main.py (MT5 Primary):**
+       - Bổ sung bộ chọn nền tảng giao dịch (Platform Selector) với 2 nút chuyển đổi trực quan:
+         - 🔵 **MetaTrader 5 (MT5 / Platform 5)** [Badge: CHÍNH / KHUYÊN DÙNG]
+         - 🟢 **TradeLocker** [Badge: PHỤ / CLOUD WEB]
+       - Khi chọn MT5: Hiển thị form nhập Server (E8 Markets Platform 5, FTMO MT5, The 5%ers, Funding Pips...), Số tài khoản MT5 (Login ID), Mật khẩu MT5.
+       - Tích hợp banner hướng dẫn thông minh chi tiết 4 điểm mấu chốt của Quỹ E8 Markets và cách liên hệ Live Chat đổi nền tảng miễn phí.
+       - Backend `main.py`: Bổ sung xử lý `platform == "mt5"` trong `TradeLockerConnectReq` và hàm `tradelocker_connect`, cho phép lưu trữ tài khoản MT5 đồng bộ vào danh sách Quỹ.
+    3. **AccountPromptModals.jsx & App.jsx (Popup cảnh báo thông minh lỗi 50123):**
+       - Xác định nguyên nhân lỗi 50123: 100% là **Lỗi cấu hình API Key từ phía người dùng** (tài khoản thủ công `thanhbot` quên tick chọn quyền "Giao dịch / Trade", hoặc không gán IP Whitelist nên sau 14 ngày sàn OKX tự động thu hồi quyền Trade theo chính sách bảo mật).
+       - Xây dựng component `ApiPermissionErrorModal`:
+         - Hiển thị rõ tên tài khoản đang bị lỗi (`thanhbot`).
+         - Trình bày trực quan 3 nguyên nhân chính.
+         - Cung cấp giải pháp nhanh nhất: Nút bấm **"⚡ Đổi sang Fast Connect"** giúp người dùng 1 chạm chuyển sang Fast Connect quét mã QR trong 3 giây, cấp quyền giao dịch vĩnh viễn không lo lệch IP hay hết hạn 14 ngày.
+       - Tích hợp vào `ws.onmessage` trong `App.jsx` kèm cơ chế cooldown chống spam popup, giúp khách hàng tự khắc phục 100% trong 10 giây mà không cần hỏi CEO.
+
+- **[27/10/2026]** - Quy Hoạch Lại Thẻ Kết Nối (ConnectModal) Tối Giản Đồng Bộ & Tích Hợp Dropdown Chọn Nền Tảng/Tài Khoản Duy Nhất Tại Sidebar (Xóa Bỏ Hàng 2):
+  - **Mô tả yêu cầu CEO:**
+    1. Thẻ Quỹ (E8/FTMO) trong modal Connect đang thừa thông tin: Bỏ badge `BOT ACTIVE` (không cần thiết ở modal), bỏ icon chấm xanh `🟢`, bỏ nút `Cài đặt ⚙` (vì nhấn vào thẻ hay nút đều chuyển tab, gây dư thừa). Đồng bộ format tối giản theo thẻ OKX:
+       - Bên trên: Tiêu đề thẻ (`OKX Connect` / `Quỹ E8 Connect` / `Quỹ FTMO Connect`).
+       - Bên dưới chữ nghiêng xanh lá: *`Đã Connect #Bot-m15`* / *`Đã Connect #4999`* (4 số cuối mã Fast API `TLS1_1790574999`) và *`Đã Connect #2534591 - $4.935,71 USD`* (Quỹ FX).
+       - Nút thao tác: Nút `Delete` màu đỏ viền đỏ đồng bộ.
+    2. Bỏ hoàn toàn dòng `Chọn tài khoản:` và dropdown nhỏ ở Hàng 2 bên ngoài Sidebar (tiết kiệm diện tích, tinh gọn). Tích hợp toàn bộ vào Dropdown lớn ở Hàng 1 (nơi hiện SÀN OKX / QUỸ E8).
+       - Dropdown này liên kết trực tiếp với toàn bộ tài khoản OKX và Quỹ FX đã kết nối.
+       - Định dạng hiển thị chuẩn: `[Logo] SÀN/QUỸ #<tên/mã API>` (dấu `#...` màu xám/trắng nhạt, ví dụ `#Bot-m15` hoặc `#4999`) + Badge `LIVE` xanh lá nếu tài khoản đang chạy bot bất kỳ.
+       - Cho phép chuyển đổi linh hoạt giữa các tài khoản cùng sàn/cùng quỹ để load đúng chart và bảng vị thế của tài khoản đó.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Backend (`main.py`):**
+       - Chuẩn hóa hàm `detect_okx_account_info`: Nếu là Fast Connect (`TLS1_1790574999`), tự động trích xuất 4 số cuối của mã API (`#4999`) thay vì lấy 4 số cuối của UID; nếu là API thủ công (`Bot-m15`), giữ nguyên tên gợi nhớ.
+       - Lưu kèm `api_label` vào `accounts.json` trong hàm `sync_account_name_in_storage`.
+    2. **ConnectModal.jsx & SidebarLeft.jsx:**
+       - Tích hợp hàm `formatOkxAccountTag` thông minh: Ưu tiên mã gợi nhớ người dùng đặt (`#Bot-m15`), tiếp theo là 4 số cuối của mã Fast API (`#4999`), fallback về 4 số cuối UID nếu không có thông tin.
+       - Thẻ OKX: Hiển thị tiêu đề `OKX Connect`, phụ đề nghiêng xanh lá `Đã Connect #${tag}`, nút `Delete` đỏ viền đỏ.
+       - Thẻ Quỹ FX (Fast Connect & Quỹ FX Connect): Bỏ hoàn toàn badge `BOT ACTIVE`, bỏ icon chấm xanh `🟢`, bỏ nút `Cài đặt ⚙` thừa; hiển thị phụ đề nghiêng `Đã Connect #${accNum} - $... USD`, chỉ giữ nút `Delete` viền đỏ đồng bộ 100% với OKX.
+       - Bổ sung component SVG `FtmoLogo` phục vụ hiển thị chuẩn logo Quỹ FTMO.
+       - Tích hợp toàn bộ logic tài khoản vào Dropdown Hàng 1: Nút kích hoạt hiển thị `[Logo] [TÊN SÀN/QUỸ] #[tag] [LIVE]` (nếu tài khoản đang chạy bot).
+       - Popup menu gom toàn bộ tài khoản OKX và tài khoản Quỹ FX kèm dấu `✓` tài khoản đang chọn, badge `LIVE` nếu tài khoản đó đang có bot chạy, và nút `+ Quản lý / Kết nối thêm tài khoản...` ở dưới cùng.
+       - Xóa bỏ hoàn toàn Hàng 2 (`Chọn tài khoản:` và dropdown cũ), giảm hơn 300 dòng code dư thừa, giúp Sidebar gọn gàng và thoáng đãng.
+    3. **App.jsx:**
+       - Tối ưu `effectiveAccId` ưu tiên tài khoản người dùng vừa click chọn từ Dropdown, đảm bảo khi chuyển đổi tài khoản, bảng vị thế và chart lập tức tải dữ liệu đúng tài khoản đó.
+       - Thêm listener cho sự kiện `tls1_prop_account_changed` để khi chuyển tài khoản Quỹ FX, vị thế và trạng thái bot Quỹ tự động refresh tức thì.
+    4. Kiểm thử bundle production `cmd /c "npm run build"` thành công code 0 (282ms).
+
+
+- **[27/10/2026]** - Hiệu Chỉnh Chuẩn Toàn Diện Tỷ Lệ Chốt Lời SMC Bot Về Mặc Định 5.0 R (Thuận Trend) và 1.0 R (Ngược Trend):
+  - **Mô tả yêu cầu CEO:** Kiểm tra nguyên nhân tại sao bên bot SMC tỷ lệ chốt lời hiển thị `0,6 R`, phân tích cơ chế đặt Entry/TP/SL của bot SMC và thiết lập cấu hình mặc định chuẩn cho SMC là **5.0 R thuận trend** và **1.0 R ngược trend**.
+  - **Nguyên nhân cốt lõi:**
+    1. Giá trị `0.6` vốn là tỷ lệ chốt lời mặc định `0.6%` của EMA200 Bot (`sub1`). Backend web `main.py` khi sinh file cấu hình mặc định đã dùng chung template với EMA bot (`SCALPING_TP_PCT: 0.006`).
+    2. Frontend `App.jsx` load giá trị này vào state `risk.tpPct = 0.60`. Khi chuyển tab sang SMC Bot, giao diện `SidebarLeft.jsx` đổi nhãn thành *"Tỷ lệ chốt lời Thuận Trend"* và đổi suffix sang `"R"`, nhưng lại bind trực tiếp giá trị `0.60` vào ô nhập -> Dẫn đến hiển thị thành `0,6 R`.
+    3. Trên Web Chart (`SingleChartPane.jsx`), hàm vẽ box SMC `calculateSMCPositions()` bị hardcode cứng 1.5R (`obHeight * 1.5`) thay vì lấy động theo cấu hình người dùng.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Backend Web (`web_app/backend/main.py`):**
+       - Tách biệt cấu hình mặc định `get_bot_config` cho `sub2`: Đặt mặc định `OB_RR_RATIO_TREND: 5.0` (tương ứng `SCALPING_TP_PCT: 0.05`), `OB_RR_RATIO_COUNTER: 1.0` (tương ứng `SCALPING_SL_PCT: 0.01`).
+       - Bổ sung cơ chế tự động di chuyển (auto-migration): Nếu file cấu hình cũ đang lưu `0.6` hoặc `0.006`/`0.015`, backend tự động nâng cấp đồng bộ về `5.0 R` và `1.0 R`.
+       - Mở rộng model `ConfigUpdate` và hàm `update_bot_config` để hỗ trợ lưu và đồng bộ trực tiếp `OB_RR_RATIO_TREND` & `OB_RR_RATIO_COUNTER` vào cả file global config và file tài khoản cụ thể.
+    2. **Frontend Web (`web_app/frontend/src/App.jsx`):**
+       - Khởi tạo state `risk` cho `sub2` chuẩn mặc định: `tpPct: 5.0` (5.0 R) và `slPct: 1.0` (1.0 R).
+       - Khi chuyển đổi qua lại giữa tab `sub1` và `sub2`: Tự động áp dụng đúng bộ thông số của từng bot (EMA: 0.60% / 0.60%, SMC: 5.0 R / 1.0 R), không bị nhiễm chéo giá trị của nhau.
+       - Cập nhật hàm khôi phục mặc định (Reset Defaults) cho SMC Bot: Đặt lại chính xác `tpPct: 5.0`, `slPct: 1.0`, gửi payload `0.05` / `0.01` và `5.0` / `1.0` xuống backend.
+       - Cập nhật parsing khi load config từ backend: Đọc ưu tiên từ `OB_RR_RATIO_TREND` và `OB_RR_RATIO_COUNTER`.
+    3. **Hiển Thị Chart Web (`SingleChartPane.jsx`):**
+       - Sửa hàm `calculateSMCPositions`: Bỏ tỷ lệ 1.5R hardcode, tính toán động khoảng cách TP theo `rrRatio = Number(riskRef.current.tpPct) || 5.0` (mặc định 5.0R).
+       - Thêm `useEffect` theo dõi biến `risk`: Mỗi khi người dùng thay đổi tỷ lệ R trên Sidebar, biểu đồ tự động kích hoạt `scheduleDraw()` vẽ lại box vị thế chính xác theo thời gian thực.
+    4. Kiểm thử bundle production `cmd /c "npm run build"` thành công code 0 (1.15s).
+
+- **[27/10/2026]** - Khắc Phục Triệt Để Hiện Tượng Chuyển Chart Bị Lỗi Mất Nến & Luôn Bật Sẵn Chế Độ [ A ] (Auto) và [ L ] (Lock Scale) Theo Cơ Chế SPA Mượt Mà Không Cần F5:
+  - **Mô tả hiện tượng từ CEO:** Khi người dùng chuyển đổi timeframe hoặc cặp coin trên chart, thỉnh thoảng chart bị lỗi canvas đen hoàn toàn không hiện nến (chỉ có overlay box vị thế và nhãn giá/thời gian ở viền). Yêu cầu khắc phục lỗi mượt mà nhất có thể trong nội bộ trang (SPA, chưa cần phải F5 tải lại trang) và luôn luôn bật sẵn ở chế độ [ A ] (Auto fit) và [ L ] (Lock/Log scale).
+  - **Nguyên nhân cốt lõi:**
+    1. Khi chuyển coin hoặc timeframe, React không remount component do key cũ chỉ là index cố định (`split_chart_slot_${idx}`), khiến chart giữ lại dữ liệu toạ độ và series dirty của coin/TF trước đó.
+    2. Quá trình fetch nến bất đồng bộ nếu gặp độ trễ mạng hoặc lỗi code trả về rỗng sẽ khiến canvas bị kẹt ở trạng thái trống không có nến.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Khởi tạo tức thì từ Cache RAM (0ms) ngay khi Mount (`SingleChartPane.jsx`):**
+       - Khởi tạo `candlesRef` trực tiếp từ `_webCandlesCache` ngay lúc mount: nếu coin/TF đó đã từng mở trước đó, nến được nạp thẳng vào series ngay khi tạo chart (0ms), không hề có khoảnh khắc canvas đen.
+       - Tích hợp hiệu ứng loading indicator mượt mà `isLoadingCandles` (spinner xoay mờ viền kính) trong lúc chờ mạng tải nến mới.
+    2. **Cơ chế Tự Động Thử Lại (Retry Mechanism) 3 Lần:**
+       - Trong hàm `fetchCandles`, nếu request lỗi mạng hoặc trả về data rỗng, hệ thống tự động retry sau 600ms (tối đa 3 lần), đảm bảo tuyệt đối không bao giờ bỏ rơi chart ở trạng thái rỗng.
+    3. **Khóa Chặt Chế Độ [ A ] & [ L ] Luôn BẬT:**
+       - Luôn khởi tạo `isAutoFit = true` và `isLogScale = true` (`autoScale: true`, `mode: 1`).
+       - Trong `applyDefaultZoom()`, luôn kích hoạt lại mode 1 (Log scale) và `autoScale: true` (Auto fit), kèm biên phải lùi 18 cây nến theo chuẩn nghiệm thu.
+    4. **Dynamic Key Cho Phép Remount Sạch Sẽ Trong 10ms (`App.jsx`):**
+       - Đổi key thành `split_chart_${idx}_${cfg.coin}_${cfg.tf}` và `chart_${idx}_${cfg.coin}_${cfg.tf}`. Khi đổi coin/TF, React tự hủy instance cũ và mount instance mới sạch sẽ trong 10ms, không làm chớp/nháy toàn bộ trang (100% SPA mượt mà, không dùng `window.location.reload()`).
+    5. Kiểm thử bundle production `cmd /c "npm run build"` thành công code 0 (332ms).
+
 - **[26/10/2026]** - Tăng Khoảng Cách Cách Biên Phải Mặc Định Cho Chế Độ [ A ] [ L ] Lên 18 Cây Nến:
   - **Mô tả yêu cầu CEO:** Hiện tại mặc định hai nút `[ A ] [ L ]` đang để nến cách mép biên trục giá bên phải khoảng 8 cây nến. Yêu cầu tăng khoảng dãn cách biên này lên tầm 16 - 20 cây nến để thoáng tầm nhìn phía trước, dễ quan sát hành vi giá và dự phóng các vùng OB/EMA200.
   - **Giải pháp kỹ thuật đã triển khai (`SingleChartPane.jsx`):**

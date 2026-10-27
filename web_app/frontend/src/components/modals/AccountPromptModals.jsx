@@ -334,3 +334,98 @@ export function ConfirmStopBotModal({
     </div>
   );
 }
+
+export function ApiPermissionErrorModal({
+  isOpen,
+  onClose,
+  accountName,
+  onSwitchToFastConnect
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="account-prompt-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="account-prompt-card" style={{ maxWidth: "460px", width: "100%" }}>
+        <div className="account-prompt-title" style={{ color: "#ff4d4f", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span>🚨</span> Lỗi Quyền API Key (Mã: 50123)
+        </div>
+        
+        <div style={{ color: "#dddddd", fontSize: "13px", margin: "12px 0 8px 0", lineHeight: "1.5" }}>
+          Sàn OKX từ chối đặt lệnh cho tài khoản <strong style={{ color: "#ffc107" }}>"{accountName || "Hiện tại"}"</strong> do API Key chưa đủ quyền giao dịch hoặc đã hết hạn.
+        </div>
+
+        <div style={{
+          background: "rgba(255, 77, 79, 0.08)",
+          border: "1px solid rgba(255, 77, 79, 0.25)",
+          borderRadius: "6px",
+          padding: "10px 12px",
+          color: "#d0d0d0",
+          fontSize: "12px",
+          lineHeight: "1.6",
+          marginBottom: "14px"
+        }}>
+          <div style={{ color: "#ff7875", fontWeight: "bold", marginBottom: "4px" }}>📌 3 Nguyên nhân chính (Phía cấu hình API Key):</div>
+          <div>1. Khi tạo API Key thủ công chưa tick chọn quyền <strong>"Giao dịch" (Trade)</strong>.</div>
+          <div>2. Không gán địa chỉ IP Whitelist nên OKX <strong>tự động khóa quyền Giao dịch sau 14 ngày</strong>.</div>
+          <div>3. Hoặc địa chỉ IP mạng máy/điện thoại chạy bot bị thay đổi (lệch IP đã đăng ký).</div>
+        </div>
+
+        <div style={{
+          background: "rgba(38, 166, 154, 0.08)",
+          border: "1px solid rgba(38, 166, 154, 0.3)",
+          borderRadius: "6px",
+          padding: "10px 12px",
+          color: "#d0d0d0",
+          fontSize: "12px",
+          lineHeight: "1.6",
+          marginBottom: "16px"
+        }}>
+          <div style={{ color: "#26a69a", fontWeight: "bold", marginBottom: "4px" }}>💡 Cách xử lý nhanh nhất:</div>
+          <div>Chuyển sang <strong>Fast Connect (Quét mã QR)</strong>: Hệ thống sẽ tự động cấp quyền Giao dịch vĩnh viễn, không lo lệch IP hay bị khóa sau 14 ngày!</div>
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "7px 15px",
+              background: "#333333",
+              border: "1px solid #555555",
+              borderRadius: "4px",
+              color: "#cccccc",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold"
+            }}
+          >
+            Đã Hiểu / Đóng
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onSwitchToFastConnect) onSwitchToFastConnect();
+            }}
+            style={{
+              padding: "7px 18px",
+              background: "#26a69a",
+              border: "none",
+              borderRadius: "4px",
+              color: "#ffffff",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: "12px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            ⚡ Đổi sang Fast Connect
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

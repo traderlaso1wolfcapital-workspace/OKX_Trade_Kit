@@ -11,6 +11,10 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   const [successMsg, setSuccessMsg] = useState("");
 
   // Form states cho thêm Quỹ mới
+  const [platform, setPlatform] = useState("mt5"); // 'mt5' (chính) | 'tradelocker' (phụ)
+  const [mt5Login, setMt5Login] = useState("");
+  const [mt5Password, setMt5Password] = useState("");
+  const [mt5Server, setMt5Server] = useState("E8-Platform5");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -113,9 +117,16 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
   // Kết nối tài khoản Quỹ mới
   const handleConnect = async (e) => {
     if (e) e.preventDefault();
-    if (!email || !password) {
-      setErrorMsg("Vui lòng điền đầy đủ Email và Password của TradeLocker!");
-      return;
+    if (platform === "mt5") {
+      if (!mt5Login || !mt5Password) {
+        setErrorMsg("Vui lòng nhập đầy đủ Số tài khoản (Login) và Mật khẩu của MT5!");
+        return;
+      }
+    } else {
+      if (!email || !password) {
+        setErrorMsg("Vui lòng điền đầy đủ Email và Password của TradeLocker!");
+        return;
+      }
     }
     setErrorMsg("");
     setSuccessMsg("");
@@ -129,10 +140,12 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
       };
       const body = {
         uid: effectiveUid,
-        email,
-        password,
-        server,
-        environment,
+        platform,
+        login: platform === "mt5" ? mt5Login : undefined,
+        email: platform === "mt5" ? `${mt5Login}@mt5` : email,
+        password: platform === "mt5" ? mt5Password : password,
+        server: platform === "mt5" ? mt5Server : server,
+        environment: platform === "mt5" ? "mt5" : environment,
         fund_size: Number(fundSize) || 5000,
         risk_per_trade: Number(riskPerTrade) || 25,
         daily_drawdown_limit: Number(dailyDrawdownLimit) || 125,
@@ -488,91 +501,262 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
               Kết nối trực tiếp tài khoản <strong>Quỹ Prop Firm (E8 Markets, The 5%ers, FTMO...)</strong> của bạn. Bot sẽ dùng chung tín hiệu chiến lược hiện tại (SMC / EMA200) và tự động tính toán số Lot an toàn để giao dịch.
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {/* Prop Firm & Server */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {/* CHỌN NỀN TẢNG GIAO DỊCH (MT5 LÀ CHÍNH, TRADELOCKER LÀ PHỤ) */}
               <div>
-                <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
-                  Chọn Quỹ & Máy chủ (Prop Firm & Server):
+                <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "6px" }}>
+                  Nền tảng giao dịch (Platform):
                 </label>
-                <select
-                  value={server}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setServer(val);
-                    if (val.includes("-Live")) {
-                      setEnvironment("https://live.tradelocker.com");
-                    } else {
-                      setEnvironment("https://demo.tradelocker.com");
-                    }
-                  }}
-                  className="connect-input"
-                  style={{ cursor: "pointer" }}
-                >
-                  <optgroup label="E8 Markets">
-                    <option value="E8">E8 Markets (Demo - demo.tradelocker.com)</option>
-                    <option value="E8-Live">E8 Markets (Live / Funded - live.tradelocker.com)</option>
-                  </optgroup>
-                  <optgroup label="The 5%ers">
-                    <option value="The5ers">The 5%ers (Demo - demo.tradelocker.com)</option>
-                    <option value="The5ers-Live">The 5%ers (Live / Funded - live.tradelocker.com)</option>
-                  </optgroup>
-                  <optgroup label="FTMO & Quỹ Khác">
-                    <option value="FTMO">FTMO (TradeLocker Demo)</option>
-                    <option value="FunderPro">FunderPro (TradeLocker)</option>
-                    <option value="FundingPips">Funding Pips (TradeLocker)</option>
-                  </optgroup>
-                </select>
-              </div>
-
-              {/* Login Email */}
-              <div>
-                <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
-                  Email đăng nhập TradeLocker:
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Ví dụ: your_email@gmail.com"
-                  className="connect-input"
-                />
-              </div>
-
-              {/* Login Password */}
-              <div>
-                <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
-                  Mật khẩu TradeLocker (Password):
-                </label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu TradeLocker"
-                    className="connect-input"
-                    style={{ paddingRight: "50px" }}
-                  />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setPlatform("mt5")}
                     style={{
-                      position: "absolute",
-                      right: "8px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "transparent",
-                      border: "none",
-                      color: "#888888",
-                      fontSize: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
+                      padding: "8px 10px",
+                      borderRadius: "5px",
                       cursor: "pointer",
+                      backgroundColor: platform === "mt5" ? "#142838" : "#141414",
+                      border: platform === "mt5" ? "1px solid #1890ff" : "1px solid #333333",
+                      color: platform === "mt5" ? "#40a9ff" : "#888888",
+                      fontWeight: platform === "mt5" ? "bold" : "normal",
+                      fontSize: "12px",
+                      transition: "all 0.15s ease",
                     }}
                   >
-                    {showPassword ? "Ẩn" : "Hiện"}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🔵 MetaTrader 5 (MT5)</span>
+                    </div>
+                    <span style={{ fontSize: "9px", background: "#1890ff", color: "#ffffff", padding: "1px 5px", borderRadius: "2px", fontWeight: "bold" }}>
+                      CHÍNH / KHUYÊN DÙNG
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPlatform("tradelocker")}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
+                      padding: "8px 10px",
+                      borderRadius: "5px",
+                      cursor: "pointer",
+                      backgroundColor: platform === "tradelocker" ? "#14261c" : "#141414",
+                      border: platform === "tradelocker" ? "1px solid #00e676" : "1px solid #333333",
+                      color: platform === "tradelocker" ? "#00e676" : "#888888",
+                      fontWeight: platform === "tradelocker" ? "bold" : "normal",
+                      fontSize: "12px",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🟢 TradeLocker</span>
+                    </div>
+                    <span style={{ fontSize: "9px", background: "#333333", color: "#aaaaaa", padding: "1px 5px", borderRadius: "2px" }}>
+                      PHỤ / CLOUD WEB
+                    </span>
                   </button>
                 </div>
               </div>
+
+              {/* NỘI DUNG FORM NỀN TẢNG MT5 */}
+              {platform === "mt5" ? (
+                <>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Chọn Quỹ & Máy chủ MT5 (Server):
+                    </label>
+                    <select
+                      value={mt5Server}
+                      onChange={(e) => setMt5Server(e.target.value)}
+                      className="connect-input"
+                      style={{ cursor: "pointer" }}
+                    >
+                      <optgroup label="E8 Markets (Khuyên dùng)">
+                        <option value="E8-Platform5">E8 Markets (Platform 5 / MT5 - Classic Markets)</option>
+                        <option value="E8Markets-Demo">E8 Markets (Demo Server MT5)</option>
+                        <option value="E8Markets-Live">E8 Markets (Live / Funded MT5)</option>
+                      </optgroup>
+                      <optgroup label="FTMO & Quỹ Lớn Khác">
+                        <option value="FTMO-MT5">FTMO (MetaTrader 5 Demo / Live)</option>
+                        <option value="The5ers-MT5">The 5%ers (MetaTrader 5)</option>
+                        <option value="FundingPips-MT5">Funding Pips (MetaTrader 5)</option>
+                        <option value="Other-MT5">Máy chủ MT5 khác...</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Số tài khoản MT5 (Login / Account ID):
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={mt5Login}
+                      onChange={(e) => setMt5Login(e.target.value)}
+                      placeholder="Ví dụ: 2534591"
+                      className="connect-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Mật khẩu MT5 (Password):
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={mt5Password}
+                        onChange={(e) => setMt5Password(e.target.value)}
+                        placeholder="Nhập mật khẩu giao dịch MT5"
+                        className="connect-input"
+                        style={{ paddingRight: "50px" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: "absolute",
+                          right: "8px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "transparent",
+                          border: "none",
+                          color: "#888888",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {showPassword ? "Ẩn" : "Hiện"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* BANNER HƯỚNG DẪN THÔNG MINH E8 MARKETS & MT5 */}
+                  <div style={{
+                    background: "rgba(24, 144, 255, 0.08)",
+                    border: "1px solid rgba(24, 144, 255, 0.25)",
+                    borderRadius: "5px",
+                    padding: "8px 10px",
+                    fontSize: "11px",
+                    lineHeight: "1.5",
+                    color: "#b0d5f8",
+                  }}>
+                    <div style={{ color: "#40a9ff", fontWeight: "bold", marginBottom: "3px" }}>
+                      💡 Lưu ý quan trọng từ Quỹ E8 Markets:
+                    </div>
+                    <div>• <strong>Tên gọi:</strong> Trên hệ thống E8, MT5 có thể hiển thị dưới tên <strong>"Platform 5"</strong> (do chính sách bản quyền MetaQuotes).</div>
+                    <div>• <strong>Loại gói:</strong> MT5 khả dụng cho danh mục <strong>Classic Markets (Forex & CFD)</strong> tại Việt Nam / Quốc tế (không áp dụng cho IP Mỹ).</div>
+                    <div>• <strong>Hỗ trợ đổi nền tảng:</strong> Nếu lúc mua bạn vô tình chọn nhầm Crypto/Perpetual, hãy mở Live Chat trên trang chủ E8 để yêu cầu hỗ trợ đổi sang MT5 miễn phí (khi tài khoản chưa mở lệnh).</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* NỘI DUNG FORM NỀN TẢNG TRADELOCKER */}
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Chọn Quỹ & Máy chủ TradeLocker:
+                    </label>
+                    <select
+                      value={server}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setServer(val);
+                        if (val.includes("-Live")) {
+                          setEnvironment("https://live.tradelocker.com");
+                        } else {
+                          setEnvironment("https://demo.tradelocker.com");
+                        }
+                      }}
+                      className="connect-input"
+                      style={{ cursor: "pointer" }}
+                    >
+                      <optgroup label="E8 Markets">
+                        <option value="E8">E8 Markets (Demo - demo.tradelocker.com)</option>
+                        <option value="E8-Live">E8 Markets (Live / Funded - live.tradelocker.com)</option>
+                      </optgroup>
+                      <optgroup label="The 5%ers">
+                        <option value="The5ers">The 5%ers (Demo - demo.tradelocker.com)</option>
+                        <option value="The5ers-Live">The 5%ers (Live / Funded - live.tradelocker.com)</option>
+                      </optgroup>
+                      <optgroup label="FTMO & Quỹ Khác">
+                        <option value="FTMO">FTMO (TradeLocker Demo)</option>
+                        <option value="FunderPro">FunderPro (TradeLocker)</option>
+                        <option value="FundingPips">Funding Pips (TradeLocker)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Email đăng nhập TradeLocker:
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Ví dụ: your_email@gmail.com"
+                      className="connect-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "#888888", display: "block", marginBottom: "4px" }}>
+                      Mật khẩu TradeLocker (Password):
+                    </label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Nhập mật khẩu TradeLocker"
+                        className="connect-input"
+                        style={{ paddingRight: "50px" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: "absolute",
+                          right: "8px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "transparent",
+                          border: "none",
+                          color: "#888888",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {showPassword ? "Ẩn" : "Hiện"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: "rgba(0, 230, 118, 0.06)",
+                    border: "1px solid rgba(0, 230, 118, 0.2)",
+                    borderRadius: "5px",
+                    padding: "8px 10px",
+                    fontSize: "11px",
+                    lineHeight: "1.5",
+                    color: "#a7f3d0",
+                  }}>
+                    💡 TradeLocker là nền tảng Cloud hiện đại, phù hợp với các gói Crypto / Perpetuals hoặc trader muốn tự động hóa trên Web mà không cần cài phần mềm máy tính.
+                  </div>
+                </>
+              )}
 
               {/* Quy mô quỹ & Ký quỹ rủi ro */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "4px" }}>

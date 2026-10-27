@@ -4831,4 +4831,9 @@ div[class*="tradingview-widget-copyright"],
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.35) !important;
 }
 
+@keyframes chartSpinner {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 

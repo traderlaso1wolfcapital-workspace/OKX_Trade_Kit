@@ -46,6 +46,65 @@ const E8Logo = ({ size = 14 }) => (
   />
 );
 
+const FtmoLogo = ({ size = 14 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="#38bdf8"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0, display: "inline-block", verticalAlign: "middle" }}
+  >
+    <polygon points="12 2 2 7 12 12 22 7 12 2" fill="rgba(56, 189, 248, 0.2)" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
+export const formatOkxAccountTag = (account) => {
+  if (!account) return "";
+  const name = (account.name || "").trim();
+  const apiLabel = (account.api_label || account.label || "").trim();
+
+  // 1. Kiểm tra api_label trước (nếu có lưu)
+  if (apiLabel) {
+    if (apiLabel.includes("TLS1_")) {
+      const digits = apiLabel.replace(/.*TLS1_/, "").replace(/\D/g, "");
+      if (digits.length >= 4) return digits.slice(-4);
+      if (digits.length > 0) return digits;
+    }
+    return apiLabel.replace(/^#/, "");
+  }
+
+  // 2. Nếu tên chứa mã Fast API dạng TLS1_1790574999 -> lấy 4 số cuối của mã API
+  if (name.includes("TLS1_")) {
+    const digits = name.replace(/.*TLS1_/, "").replace(/\D/g, "");
+    if (digits.length >= 4) return digits.slice(-4);
+    if (digits.length > 0) return digits;
+  }
+
+  // 3. Nếu tên là dạng "Tài khoản chính (7626)" hoặc "Tài khoản phụ (4999)" -> lấy trong ngoặc đơn
+  const parenMatch = name.match(/\(([^)]+)\)/);
+  if (parenMatch && parenMatch[1]) {
+    return parenMatch[1].replace(/^#/, "");
+  }
+
+  // 4. Nếu tên là tên gợi nhớ người dùng tự đặt (như "Bot-m15", "Scalp-5m", "#4999")
+  if (name && !name.toLowerCase().startsWith("tài khoản ") && name !== "sub1" && name !== "sub2" && name !== "sub3") {
+    return name.replace(/^#/, "");
+  }
+
+  // 5. Fallback về 4 số cuối UID
+  if (account.okx_uid) {
+    return account.okx_uid.slice(-4);
+  }
+
+  return name ? name.replace(/^#/, "") : "OKX";
+};
+
 export default function SidebarLeft({
   activeBotTab,
   accounts = [],
@@ -206,23 +265,17 @@ export default function SidebarLeft({
   const [isPlatformMenuOpen, setIsPlatformMenuOpen] = useState(false);
   const platformDropdownRef = useRef(null);
 
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const accountDropdownRef = useRef(null);
-
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (platformDropdownRef.current && !platformDropdownRef.current.contains(e.target)) {
         setIsPlatformMenuOpen(false);
       }
-      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target)) {
-        setIsAccountMenuOpen(false);
-      }
     };
-    if (isPlatformMenuOpen || isAccountMenuOpen) {
+    if (isPlatformMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isPlatformMenuOpen, isAccountMenuOpen]);
+  }, [isPlatformMenuOpen]);
 
   useEffect(() => {
     const handlePlatformChange = (e) => {
@@ -319,677 +372,397 @@ export default function SidebarLeft({
             </button>
           </div>
 
-          {/* HÀNG 1: NGANG HÀNG NÚT SÀN/QUỸ, HƯỚNG DẪN VÀ CÀI ĐẶT */}
-          <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
-            {/* Custom Dropdown Nền Tảng: SÀN OKX / QUỸ FX (Thiết kế phong cách Pill Badge phát sáng đồng bộ Kênh Logs) */}
-            <div ref={platformDropdownRef} style={{ position: "relative", flex: 1, minWidth: 0 }}>
-              <button
-                type="button"
-                data-tour="platform-select"
-                onClick={() => setIsPlatformMenuOpen(!isPlatformMenuOpen)}
-                style={{
-                  width: "100%",
-                  height: "30px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "6px",
-                  padding: "0 8px 0 10px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
-                  background: tradingPlatform === "okx" ? "rgba(18, 14, 6, 0.92)" : "rgba(8, 14, 26, 0.92)",
-                  border: tradingPlatform === "okx" ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid rgba(59, 130, 246, 0.45)",
-                  color: tradingPlatform === "okx" ? "#fbbf24" : "#60a5fa",
-                  boxShadow: "inset 0 1px 4px rgba(0, 0, 0, 0.6)",
-                  outline: "none",
-                }}
-                title="Chọn nền tảng giao dịch (Sàn OKX / Quỹ E8)"
-              >
-                <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {tradingPlatform === "okx" ? (
-                    <>
-                      <OkxLogo size={14} />
-                      <span>SÀN OKX</span>
-                    </>
-                  ) : (
-                    <>
-                      <E8Logo size={14} />
-                      <span>QUỸ E8</span>
-                    </>
-                  )}
-                  {(tradingPlatform === "okx" ? isOkxRunning : isPropRunning) && (
-                    <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>
-                  )}
-                </div>
-                <span
-                  style={{
-                    fontSize: "9px",
-                    color: tradingPlatform === "okx" ? "#fbbf24" : "#60a5fa",
-                    transform: isPlatformMenuOpen ? "rotate(180deg)" : "none",
-                    transition: "transform 0.2s ease",
-                    flexShrink: 0,
-                    marginLeft: "4px",
-                  }}
-                >
-                  ▼
-                </span>
-              </button>
+          {/* HÀNG 1: DROPDOWN CHỌN SÀN / QUỸ TÍCH HỢP TOÀN BỘ TÀI KHOẢN KẾT NỐI, HƯỚNG DẪN VÀ CÀI ĐẶT */}
+          {(() => {
+            const currentOkxAcc = accounts.find((a) => a.id === effectiveAccId || a.name === effectiveAccId) || accounts[0];
+            const currentPropAcc = propAccounts.find((a) => a.id === activePropId) || propAccounts[0];
 
-              {/* Popup Menu Danh Sách Lựa Chọn */}
-              {isPlatformMenuOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 4px)",
-                    left: 0,
-                    width: "100%",
-                    minWidth: "170px",
-                    zIndex: 100,
-                    background: "rgba(15, 23, 42, 0.96)",
-                    backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(255, 255, 255, 0.15)",
-                    borderRadius: "7px",
-                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
-                    padding: "4px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
-                  }}
-                >
-                  {/* Mục 1: SÀN OKX (Tông Vàng Gold) */}
+            const isOkx = tradingPlatform === "okx";
+            const displayPlatformName = isOkx ? "SÀN OKX" : `QUỸ ${(currentPropAcc?.firm || "E8").toUpperCase()}`;
+            let displayAccountTag = "";
+            if (isOkx) {
+              if (currentOkxAcc) {
+                displayAccountTag = formatOkxAccountTag(currentOkxAcc);
+              }
+            } else {
+              if (currentPropAcc) {
+                const rawTag = (currentPropAcc.account_id || currentPropAcc.id || "").toString();
+                displayAccountTag = rawTag ? rawTag.replace(/^#/, "") : "";
+              }
+            }
+
+            const isThisOkxRunning = isOkx && currentOkxAcc && (
+              Object.values(activeAccounts || {}).includes(currentOkxAcc.id) ||
+              Object.values(activeAccounts || {}).includes(currentOkxAcc.name) ||
+              isOkxRunning
+            );
+            const isThisPropRunning = !isOkx && isPropRunning && (
+              currentPropAcc?.id === activePropId || propAccounts.length <= 1
+            );
+            const isCurrentRunning = isOkx ? isThisOkxRunning : isThisPropRunning;
+
+            return (
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "10px" }}>
+                {/* Custom Dropdown Tích Hợp Nền Tảng & Toàn Bộ Tài Khoản Đã Kết Nối */}
+                <div ref={platformDropdownRef} style={{ position: "relative", flex: 1, minWidth: 0 }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      handlePlatformSwitch("okx");
-                      setIsPlatformMenuOpen(false);
-                    }}
+                    data-tour="platform-select"
+                    onClick={() => setIsPlatformMenuOpen(!isPlatformMenuOpen)}
                     style={{
-                      display: "flex",
+                      width: "100%",
+                      height: "30px",
+                      display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      width: "100%",
-                      padding: "6px 8px",
-                      borderRadius: "5px",
-                      fontSize: "11px",
+                      gap: "6px",
+                      padding: "0 8px 0 10px",
+                      borderRadius: "6px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      background: tradingPlatform === "okx" ? "rgba(18, 14, 6, 0.95)" : "transparent",
-                      border: tradingPlatform === "okx" ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid transparent",
-                      color: tradingPlatform === "okx" ? "#fbbf24" : "#cbd5e1",
-                      textAlign: "left",
+                      transition: "all 0.18s ease",
+                      background: isOkx ? "rgba(18, 14, 6, 0.92)" : "rgba(8, 14, 26, 0.92)",
+                      border: isOkx ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid rgba(59, 130, 246, 0.45)",
+                      color: isOkx ? "#fbbf24" : "#60a5fa",
+                      boxShadow: "inset 0 1px 4px rgba(0, 0, 0, 0.6)",
+                      outline: "none",
                     }}
-                    onMouseEnter={(e) => {
-                      if (tradingPlatform !== "okx") {
-                        e.currentTarget.style.background = "rgba(245, 158, 11, 0.12)";
-                        e.currentTarget.style.color = "#fde68a";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (tradingPlatform !== "okx") {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "#cbd5e1";
-                      }
-                    }}
+                    title="Chọn tài khoản giao dịch (Sàn OKX / Quỹ E8 / FTMO...)"
                   >
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <OkxLogo size={13} />
-                      <span>SÀN OKX</span>
-                      {isOkxRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {isOkx ? (
+                        <OkxLogo size={14} />
+                      ) : (
+                        (currentPropAcc?.firm || "").toLowerCase() === "ftmo" ? <FtmoLogo size={14} /> : <E8Logo size={14} />
+                      )}
+                      <span>{displayPlatformName}</span>
+                      {displayAccountTag && (
+                        <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{displayAccountTag}</span>
+                      )}
+                      {isCurrentRunning && (
+                        <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                          LIVE
+                        </span>
+                      )}
                     </div>
-                    {tradingPlatform === "okx" && <span style={{ fontSize: "11px", color: "#fbbf24" }}>✓</span>}
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        color: isOkx ? "#fbbf24" : "#60a5fa",
+                        transform: isPlatformMenuOpen ? "rotate(180deg)" : "none",
+                        transition: "transform 0.2s ease",
+                        flexShrink: 0,
+                        marginLeft: "4px",
+                      }}
+                    >
+                      ▼
+                    </span>
                   </button>
 
-                  {/* Mục 2: QUỸ E8 (Tông Xanh dương) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePlatformSwitch("e8");
-                      setIsPlatformMenuOpen(false);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      width: "100%",
-                      padding: "6px 8px",
-                      borderRadius: "5px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      background: tradingPlatform === "e8" ? "rgba(8, 14, 26, 0.95)" : "transparent",
-                      border: tradingPlatform === "e8" ? "1px solid rgba(59, 130, 246, 0.45)" : "1px solid transparent",
-                      color: tradingPlatform === "e8" ? "#60a5fa" : "#cbd5e1",
-                      textAlign: "left",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (tradingPlatform !== "e8") {
-                        e.currentTarget.style.background = "rgba(59, 130, 246, 0.12)";
-                        e.currentTarget.style.color = "#93c5fd";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (tradingPlatform !== "e8") {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "#cbd5e1";
-                      }
-                    }}
-                  >
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <E8Logo size={13} />
-                      <span>QUỸ E8</span>
-                      {isPropRunning && <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800 }}>LIVE</span>}
-                    </div>
-                    {tradingPlatform === "e8" && <span style={{ fontSize: "11px", color: "#60a5fa" }}>✓</span>}
-                  </button>
-                </div>
-              )}
-            </div>
+                  {/* Popup Menu Danh Sách Lựa Chọn Tài Khoản Toàn Bộ Các Sàn & Quỹ */}
+                  {isPlatformMenuOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        minWidth: "220px",
+                        maxWidth: "290px",
+                        zIndex: 150,
+                        background: "rgba(15, 23, 42, 0.98)",
+                        backdropFilter: "blur(10px)",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        borderRadius: "7px",
+                        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
+                        padding: "5px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "3px",
+                        maxHeight: "320px",
+                        overflowY: "auto",
+                      }}
+                    >
+                      {/* 1. DANH SÁCH TÀI KHOẢN OKX */}
+                      {accounts.length > 0 ? (
+                        accounts.map((acc) => {
+                          const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
+                          const tag = formatOkxAccountTag(acc);
+                          const isAccRunning = Object.values(activeAccounts || {}).includes(acc.id) ||
+                                               Object.values(activeAccounts || {}).includes(acc.name) ||
+                                               (isOkxRunning && isSelected);
 
-            {/* 1. Nút Hướng Dẫn (nổi bật, đặt trước Cài Đặt, kích thước chuẩn bằng nút Cài Đặt) */}
-            <button
-              type="button"
-              className="btn-tour-guide"
-              data-tour="tour-btn"
-              onClick={onStartTour}
-              style={{
-                height: "30px",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "5px",
-                padding: "0 14px",
-                fontSize: "13px",
-                fontWeight: 700,
-                borderRadius: "6px",
-                cursor: "pointer",
-                background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-                border: "1px solid #6366f1",
-                color: "#ffffff",
-                boxShadow: "0 2px 8px rgba(79, 70, 229, 0.4)",
-                transition: "all 0.18s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.filter = "brightness(1.15)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.filter = "brightness(1.0)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-              title={t("guide_tooltip", "Khám phá toàn bộ hệ thống bot cho người mới (19 bước từ A đến Z)")}
-            >
-              <span>{t("guide_btn", "Hướng Dẫn")}</span>
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  backgroundColor: "#34d399",
-                  boxShadow: "0 0 6px #34d399",
-                  display: "inline-block",
-                }}
-              />
-            </button>
-
-            {/* 2. Nút Cài Đặt */}
-            <button
-              type="button"
-              className="btn-chart-settings"
-              data-tour="settings-btn"
-              style={{
-                height: "30px",
-                padding: "0 14px",
-                fontSize: "13px",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onClick={onOpenSettings}
-              title="Cài đặt hệ thống & API Key"
-            >
-              ⚙ {t("settings")}
-            </button>
-          </div>
-
-          {/* HÀNG 2: CHỌN TÀI KHOẢN (NGANG HÀNG ĐẸP MẮT THEO BẢN VẼ CHIẾN THUẬT - ẢNH 3) */}
-          <div
-            data-tour="account-select"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "10px",
-              marginBottom: "10px",
-              flexWrap: "nowrap",
-            }}
-          >
-            <span
-              style={{
-                color: "#e0e0e0",
-                fontSize: "12px",
-                fontWeight: "bold",
-                whiteSpace: "nowrap",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                flexShrink: 0,
-              }}
-            >
-              {isRunning && <span title="Bot đang chạy - Tài khoản bị khóa" style={{ color: "#ff9900", fontSize: "12px" }}>🔒</span>}
-              Chọn tài khoản:
-            </span>
-
-            {tradingPlatform === "e8" ? (
-              propAccounts.length > 0 ? (
-                /* Custom Dropdown tài khoản Quỹ E8 */
-                <div ref={accountDropdownRef} style={{ position: "relative", flexShrink: 0 }}>
-                  {(() => {
-                    const curPropAcc = propAccounts.find((a) => a.id === activePropId) || propAccounts[0];
-                    const propDisplayText = curPropAcc
-                      ? `${curPropAcc.name || `Quỹ ${curPropAcc.firm} #${curPropAcc.account_id}`} ($${Number(curPropAcc.balance || 0).toLocaleString()})`
-                      : "Chọn Quỹ";
-
-                    return (
-                      <>
-                        <button
-                          type="button"
-                          disabled={isRunning}
-                          onClick={() => {
-                            if (!isRunning) setIsAccountMenuOpen(!isAccountMenuOpen);
-                          }}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "8px",
-                            background: isRunning ? "#1a1a1a" : "#2d2d2d",
-                            border: isRunning ? "1px solid #444444" : "1px solid #555555",
-                            color: isRunning ? "#888888" : "#ffffff",
-                            padding: "4px 8px 4px 10px",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            height: "30px",
-                            outline: "none",
-                            cursor: isRunning ? "not-allowed" : "pointer",
-                            opacity: isRunning ? 0.65 : 1,
-                            transition: "all 0.18s ease",
-                            maxWidth: "190px",
-                            boxSizing: "border-box",
-                          }}
-                          title={isRunning ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để đổi Quỹ!" : "Chọn tài khoản Quỹ để giao dịch"}
-                        >
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {propDisplayText}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "9px",
-                              color: isRunning ? "#666666" : "#aaaaaa",
-                              transform: isAccountMenuOpen ? "rotate(180deg)" : "none",
-                              transition: "transform 0.2s ease",
-                              flexShrink: 0,
-                            }}
-                          >
-                            ▼
-                          </span>
-                        </button>
-
-                        {isAccountMenuOpen && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "calc(100% + 4px)",
-                              right: 0,
-                              minWidth: "200px",
-                              maxWidth: "280px",
-                              zIndex: 110,
-                              background: "rgba(26, 26, 26, 0.98)",
-                              backdropFilter: "blur(8px)",
-                              border: "1px solid #444444",
-                              borderRadius: "6px",
-                              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
-                              padding: "4px",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "3px",
-                              maxHeight: "220px",
-                              overflowY: "auto",
-                            }}
-                          >
-                            {propAccounts.map((acc) => {
-                              const isSelected = acc.id === (activePropId || propAccounts[0]?.id);
-                              return (
-                                <button
-                                  key={acc.id}
-                                  type="button"
-                                  onClick={() => {
-                                    handleSelectPropAccount(acc.id);
-                                    setIsAccountMenuOpen(false);
-                                  }}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: "8px",
-                                    width: "100%",
-                                    padding: "6px 10px",
-                                    borderRadius: "4px",
-                                    fontSize: "11.5px",
-                                    fontWeight: isSelected ? 700 : 500,
-                                    cursor: "pointer",
-                                    background: isSelected ? "rgba(255, 255, 255, 0.1)" : "transparent",
-                                    border: "none",
-                                    color: isSelected ? "#ffffff" : "#d1d5db",
-                                    textAlign: "left",
-                                    transition: "background 0.15s ease",
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (!isSelected) {
-                                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                                      e.currentTarget.style.color = "#ffffff";
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!isSelected) {
-                                      e.currentTarget.style.background = "transparent";
-                                      e.currentTarget.style.color = "#d1d5db";
-                                    }
-                                  }}
-                                >
-                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {acc.name || `Quỹ ${acc.firm} #${acc.account_id}`} (${Number(acc.balance || 0).toLocaleString()})
-                                  </span>
-                                  {isSelected && <span style={{ fontSize: "11px", color: "#00e676", fontWeight: "bold" }}>✓</span>}
-                                </button>
-                              );
-                            })}
-                            <div style={{ height: "1px", background: "#3a3a3a", margin: "2px 0" }} />
+                          return (
                             <button
+                              key={acc.id}
                               type="button"
                               onClick={() => {
-                                setIsAccountMenuOpen(false);
-                                onOpenConnectModal && onOpenConnectModal("tradelocker");
+                                if (tradingPlatform !== "okx") handlePlatformSwitch("okx");
+                                handleAccountSelect(acc.id);
+                                setIsPlatformMenuOpen(false);
                               }}
                               style={{
                                 display: "flex",
                                 alignItems: "center",
-                                gap: "6px",
+                                justifyContent: "space-between",
                                 width: "100%",
-                                padding: "6px 10px",
-                                borderRadius: "4px",
+                                padding: "6px 8px",
+                                borderRadius: "5px",
                                 fontSize: "11px",
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 cursor: "pointer",
-                                background: "transparent",
-                                border: "none",
-                                color: "#00e676",
+                                transition: "all 0.15s ease",
+                                background: isSelected ? "rgba(18, 14, 6, 0.95)" : "transparent",
+                                border: isSelected ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid transparent",
+                                color: isSelected ? "#fbbf24" : "#cbd5e1",
                                 textAlign: "left",
                               }}
-                              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 230, 118, 0.12)"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                            >
-                              <span>+</span>
-                              <span>Kết nối thêm Quỹ mới...</span>
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : (
-                /* Chưa có tài khoản Quỹ */
-                <div
-                  onClick={() => onOpenConnectModal && onOpenConnectModal("tradelocker")}
-                  style={{
-                    width: "auto",
-                    minWidth: "140px",
-                    height: "30px",
-                    borderRadius: "4px",
-                    border: "1px solid #3a3a3a",
-                    backgroundColor: "#202020",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "0 10px",
-                    fontSize: "11.5px",
-                    color: "#cccccc",
-                    fontWeight: "bold",
-                    boxSizing: "border-box",
-                    cursor: "pointer",
-                    transition: "all 0.18s ease",
-                    gap: "5px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#2a2a2a";
-                    e.currentTarget.style.borderColor = "#555555";
-                    e.currentTarget.style.color = "#ffffff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#202020";
-                    e.currentTarget.style.borderColor = "#3a3a3a";
-                    e.currentTarget.style.color = "#cccccc";
-                  }}
-                  title="Nhấp để kết nối tài khoản Quỹ FX (E8, The 5%ers, FTMO...)"
-                >
-                  <span style={{ fontWeight: "600" }}>Kết Nối Quỹ FX</span>
-                </div>
-              )
-            ) : (
-              /* Custom Dropdown tài khoản OKX */
-              <div ref={accountDropdownRef} style={{ position: "relative", flexShrink: 0 }}>
-                {(() => {
-                  const currentOkxAcc = accounts.find((a) => a.id === effectiveAccId || a.name === effectiveAccId);
-                  const okxDisplayText = currentOkxAcc
-                    ? currentOkxAcc.name
-                    : effectiveAccId
-                    ? effectiveAccId
-                    : accounts.length === 0
-                    ? "chưa có tài khoản"
-                    : "chọn tài khoản";
-
-                  return (
-                    <>
-                      <button
-                        type="button"
-                        disabled={isRunning}
-                        onClick={() => {
-                          if (!isRunning) setIsAccountMenuOpen(!isAccountMenuOpen);
-                        }}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "8px",
-                          background: isRunning ? "#1a1a1a" : "#2d2d2d",
-                          border: isRunning ? "1px solid #444444" : "1px solid #555555",
-                          color: isRunning ? "#888888" : "#e0e0e0",
-                          padding: "4px 8px 4px 10px",
-                          borderRadius: "4px",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          height: "30px",
-                          outline: "none",
-                          cursor: isRunning ? "not-allowed" : "pointer",
-                          opacity: isRunning ? 0.65 : 1,
-                          transition: "all 0.18s ease",
-                          maxWidth: "180px",
-                          boxSizing: "border-box",
-                        }}
-                        title={
-                          isRunning
-                            ? "🔒 Bot đang chạy - Vui lòng DỪNG BOT để chọn tài khoản khác!"
-                            : "Chọn tài khoản giao dịch"
-                        }
-                      >
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {okxDisplayText}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "9px",
-                            color: isRunning ? "#666666" : "#aaaaaa",
-                            transform: isAccountMenuOpen ? "rotate(180deg)" : "none",
-                            transition: "transform 0.2s ease",
-                            flexShrink: 0,
-                          }}
-                        >
-                          ▼
-                        </span>
-                      </button>
-
-                      {isAccountMenuOpen && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "calc(100% + 4px)",
-                            right: 0,
-                            minWidth: "180px",
-                            maxWidth: "260px",
-                            zIndex: 110,
-                            background: "rgba(26, 26, 26, 0.98)",
-                            backdropFilter: "blur(8px)",
-                            border: "1px solid #444444",
-                            borderRadius: "6px",
-                            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
-                            padding: "4px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "3px",
-                            maxHeight: "220px",
-                            overflowY: "auto",
-                          }}
-                        >
-                          {accounts.length === 0 ? (
-                            <div
-                              style={{
-                                padding: "8px 10px",
-                                fontSize: "11.5px",
-                                color: "#888888",
-                                textAlign: "center",
-                                fontStyle: "italic",
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "rgba(245, 158, 11, 0.12)";
+                                  e.currentTarget.style.color = "#fde68a";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "transparent";
+                                  e.currentTarget.style.color = "#cbd5e1";
+                                }
                               }}
                             >
-                              chưa có tài khoản
-                            </div>
-                          ) : (
-                            accounts.map((acc) => {
-                              const runningBotKey = Object.entries(activeAccounts || {}).find(([strat, accId]) => accId === acc.id || accId === acc.name)?.[0];
-                              const isThisBotAccount = (acc.id === effectiveAccId || acc.name === effectiveAccId);
-                              const isRunningThisBot = isRunning && (isThisBotAccount || runningBotKey === activeBotTab);
-                              const isRunningOnOtherBot = runningBotKey && runningBotKey !== activeBotTab;
-                              const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && (accId === acc.id || accId === acc.name))?.[0];
-
-                              const getTargetBotName = (key) => {
-                                if (key === "sub1") return t("bot_ema200");
-                                if (key === "sub2") return t("bot_smc");
-                                return t("bot_liquidation");
-                              };
-
-                              let labelSuffix = "";
-                              if (isRunningThisBot) {
-                                labelSuffix = " 🔒";
-                              } else if (isRunningOnOtherBot) {
-                                labelSuffix = ` (${t("running_on_bot")} ${getTargetBotName(runningBotKey)})`;
-                              } else if (assignedOtherBot) {
-                                labelSuffix = ` (${t("assigned_on_bot")} ${getTargetBotName(assignedOtherBot)})`;
-                              }
-
-                              return (
-                                <button
-                                  key={acc.id}
-                                  type="button"
-                                  disabled={isRunningOnOtherBot}
-                                  onClick={() => {
-                                    if (isRunningOnOtherBot) return;
-                                    handleAccountSelect(acc.id);
-                                    setIsAccountMenuOpen(false);
-                                  }}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: "8px",
-                                    width: "100%",
-                                    padding: "6px 10px",
-                                    borderRadius: "4px",
-                                    fontSize: "11.5px",
-                                    fontWeight: isThisBotAccount ? 700 : 500,
-                                    cursor: isRunningOnOtherBot ? "not-allowed" : "pointer",
-                                    opacity: isRunningOnOtherBot ? 0.45 : 1,
-                                    background: isThisBotAccount ? "rgba(255, 255, 255, 0.1)" : "transparent",
-                                    border: "none",
-                                    color: isThisBotAccount ? "#ffffff" : isRunningOnOtherBot ? "#777777" : "#d1d5db",
-                                    textAlign: "left",
-                                    transition: "background 0.15s ease",
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (!isRunningOnOtherBot && !isThisBotAccount) {
-                                      e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                                      e.currentTarget.style.color = "#ffffff";
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!isRunningOnOtherBot && !isThisBotAccount) {
-                                      e.currentTarget.style.background = "transparent";
-                                      e.currentTarget.style.color = "#d1d5db";
-                                    }
-                                  }}
-                                >
-                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {acc.name}{labelSuffix}
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <OkxLogo size={13} />
+                                <span>SÀN OKX</span>
+                                <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                                {isAccRunning && (
+                                  <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                                    LIVE
                                   </span>
-                                  {isThisBotAccount && <span style={{ fontSize: "11px", color: "#22c55e", fontWeight: "bold" }}>✓</span>}
-                                </button>
-                              );
-                            })
-                          )}
-                          <div style={{ height: "1px", background: "#3a3a3a", margin: "2px 0" }} />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsAccountMenuOpen(false);
-                              onOpenConnectModal && onOpenConnectModal("fast");
-                            }}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              width: "100%",
-                              padding: "6px 10px",
-                              borderRadius: "4px",
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              background: "transparent",
-                              border: "none",
-                              color: "#26a69a",
-                              textAlign: "left",
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(38, 166, 154, 0.12)"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                          >
-                            <span>+</span>
-                            <span>Kết nối tài khoản OKX...</span>
-                          </button>
-                        </div>
+                                )}
+                              </div>
+                              {isSelected && <span style={{ fontSize: "11px", color: "#fbbf24", fontWeight: 700 }}>✓</span>}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tradingPlatform !== "okx") handlePlatformSwitch("okx");
+                            setIsPlatformMenuOpen(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: "5px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            background: isOkx ? "rgba(18, 14, 6, 0.95)" : "transparent",
+                            border: isOkx ? "1px solid rgba(245, 158, 11, 0.45)" : "1px solid transparent",
+                            color: isOkx ? "#fbbf24" : "#cbd5e1",
+                            textAlign: "left",
+                          }}
+                        >
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <OkxLogo size={13} />
+                            <span>SÀN OKX</span>
+                          </div>
+                          {isOkx && <span style={{ fontSize: "11px", color: "#fbbf24" }}>✓</span>}
+                        </button>
                       )}
-                    </>
-                  );
-                })()}
+
+                      {/* 2. DANH SÁCH TÀI KHOẢN QUỸ FX */}
+                      {propAccounts.length > 0 ? (
+                        propAccounts.map((pAcc) => {
+                          const isSelected = !isOkx && (pAcc.id === activePropId || (!activePropId && propAccounts[0]?.id === pAcc.id));
+                          const firmUpper = (pAcc.firm || "E8").toUpperCase();
+                          const rawTag = (pAcc.account_id || pAcc.id || "").toString();
+                          const tag = rawTag.replace(/^#/, "");
+                          const isThisPropAccRunning = isPropRunning && (pAcc.id === activePropId || propAccounts.length <= 1);
+
+                          return (
+                            <button
+                              key={pAcc.id}
+                              type="button"
+                              onClick={() => {
+                                if (tradingPlatform !== "e8") handlePlatformSwitch("e8");
+                                handleSelectPropAccount(pAcc.id);
+                                setIsPlatformMenuOpen(false);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                width: "100%",
+                                padding: "6px 8px",
+                                borderRadius: "5px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                                background: isSelected ? "rgba(8, 14, 26, 0.95)" : "transparent",
+                                border: isSelected ? "1px solid rgba(59, 130, 246, 0.45)" : "1px solid transparent",
+                                color: isSelected ? "#60a5fa" : "#cbd5e1",
+                                textAlign: "left",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "rgba(59, 130, 246, 0.12)";
+                                  e.currentTarget.style.color = "#93c5fd";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = "transparent";
+                                  e.currentTarget.style.color = "#cbd5e1";
+                                }
+                              }}
+                            >
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {firmUpper === "FTMO" ? <FtmoLogo size={13} /> : <E8Logo size={13} />}
+                                <span>QUỸ {firmUpper}</span>
+                                <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                                {isThisPropAccRunning && (
+                                  <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
+                                    LIVE
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && <span style={{ fontSize: "11px", color: "#60a5fa", fontWeight: 700 }}>✓</span>}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tradingPlatform !== "e8") handlePlatformSwitch("e8");
+                            setIsPlatformMenuOpen(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            width: "100%",
+                            padding: "6px 8px",
+                            borderRadius: "5px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                            background: !isOkx ? "rgba(8, 14, 26, 0.95)" : "transparent",
+                            border: !isOkx ? "1px solid rgba(59, 130, 246, 0.45)" : "1px solid transparent",
+                            color: !isOkx ? "#60a5fa" : "#cbd5e1",
+                            textAlign: "left",
+                          }}
+                        >
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <E8Logo size={13} />
+                            <span>QUỸ E8</span>
+                          </div>
+                          {!isOkx && <span style={{ fontSize: "11px", color: "#60a5fa" }}>✓</span>}
+                        </button>
+                      )}
+
+                      {/* 3. NÚT KẾT NỐI THÊM TÀI KHOẢN MỚI */}
+                      <div style={{ height: "1px", background: "rgba(255, 255, 255, 0.1)", margin: "3px 0" }} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPlatformMenuOpen(false);
+                          onOpenConnectModal && onOpenConnectModal("fast");
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          width: "100%",
+                          padding: "6px 8px",
+                          borderRadius: "5px",
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          background: "transparent",
+                          border: "none",
+                          color: "#26a69a",
+                          textAlign: "left",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(38, 166, 154, 0.12)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span style={{ fontSize: "13px", fontWeight: "bold" }}>+</span>
+                        <span>Quản lý / Kết nối thêm tài khoản...</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* 1. Nút Hướng Dẫn (nhỏ gọn, tinh tế, không chấm xanh) */}
+                <button
+                  type="button"
+                  className="btn-tour-guide"
+                  data-tour="tour-btn"
+                  onClick={onStartTour}
+                  style={{
+                    height: "28px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 8px",
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    borderRadius: "5px",
+                    cursor: "pointer",
+                    background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
+                    border: "1px solid #6366f1",
+                    color: "#ffffff",
+                    boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
+                    transition: "all 0.18s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.filter = "brightness(1.15)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.filter = "brightness(1.0)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                  title={t("guide_tooltip", "Khám phá toàn bộ hệ thống bot cho người mới (19 bước từ A đến Z)")}
+                >
+                  <span>{t("guide_btn", "Hướng Dẫn")}</span>
+                </button>
+
+                {/* 2. Nút Cài Đặt */}
+                <button
+                  type="button"
+                  className="btn-chart-settings"
+                  data-tour="settings-btn"
+                  style={{
+                    height: "28px",
+                    padding: "0 10px",
+                    fontSize: "12px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  onClick={onOpenSettings}
+                  title="Cài đặt hệ thống & API Key"
+                >
+                  ⚙ {t("settings")}
+                </button>
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {!isRiskCollapsed && (
             <div className="risk-grid">

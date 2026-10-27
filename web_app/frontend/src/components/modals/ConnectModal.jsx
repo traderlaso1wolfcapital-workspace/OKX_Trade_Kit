@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "../../i18n";
 import { ConfirmLogoutModal } from "./AccountPromptModals";
 import TradeLockerTab from "./TradeLockerTab";
+import { formatOkxAccountTag } from "../sidebar/SidebarLeft";
 
 export default function ConnectModal({
   isOpen,
@@ -530,14 +531,17 @@ export default function ConnectModal({
                       </div>
                       <div
                         style={{
-                          fontSize: "10px",
+                          fontSize: "11px",
                           fontStyle: "italic",
                           color: "#4ade80",
                           marginTop: "2px",
                           fontWeight: "600",
                         }}
                       >
-                        {`Đã Connect ${acc.name || "Tài khoản OKX"}`}
+                        {(() => {
+                          const raw = formatOkxAccountTag(acc);
+                          return `Đã Connect #${raw}`;
+                        })()}
                       </div>
                     </div>
 
@@ -622,34 +626,25 @@ export default function ConnectModal({
                           </div>
 
                           <div style={{ flex: 1, textAlign: "left" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <span style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                                {pAcc.name || `${firm.name} #${pAcc.account_id}`}
-                              </span>
-                              {isActive && (
-                                <span style={{
-                                  fontSize: "9px",
-                                  fontWeight: "bold",
-                                  background: "#00e676",
-                                  color: "#000000",
-                                  padding: "1px 5px",
-                                  borderRadius: "3px",
-                                  letterSpacing: "0.5px"
-                                }}>
-                                  BOT ACTIVE
-                                </span>
-                              )}
+                            <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
+                              {firm.key === "e8" ? "Quỹ E8 Connect" : firm.key === "ftmo" ? "Quỹ FTMO Connect" : `${firm.name} Connect`}
                             </div>
                             <div
                               style={{
-                                fontSize: "10.5px",
+                                fontSize: "11px",
                                 fontStyle: "italic",
-                                color: "#00e676",
+                                color: "#4ade80",
                                 marginTop: "2px",
                                 fontWeight: "600",
                               }}
                             >
-                              {`🟢 Đã Connect #${pAcc.account_id} - $${Number(pAcc.balance || 0).toLocaleString()} USD`}
+                              {(() => {
+                                const accNum = pAcc.account_id || pAcc.id;
+                                const balStr = pAcc.balance !== undefined && pAcc.balance !== null
+                                  ? ` - $${Number(pAcc.balance).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                                  : "";
+                                return `Đã Connect #${accNum}${balStr}`;
+                              })()}
                             </div>
                           </div>
 
@@ -657,48 +652,34 @@ export default function ConnectModal({
                             <span
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedPropId(pAcc.id);
-                                handleTabSwitch("tradelocker");
+                                handleDeletePropAccount(pAcc.id);
                               }}
                               style={{
                                 fontSize: "11px",
                                 fontWeight: "700",
-                                color: "#00e676",
-                                background: "rgba(0, 230, 118, 0.1)",
-                                border: "1px solid #00e676",
-                                padding: "4px 10px",
+                                color: "#ff4d4f",
+                                background: "rgba(255, 77, 79, 0.08)",
+                                border: "1px solid #ff4d4f",
+                                padding: "4px 12px",
                                 borderRadius: "4px",
                                 whiteSpace: "nowrap",
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "4px",
+                                justifyContent: "center",
+                                userSelect: "none",
                                 cursor: "pointer",
+                                transition: "all 0.18s ease",
                               }}
-                              title="Mở cấu hình Quỹ"
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
+                              }}
+                              title="Xóa tài khoản Quỹ này (Delete)"
                             >
-                              Cài đặt ⚙
+                              Delete
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletePropAccount(pAcc.id);
-                              }}
-                              style={{
-                                background: "transparent",
-                                border: "1px solid #444",
-                                color: "#888",
-                                borderRadius: "4px",
-                                padding: "4px 8px",
-                                fontSize: "11px",
-                                cursor: "pointer",
-                              }}
-                              title="Xóa tài khoản Quỹ này"
-                              onMouseOver={(e) => { e.currentTarget.style.color = "#ff5252"; e.currentTarget.style.borderColor = "#ff5252"; }}
-                              onMouseOut={(e) => { e.currentTarget.style.color = "#888"; e.currentTarget.style.borderColor = "#444"; }}
-                            >
-                              ✕
-                            </button>
                           </div>
                         </div>
                       );
@@ -805,10 +786,16 @@ export default function ConnectModal({
                         </div>
                         <div style={{ flex: 1, textAlign: "left" }}>
                           <div style={{ fontSize: "13px", fontWeight: "600", color: "#ffffff" }}>
-                            {pAcc.name || `Quỹ ${pAcc.firm} #${pAcc.account_id}`}
+                            {pAcc.name || `Quỹ ${pAcc.firm || "E8"} Connect`}
                           </div>
-                          <div style={{ fontSize: "10.5px", fontStyle: "italic", color: "#00e676", marginTop: "2px", fontWeight: "600" }}>
-                            {`🟢 Đã Connect #${pAcc.account_id} - $${Number(pAcc.balance || 0).toLocaleString()} USD`}
+                          <div style={{ fontSize: "11px", fontStyle: "italic", color: "#4ade80", marginTop: "2px", fontWeight: "600" }}>
+                            {(() => {
+                              const accNum = pAcc.account_id || pAcc.id;
+                              const balStr = pAcc.balance !== undefined && pAcc.balance !== null
+                                ? ` - $${Number(pAcc.balance).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                                : "";
+                              return `Đã Connect #${accNum}${balStr}`;
+                            })()}
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -821,34 +808,59 @@ export default function ConnectModal({
                             style={{
                               fontSize: "11px",
                               fontWeight: "700",
-                              color: "#00e676",
-                              background: "rgba(0, 230, 118, 0.1)",
-                              border: "1px solid #00e676",
-                              padding: "4px 10px",
+                              color: "#26a69a",
+                              background: "rgba(38, 166, 154, 0.12)",
+                              border: "1px solid rgba(38, 166, 154, 0.3)",
+                              padding: "4px 9px",
                               borderRadius: "4px",
+                              whiteSpace: "nowrap",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
                               cursor: "pointer",
+                              transition: "all 0.18s ease",
                             }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = "rgba(38, 166, 154, 0.25)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = "rgba(38, 166, 154, 0.12)";
+                            }}
+                            title="Cài đặt thông số Quỹ (Lots, Cầu dao)"
                           >
                             Cài đặt ⚙
                           </span>
-                          <button
-                            type="button"
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeletePropAccount(pAcc.id);
                             }}
                             style={{
-                              background: "transparent",
-                              border: "1px solid #444",
-                              color: "#888",
-                              borderRadius: "4px",
-                              padding: "4px 8px",
                               fontSize: "11px",
+                              fontWeight: "700",
+                              color: "#ff4d4f",
+                              background: "rgba(255, 77, 79, 0.08)",
+                              border: "1px solid #ff4d4f",
+                              padding: "4px 12px",
+                              borderRadius: "4px",
+                              whiteSpace: "nowrap",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              userSelect: "none",
                               cursor: "pointer",
+                              transition: "all 0.18s ease",
                             }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
+                            }}
+                            title="Xóa tài khoản Quỹ này (Delete)"
                           >
-                            ✕
-                          </button>
+                            Delete
+                          </span>
                         </div>
                       </div>
                     );

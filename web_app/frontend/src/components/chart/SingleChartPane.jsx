@@ -74,7 +74,14 @@ export default function SingleChartPane({
   const liquidV5BoxesOverlayRef = useRef(null);
   const activeObsRef = useRef([]);
   const liquidV5BoxesRef = useRef({ fvg_boxes: [], ob_boxes: [] });
-  const candlesRef = useRef([]);
+
+  const tfMapOnInit = { "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m", "1H": "1H", "2H": "2H", "4H": "4H", "1D": "1D" };
+  const currentBarOnInit = tfMapOnInit[tf] || tf;
+  const initialCacheKey = `${coin}_${currentBarOnInit}`;
+  const initialCached = _webCandlesCache.get(initialCacheKey);
+
+  const candlesRef = useRef(initialCached && initialCached.candles ? initialCached.candles : []);
+  const [isLoadingCandles, setIsLoadingCandles] = useState(!initialCached || !initialCached.candles || initialCached.candles.length === 0);
   const activeBotTabRef = useRef(activeBotTab);
   const tfRef = useRef(tf);
   const coinRef = useRef(coin);
@@ -318,12 +325,12 @@ export default function SingleChartPane({
     try {
       chartRef.current.priceScale('right').applyOptions({
         autoScale: true,
-        mode: isLogScaleRef.current ? 1 : 0
+        mode: 1 // Luôn luôn khóa chặt chế độ Log scale (L) theo yêu cầu CEO
       });
       if (candleSeriesRef.current) {
         candleSeriesRef.current.priceScale().applyOptions({
           autoScale: true,
-          mode: isLogScaleRef.current ? 1 : 0
+          mode: 1 // Luôn luôn khóa chặt chế độ Log scale (L) theo yêu cầu CEO
         });
       }
       chartRef.current.timeScale().setVisibleLogicalRange({
@@ -383,6 +390,11 @@ export default function SingleChartPane({
     let activeTrade = null;
     let consecutiveAbove = 0;
     let consecutiveBelow = 0;
+    let currentTrend = null; // 'Long' | 'Short'
+    let lastClosedIdx = -1;
+
+    // Ngưỡng xác nhận đảo chiều: cần ít nhất 20 nến đóng cửa liên tục ở phía đối nghịch
+    const REVERSAL_THRESHOLD = Math.min(20, Math.floor(REQUIRED_ACCUM / 2));
 
     for (let i = 200; i < candles.length; i++) {
       const candle = candles[i];
@@ -397,10 +409,23 @@ export default function SingleChartPane({
         consecutiveAbove = 0;
       }
 
+      // Xác lập hoặc đảo chiều xu hướng:
+      if (!currentTrend) {
+        if (consecutiveAbove >= REQUIRED_ACCUM) currentTrend = 'Long';
+        else if (consecutiveBelow >= REQUIRED_ACCUM) currentTrend = 'Short';
+      } else if (currentTrend === 'Long' && consecutiveBelow >= REVERSAL_THRESHOLD) {
+        currentTrend = 'Short';
+        if (activeTrade && activeTrade.state === 'waiting') activeTrade = null;
+      } else if (currentTrend === 'Short' && consecutiveAbove >= REVERSAL_THRESHOLD) {
+        currentTrend = 'Long';
+        if (activeTrade && activeTrade.state === 'waiting') activeTrade = null;
+      }
+
+      // Xử lý lệnh đang hoạt động (activeTrade)
       if (activeTrade) {
+        const isLong = activeTrade.entryType === 'Long';
         if (activeTrade.state === 'waiting') {
-          const isLong = activeTrade.entryType === 'Long';
-          // Khi lệnh đang chờ, giá Limit bám theo đường EMA200 động
+          // Khi lệnh đang chờ, giá Limit bám theo đường EMA200 động (Trailing Limit)
           const ep = isLong ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
           const tp = isLong ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
           const sl = isLong ? (ep * (1 - slPct)) : (ep * (1 + slPct));
@@ -421,9 +446,10 @@ export default function SingleChartPane({
             activeTrade.tpTarget = tp;
             activeTrade.slTarget = sl;
 
-            // Hủy nếu gãy trục xu hướng (nến đóng cửa xuyên qua phía bên kia)
-            if (isLong && consecutiveBelow > 0) activeTrade = null;
-            if (!isLong && consecutiveAbove > 0) activeTrade = null;
+            // Hủy lệnh chờ nếu giá đi quá xa phá vỡ cản (> 2% so với EMA)
+            const breachPct = Math.abs(candle.close - ema) / ema;
+            if (isLong && candle.close < ema && breachPct > 0.02) activeTrade = null;
+            if (!isLong && candle.close > ema && breachPct > 0.02) activeTrade = null;
           }
         } else if (activeTrade.state === 'open') {
           const isLong = activeTrade.entryType === 'Long';
@@ -440,27 +466,59 @@ export default function SingleChartPane({
             activeTrade.state = 'closed';
             results.push({ ...activeTrade });
             activeTrade = null;
+            lastClosedIdx = i;
           }
         }
       }
 
-      // Chỉ xuất hiện box khi nến tích lũy bám một phía trục EMA200 vượt qua điều kiện >= 60 nến
-      if (!activeTrade && (consecutiveAbove >= REQUIRED_ACCUM || consecutiveBelow >= REQUIRED_ACCUM)) {
-        const isBull = consecutiveAbove >= REQUIRED_ACCUM;
+      // KÍCH HOẠT LỆNH MỚI TRONG XU HƯỚNG (TÍNH TOÁN LIÊN TỤC ĐẾN VÔ TẬN):
+      // Nếu xu hướng đã được xác lập (currentTrend) và hiện chưa có lệnh mở (activeTrade === null):
+      // Đảm bảo không spam lệnh trùng trên cùng 1 cây nến vừa đóng (i > lastClosedIdx)
+      if (!activeTrade && currentTrend && (i > lastClosedIdx)) {
+        const isBull = currentTrend === 'Long';
         const ep = isBull ? (ema * (1 + entryOffsetPct)) : (ema * (1 - entryOffsetPct));
         const tp = isBull ? (ep * (1 + tpPct)) : (ep * (1 - tpPct));
         const sl = isBull ? (ep * (1 - slPct)) : (ep * (1 + slPct));
 
-        activeTrade = {
-          entryTime: candle.time,
-          entryEma: ema,
-          entryPrice: ep,
-          tpTarget: tp,
-          slTarget: sl,
-          entryType: isBull ? 'Long' : 'Short',
-          state: 'waiting',
-          isEmaBot: true,
-        };
+        // Kiểm tra xem nến hiện tại có chạm entry luôn không
+        const entryHitNow = isBull ? candle.low <= ep : candle.high >= ep;
+
+        if (entryHitNow) {
+          activeTrade = {
+            entryTime: candle.time,
+            entryEma: ema,
+            entryPrice: ep,
+            tpTarget: tp,
+            slTarget: sl,
+            entryType: isBull ? 'Long' : 'Short',
+            state: 'open',
+            isEmaBot: true,
+          };
+
+          // Kiểm tra xem có TP hoặc SL luôn trong cùng cây nến (nến râu dài)
+          const tpHitSame = isBull ? candle.high >= tp : candle.low <= tp;
+          const slHitSame = isBull ? candle.low <= sl : candle.high >= sl;
+          if (tpHitSame || slHitSame) {
+            activeTrade.exitTime = candle.time;
+            activeTrade.exitResult = tpHitSame ? 'TP' : 'SL';
+            activeTrade.state = 'closed';
+            results.push({ ...activeTrade });
+            activeTrade = null;
+            lastClosedIdx = i;
+          }
+        } else {
+          // Giá chưa chạm nhưng xu hướng vẫn duy trì: tạo lệnh chờ (waiting) bám theo EMA200
+          activeTrade = {
+            entryTime: candle.time,
+            entryEma: ema,
+            entryPrice: ep,
+            tpTarget: tp,
+            slTarget: sl,
+            entryType: isBull ? 'Long' : 'Short',
+            state: 'waiting',
+            isEmaBot: true,
+          };
+        }
       }
     }
 
@@ -510,11 +568,14 @@ export default function SingleChartPane({
       // 2. STOP LOSS: Luôn đặt tại biên đối diện của OB (Long: biên dưới ob.low, Short: biên trên ob.high)
       const slTarget = isBull ? ob.low : ob.high;
 
-      // 3. TAKE PROFIT: Tỷ lệ RR 1.5R dựa trên khoảng cách SL (chính bằng chiều cao khối OB)
+      // 3. TAKE PROFIT: Tỷ lệ RR theo cấu hình (mặc định 5.0R thuận trend)
       const obHeight = Math.abs(ob.high - ob.low);
+      const rrRatio = (riskRef.current && riskRef.current.tpPct && !isNaN(riskRef.current.tpPct) && Number(riskRef.current.tpPct) > 0)
+        ? Number(riskRef.current.tpPct)
+        : 5.0;
       const tpTarget = isBull
-        ? (entryPrice + obHeight * 1.5)
-        : (entryPrice - obHeight * 1.5);
+        ? (entryPrice + obHeight * rrRatio)
+        : (entryPrice - obHeight * rrRatio);
 
       // 4. LOẠI BOX: OB Long (xanh dương) -> Box Long; OB Short (đỏ) -> Box Short
       const entryType = isBull ? 'Long' : 'Short';
@@ -1696,6 +1757,13 @@ export default function SingleChartPane({
     return () => clearTimeout(timer);
   }, [isVisible, layout, scheduleDraw]);
 
+  useEffect(() => {
+    riskRef.current = risk;
+    if (isVisible && chartRef.current) {
+      scheduleDraw();
+    }
+  }, [risk, isVisible, scheduleDraw]);
+
   // Real-time tick callback from OKX Public WebSocket
   const handleWsTick = useCallback((liveCandle) => {
     if (!candleSeriesRef.current || !candlesRef.current || candlesRef.current.length === 0) return;
@@ -1777,11 +1845,13 @@ export default function SingleChartPane({
       }
       hasInitializedRef.current = true;
       prevLengthRef.current = cached.candles.length;
+      setIsLoadingCandles(false);
       applyDefaultZoom();
       updateIndicatorsRef.current?.();
       scheduleDraw();
     } else {
-      // Nếu chưa có cache: dọn sạch nến cũ của TF trước đó để không bị lệch nến/chỉ báo
+      // Nếu chưa có cache: bật trạng thái loading nến để người dùng biết đang tải
+      setIsLoadingCandles(true);
       candlesRef.current = [];
       activeObsRef.current = [];
       if (candleSeriesRef.current) {
@@ -1795,13 +1865,24 @@ export default function SingleChartPane({
       }
     }
 
-    const fetchCandles = async () => {
+    const fetchCandles = async (retryCount = 0) => {
       if (!candleSeriesRef.current) return;
       try {
         const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=2500`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (isMounted && retryCount < 3) {
+            setTimeout(() => { if (isMounted) fetchCandles(retryCount + 1); }, 600);
+          }
+          return;
+        }
         const rd = await res.json();
-        if (!isMounted || targetCoin !== coin || targetTf !== tf || rd.code !== "0" || !rd.data || rd.data.length === 0) return;
+        if (!isMounted || targetCoin !== coin || targetTf !== tf) return;
+        if (rd.code !== "0" || !rd.data || rd.data.length === 0) {
+          if (isMounted && retryCount < 3) {
+            setTimeout(() => { if (isMounted) fetchCandles(retryCount + 1); }, 600);
+          }
+          return;
+        }
 
         const candles = [];
         for (let i = rd.data.length - 1; i >= 0; i--) {
@@ -1852,8 +1933,10 @@ export default function SingleChartPane({
         if (rd.ob_boxes) activeObsRef.current = rd.ob_boxes;
         updateIndicatorsRef.current?.();
 
-        hasInitializedRef.current = true;
+        const isHugeCandleJump = Math.abs(unique.length - (prevLengthRef.current || 0)) > 50;
         prevLengthRef.current = unique.length;
+        hasInitializedRef.current = true;
+        setIsLoadingCandles(false);
 
         if (isInitialForThisTarget) {
           // Khi lần đầu tải TF/Coin mới: LUÔN LUÔN zoom đúng 60 nến gần nhất ở bên phải
@@ -1865,9 +1948,14 @@ export default function SingleChartPane({
               scheduleDraw();
             }
           });
+          setTimeout(() => {
+            if (isMounted) {
+              applyDefaultZoom();
+              scheduleDraw();
+            }
+          }, 60);
         } else {
           // Background reconcile: Giữ tầm nhìn hiện tại nếu người dùng đang chủ động soi nến cũ
-          const isHugeCandleJump = Math.abs(unique.length - (prevLengthRef.current || 0)) > 50;
           if (isAutoFitRef.current || !userInteractedRef.current || isHugeCandleJump) {
             applyDefaultZoom();
           } else if (prevRange) {
@@ -1997,6 +2085,43 @@ export default function SingleChartPane({
             onDrawingsCountChange={setDrawingsCount}
             clearTrigger={clearDrawingsTrigger}
           />
+
+          {/* Hiệu ứng loading nến mượt mà khi đổi coin / timeframe */}
+          {isLoadingCandles && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                zIndex: 20,
+                pointerEvents: 'none',
+                backgroundColor: 'rgba(12, 12, 12, 0.75)',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                backdropFilter: 'blur(4px)'
+              }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '2px solid rgba(255, 255, 255, 0.15)',
+                  borderTopColor: '#2962ff',
+                  borderRadius: '50%',
+                  animation: 'chartSpinner 0.7s linear infinite'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#888', fontWeight: 500, letterSpacing: '0.3px' }}>
+                Đang tải nến...
+              </span>
+            </div>
+          )}
 
           {/* Indicator Legend Overlay */}
           <div className="chart-legend-overlay">
