@@ -909,3 +909,54 @@ Mọi Box Long/Short vẽ trên biểu đồ bắt buộc phải ánh xạ trự
   - Log chi tiết Backend: `pm2 logs tls1-bot-backend --lines 30`
   - Log kết nối Cloudflare: `tail -n 30 web_app/tunnel.log`
 
+
+===========================================================================================
+## XIII. KIẾN TRÚC ĐA TÀI KHOẢN, FAST CONNECT ĐA THIẾT BỊ & CLEAN PROCESS SHUTDOWN
+*(Cập nhật chuẩn hóa: 27/10/2026 - zMultiAccountArchitecture)*
+===========================================================================================
+
+### 1. Phân Tách Profile Bộ Lưu Độc Lập Theo UID / Account ID
+- **Bản chất vấn đề cũ:** Trước đây, bot dùng chung các file `{strategy}_du_lieu_tien_hoa.json` (ví dụ `sub1_du_lieu_tien_hoa.json`) ở cấp độ toàn cục. Khi người dùng đổi tài khoản hoặc kết nối tài khoản mới có số dư nhỏ hơn, số dư mới ($26.26) bị trừ đè vào Vốn Gốc cũ ($1,112.40) gây ra hiện tượng PNL âm ảo (-$1,086.14).
+- **Kiến trúc Profile độc lập mới:**
+  - Mọi dữ liệu Vốn Gốc, Tổng Tài Sản, PNL, Winrate, M/M (MAE/MFE) được lưu trong file riêng mang tên `{account_id}_evolution_data.json` và `{account_id}_du_lieu_tien_hoa.json` bên trong thư mục profile của từng `uid`.
+  - **Quy tắc khi Xóa (Delete / Đăng Xuất) tài khoản trên Web:** 
+    - Dừng tiến trình bot nếu tài khoản bị xóa đang chạy.
+    - Xóa file `.api_{account_id}` để hủy quyền truy cập sàn.
+    - **TUYỆT ĐỐI BẢO LƯU NGUYÊN VẸN** các file thống kê tiến hóa `{account_id}_evolution_data.json`. Dữ liệu hiệu suất lịch sử của tài khoản đó không bị xóa mất.
+    - **KHÔNG phát cờ reset_wallet đại trà:** Số liệu của tài khoản khác không bị ảnh hưởng.
+  - **Cơ chế Reset Vốn Gốc (Audit):** CHỈ KHI người dùng chủ động bấm nút "RESET Vốn Gốc (Audit)" trong Cài Đặt Hệ Thống, hàm `reset_capital` mới quét số dư thực tế từ sàn OKX để gán lại mốc Vốn Gốc mới (PNL = 0.00 $, Winrate = 0).
+
+### 2. Triệt Tiêu Cơ Chế SHADOW MODE ➔ Thay Bằng Clean Process Shutdown
+- **Loại bỏ hoàn toàn SHADOW MODE:** Cờ ngầm `dry_run = "1"` cũ giữ tiến trình Python chạy ngầm trong RAM gây chiếm dụng bộ nhớ, xung đột API Key và lỗi 51008 thiếu USDT margin khi tài khoản có ít vốn.
+- **Quy trình Clean Process Shutdown:**
+  - Khi người dùng bấm **Dừng Bot** hoặc **Đăng Xuất tài khoản**:
+    1. Quét và HỦY toàn bộ lệnh Limit đang chờ khớp trên sàn OKX (`_cancel_unfilled_limit_orders`).
+    2. BẢO TOÀN 100% vị thế mở và lệnh chốt lời/cắt lỗ (TP/SL) an toàn trên sàn.
+    3. Dùng `psutil` **KILL triệt để toàn bộ tiến trình Python bot**, giải phóng 100% RAM.
+    4. Dọn sạch hàng đợi logs `bot_log_queues` trong bộ nhớ server.
+  - Khi bật lại Bot: Sử dụng thuật toán **Replay K-line** tải nến siêu tốc từ sàn OKX (~1.5s) để tái lập bộ đếm tích lũy EMA200 60 nến và ma trận xu hướng, không cần phải chạy ngầm giả lập.
+
+### 3. Vòng Đời Fast Connect OKX & Đồng Bộ Real-time Đa Thiết Bị
+- **Cơ chế Fast Connect đa thiết bị (Điện thoại & PC):**
+  - Sàn OKX quy định mỗi tài khoản phụ chỉ duy trì duy nhất 1 Fast API Key của cùng 1 bên thứ ba.
+  - Khi người dùng Fast Connect trên Điện thoại rồi sau đó Fast Connect cùng tài khoản phụ đó trên PC:
+    - Sàn OKX tự động xóa key cũ (`TLS1_xxx cũ`) và cấp key mới (`TLS1_yyy mới`).
+    - Máy chủ nhận key mới qua OAuth callback và cập nhật vào file `.api_{acc}`.
+    - Tiến trình bot trên máy chủ tiếp tục chạy bằng key mới mà không bị gián đoạn.
+    - **Điện thoại KHÔNG BỊ VĂNG ĐĂNG XUẤT:** Do cùng chung Master UID, phiên đăng nhập được giữ nguyên và tự động nhận key mới qua WebSocket.
+- **Đồng bộ hai chiều Real-time qua WebSocket:**
+  - Danh sách `bot_data_connections` trên máy chủ lưu giữ toàn bộ kết nối của cùng một UID (Điện thoại, PC, Laptop).
+  - Khi người dùng bấm **Dừng Bot / Chạy Bot** trên Điện thoại, trạng thái `bot_status` đổi thành `STOPPED`/`RUNNING` và phát thanh tức thì sang PC (~50ms) mà không cần F5.
+  - Mọi thay đổi về chỉ số (Volume, TP/SL, DCA, SMC) được lưu tập trung trên Server và tự động hiển thị đồng bộ trên mọi thiết bị.
+
+### 4. Quy Chuẩn Hiển Thị Dashboard Logs & Giao Diện Modal Connect
+- **Điều kiện hiển thị Bảng Thợ Săn EMA200 (`LogsTerminal.jsx`):**
+  - Bảng Dashboard `cleanDashboardLines` CHỈ ĐƯỢC HIỂN THỊ khi: `currentPlatform === "okx"` VÀ tài khoản **ĐÃ KẾT NỐI** VÀ **ĐƯỢC CHỌN TRONG DROPDOWN** (`hasActiveAccount && selectedAccount && accountsCount > 0`).
+  - Khi chưa có tài khoản nào được kết nối / chọn: Bảng Dashboard cũ lập tức bị ẩn bỏ hoàn toàn (không lưu vết số liệu cũ), thay bằng banner thông báo hướng dẫn người dùng kết nối/chọn tài khoản.
+- **Chuẩn hóa Giao diện Modal Connect (`ConnectModal.jsx`):**
+  - Phân chia các phân khu rõ ràng bằng đường kẻ ngang: `Crypto`, `Forex (MT5)`, `Quỹ Prop Firm (TradeLocker / MT5)`, `Sắp hỗ trợ`.
+  - **Hợp nhất nút Đăng Xuất:**
+    - Đổi toàn bộ các nút `Delete` nhỏ ở bên cạnh dòng `• Đã Connect #...` thành chữ tiếng Việt chuẩn: **`[Đăng Xuất]`**.
+    - Loại bỏ hoàn toàn nút `[Đăng Xuất]` lớn thừa thãi ở đáy modal (tàn dư từ thời Single-Account). Đáy modal giờ đây thông thoáng, sạch sẽ 100%.
+    - Ẩn hoàn toàn dòng trạng thái đơn lẻ `UID: Đã ngắt kết nối...` và chấm đỏ/xanh ở footer.
+
