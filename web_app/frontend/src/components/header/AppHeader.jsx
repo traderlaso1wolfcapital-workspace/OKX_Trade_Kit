@@ -73,64 +73,41 @@ export default function AppHeader({
   };
 
   const getAccountTheme = (platform, firm = "") => {
+    let name = "OKX";
+    let logo = <OkxLogo size={14} />;
+
     if (platform === "okx") {
-      return {
-        name: "OKX",
-        color: "#f59e0b",
-        bg: "rgba(245, 158, 11, 0.08)",
-        bgHover: "rgba(245, 158, 11, 0.16)",
-        bgActive: "rgba(245, 158, 11, 0.22)",
-        borderColor: "rgba(245, 158, 11, 0.25)",
-        borderActive: "rgba(245, 158, 11, 0.65)",
-        logo: <OkxLogo size={14} />,
-      };
+      name = "OKX";
+      logo = <OkxLogo size={14} />;
+    } else {
+      const f = (firm || "").toLowerCase();
+      name = getPropFirmName(firm) || "E8 Markets";
+      if (f.includes("vantage")) {
+        logo = renderAccountLogo("vantage");
+      } else if (f.includes("exness")) {
+        logo = renderAccountLogo("exness");
+      } else if (f.includes("ftmo")) {
+        logo = renderAccountLogo("ftmo");
+      } else {
+        logo = renderAccountLogo("e8");
+      }
     }
-    const f = (firm || "").toLowerCase();
-    if (f.includes("vantage")) {
-      return {
-        name: "Vantage Markets",
-        color: "#ff4d4f",
-        bg: "rgba(255, 77, 79, 0.08)",
-        bgHover: "rgba(255, 77, 79, 0.16)",
-        bgActive: "rgba(255, 77, 79, 0.22)",
-        borderColor: "rgba(255, 77, 79, 0.25)",
-        borderActive: "rgba(255, 77, 79, 0.65)",
-        logo: renderAccountLogo("vantage"),
-      };
-    }
-    if (f.includes("exness")) {
-      return {
-        name: "Exness",
-        color: "#ffc700",
-        bg: "rgba(255, 199, 0, 0.08)",
-        bgHover: "rgba(255, 199, 0, 0.16)",
-        bgActive: "rgba(255, 199, 0, 0.22)",
-        borderColor: "rgba(255, 199, 0, 0.25)",
-        borderActive: "rgba(255, 199, 0, 0.65)",
-        logo: renderAccountLogo("exness"),
-      };
-    }
-    if (f.includes("ftmo")) {
-      return {
-        name: "FTMO",
-        color: "#06b6d4",
-        bg: "rgba(6, 182, 212, 0.08)",
-        bgHover: "rgba(6, 182, 212, 0.16)",
-        bgActive: "rgba(6, 182, 212, 0.22)",
-        borderColor: "rgba(6, 182, 212, 0.25)",
-        borderActive: "rgba(6, 182, 212, 0.65)",
-        logo: renderAccountLogo("ftmo"),
-      };
-    }
+
+    // 💎 ĐỒNG BỘ 100% VỀ MỘT HỆ MÀU XANH CYAN PRESTIGE (#38bdf8):
+    // Giúp toàn bộ thẻ tài khoản có cùng phong cách thanh lịch, chữ nổi bật tối đa.
+    // Thẻ được chọn có nền sáng và dải viền trái sáng rực rỡ kèm dấu tích V.
     return {
-      name: getPropFirmName(firm) || "E8 Markets",
-      color: "#3b82f6",
-      bg: "rgba(59, 130, 246, 0.08)",
-      bgHover: "rgba(59, 130, 246, 0.16)",
-      bgActive: "rgba(59, 130, 246, 0.22)",
-      borderColor: "rgba(59, 130, 246, 0.25)",
-      borderActive: "rgba(59, 130, 246, 0.65)",
-      logo: renderAccountLogo(firm || "e8"),
+      name,
+      logo,
+      color: "#38bdf8",
+      brightColor: "#38bdf8",
+      dimColor: "rgba(56, 189, 248, 0.35)",
+      bg: "transparent",
+      bgHover: "rgba(56, 189, 248, 0.08)",
+      bgActive: "rgba(56, 189, 248, 0.14)",
+      borderColor: "rgba(255, 255, 255, 0.08)",
+      borderActive: "rgba(56, 189, 248, 0.70)",
+      shadowActive: "0 0 10px rgba(56, 189, 248, 0.22), inset 0 0 8px rgba(56, 189, 248, 0.08)",
     };
   };
 
@@ -164,11 +141,11 @@ export default function AppHeader({
             gap: "8px",
             padding: "5px 12px 5px 10px",
             background: "linear-gradient(180deg, #242630 0%, #15161c 100%)",
-            border: isOpen ? "1px solid #f59e0b" : "1px solid #3e4451",
+            border: isOpen ? "1px solid #38bdf8" : "1px solid #3e4451",
             borderRadius: "6px",
             cursor: "pointer",
             boxShadow: isOpen 
-              ? "0 0 10px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255,255,255,0.08)"
+              ? "0 0 10px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255,255,255,0.08)"
               : "0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)",
             transition: "all 0.18s ease",
             outline: "none",
@@ -222,7 +199,7 @@ export default function AppHeader({
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={isOpen ? "#f59e0b" : "#ffffff"}
+            stroke={isOpen ? "#38bdf8" : "#ffffff"}
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -278,12 +255,12 @@ export default function AppHeader({
                     padding: "8px 10px",
                     borderRadius: "5px",
                     cursor: "pointer",
-                    backgroundColor: isSelected ? theme.bgActive : theme.bg,
-                    borderLeft: `3.5px solid ${theme.color}`,
+                    backgroundColor: isSelected ? theme.bgActive : "transparent",
+                    borderLeft: `3.5px solid ${isSelected ? theme.brightColor : theme.dimColor}`,
                     borderTop: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
                     borderRight: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
                     borderBottom: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
-                    boxShadow: isSelected ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${theme.bgActive}` : "none",
+                    boxShadow: isSelected ? theme.shadowActive : "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -292,13 +269,19 @@ export default function AppHeader({
                   onMouseEnter={(e) => {
                     if (!isSelected) {
                       e.currentTarget.style.backgroundColor = theme.bgHover;
-                      e.currentTarget.style.borderColor = theme.borderActive;
+                      e.currentTarget.style.borderLeftColor = theme.brightColor;
+                      e.currentTarget.style.borderTopColor = theme.borderActive;
+                      e.currentTarget.style.borderRightColor = theme.borderActive;
+                      e.currentTarget.style.borderBottomColor = theme.borderActive;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = theme.bg;
-                      e.currentTarget.style.borderColor = theme.borderColor;
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.borderLeftColor = theme.dimColor;
+                      e.currentTarget.style.borderTopColor = theme.borderColor;
+                      e.currentTarget.style.borderRightColor = theme.borderColor;
+                      e.currentTarget.style.borderBottomColor = theme.borderColor;
                     }
                   }}
                 >
@@ -347,12 +330,12 @@ export default function AppHeader({
                     padding: "8px 10px",
                     borderRadius: "5px",
                     cursor: "pointer",
-                    backgroundColor: isSelected ? theme.bgActive : theme.bg,
-                    borderLeft: `3.5px solid ${theme.color}`,
+                    backgroundColor: isSelected ? theme.bgActive : "transparent",
+                    borderLeft: `3.5px solid ${isSelected ? theme.brightColor : theme.dimColor}`,
                     borderTop: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
                     borderRight: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
                     borderBottom: isSelected ? `1px solid ${theme.borderActive}` : `1px solid ${theme.borderColor}`,
-                    boxShadow: isSelected ? `0 2px 8px rgba(0,0,0,0.35), 0 0 10px ${theme.bgActive}` : "none",
+                    boxShadow: isSelected ? theme.shadowActive : "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -361,13 +344,19 @@ export default function AppHeader({
                   onMouseEnter={(e) => {
                     if (!isSelected) {
                       e.currentTarget.style.backgroundColor = theme.bgHover;
-                      e.currentTarget.style.borderColor = theme.borderActive;
+                      e.currentTarget.style.borderLeftColor = theme.brightColor;
+                      e.currentTarget.style.borderTopColor = theme.borderActive;
+                      e.currentTarget.style.borderRightColor = theme.borderActive;
+                      e.currentTarget.style.borderBottomColor = theme.borderActive;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = theme.bg;
-                      e.currentTarget.style.borderColor = theme.borderColor;
+                      e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.borderLeftColor = theme.dimColor;
+                      e.currentTarget.style.borderTopColor = theme.borderColor;
+                      e.currentTarget.style.borderRightColor = theme.borderColor;
+                      e.currentTarget.style.borderBottomColor = theme.borderColor;
                     }
                   }}
                 >

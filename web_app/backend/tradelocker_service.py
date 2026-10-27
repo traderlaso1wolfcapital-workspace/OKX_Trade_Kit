@@ -3,6 +3,7 @@ import json
 import time
 import socket
 import threading
+import subprocess
 from datetime import datetime, timezone
 import requests
 from typing import Optional, Dict, Any, List, Tuple
@@ -91,7 +92,7 @@ HARDCODED_E8_INSTRUMENTS = {
 }
 
 class TradeLockerClient:
-    def __init__(self, email: str, password: str, server: str = "E8", environment: str = "https://demo.tradelocker.com"):
+    def __init__(self, email: str, password: str, server: str = "E8", environment: str = "https://demo.tradelocker.com", account_id: Optional[str] = None, acc_num: Optional[str] = None):
         self.email = email.strip()
         self.password = password.strip()
         self.server = server.strip()
@@ -105,8 +106,8 @@ class TradeLockerClient:
         self.access_token: Optional[str] = None
         self.refresh_token: Optional[str] = None
         self.token_expiry: float = 0
-        self.account_id: Optional[str] = None
-        self.acc_num: Optional[str] = None
+        self.account_id: Optional[str] = str(account_id) if account_id else None
+        self.acc_num: Optional[str] = str(acc_num) if acc_num else None
         self.account_balance: float = 0.0
         self.instruments_cache: Dict[str, Dict[str, Any]] = {}
         self.instruments_cache_time: float = 0
@@ -624,7 +625,7 @@ class TradeLockerClient:
         return self._orders_columns
 
     def get_positions(self) -> Tuple[bool, List[Any], str]:
-        """Lấy danh sách các vị thế đang mở (chuẩn hóa ma trận mảng thành danh sách Dict)"""
+        """Lấy danh sách các vị thế đang mở (chuẩn hóa ma trận mảng thành danh sách Dict, có Native Curl Schannel Fallback)"""
         if not self._ensure_authenticated():
             return False, [], "Chưa xác thực"
         if not self.account_id or not self.acc_num:
@@ -633,30 +634,58 @@ class TradeLockerClient:
                 return False, [], msg or "Không tìm thấy tài khoản"
 
         url = f"{self.base_url}/trade/accounts/{self.account_id}/positions"
+        data_obj = None
+
+        # 1. Thử gửi qua requests trước
         try:
-            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=8)
             if resp.status_code == 200:
                 res_json = resp.json()
                 data_obj = res_json.get("d", {})
-                raw_positions = data_obj.get("positions", [])
-                cols = data_obj.get("columns", [])
-                if not cols:
-                    cols = self.get_positions_columns()
-                
-                if raw_positions and isinstance(raw_positions[0], list):
-                    dict_positions = []
-                    for row in raw_positions:
-                        row_dict = {}
-                        for idx, col in enumerate(cols):
-                            if idx < len(row):
-                                row_dict[col] = row[idx]
-                        dict_positions.append(row_dict)
-                    return True, dict_positions, "OK"
-                
-                return True, raw_positions, "OK"
-            return False, [], f"Lỗi lấy vị thế ({resp.status_code}): {self._clean_error_text(resp)}"
-        except Exception as e:
-            return False, [], str(e)
+        except Exception:
+            pass
+
+        # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
+        if data_obj is None:
+            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+            for ip in ["104.18.29.67", "104.18.28.67"]:
+                try:
+                    cmd = [
+                        "curl.exe", "-s", "--http1.1", "--resolve", f"{domain}:443:{ip}",
+                        "-X", "GET", url,
+                        "-H", f"Authorization: Bearer {self.access_token}",
+                        "-H", f"accNum: {self.acc_num}",
+                        "-H", "accept: application/json",
+                        "--max-time", "12"
+                    ]
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                    if res.returncode == 0 and res.stdout.strip():
+                        parsed = json.loads(res.stdout)
+                        data_obj = parsed.get("d", {})
+                        if data_obj is not None:
+                            break
+                except Exception:
+                    pass
+
+        if data_obj is not None:
+            raw_positions = data_obj.get("positions", [])
+            cols = data_obj.get("columns", [])
+            if not cols:
+                cols = self.get_positions_columns()
+            
+            if raw_positions and isinstance(raw_positions[0], list):
+                dict_positions = []
+                for row in raw_positions:
+                    row_dict = {}
+                    for idx, col in enumerate(cols):
+                        if idx < len(row):
+                            row_dict[col] = row[idx]
+                    dict_positions.append(row_dict)
+                return True, dict_positions, "OK"
+            
+            return True, raw_positions, "OK"
+
+        return False, [], "Không thể lấy danh sách vị thế từ TradeLocker"
 
     def modify_position(self, position_id: str, stop_loss: Optional[float] = None, take_profit: Optional[float] = None) -> Tuple[bool, str]:
         """Sửa TP/SL cho vị thế đang mở trên TradeLocker"""
@@ -695,7 +724,7 @@ class TradeLockerClient:
             return False, f"Lỗi mạng: {str(e)}"
 
     def get_orders(self) -> Tuple[bool, List[Any], str]:
-        """Lấy danh sách các lệnh chờ (Pending/Limit) - tự động chuẩn hóa ma trận mảng thành List[Dict]"""
+        """Lấy danh sách các lệnh chờ (Pending/Limit) - tự động chuẩn hóa ma trận mảng thành List[Dict] (có Native Curl Schannel Fallback)"""
         if not self._ensure_authenticated():
             return False, [], "Chưa xác thực TradeLocker"
         if not self.account_id or not self.acc_num:
@@ -704,25 +733,53 @@ class TradeLockerClient:
                 return False, [], msg or "Không tìm thấy tài khoản"
 
         url = f"{self.base_url}/trade/accounts/{self.account_id}/orders"
+        d_obj = None
+
+        # 1. Thử gửi qua requests trước
         try:
-            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=8)
             if resp.status_code == 200:
                 d_obj = resp.json().get("d", {})
-                orders = d_obj.get("orders", [])
-                cols = d_obj.get("columns") or self.get_orders_columns()
-                if orders and isinstance(orders[0], list):
-                    dict_orders = []
-                    for row in orders:
-                        row_dict = {}
-                        for idx, col in enumerate(cols):
-                            if idx < len(row):
-                                row_dict[col] = row[idx]
-                        dict_orders.append(row_dict)
-                    return True, dict_orders, "OK"
-                return True, orders, "OK"
-            return False, [], f"Lỗi lấy danh sách lệnh ({resp.status_code}): {self._clean_error_text(resp)}"
-        except Exception as e:
-            return False, [], str(e)
+        except Exception:
+            pass
+
+        # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
+        if d_obj is None:
+            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+            for ip in ["104.18.29.67", "104.18.28.67"]:
+                try:
+                    cmd = [
+                        "curl.exe", "-s", "--http1.1", "--resolve", f"{domain}:443:{ip}",
+                        "-X", "GET", url,
+                        "-H", f"Authorization: Bearer {self.access_token}",
+                        "-H", f"accNum: {self.acc_num}",
+                        "-H", "accept: application/json",
+                        "--max-time", "12"
+                    ]
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                    if res.returncode == 0 and res.stdout.strip():
+                        parsed = json.loads(res.stdout)
+                        d_obj = parsed.get("d", {})
+                        if d_obj is not None:
+                            break
+                except Exception:
+                    pass
+
+        if d_obj is not None:
+            orders = d_obj.get("orders", [])
+            cols = d_obj.get("columns") or self.get_orders_columns()
+            if orders and isinstance(orders[0], list):
+                dict_orders = []
+                for row in orders:
+                    row_dict = {}
+                    for idx, col in enumerate(cols):
+                        if idx < len(row):
+                            row_dict[col] = row[idx]
+                    dict_orders.append(row_dict)
+                return True, dict_orders, "OK"
+            return True, orders, "OK"
+
+        return False, [], "Không thể lấy danh sách lệnh chờ từ TradeLocker"
 
     def cancel_order(self, order_id: str) -> Tuple[bool, str]:
         """Hủy 1 lệnh chờ theo orderId với cơ chế đa tầng (Requests + Native Curl Schannel Fallback)"""
@@ -746,23 +803,23 @@ class TradeLockerClient:
             pass
 
         # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
-        try:
-            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
-            cf_ip = "104.18.28.67"
-            cmd = [
-                "curl.exe", "-s", "--resolve", f"{domain}:443:{cf_ip}",
-                "-X", "DELETE", url,
-                "-H", f"Authorization: Bearer {self.access_token}",
-                "-H", f"accNum: {self.acc_num}",
-                "-H", "accept: application/json",
-                "--max-time", "12"
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if res.returncode == 0:
-                if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
-                    return True, f"Đã hủy lệnh {order_id} thành công"
-        except Exception as e:
-            return False, f"Lỗi native cancel: {e}"
+        domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+        for ip in ["104.18.29.67", "104.18.28.67"]:
+            try:
+                cmd = [
+                    "curl.exe", "-s", "--http1.1", "--resolve", f"{domain}:443:{ip}",
+                    "-X", "DELETE", url,
+                    "-H", f"Authorization: Bearer {self.access_token}",
+                    "-H", f"accNum: {self.acc_num}",
+                    "-H", "accept: application/json",
+                    "--max-time", "12"
+                ]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                if res.returncode == 0:
+                    if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
+                        return True, f"Đã hủy lệnh {order_id} thành công"
+            except Exception:
+                pass
 
         return False, f"Không thể hủy lệnh {order_id}"
 
@@ -791,24 +848,24 @@ class TradeLockerClient:
             pass
 
         # 2. Native Schannel Fallback (Curl) - Vượt qua 100% lỗi Cloudflare TLS Renegotiation (10054)
-        try:
-            domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
-            cf_ip = "104.18.28.67"
-            curl_url = f"{url}?tradableInstrumentId={tradable_instrument_id}" if tradable_instrument_id else url
-            cmd = [
-                "curl.exe", "-s", "--resolve", f"{domain}:443:{cf_ip}",
-                "-X", "DELETE", curl_url,
-                "-H", f"Authorization: Bearer {self.access_token}",
-                "-H", f"accNum: {self.acc_num}",
-                "-H", "accept: application/json",
-                "--max-time", "12"
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if res.returncode == 0:
-                if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
-                    return True, "Đã hủy tất cả lệnh chờ thành công"
-        except Exception as e:
-            return False, f"Lỗi native cancel: {e}"
+        domain = "demo.tradelocker.com" if "demo" in self.base_url else "live.tradelocker.com"
+        curl_url = f"{url}?tradableInstrumentId={tradable_instrument_id}" if tradable_instrument_id else url
+        for ip in ["104.18.29.67", "104.18.28.67"]:
+            try:
+                cmd = [
+                    "curl.exe", "-s", "--http1.1", "--resolve", f"{domain}:443:{ip}",
+                    "-X", "DELETE", curl_url,
+                    "-H", f"Authorization: Bearer {self.access_token}",
+                    "-H", f"accNum: {self.acc_num}",
+                    "-H", "accept: application/json",
+                    "--max-time", "12"
+                ]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                if res.returncode == 0:
+                    if '"s":"ok"' in res.stdout or '"status":200' in res.stdout or not res.stdout.strip():
+                        return True, "Đã hủy tất cả lệnh chờ thành công"
+            except Exception:
+                pass
 
         return False, "Không thể hủy lệnh chờ sau khi thử các phương thức"
 
@@ -1218,7 +1275,9 @@ class TradeLockerManager:
             email=cfg["email"],
             password=cfg["password"],
             server=cfg.get("server", "E8"),
-            environment=cfg.get("environment", "https://demo.tradelocker.com")
+            environment=cfg.get("environment", "https://demo.tradelocker.com"),
+            account_id=cfg.get("account_id") or cfg.get("id"),
+            acc_num=cfg.get("acc_num", "1")
         )
         cls._clients[cache_key] = client
         cls._clients[uid] = client
@@ -1633,9 +1692,15 @@ class TradeLockerManager:
                 inst_info = client.resolve_instrument(clean_base)
                 tid = inst_info.get("tradableInstrumentId") if inst_info else None
                 if tid:
-                    ok_ord, orders, _ = client.get_orders()
-                    if ok_ord and orders:
-                        existing_for_symbol = []
+                    ok_ord, orders, msg_ord = client.get_orders()
+                    if not ok_ord:
+                        # 🛡️ Cầu dao an toàn: Nếu không đọc được danh sách lệnh (lỗi mạng/timeout),
+                        # TUYỆT ĐỐI KHÔNG ĐẶT LỆNH MỚI BỪA BÃI để tránh spam lệnh rác!
+                        cls.log_event(clean_uid, f"⏳ [TRADELOCKER] Không đọc được danh sách lệnh chờ của {clean_base} ({msg_ord}) — Tạm dừng đặt lệnh để bảo đảm an toàn.")
+                        return False, "Không đọc được danh sách lệnh chờ từ sàn"
+
+                    existing_for_symbol = []
+                    if orders:
                         for o in orders:
                             o_dict = o if isinstance(o, dict) else {}
                             o_tid = o_dict.get("tradableInstrumentId")
@@ -1648,37 +1713,46 @@ class TradeLockerManager:
                             if str(o_tid) == str(tid):
                                 existing_for_symbol.append(o_dict)
 
-                        # 1. Hủy ngay mọi lệnh ngược chiều để bảo vệ tài khoản Netting
-                        diff_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() != side_clean]
-                        for diff_ord in diff_side_orders:
-                            diff_id = str(diff_ord.get("id") or "")
-                            if diff_id:
-                                client.cancel_order(diff_id)
-                                cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã hủy lệnh Limit ngược chiều #{diff_id} ({clean_base})")
+                    # 1. Hủy ngay mọi lệnh ngược chiều để bảo vệ tài khoản Netting
+                    diff_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() != side_clean]
+                    for diff_ord in diff_side_orders:
+                        diff_id = str(diff_ord.get("id") or "")
+                        if diff_id:
+                            client.cancel_order(diff_id)
+                            cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã hủy lệnh Limit ngược chiều #{diff_id} ({clean_base})")
 
-                        # 2. Xử lý các lệnh cùng chiều: Chỉ giữ duy nhất 1 lệnh bám sát EMA
-                        same_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() == side_clean]
-                        if same_side_orders:
-                            # Nếu có nhiều hơn 1 lệnh cùng chiều (do lỗi cũ tích tụ), dọn sạch các lệnh phụ
-                            primary_ord = same_side_orders[0]
-                            for excess_ord in same_side_orders[1:]:
-                                ex_id = str(excess_ord.get("id") or "")
-                                if ex_id:
-                                    client.cancel_order(ex_id)
+                    # 2. Xử lý các lệnh cùng chiều: Chỉ giữ duy nhất 1 lệnh bám sát EMA
+                    same_side_orders = [o for o in existing_for_symbol if str(o.get("side", "")).lower() == side_clean]
+                    if same_side_orders:
+                        # Tìm xem có lệnh nào khớp sát giá mục tiêu (< 0.1%) không
+                        close_order = None
+                        for s_ord in same_side_orders:
+                            s_px = _safe_float(s_ord.get("price"))
+                            if s_px > 0 and target_px > 0:
+                                diff_pct = abs(s_px - target_px) / target_px
+                                if diff_pct < 0.001:  # Khớp sát giá EMA hiện tại
+                                    close_order = s_ord
+                                    break
 
-                            ex_px = _safe_float(primary_ord.get("price"))
-                            ex_id = str(primary_ord.get("id") or "")
-                            if ex_px > 0 and target_px > 0:
-                                diff_pct = abs(ex_px - target_px) / target_px
-                                if diff_pct < 0.001:  # Chênh lệch < 0.1% -> Giữ nguyên, không spam hủy/đặt lại
-                                    msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{ex_px} đang chờ khớp sát giá EMA (lệch {diff_pct*100:.2f}%) — Giữ nguyên."
-                                    cls.log_event(clean_uid, msg_exist)
-                                    return True, msg_exist
-                                else:
-                                    # Giá EMA đã thay đổi -> Hủy lệnh cũ để đặt lệnh mới sát giá
-                                    if ex_id:
-                                        client.cancel_order(ex_id)
-                                        cls.log_event(clean_uid, f"🔄 [TRADELOCKER] Giá EMA200 dời từ @{ex_px} sang @{target_px}. Đã hủy lệnh cũ #{ex_id} để cập nhật mức giá mới.")
+                        if close_order:
+                            c_id = str(close_order.get("id") or "")
+                            c_px = _safe_float(close_order.get("price"))
+                            diff_pct = abs(c_px - target_px) / target_px
+                            # Dọn sạch tất cả các lệnh dư thừa khác (nếu có lỗi tích tụ trước đó)
+                            for s_ord in same_side_orders:
+                                s_id = str(s_ord.get("id") or "")
+                                if s_id and s_id != c_id:
+                                    client.cancel_order(s_id)
+                            msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{c_px} đang chờ khớp sát giá EMA (lệch {diff_pct*100:.2f}%) — Giữ nguyên."
+                            cls.log_event(clean_uid, msg_exist)
+                            return True, msg_exist
+                        else:
+                            # Giá EMA đã thay đổi -> Hủy TOÀN BỘ các lệnh cũ của mã này trước khi đặt lệnh mới!
+                            for s_ord in same_side_orders:
+                                s_id = str(s_ord.get("id") or "")
+                                if s_id:
+                                    client.cancel_order(s_id)
+                            cls.log_event(clean_uid, f"🔄 [TRADELOCKER] Giá EMA200 dời sang @{target_px}. Đã hủy sạch {len(same_side_orders)} lệnh Limit cũ của {clean_base} để chuẩn bị đặt lệnh mới.")
 
             # 🎯 TỰ ĐỘNG BỔ SUNG SL & TP BẮT BUỘC (MẶC ĐỊNH THEO TỶ LỆ CÀI ĐẶT CỦA USER HOẶC 1.2%):
             ref_px = target_px

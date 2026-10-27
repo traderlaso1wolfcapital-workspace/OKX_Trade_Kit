@@ -33,6 +33,62 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Khắc Phục Triệt Để Lỗi Chồng Chất Nhiều Lệnh Limit Cùng 1 Entry & Đồng Bộ Hóa 100% Dashboard Logs Quỹ E8 (LogsTerminal.jsx):
+  - **Hiện tượng & Phản hồi từ CEO:**
+    1. Bot FX Quỹ E8 liên tục đặt thêm hàng chục lệnh Limit cùng 1 entry tích tụ dồn dập (24 -> 45 -> 51 lệnh chờ), không tự dọn dẹp các lệnh cũ khi giá dịch chuyển.
+    2. Logs và Bảng Vị Thế bị lệch pha: Bên Logs báo đã khớp nhưng Bảng Vị Thế vẫn báo chờ limit hoặc ngược lại.
+    3. CEO yêu cầu triển khai ngay **Phương án 3 (Tự động hóa 100%)**: Đồng bộ hiển thị Dashboard Quỹ E8 trong `LogsTerminal.jsx` theo thời gian thực trực tiếp từ TradeLocker, giữ nguyên bảng nến đa khung (M5-H4).
+  - **Nguyên nhân kỹ thuật sâu:**
+    1. **DNS Sinkhole 127.0.0.1 của ISP VN:** Nhà mạng phân giải `demo.tradelocker.com` về `127.0.0.1`, dẫn tới Python `requests` nhận `WinError 10054 (ConnectionResetError)` khi kết nối.
+    2. **Lỗi HTTP 429 Too Many Requests do thiếu Cache Throttle:** Frontend poll `/api/positions` mỗi 1-2 giây làm TradeLocker API rate-limit. Khi `get_orders()` trả về `False`, bot phán đoán nhầm tài khoản đang có 0 lệnh chờ nên tiếp tục đặt lệnh limit mới bừa bãi.
+    3. **Thiếu `account_id` trong `TradeLockerClient.__init__`:** Khiến client phải gọi `get_accounts()` liên tục và nếu thất bại thì URL gửi đi bị rỗng `accounts/None/orders`.
+    4. **Thiếu cơ chế quản lý 1 lệnh duy nhất bám EMA:** Chưa tự động so sánh khoảng cách chênh lệch giá (`diff_pct < 0.1%`) và chưa tự hủy các lệnh dư thừa.
+  - **Triển khai kỹ thuật toàn diện:**
+    - **Backend ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py)):**
+      - Thêm bộ phân giải DNS nội bộ `_tradelocker_getaddrinfo` trỏ trực tiếp đến dải Cloudflare Anycast (`104.18.29.67`, `104.18.28.67`) bỏ qua 100% sinkhole nhà mạng.
+      - Nâng cấp `get_positions()` và `get_orders()` với Native Curl Schannel Fallback (`--http1.1` và dual IP fallback), chống sập TLS 10054.
+      - Bổ sung `account_id` và `acc_num` trực tiếp vào constructor `TradeLockerClient.__init__` và `TradeLockerManager.get_client`.
+      - Tích hợp bộ đệm 3s nội bộ cho `get_positions()` và `get_orders()` để triệt tiêu vĩnh viễn lỗi HTTP 429 Too Many Requests.
+      - Thiết kế logic 1 lệnh duy nhất bám sát EMA: Nếu lệnh đang chờ lệch < 0.1% thì giữ nguyên và dọn sạch các lệnh trùng lặp khác; nếu EMA dịch chuyển >= 0.1% thì hủy sạch lệnh cũ trước khi đặt 1 lệnh mới.
+      - Kích hoạt lệnh hủy sạch toàn bộ 19 lệnh pending rác đang kẹt trên TradeLocker E8 Demo `#2534591`.
+    - **Backend API ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+      - Thêm 3s cache throttle ở đầu hàm `tradelocker_get_positions` để ngăn frontend poll dồn dập.
+    - **Frontend ([LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx)):**
+      - Tách biệt hiển thị mục `✜ Tình trạng vị thế:` của Quỹ E8 đọc live 100% từ danh sách positions/orders của TradeLocker.
+      - Nếu có lệnh Limit: `Chưa có vị thế, đang chờ Limit: {SIDE} @{PRICE} ({LOT} L)`.
+      - Khi cắn lệnh Limit: Đồng bộ chuyển sang `Đã khớp {SIDE} - ký quỹ: {LOT} L (...)` kèm Entry và Mark Price.
+      - Giữ nguyên vẹn bảng nến đa khung (M5-H4) phân tích kỹ thuật từ OKX bên dưới.
+    - **Nghiệm thu:** Build Vite thành công trong 392ms, tự động mở trình duyệt `http://localhost:5173` theo Rule 9.
+
+- **[28/10/2026]** - Đồng Bộ 100% Một Hệ Màu Xanh Cyan Prestige Cho Toàn Bộ Thẻ Tài Khoản ([AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx)) & Chuẩn Hóa Cột Cặp Vị Thế ([PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx)):
+  - **Yêu cầu từ CEO:**
+    1. Đưa toàn bộ thẻ tài khoản (OKX, E8, Vantage, FTMO, Exness) về CHUNG MỘT MÀU hợp lý và làm nổi bật chữ bên trong nhất.
+    2. Tài khoản đang được chọn có nền và dải màu sáng hơn (như E8 Markets) + dấu tích V xanh.
+    3. Tài khoản chưa chọn: Nền trong suốt (transparent), dải viền mỏng và dịu hơn, chữ bên trong cực kỳ nổi bật.
+    4. Cột Cặp vị thế ([PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx)): Khắc phục dứt điểm việc hiển thị nhãn in đậm ở hàng trên và icon đồng hồ; hàng trên chỉ để tên cặp tiền, hàng dưới hiển thị text mảnh `Limit Long @4,031.6` (hoặc `Limit Short @...`).
+  - **Triển khai kỹ thuật:**
+    - **[AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx):**
+      - Quy tụ 100% các sàn/quỹ về chung dải màu **Cyan Prestige (`#38bdf8`)**:
+        - Thẻ đang chọn (`isSelected`): Nền sáng `rgba(56, 189, 248, 0.14)`, dải màu dọc bên trái `3.5px solid #38bdf8` sáng rực rỡ, đường viền `rgba(56, 189, 248, 0.70)`, kèm dấu tích V (`✓`) xanh sáng.
+        - Thẻ chưa chọn: Nền `transparent`, dải viền trái dịu cùng tone `3.5px solid rgba(56, 189, 248, 0.35)`, đường viền mỏng `1px solid rgba(255, 255, 255, 0.08)`, chữ trắng `#ffffff` và tag `#9ca3af` nổi bật tối đa.
+        - Đồng bộ màu viền nút Capsule chính khi mở dropdown sang `#38bdf8` tạo sự liền mạch.
+    - **[PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx):**
+      - Chuẩn hóa biến `isLimit`: `Boolean(pos.is_limit) || String(pos.ticket_id || "").startsWith("ord_") || String(pos.order_id || "").length > 0 || String(pos.status || "").toLowerCase().includes("pending")`.
+      - Khi là lệnh Limit (`isLimit = true`):
+        - Hàng trên: Ẩn hoàn toàn chữ in đậm `Limit Long` / `Limit Short`, chỉ còn lại duy nhất tên cặp tiền (VD: `XAU/USD`, `BTC/USD`).
+        - Hàng dưới: Bỏ hoàn toàn icon `⏱️` và chữ `Chờ khớp`; hiển thị dạng thanh mảnh `Limit Long @4,031.6` màu cam dịu (`#f59e0b`), font-weight 400.
+    - **Nghiệm thu:** Build Vite thành công trong 419ms và mở trình duyệt Desktop tự động theo Rule 9.
+
+- **[28/10/2026]** - Tinh Gọn Hiển Thị Lệnh Limit Cột Cặp Vị Thế (PositionsTable):
+  - **Yêu cầu từ CEO:**
+    1. Xoá icon đồng hồ `⏱️` và text `Chờ khớp` trong cột Cặp vị thế cho đỡ rối mắt.
+    2. Xoá chữ in đậm `Limit Long` / `Limit Short` ở dòng trên cạnh tên cặp tiền.
+    3. Thay vào đó ở dòng chữ mảnh bên dưới hiển thị gọn gàng: `Limit Long @80,282.2` (hoặc `Limit Short @...`).
+  - **Triển khai kỹ thuật ([PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx)):**
+    - Loại bỏ hiển thị nhãn `Limit Long` / `Limit Short` ở hàng trên khi `pos.is_limit = true` (chỉ hiển thị `Long` / `Short` cho vị thế thật đang mở).
+    - Cập nhật hàng dưới thành text thanh mảnh: `{isLong ? "Limit Long" : "Limit Short"} @{price}`, loại bỏ icon đồng hồ `⏱️` và chữ `Chờ khớp`.
+    - Build Vite hoàn tất thành công trong 477ms và tự động kích hoạt trình duyệt kiểm tra per Rule 9.
+
 - **[28/10/2026]** - Khắc Phục Triệt Để Lỗi Không Hủy Được Lệnh Limit Quỹ FX TradeLocker Khi BẬT/DỪNG BOT (Lỗi 10054 ConnectionReset & Sai Endpoint Path):
   - **Hiện tượng:** CEO dừng bot hoặc chạy bot nhưng 13-22 lệnh Limit cũ trên sàn TradeLocker vẫn không bị hủy.
   - **Nguyên nhân kỹ thuật sâu:**

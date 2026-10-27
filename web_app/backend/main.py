@@ -4532,6 +4532,11 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
     cache_key = f"{clean_uid}:{account_id or 'active'}"
     now = time.time()
 
+    # 🛡️ 3-Giây Cache Throttle: Ngăn chặn 100% việc frontend poll dồn dập gây HTTP 429 Too Many Requests từ TradeLocker
+    cached_recent = _prop_positions_cache.get(cache_key)
+    if cached_recent and (now - cached_recent.get("time", 0) < 3.0):
+        return cached_recent.get("data", [])
+
     try:
         # 0. Kiểm tra nếu tài khoản là nền tảng MT5
         raw_accounts, active_id = TradeLockerManager.load_raw_data(clean_uid, get_user_base_dir, fernet)

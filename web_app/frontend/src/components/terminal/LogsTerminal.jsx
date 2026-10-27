@@ -286,43 +286,62 @@ export default function LogsTerminal({
     if (currentPlatform === "e8") {
       const propHeader = Array.isArray(propLogs?.dashboardLines) ? propLogs.dashboardLines : [];
       const okxDashboard = Array.isArray(okxLogs?.dashboardLines) ? okxLogs.dashboardLines : [];
-      
-      // Tìm vị trí bắt đầu chi tiết vị thế và bảng nến từ OKX Dashboard
-      let detailIndex = -1;
+
+      // 🛡️ Xây dựng Tình trạng vị thế chuẩn 100% từ TradeLocker E8:
+      const propPosLines = ["✜ Tình trạng vị thế:"];
+      const coins = ["XAU", "BTC", "ETH"];
+
+      coins.forEach(c => {
+        // 1. Kiểm tra vị thế thật đang mở trên TradeLocker
+        const activePos = Array.isArray(positions) 
+          ? positions.find(p => !p.is_limit && (p.instId || p.coin || "").toUpperCase().includes(c)) 
+          : null;
+
+        // 2. Kiểm tra lệnh chờ Limit đang cắm trên TradeLocker
+        const limitPos = Array.isArray(positions)
+          ? positions.filter(p => p.is_limit && (p.instId || p.coin || "").toUpperCase().includes(c))
+          : [];
+
+        if (activePos) {
+          const side = (activePos.posSide || activePos.side || "long").toUpperCase();
+          const lot = activePos.lots || activePos.pos || 0.01;
+          const upl = Number(activePos.upl || 0);
+          const uplSign = upl >= 0 ? "+" : "";
+          const uplRatio = activePos.uplRatio || `${uplSign}0.0%`;
+          const avgPx = activePos.avgPx ? Number(activePos.avgPx).toLocaleString() : "0.0";
+          const lastPx = activePos.lastPx ? Number(activePos.lastPx).toLocaleString() : avgPx;
+          propPosLines.push(`    ${c} ╭─ Đã khớp ${side} - ký quỹ: ${lot} L (${uplSign}${upl.toFixed(2)}$ / ${uplRatio})`);
+          propPosLines.push(`        ├─ Entry: ${avgPx} ⭢ Mark: ${lastPx}`);
+          propPosLines.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
+        } else if (limitPos.length > 0) {
+          const firstLim = limitPos[0];
+          const limSide = (firstLim.posSide || firstLim.side || "long").toUpperCase();
+          const limPx = firstLim.avgPx ? Number(firstLim.avgPx).toLocaleString() : "0.0";
+          const limLot = firstLim.lots || firstLim.pos || 0.01;
+          propPosLines.push(`    ${c} ╭─ Chưa có vị thế, đang chờ Limit: ${limSide} @${limPx} (${limLot} L)`);
+          propPosLines.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
+        } else {
+          propPosLines.push(`    ${c} ╭─ Chưa có vị thế`);
+          propPosLines.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
+        }
+      });
+
+      // Tìm vị trí bắt đầu bảng nến đa khung từ OKX Dashboard
+      let tableIndex = -1;
       for (let i = 0; i < okxDashboard.length; i++) {
-        const l = okxDashboard[i];
-        if (l.includes("Tình trạng vị thế") || l.includes("✜") || l.includes("╭─")) {
-          detailIndex = i;
+        if (okxDashboard[i].includes("Coin |") || (okxDashboard[i].includes("Coin") && okxDashboard[i].includes("Price"))) {
+          tableIndex = i - 1;
           break;
         }
       }
 
       let combinedDashboard = propHeader;
-      const convertUtoLot = (lines) => {
-        return lines.map(l => {
-          if (!l || typeof l !== "string") return l;
-          let s = l;
-          // Chuyển ký quỹ: xx.x U -> ký quỹ: 0.01 L
-          s = s.replace(/ký quỹ:\s*(\d+(\.\d+)?)\s*U/gi, "ký quỹ: 0.01 L");
-          // Chuyển VOL: xx.x U -> VOL: 0.01 L
-          s = s.replace(/VOL:\s*(\d+(\.\d+)?)\s*U/gi, "VOL: 0.01 L");
-          // Chuyển số kèm U độc lập ở entry/limit -> 0.01 L
-          s = s.replace(/(-\s*)(\d+(\.\d+)?)\s*U\b/g, "$10.01 L");
-          s = s.replace(/(\(\s*ký quỹ:\s*)(\d+(\.\d+)?)\s*U\s*\)/gi, "$10.01 L)");
-          s = s.replace(/(\d+(\.\d+)?)\s*U\b/g, "0.01 L");
-          return s;
-        });
-      };
-
-      if (propHeader.length > 0 && detailIndex !== -1) {
-        // Giữ nguyên giao diện Quỹ FX ở đầu + Chi tiết vị thế & bảng nến của bot ở dưới (chuẩn hóa Lot L)!
-        combinedDashboard = [...propHeader, ...convertUtoLot(okxDashboard.slice(detailIndex))];
-      } else if (propHeader.length > 0 && okxDashboard.length > 6) {
-        combinedDashboard = [...propHeader, ...convertUtoLot(okxDashboard.slice(6))];
-      } else if (propHeader.length > 0) {
-        combinedDashboard = propHeader;
-      } else if (okxDashboard.length > 0) {
-        combinedDashboard = convertUtoLot(okxDashboard);
+      if (propHeader.length > 0) {
+        if (tableIndex !== -1 && tableIndex >= 0) {
+          combinedDashboard = [...propHeader, ...propPosLines, ...okxDashboard.slice(tableIndex)];
+        } else {
+          combinedDashboard = [...propHeader, ...propPosLines, "=".repeat(78)];
+        }
       }
 
       const pEvents = Array.isArray(propLogs?.eventLogs) ? propLogs.eventLogs : [];

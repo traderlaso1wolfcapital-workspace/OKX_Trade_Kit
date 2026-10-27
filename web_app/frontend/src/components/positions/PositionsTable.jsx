@@ -236,7 +236,8 @@ export default function PositionsTable({
             }
 
             return posList.map((pos, ticketIndex) => {
-              const isLong = pos.posSide === "long";
+              const isLimit = Boolean(pos.is_limit) || String(pos.ticket_id || "").startsWith("ord_") || String(pos.order_id || "").length > 0 || String(pos.status || "").toLowerCase().includes("pending");
+              const isLong = (pos.posSide || pos.side || "long").toLowerCase() === "long" || (pos.posSide || pos.side || "").toLowerCase() === "buy";
               const upl = parseFloat(pos.upl || "0");
               const margin = parseFloat(pos.margin || "0");
               const isChild = pos.is_child;
@@ -322,23 +323,23 @@ export default function PositionsTable({
                             : coin.label.replace("-SWAP", "")}
                         </span>
 
-                        {!isChild && (
+                        {!isChild && !isLimit && (
                           <span
                             style={{
                               fontSize: "12px",
-                              color: pos.is_limit ? "#f59e0b" : (isLong ? "#00c087" : "#ff4d4f"),
-                              fontWeight: pos.is_limit ? "bold" : "normal",
+                              color: isLong ? "#00c087" : "#ff4d4f",
+                              fontWeight: "normal",
                               marginLeft: "4px",
                             }}
                           >
-                            {pos.is_limit ? (isLong ? "Limit Long" : "Limit Short") : (isLong ? "Long" : "Short")}
+                            {isLong ? "Long" : "Short"}
                           </span>
                         )}
                       </div>
 
-                      {pos.is_limit ? (
-                        <div style={{ color: "#f59e0b", fontSize: "11px", marginLeft: isChild ? "26px" : "22px" }}>
-                          Limit @{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"} ⏱️ Chờ khớp
+                      {isLimit ? (
+                        <div style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 400, marginLeft: isChild ? "26px" : "22px" }}>
+                          {isLong ? "Limit Long" : "Limit Short"} @{pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}
                         </div>
                       ) : (
                         <div style={{ color: "#888", fontSize: "11.5px", marginLeft: isChild ? "26px" : "22px" }}>
@@ -377,7 +378,7 @@ export default function PositionsTable({
                     {isFxOrProp ? `${lotVal.toFixed(2)} L` : `${margin.toFixed(2)} $`}
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
-                    {pos.is_limit ? (
+                    {isLimit ? (
                       <span style={{ color: "#f59e0b", fontSize: "12px", fontWeight: "bold" }}>
                         Chờ khớp (Limit)
                       </span>
@@ -449,7 +450,7 @@ export default function PositionsTable({
                     <button
                       onClick={() => handleClosePosition(coin, pos)}
                       style={{
-                        background: pos.is_limit ? "#d97706" : "#b32626",
+                        background: isLimit ? "#d97706" : "#b32626",
                         color: "white",
                         border: "none",
                         borderRadius: "4px",
@@ -459,7 +460,7 @@ export default function PositionsTable({
                         fontWeight: "bold",
                       }}
                     >
-                      {pos.is_limit ? "Hủy" : t("close_btn")}
+                      {isLimit ? "Hủy" : t("close_btn")}
                     </button>
                   </td>
                 </tr>
