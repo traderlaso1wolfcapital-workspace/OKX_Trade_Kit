@@ -383,7 +383,7 @@ export default function PositionsTable({
                     })()}
                   </td>
                   <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
-                    {!isChild && ticketIndex === 0 && (
+                    {!isChild && (
                       <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
                         {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
                           const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];

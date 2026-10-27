@@ -33,6 +33,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Hiển Thị Đầy Đủ Nút TF Trade Cho Cả 2 Vị Thế Long / Short Trên Cùng Một Cặp Coin & Tối Ưu Cơ Chế Đồng Bộ (Sync):
+  - **Mô tả yêu cầu CEO:** Khi tài khoản mở cả 2 vị thế Long và Short trên cùng 1 cặp coin (chế độ Hedge Mode, ví dụ XAU-USDT), hàng thứ 2 (Long) bị khuyết trống cột TF trade. Yêu cầu hiển thị đầy đủ các nút bấm TF trade ở cả 2 hàng, và tư vấn phương án tương tác (Độc lập hay Đồng bộ).
+  - **Tư vấn chuyên môn CTO:**
+    - **Nên để ĐỒNG BỘ (Synced) 100%:** Trong thuật toán Bot (cả OKX & Quỹ FX), cấu hình Khung Thời Gian giao dịch (`enabled_tfs`) được lưu trữ theo **cặp coin** (`coin.value`). Khi trader tắt M15 của XAU-USDT tức là ngừng quét sóng M15 cho cặp coin đó (cả Long và Short đều không rải thêm lệnh M15).
+    - Để đồng bộ giúp: (1) Nhất quán 100% với backend, không gây xung đột race condition; (2) Tránh bẫy hiểu lầm cho người dùng; (3) Tiện tay thao tác ở bất kỳ hàng nào thì hàng kia tự động cập nhật theo tức thì.
+  - **Giải pháp kỹ thuật:**
+    - File [PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx): Bỏ điều kiện `ticketIndex === 0`, chỉ giữ `!isChild`. Đảm bảo cả hàng Long và Short đều hiển thị trọn vẹn 6 nút `[5] [15] [30] [H1] [H2] [H4]` và đồng bộ trạng thái khi click.
+
 - **[27/10/2026]** - Thu Nhỏ Nút Hướng Dẫn, Giảm Chiều Ngang & Bỏ Icon Chấm Xanh Cho Tinh Gọn Sidebar:
   - **Mô tả yêu cầu CEO:** Nút Hướng Dẫn ở thanh Sidebar hơi to, chiều ngang hơi dài. Thu nhỏ lại, giảm chiều ngang và bỏ icon chấm xanh tròn để nút gọn gàng, tinh tế.
   - **Giải pháp kỹ thuật:**
