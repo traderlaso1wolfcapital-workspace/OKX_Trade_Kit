@@ -98,6 +98,8 @@ if res.returncode == 0 and res_tag.returncode == 0:
         print("✅ HOÀN TẤT! CODE ĐÃ ĐƯỢC ĐẨY LÊN GITHUB (ĐÃ KHÓA BUILD ACTION .EXE).")
     print(f"Phiên bản: v{new_v}")
     print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    print("💡 MẸO: Chạy 'python zzzGit_Pull_bash_web.py' (hoặc click zzzGit_Pull_bash_web.bat)")
+    print("       để tự động pull và khởi động web server trên Mac Mini M1 ngay từ máy này!")
 else:
     print("❌ THẤT BẠI: Quá trình đẩy code lên GitHub gặp lỗi (Exit code != 0).")
     print(f"Thời gian: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")

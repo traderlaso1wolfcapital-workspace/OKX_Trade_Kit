@@ -33,6 +33,19 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Phát Triển Công Cụ Điều Khiển Triển Khai Từ Xa Cho Mac Mini M1 ([zzzGit_Pull_bash_web.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.py) & [zzzGit_Pull_bash_web.bat](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.bat)):
+  - **Yêu cầu từ CEO:**
+    - Thay vì phải sang máy Mac Mini M1 mở terminal chạy lệnh `git pull origin main && bash start_web_server.sh` thủ công, CEO muốn chạy trực tiếp 1 click trên máy tính Windows này ngay sau khi `zzPush_To_GitHub.py` hoàn tất.
+  - **Triển khai kỹ thuật:**
+    - Tạo file [zzzGit_Pull_bash_web.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.py):
+      - Sử dụng thư viện `paramiko` kết nối SSH thẳng tới Mac Mini M1 (`tls1clawbot@192.168.100.154:22`).
+      - Tự động di chuyển vào `/Users/tls1clawbot/Desktop/OKX_Trade_Kit/web_app` và thực thi chuỗi lệnh `git pull origin main && bash start_web_server.sh`.
+      - Mở PTY session stream toàn bộ log màu sắc real-time về màn hình Windows của CEO (git pull, npm build, PM2 status, Cloudflare Tunnel).
+      - Hỗ trợ lưu mật khẩu tự động vào `mac_mini_config.json` (đã thêm vào `.gitignore` chống lộ lọt) và tự nạp SSH key để các lần sau chạy 100% không cần gõ lại mật khẩu.
+      - Tự động quét mạng LAN (auto-discovery) nếu Mac Mini bị đổi IP qua DHCP.
+    - Tạo file [zzzGit_Pull_bash_web.bat](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.bat) để CEO có thể nhấp đúp chạy nhanh từ File Explorer.
+    - Bổ sung lời nhắc điều hướng tự động vào cuối file [zzPush_To_GitHub.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPush_To_GitHub.py).
+
 - **[28/10/2026]** - Khắc Phục Triệt Để Lỗi Chồng Chất Nhiều Lệnh Limit Cùng 1 Entry & Đồng Bộ Hóa 100% Dashboard Logs Quỹ E8 (LogsTerminal.jsx):
   - **Hiện tượng & Phản hồi từ CEO:**
     1. Bot FX Quỹ E8 liên tục đặt thêm hàng chục lệnh Limit cùng 1 entry tích tụ dồn dập (24 -> 45 -> 51 lệnh chờ), không tự dọn dẹp các lệnh cũ khi giá dịch chuyển.

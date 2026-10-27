@@ -1,4 +1,6 @@
 #!/bin/bash
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$PATH"
+
 # Dừng các tiến trình cũ nếu có
 echo "Đang dọn dẹp các tiến trình cũ..."
 pkill -f "python3 main.py" 2>/dev/null
