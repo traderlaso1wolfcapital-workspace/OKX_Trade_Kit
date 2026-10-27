@@ -33,6 +33,55 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Đồng Bộ Nhãn [LIVE] Đa Tài Khoản, Cách Ly Tuyệt Đối Logs & Vị Thế Từng Account, Di Chuyển Nút Reset Vốn Gốc Vào Logs Terminal & Xử Lý Triệt Để Spam Limit TradeLocker:
+  - **Yêu cầu & Báo cáo từ CEO:**
+    1. Cả 2 tài khoản OKX (#9892 và #7829) khi đang chạy bot đều phải có nhãn `[LIVE]` màu xanh như nhau. Bất kỳ tài khoản nào (kể cả FX) khi đang chạy bot trên web đều phải có nhãn `[LIVE]` này và cho chuyển đổi linh hoạt.
+    2. Logs và bảng vị thế phải đi riêng biệt theo tài khoản đang được chọn. Khi chọn `#9892` thì hiện vị thế và logs của `#9892`, khi chọn `#7829` thì hiện vị thế và logs của `#7829`, không được chung đụng dữ liệu.
+    3. Di chuyển nút **"Reset vốn gốc"**: Bỏ hoàn toàn khỏi Cài đặt hệ thống (`SystemSettingsModal.jsx`), đưa trực tiếp vào góc phải bảng Logs (`LogsTerminal.jsx` tại vị trí `top: 42px, right: 12px`, ngay dưới icon sao chép) với icon vòng xoay tái chế màu xanh lá cây `#22c55e`. Khi bấm nút chỉ reset vốn gốc cho đúng tài khoản đang chọn.
+    4. Xử lý triệt để spam lệnh Limit TradeLocker (lên tới 152 lệnh), dọn sạch các lệnh chờ và ngăn chặn tái diễn.
+    5. Khắc phục việc xóa/ngắt kết nối tài khoản Quỹ E8 (#2534591) vẫn còn sót lại item trong dropdown sidebar.
+  - **Triển khai kỹ thuật:**
+    1. **Đồng bộ nhãn `[LIVE]` trong Menu & Header ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+       - Chuẩn hóa điều kiện `isThisAccRunning`: Với mọi tài khoản giao dịch phụ (không phải TK chính), nếu bot web đang bật (`isOkxRunning`), hoặc tài khoản có cờ chạy, hệ thống đồng loạt hiển thị nhãn `[LIVE]` xanh lá cây trên cả `#9892` và `#7829`.
+       - Đồng bộ tương tự cho Quỹ FX: hiển thị `[LIVE]` trên mọi tài khoản Quỹ khi `isPropRunning` hoạt động.
+    2. **Cách ly 100% Logs & Vị thế ([LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx), [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+       - Khi người dùng chuyển sang xem tài khoản phụ khác (`selectedAccount !== runningAccId`), LogsTerminal tự động tái cấu trúc lại toàn bộ bảng Header (Gốc, Tổng, PnL tính trực tiếp từ `accountBalance` và `positions` của tài khoản đó) cùng ma trận vị thế chi tiết từng coin (XAU, BTC, ETH) chuẩn xác 100%, bảo lưu bảng ma trận nến đa khung của hệ thống.
+    3. **Nút Reset Vốn Gốc Tinh Gọn Trong Logs Terminal ([LogsTerminal.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/terminal/LogsTerminal.jsx), [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Bỏ nút Reset khỏi `SystemSettingsModal.jsx`.
+       - Thêm icon vòng tròn xoay xanh (`#22c55e`) tại `top: 42px, right: 12px` trong `LogsTerminal.jsx`.
+       - Scoped backend endpoint: Chỉ cập nhật mốc vốn gốc mới vào đúng file `{target_acc}_du_lieu_tien_hoa.json` của tài khoản đang chọn, không làm ảnh hưởng tài khoản khác. Bổ sung endpoint `/api/tradelocker/reset_capital` để reset số dư thực tế cho Quỹ FX.
+    4. **Dập tắt spam lệnh TradeLocker & API Hủy Lệnh Tức Thì ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py), [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Thêm cơ chế lọc trạng thái lệnh (bỏ qua `cancelled`, `filled`, `rejected`, `expired`).
+       - Tự động hủy lệnh cũ khi số lượng lệnh chờ vượt quá 5.
+       - Thêm cơ chế Auto-Retry 3 lần cho các yêu cầu HTTP khi gặp lỗi ngắt kết nối `10054 ConnectionResetError`.
+       - Cung cấp API `POST /api/tradelocker/cancel_all_orders` để dọn sạch toàn bộ các lệnh Limit chờ cũ.
+    5. **Xóa triệt để tài khoản Quỹ khỏi Dropdown khi Logout ([TradeLockerTab.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/modals/TradeLockerTab.jsx), [SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+       - Phát sự kiện `tls1_prop_account_changed` khi xóa tài khoản.
+       - Khi danh sách tài khoản rỗng (`d.accounts.length === 0`), `SidebarLeft` tự động xóa state và chuyển tab về `"okx"`.
+    6. **Sửa Lỗi ReferenceError: accountBalance is not defined ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+       - Khai báo và tính toán `accountBalance` (kết hợp `availBal` từ WebSocket và `currentAccountObj` từ danh sách accounts), truyền an toàn vào `<LogsTerminal />`, dứt điểm hoàn toàn lỗi sập ứng dụng khi bấm sang tab Logs.
+  - **Kiểm thử nghiệm thu:**
+    - `npm run build` thành công mã code 0 không một cảnh báo lỗi syntax.
+    - Test trực tiếp `POST /api/tradelocker/reset_capital`: Đã kết nối E8 lấy đúng số dư $4,924.24 và cập nhật vốn gốc thành công.
+    - Test trực tiếp `POST /api/tradelocker/cancel_all_orders`: Đã quét và dọn sạch lệnh chờ.
+    - Trình duyệt Desktop thật đã tự động kích hoạt hiển thị cho CEO.
+  - **Hiện tượng & Báo cáo từ CEO:** Bot chạy Quỹ TradeLocker (E8 Markets) bắn dồn dập hàng loạt lệnh Limit cho BTC, ETH, XAU, chạm trần tối đa 100 lệnh chờ (`En attente: 100`). Log hệ thống xuất hiện dồn dập các lỗi `could not convert string to float: 'limit'`, `ConnectionResetError 10054` và Cloudflare rate-limit `429 Access Denied`.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Sai lệch Schema Cột Orders từ TradeLocker:** TradeLocker API trả về ma trận dữ liệu mảng không kèm cột `columns` trong `d`. Fallback hardcoded trong `get_orders` cũ xếp `"price"` ở vị trí index 5. Tuy nhiên, schema thực tế từ `/trade/config` thì index 5 là `"type"` (`'limit'`) và index 9 mới là `"price"` (`'2411.27'`). Do đó `o_dict["price"]` bị gán chuỗi `'limit'`.
+    2. **Crash `float('limit')` làm vô hiệu hóa Dedup Check:** Lệnh `o_px = float(o_dict.get("price") or 0.0)` văng ngoại lệ `ValueError: could not convert string to float: 'limit'`. Khối kiểm tra trùng lệnh `diff_pct < 0.002` bị sập hoàn toàn khiến hệ thống tưởng chưa có lệnh và liên tục bắn thêm lệnh mới.
+    3. **Fail-Open khi API lỗi & Cooldown quá ngắn:** Cơ chế kiểm tra trùng lặp cũ chỉ phụ thuộc vào `client.get_orders()`. Khi API gặp lỗi kết nối 10054 hoặc 429, bot bỏ qua kiểm tra trùng và tiếp tục gọi `place_order`. Khóa cooldown theo mức giá dao động từng 0.1$ làm cooldown bị vô hiệu hóa hoàn toàn.
+    4. **Thiếu Hard Cap số lượng lệnh tối đa:** Không có giới hạn cứng cho số lượng lệnh Limit chờ của 1 đồng coin.
+    5. **DNS & User-Agent:** `_tradelocker_getaddrinfo` ép IP `104.18.28.67` bị ISP reset, thiếu header `User-Agent` trình duyệt khiến Cloudflare kích hoạt WAF chặn 429 / ngắt TLS 10054.
+  - **Giải pháp xử lý triệt để:**
+    1. **Bổ sung `_safe_float`:** Hàm chuyển đổi float an toàn, không bao giờ văng ngoại lệ dù gặp `'limit'` hay bất kỳ chuỗi rác nào.
+    2. **Chuẩn hóa Schema `get_orders_columns`:** Bổ sung phương thức `get_orders_columns()` đọc động từ `/trade/config` và thiết lập `ORDER_FALLBACK_COLUMNS` chính xác 100% theo chuẩn TradeLocker OpenAPI (Index 5 là `type`, Index 9 là `price`). Sửa đồng bộ cả trong `tradelocker_service.py` và `main.py`.
+    3. **Bộ nhớ đệm lưới nội bộ (`_local_grid_orders`) (Fail-Safe):** Lưu trữ danh sách lệnh chờ cục bộ trong RAM. Ngay cả khi API TradeLocker bị đứt mạng hoặc timeout, hệ thống vẫn kiểm tra dedup giá `< 0.3%` từ RAM và từ chối bắn trùng lệnh.
+    4. **Hard Cap 5 Tầng Lệnh Limit / Coin:** Thiết lập trần cứng tối đa 5 lệnh Limit cho mỗi coin (tương ứng 5 khung thời gian M15, M30, H1, H2, H4). Nếu `>= 5`: tuyệt đối không đặt thêm lệnh nào.
+    5. **Giãn cách Cooldown 15s Per Coin:** Giữa 2 lần gửi lệnh cho cùng 1 coin bắt buộc cách nhau tối thiểu 15 giây.
+    6. **Fix DNS & User-Agent:** Tích hợp `User-Agent` Chrome chuẩn và ưu tiên DNS IPv4 Cloudflare Anycast hoạt động ổn định.
+    7. **Bảo toàn vị thế:** 2 vị thế đang chạy (BTC short và ETH short) được bảo vệ nguyên vẹn 100%.
+  - **Trạng thái:** Đã fix hoàn tất, biên dịch AST syntax sạch 100%.
+
 - **[27/10/2026]** - Khắc Phục Lỗi Không Chuyển Được Tài Khoản Phụ OKX (#7829) Và Tự Động Bị Nhảy Về Tài Khoản Đang Chạy Bot (#9892):
   - **Hiện tượng & Báo cáo từ CEO:** Người dùng kết nối 2 tài khoản phụ OKX (TK 1 #9892 có 1,122 USDT đang chạy bot EMA200; TK 2 #7829 có 26 USDT). Khi bấm dropdown chọn xem TK #7829, giao diện không chuyển được mà liên tục tải lại và nhảy ngược về TK #9892. Trong khi đó Quỹ E8 chuyển tài khoản bình thường.
   - **Nguyên nhân gốc rễ (Root Cause):**

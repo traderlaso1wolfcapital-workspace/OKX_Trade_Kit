@@ -1941,15 +1941,18 @@ def reset_capital(uid: str, strategy: str = "sub1", account_id: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi truy vấn số dư OKX: {str(e)}")
         
-    # 3. Cập nhật mốc VỐN GỐC mới vào toàn bộ các file dữ liệu tiến hóa
+    # 3. Cập nhật mốc VỐN GỐC mới vào đúng file dữ liệu tiến hóa của tài khoản này
     evo_files = [
         os.path.join(data_dir, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
-        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
         os.path.join(data_dir, f"bots/{strategy}/json_data", f"{target_acc}_evolution_data.json"),
-        os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_evolution_data.json"),
         os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{target_acc}_du_lieu_tien_hoa.json"),
-        os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
     ]
+    if target_acc == strategy:
+        evo_files.extend([
+            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+            os.path.join(data_dir, f"bots/{strategy}/json_data", f"{strategy}_evolution_data.json"),
+            os.path.join(OKX_TRADE_KIT_DIR, f"bots/{strategy}/json_data", f"{strategy}_du_lieu_tien_hoa.json"),
+        ])
     for evo_file in evo_files:
         try:
             os.makedirs(os.path.dirname(evo_file), exist_ok=True)
@@ -4115,7 +4118,7 @@ async def like_review(review_id: str):
 # ==============================================================================
 # TRADELOCKER / E8 MARKETS PROP FIRM INTEGRATION
 # ==============================================================================
-from tradelocker_service import TradeLockerManager, TradeLockerClient
+from tradelocker_service import TradeLockerManager, TradeLockerClient, _safe_float
 
 class TradeLockerConnectReq(BaseModel):
     uid: str
@@ -4467,6 +4470,29 @@ def tradelocker_disconnect(uid: str, account_id: Optional[str] = None, jwt_data:
         TradeLockerManager.remove_client(clean_uid)
         return {"status": "success", "message": "Đã ngắt kết nối toàn bộ tài khoản Quỹ."}
 
+@app.post("/api/tradelocker/reset_capital")
+def tradelocker_reset_capital(uid: str = "default", account_id: Optional[str] = None):
+    clean_uid = uid.strip() if uid else "default"
+    ok, bal, msg = TradeLockerManager.reset_capital(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    return {
+        "status": "success",
+        "total_equity": round(bal, 2),
+        "account": account_id or "default",
+        "message": f"✅ {msg}"
+    }
+
+@app.post("/api/tradelocker/cancel_all_orders")
+def tradelocker_cancel_all_orders(uid: str = "default", account_id: Optional[str] = None):
+    clean_uid = uid.strip() if uid else "default"
+    ok, canceled_count, msg = TradeLockerManager.cancel_all_pending_orders(clean_uid, get_user_base_dir, fernet, account_id=account_id)
+    return {
+        "status": "success" if ok else "error",
+        "canceled_count": canceled_count,
+        "message": msg
+    }
+
 class TradeLockerCloseReq(BaseModel):
     position_id: str
     uid: Optional[str] = "default"
@@ -4617,9 +4643,11 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
         if ok_ord and raw_orders:
             for o in raw_orders:
                 if isinstance(o, list):
-                    cols = [
-                        "id", "tradableInstrumentId", "routeId", "side", "qty", "price",
-                        "stopLoss", "takeProfit", "status", "type", "created", "modified"
+                    cols = client.get_orders_columns() if hasattr(client, "get_orders_columns") else [
+                        "id", "tradableInstrumentId", "routeId", "qty", "side", "type",
+                        "status", "filledQty", "avgPrice", "price", "stopPrice", "validity",
+                        "expireDate", "createdDate", "lastModified", "isOpen", "positionId",
+                        "stopLoss", "stopLossType", "takeProfit", "takeProfitType", "strategyId"
                     ]
                     o = {cols[i]: o[i] for i in range(min(len(cols), len(o)))}
 
@@ -4648,10 +4676,10 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
 
                 raw_side = str(o.get("side", "buy")).lower()
                 pos_side = "long" if raw_side in ("buy", "long") else "short"
-                qty = float(o.get("qty") or 0.0)
-                price = float(o.get("price") or 0.0)
+                qty = _safe_float(o.get("qty"))
+                price = _safe_float(o.get("price"))
                 ord_type = str(o.get("type") or "LIMIT").upper()
-                margin = float(o.get("margin") or (price * qty if qty > 0 else 1.0))
+                margin = _safe_float(o.get("margin")) or (price * qty if qty > 0 else 1.0)
 
                 mapped_list.append({
                     "ticket_id": f"ord_{order_id}",

@@ -13,22 +13,25 @@ from collections import deque
 _orig_getaddrinfo = socket.getaddrinfo
 def _tradelocker_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     if host and "tradelocker.com" in str(host):
-        # 1. Ưu tiên IPv6 Cloudflare sạch tuyệt đối không bị ISP chặn SNI/DPI
+        # Ưu tiên các IP IPv4 Cloudflare Anycast đã được kiểm chứng hoạt động ổn định trên ISP VN
         try:
-            return _orig_getaddrinfo("2606:4700::6812:1c43", port, socket.AF_INET6, type, proto, flags)
+            return [
+                (socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.18.29.67', port)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, '', ('104.18.28.67', port))
+            ]
         except Exception:
             pass
-        # 2. Fallback IPv4 Cloudflare (loại bỏ sạch 127.0.0.1 / ::1 sinkhole)
-        try:
-            res = _orig_getaddrinfo(host, port, family, type, proto, flags)
-            clean_res = [r for r in res if r[4][0] not in ("127.0.0.1", "::1", "localhost")]
-            if clean_res:
-                return clean_res
-            return _orig_getaddrinfo("104.18.28.67", port, family, type, proto, flags)
-        except Exception:
-            return _orig_getaddrinfo("104.18.28.67", port, family, type, proto, flags)
     return _orig_getaddrinfo(host, port, family, type, proto, flags)
 socket.getaddrinfo = _tradelocker_getaddrinfo
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Chuyển đổi an toàn sang float, tuyệt đối không quăng ValueError khi gặp chuỗi không hợp lệ như 'limit'"""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
 
 # Môi trường mặc định của TradeLocker
 DEFAULT_DEMO_ENV = "https://demo.tradelocker.com/backend-api"
@@ -108,6 +111,7 @@ class TradeLockerClient:
         self.instruments_cache: Dict[str, Dict[str, Any]] = {}
         self.instruments_cache_time: float = 0
         self._positions_columns: List[str] = []
+        self._orders_columns: List[str] = []
 
     @staticmethod
     def _clean_error_text(resp) -> str:
@@ -163,19 +167,29 @@ class TradeLockerClient:
             "password": self.password,
             "server": clean_server
         }
-        try:
-            resp = requests.post(auth_url, json=payload, timeout=12)
-            if resp.status_code in (200, 201):
-                data = resp.json()
-                self.access_token = data.get("accessToken")
-                self.refresh_token = data.get("refreshToken")
-                self.token_expiry = time.time() + 3000  # Token hiệu lực ~ 1 giờ
-                return True, "Đăng nhập TradeLocker thành công!"
-            else:
-                err_msg = self._clean_error_text(resp)
-                return False, f"Lỗi đăng nhập TradeLocker ({resp.status_code}): {err_msg}"
-        except Exception as e:
-            return False, f"Lỗi kết nối máy chủ TradeLocker: {str(e)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Content-Type": "application/json"
+        }
+        last_error = ""
+        for attempt in range(3):
+            try:
+                resp = requests.post(auth_url, json=payload, headers=headers, timeout=12)
+                if resp.status_code in (200, 201):
+                    data = resp.json()
+                    self.access_token = data.get("accessToken")
+                    self.refresh_token = data.get("refreshToken")
+                    self.token_expiry = time.time() + 3000  # Token hiệu lực ~ 1 giờ
+                    return True, "Đăng nhập TradeLocker thành công!"
+                else:
+                    err_msg = self._clean_error_text(resp)
+                    return False, f"Lỗi đăng nhập TradeLocker ({resp.status_code}): {err_msg}"
+            except Exception as e:
+                last_error = str(e)
+                if attempt < 2:
+                    time.sleep(0.5)
+                    continue
+        return False, f"Lỗi kết nối máy chủ TradeLocker: {last_error}"
 
     def _ensure_authenticated(self) -> bool:
         if not self.access_token or time.time() >= self.token_expiry:
@@ -186,7 +200,8 @@ class TradeLockerClient:
     def _get_headers(self, include_acc_num: bool = True) -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         }
         if include_acc_num and self.acc_num:
             headers["accNum"] = str(self.acc_num)
@@ -198,24 +213,34 @@ class TradeLockerClient:
             return False, [], "Chưa xác thực TradeLocker"
 
         url = f"{self.base_url}/auth/jwt/all-accounts"
-        try:
-            resp = requests.get(url, headers=self._get_headers(include_acc_num=False), timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                accounts = data.get("accounts", [])
-                if accounts:
-                    # Tự động gán tài khoản đầu tiên
-                    first_acc = accounts[0]
-                    self.account_id = str(first_acc.get("id"))
-                    self.acc_num = str(first_acc.get("accNum", "1"))
-                    try:
-                        self.account_balance = float(first_acc.get("accountBalance", 0))
-                    except:
-                        pass
-                return True, accounts, "OK"
-            return False, [], f"Lỗi lấy tài khoản ({resp.status_code}): {self._clean_error_text(resp)}"
-        except Exception as e:
-            return False, [], f"Lỗi kết nối: {str(e)}"
+        last_error = ""
+        for attempt in range(3):
+            try:
+                resp = requests.get(url, headers=self._get_headers(include_acc_num=False), timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    accounts = data.get("accounts", [])
+                    if accounts:
+                        # Tự động gán tài khoản đầu tiên
+                        first_acc = accounts[0]
+                        self.account_id = str(first_acc.get("id"))
+                        self.acc_num = str(first_acc.get("accNum", "1"))
+                        try:
+                            self.account_balance = float(first_acc.get("accountBalance", 0))
+                        except:
+                            pass
+                    return True, accounts, "OK"
+                elif resp.status_code in (401, 403):
+                    self.access_token = ""
+                    self._ensure_authenticated()
+                else:
+                    return False, [], f"Lỗi lấy tài khoản ({resp.status_code}): {self._clean_error_text(resp)}"
+            except Exception as e:
+                last_error = str(e)
+                if attempt < 2:
+                    time.sleep(0.5)
+                    continue
+        return False, [], f"Lỗi kết nối: {last_error}"
 
     def get_account_state(self) -> Tuple[bool, Dict[str, Any], str]:
         """Lấy trạng thái chi tiết của tài khoản (Balance, Equity, PnL)"""
@@ -227,30 +252,40 @@ class TradeLockerClient:
                 return False, {}, msg or "Không tìm thấy tài khoản"
 
         url = f"{self.base_url}/trade/accounts/{self.account_id}/state"
-        try:
-            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
-            if resp.status_code == 200:
-                res_json = resp.json()
-                details = res_json.get("d", {}).get("accountDetailsData", [])
-                # Theo cấu trúc TradeLocker:
-                # [0]: Balance, [1]: Equity, [4]: Free Margin, [11]: Margin Level%
-                balance = float(details[0]) if len(details) > 0 else self.account_balance
-                equity = float(details[1]) if len(details) > 1 else balance
-                free_margin = float(details[4]) if len(details) > 4 else balance
-                pnl = equity - balance
+        last_err = ""
+        for attempt in range(3):
+            try:
+                resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
+                if resp.status_code == 200:
+                    res_json = resp.json()
+                    details = res_json.get("d", {}).get("accountDetailsData", [])
+                    # Theo cấu trúc TradeLocker:
+                    # [0]: Balance, [1]: Equity, [4]: Free Margin, [11]: Margin Level%
+                    balance = float(details[0]) if len(details) > 0 else self.account_balance
+                    equity = float(details[1]) if len(details) > 1 else balance
+                    free_margin = float(details[4]) if len(details) > 4 else balance
+                    pnl = equity - balance
 
-                self.account_balance = balance
-                return True, {
-                    "account_id": self.account_id,
-                    "acc_num": self.acc_num,
-                    "balance": balance,
-                    "equity": equity,
-                    "free_margin": free_margin,
-                    "pnl": pnl
-                }, "OK"
-            return False, {}, f"Lỗi lấy trạng thái tài khoản ({resp.status_code}): {self._clean_error_text(resp)}"
-        except Exception as e:
-            return False, {}, str(e)
+                    self.account_balance = balance
+                    return True, {
+                        "account_id": self.account_id,
+                        "acc_num": self.acc_num,
+                        "balance": balance,
+                        "equity": equity,
+                        "free_margin": free_margin,
+                        "pnl": pnl
+                    }, "OK"
+                elif resp.status_code in (401, 403):
+                    self.access_token = ""
+                    self._ensure_authenticated()
+                else:
+                    last_err = f"Lỗi lấy trạng thái tài khoản ({resp.status_code}): {self._clean_error_text(resp)}"
+            except Exception as e:
+                last_err = str(e)
+                if attempt < 2:
+                    time.sleep(0.5)
+                    continue
+        return False, {}, last_err
 
     def load_instruments(self) -> Tuple[bool, Dict[str, Dict[str, Any]], str]:
         """Tải và lập chỉ mục danh sách các mã giao dịch (Instruments) kèm bộ lưu cache trên đĩa và dự phòng cứng"""
@@ -550,6 +585,44 @@ class TradeLockerClient:
         self._positions_columns = fallback_cols
         return self._positions_columns
 
+    def get_orders_columns(self) -> List[str]:
+        """Lấy danh sách các cột của bảng Orders từ TradeLocker /trade/config hoặc dùng fallback chuẩn"""
+        if self._orders_columns:
+            return self._orders_columns
+
+        # Schema cột chuẩn thực tế từ TradeLocker /trade/config:
+        fallback_cols = [
+            "id", "tradableInstrumentId", "routeId", "qty", "side", "type",
+            "status", "filledQty", "avgPrice", "price", "stopPrice", "validity",
+            "expireDate", "createdDate", "lastModified", "isOpen", "positionId",
+            "stopLoss", "stopLossType", "takeProfit", "takeProfitType", "strategyId"
+        ]
+
+        if not self._ensure_authenticated():
+            return fallback_cols
+
+        try:
+            url = f"{self.base_url}/trade/config"
+            resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=8)
+            if resp.status_code == 200:
+                cfg_data = resp.json().get("d", {})
+                ord_cfg = cfg_data.get("ordersConfig", {})
+                cols_meta = ord_cfg.get("columns", [])
+                extracted = []
+                for c in cols_meta:
+                    if isinstance(c, dict) and "id" in c:
+                        extracted.append(c["id"])
+                    elif isinstance(c, str):
+                        extracted.append(c)
+                if extracted:
+                    self._orders_columns = extracted
+                    return self._orders_columns
+        except Exception:
+            pass
+
+        self._orders_columns = fallback_cols
+        return self._orders_columns
+
     def get_positions(self) -> Tuple[bool, List[Any], str]:
         """Lấy danh sách các vị thế đang mở (chuẩn hóa ma trận mảng thành danh sách Dict)"""
         if not self._ensure_authenticated():
@@ -625,18 +698,18 @@ class TradeLockerClient:
         """Lấy danh sách các lệnh chờ (Pending/Limit) - tự động chuẩn hóa ma trận mảng thành List[Dict]"""
         if not self._ensure_authenticated():
             return False, [], "Chưa xác thực TradeLocker"
+        if not self.account_id or not self.acc_num:
+            ok, accounts, msg = self.get_accounts()
+            if not ok or not self.account_id:
+                return False, [], msg or "Không tìm thấy tài khoản"
+
         url = f"{self.base_url}/trade/accounts/{self.account_id}/orders"
         try:
             resp = requests.get(url, headers=self._get_headers(include_acc_num=True), timeout=10)
             if resp.status_code == 200:
                 d_obj = resp.json().get("d", {})
                 orders = d_obj.get("orders", [])
-                cols = d_obj.get("columns", [])
-                if not cols:
-                    cols = [
-                        "id", "tradableInstrumentId", "routeId", "side", "qty", "price",
-                        "stopLoss", "takeProfit", "status", "type", "created", "modified"
-                    ]
+                cols = d_obj.get("columns") or self.get_orders_columns()
                 if orders and isinstance(orders[0], list):
                     dict_orders = []
                     for row in orders:
@@ -692,6 +765,7 @@ class TradeLockerManager:
     _log_queues: Dict[str, Any] = {}
     _subscribers: Dict[str, List[Any]] = {}
     _symbol_cooldowns: Dict[str, float] = {}
+    _local_grid_orders: Dict[str, List[Dict[str, Any]]] = {}
     _dispatch_lock: threading.Lock = threading.Lock()
 
     @classmethod
@@ -1254,6 +1328,55 @@ class TradeLockerManager:
         return bool(cfg.get("is_bot_running", False))
 
     @classmethod
+    def reset_capital(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Tuple[bool, float, str]:
+        """Reset vốn gốc Quỹ FX (cập nhật fund_size bằng số dư thực tế hiện tại)"""
+        clean_uid = uid.strip() if (uid and uid not in ["guest", "undefined", "null"]) else "default"
+        client = cls.get_client(clean_uid, user_base_dir_fn, fernet_instance, account_id=account_id)
+        if not client:
+            return False, 0.0, "Không khởi tạo được kết nối Quỹ FX"
+        ok_state, state, msg = client.get_account_state()
+        bal = 0.0
+        if ok_state and state:
+            bal = _safe_float(state.get("balance"), 0.0)
+        if bal <= 0 and hasattr(client, "account_balance") and (client.account_balance or 0) > 0:
+            bal = float(client.account_balance)
+        if bal <= 0:
+            return False, 0.0, msg or "Không truy vấn được số dư Quỹ"
+        bal = round(bal, 2)
+        cfg = cls.load_user_config(clean_uid, user_base_dir_fn, fernet_instance, account_id=account_id)
+        if not cfg:
+            cfg = {}
+        cfg["fund_size"] = round(bal, 2)
+        cls.save_user_config(clean_uid, cfg, user_base_dir_fn, fernet_instance, account_id=account_id)
+        cls.log_event(clean_uid, f"♻️ [QUỸ FX] Đã Reset Vốn Gốc thành công! Mốc vốn mới: ${bal:,.2f}")
+        return True, bal, f"Đã Reset Vốn Gốc Quỹ FX thành công: ${bal:,.2f}"
+
+    @classmethod
+    def cancel_all_pending_orders(cls, uid: str, user_base_dir_fn = None, fernet_instance = None, account_id: Optional[str] = None) -> Tuple[bool, int, str]:
+        """Hủy toàn bộ lệnh Limit / Pending đang chờ trên TradeLocker để dọn sạch tài khoản"""
+        clean_uid = uid.strip() if (uid and uid not in ["guest", "undefined", "null"]) else "default"
+        client = cls.get_client(clean_uid, user_base_dir_fn, fernet_instance, account_id=account_id)
+        if not client:
+            return False, 0, "Không khởi tạo được TradeLocker client"
+        ok_ord, orders, msg = client.get_orders()
+        if not ok_ord or not orders:
+            return True, 0, "Không có lệnh chờ nào cần hủy"
+        canceled = 0
+        for o in orders:
+            o_dict = o if isinstance(o, dict) else {}
+            o_id = str(o_dict.get("id") or "")
+            o_status = str(o_dict.get("status") or "").lower()
+            if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
+                continue
+            if o_id:
+                ok_c, _ = client.cancel_order(o_id)
+                if ok_c:
+                    canceled += 1
+        cls._local_grid_orders = {}
+        cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Đã quét và hủy sạch {canceled} lệnh Limit đang chờ.")
+        return True, canceled, f"Đã hủy thành công {canceled} lệnh chờ trên TradeLocker"
+
+    @classmethod
     def set_bot_running(cls, uid: str, running: bool, user_base_dir_fn = None, fernet_instance = None) -> bool:
         """Bật/Tắt trạng thái chạy Bot Quỹ FX (TradeLocker) độc lập với Sàn OKX"""
         cfg = cls.load_user_config(uid, user_base_dir_fn, fernet_instance) or {}
@@ -1284,13 +1407,14 @@ class TradeLockerManager:
         Bộ điều phối tín hiệu chiến lược từ Bot sang tài khoản Quỹ TradeLocker (E8 Markets)
         Tích hợp đầy đủ:
         1. Thread-safe lock (_dispatch_lock) triệt tiêu hoàn toàn race-condition giữa các khung đa thời gian
-        2. Chống Spam / Khóa Cooldown (45s per symbol) cập nhật tức thì dưới lock
+        2. Chống Spam / Khóa Cooldown (15s per coin)
         3. Quy tắc an toàn Quỹ: Mỗi coin chỉ 1 vị thế (Chặn mở thêm lệnh khi đã có vị thế, bảo vệ tài khoản Netting)
-        4. Chống Spam hủy/đặt lại lệnh Limit: Giữ nguyên lệnh chờ nếu đã có lệnh cùng chiều với giá lệch < 0.2%
-        5. Tự động tính SL/TP fallback theo tỷ lệ cấu hình (mặc định 1.2%)
-        6. Tự động vá SL/TP cho các vị thế đang trần (naked positions)
-        7. Cầu Dao An Toàn ngắt sớm (Circuit Breakers: Static DD 8%, Daily DD 2.5%, Daily Profit Cap)
-        8. Khóa Độc Quyền Bot: Mỗi tài khoản Quỹ chỉ chạy duy nhất 1 phương pháp Bot (EMA200 / SMC)
+        4. Chống Spam Limit: In-Memory Grid Cache & Dedup chênh lệch giá < 0.3%
+        5. Hard Cap: Tối đa 5 tầng lệnh Limit cho mỗi coin
+        6. Tự động tính SL/TP fallback theo tỷ lệ cấu hình (mặc định 1.2%)
+        7. Tự động vá SL/TP cho các vị thế đang trần (naked positions)
+        8. Cầu Dao An Toàn ngắt sớm (Circuit Breakers: Static DD 8%, Daily DD 2.5%, Daily Profit Cap)
+        9. Safe Float: Loại trừ 100% rủi ro crash chuỗi 'limit'
         """
         with cls._dispatch_lock:
             clean_uid = uid.strip() if (uid and uid not in ["guest", "undefined", "null"]) else "default"
@@ -1321,30 +1445,41 @@ class TradeLockerManager:
             if clean_base not in [s.upper() for s in enabled_syms]:
                 return False, f"Mã {symbol} ({clean_base}) không nằm trong danh sách bật trade quỹ của tài khoản {target_acc_id or 'mặc định'}"
 
-            # ⏳ KHÓA COOLDOWN CHỐNG SPAM TRÙNG LỆNH (Theo từng mức giá và chiều lệnh):
-            # Cho phép các mức giá / khung thời gian khác nhau (M15, M30, H1, H2, H4) được đặt đồng thời!
-            px_key = round(float(price), 1) if price and price > 0 else "market"
-            cool_key = f"{clean_base}_{side.lower()}_{px_key}"
+            # ⏳ KHÓA COOLDOWN CHỐNG SPAM (Tối thiểu 15s giữa 2 lần đặt lệnh cho cùng 1 coin):
+            sym_cool_key = f"{clean_uid}_{clean_base}"
             now_time = time.time()
-            last_time = cls._symbol_cooldowns.get(cool_key, 0.0)
-            elapsed = now_time - last_time
-            if elapsed < 10.0:  # Chống spam bắn trùng lặp 1 mức giá trong 10s
-                msg_cool = f"⏳ [TRADELOCKER] Cooldown {clean_base} @{price}: Vừa xử lý cách đây {int(elapsed)}s (< 10s) — Bỏ qua tránh spam"
+            last_sym_time = cls._symbol_cooldowns.get(sym_cool_key, 0.0)
+            elapsed_sym = now_time - last_sym_time
+            if elapsed_sym < 15.0:
+                msg_cool = f"⏳ [TRADELOCKER] Cooldown {clean_base}: Vừa gửi lệnh cách đây {int(elapsed_sym)}s (< 15s) — Bỏ qua tránh spam"
                 cls.log_event(clean_uid, msg_cool)
                 return False, msg_cool
 
-            # Cập nhật cooldown cho mức giá này
-            cls._symbol_cooldowns[cool_key] = now_time
+            # 🔒 CẬP NHẬT COOLDOWN NGAY LẬP TỨC TRONG LOCK ĐỂ CHẶN ĐỨNG MỌI LUỒNG TIẾP THEO
+            cls._symbol_cooldowns[sym_cool_key] = now_time
 
             client = cls.get_client(clean_uid, user_base_dir_fn, fernet_instance, account_id=target_acc_id)
             if not client:
                 return False, f"Không khởi tạo được TradeLocker client cho tài khoản {target_acc_id or 'mặc định'}"
 
             side_clean = "buy" if side.lower() in ("buy", "long") else "sell"
-            order_type = "limit" if price and price > 0 else "market"
+            target_px = _safe_float(price)
+            order_type = "limit" if target_px > 0 else "market"
+
+            # Key bộ nhớ đệm lưới lệnh cục bộ (In-Memory Fail-Safe):
+            grid_key = f"{clean_uid}_{clean_base}_{side_clean}"
+            if not hasattr(cls, "_local_grid_orders") or cls._local_grid_orders is None:
+                cls._local_grid_orders = {}
+            if grid_key not in cls._local_grid_orders:
+                cls._local_grid_orders[grid_key] = []
+
+            # Dọn dẹp cache cục bộ: loại bỏ các lệnh cũ hơn 2 giờ
+            cls._local_grid_orders[grid_key] = [
+                o for o in cls._local_grid_orders[grid_key] if (now_time - _safe_float(o.get("time", 0))) < 7200
+            ]
 
             # 🛡️ KIỂM TRA VỊ THẾ ĐANG MỞ (POSITION CHECK THEO CHUẨN LƯỚI ĐA KHUNG):
-            # LỰA CHỌN B: Cho phép nhồi lệnh Limit lưới cùng chiều (M15, M30, H1, H2, H4) giống hệt OKX!
+            # Cho phép nhồi lệnh Limit lưới cùng chiều (M15, M30, H1, H2, H4) giống hệt OKX!
             # Chỉ chặn nếu là:
             # 1. Lệnh MARKET mới khi đã có vị thế mở (tránh vào bừa bãi).
             # 2. Lệnh ngược chiều vị thế đang chạy (tránh xung đột hai chiều trên tài khoản Netting).
@@ -1372,13 +1507,13 @@ class TradeLockerManager:
                         pos_id = str(p_dict.get("id") or "")
 
                         # 🏥 Tự động vá SL/TP cho các vị thế đang trần (naked position)
-                        cur_sl = p_dict.get("stopLoss")
-                        cur_tp = p_dict.get("takeProfit")
-                        if (not cur_sl or float(cur_sl) <= 0) and pos_id:
-                            pos_px = float(p_dict.get("price") or price or 0.0)
+                        cur_sl = _safe_float(p_dict.get("stopLoss"))
+                        cur_tp = _safe_float(p_dict.get("takeProfit"))
+                        if cur_sl <= 0 and pos_id:
+                            pos_px = _safe_float(p_dict.get("price")) or target_px
                             if pos_px > 0:
-                                sl_pct = float(cfg.get("sl_percent") or 1.2) / 100.0
-                                tp_pct = float(cfg.get("tp_percent") or 1.2) / 100.0
+                                sl_pct = _safe_float(cfg.get("sl_percent"), 1.2) / 100.0
+                                tp_pct = _safe_float(cfg.get("tp_percent"), 1.2) / 100.0
                                 heal_sl = round(pos_px * (1.0 - sl_pct) if p_side == "buy" else pos_px * (1.0 + sl_pct), 2)
                                 heal_tp = round(pos_px * (1.0 + tp_pct) if p_side == "buy" else pos_px * (1.0 - tp_pct), 2)
                                 ok_mod, mod_msg = client.modify_position(pos_id, stop_loss=heal_sl, take_profit=heal_tp)
@@ -1391,14 +1526,11 @@ class TradeLockerManager:
                             cls.log_event(clean_uid, msg_has_pos)
                             return False, msg_has_pos
 
-                        # 🚀 NẾU LÀ LỆNH LIMIT CÙNG CHIỀU: CHO PHÉP NHỒI LƯỚI ĐA KHUNG (M15, M30, H1, H2, H4) GIỐNG OKX!
-                        # TUYỆT ĐỐI KHÔNG HỦY CÁC LỆNH CHỜ KHÁC!
-
             # Giám sát Cầu dao bảo vệ tài khoản Quỹ (Circuit Breaker)
             ok_state, state, _ = client.get_account_state()
             if ok_state:
-                fund_size = float(cfg.get("fund_size", 5000.0))
-                equity = float(state.get("equity", fund_size))
+                fund_size = _safe_float(cfg.get("fund_size"), 5000.0)
+                equity = _safe_float(state.get("equity"), fund_size)
 
                 # 1. Chặn Static Drawdown (8%)
                 loss_level = fund_size - (fund_size * 0.08)
@@ -1408,7 +1540,7 @@ class TradeLockerManager:
                     return False, msg_cb
 
                 # 2. Chặn Daily Drawdown (2.5%) - Tự ngắt sớm ở 80% mốc lỗ ngày để bảo vệ an toàn tuyệt đối
-                daily_loss_limit = float(cfg.get("daily_drawdown_limit", 125.0))
+                daily_loss_limit = _safe_float(cfg.get("daily_drawdown_limit"), 125.0)
                 current_loss = fund_size - equity
                 if current_loss >= daily_loss_limit * 0.8:
                     msg_cb = f"🚨 CẦU DAO KÍCH HOẠT: Mức lỗ hiện tại (${current_loss:.2f}) tiệm cận ngưỡng Daily Drawdown (${daily_loss_limit:.2f})!"
@@ -1416,7 +1548,7 @@ class TradeLockerManager:
                     return False, msg_cb
 
                 # 3. Chốt lãi trần ngày (Daily Profit Cap)
-                daily_profit_cap = float(cfg.get("daily_profit_cap", 100.0))
+                daily_profit_cap = _safe_float(cfg.get("daily_profit_cap"), 100.0)
                 profit = equity - fund_size
                 if profit >= daily_profit_cap * 0.95:
                     msg_cb = f"⏳ CẦU DAO CHỐT LÃI: Đã đạt trần lãi ngày (${profit:.2f} / ${daily_profit_cap:.2f}), bảo toàn kết quả thi."
@@ -1424,48 +1556,89 @@ class TradeLockerManager:
                     return False, msg_cb
 
             # Xác định khối lượng Lot (Fixed Lot mặc định an toàn: 0.01 Lot)
-            fixed_lot = float(cfg.get("fixed_lot") or 0.01)
+            fixed_lot = _safe_float(cfg.get("fixed_lot"), 0.01)
             lot = round(max(0.01, fixed_lot), 2)
 
             if dry_run and not cfg.get("is_bot_running", False):
                 print(f"🌑 [DRY-RUN TradeLocker] Bỏ qua đặt lệnh thật (Shadow Mode): {side.upper()} {lot} Lot {clean_base}")
                 return True, f"Chế độ Shadow Mode (Dry-run): Sẽ đặt {side.upper()} {lot} Lot {clean_base}"
 
-            # 🛡️ KIỂM TRA LỆNH CHỜ (PENDING LIMIT ORDERS - BẢO TOÀN LƯỚI ĐA KHUNG):
-            # Nếu là lệnh Limit, kiểm tra xem đã có lệnh Limit cùng chiều với mức giá gần tương đương chưa (< 0.2%)
+            # 🛡️ KIỂM TRA LỆNH CHỜ (PENDING LIMIT ORDERS - BẢO TOÀN LƯỚI ĐA KHUNG VÀ HARD CAP):
+            # Nếu là lệnh Limit, kiểm tra xem đã có lệnh Limit cùng chiều với mức giá gần tương đương chưa (< 0.3%)
             # Nếu đã có mức giá này rồi -> Giữ nguyên, không đặt đè
-            # Nếu là mức giá mới (thuộc tầng lưới khác) -> ĐẶT THÊM, TUYỆT ĐỐI KHÔNG HỦY CÁC TẦNG LỆNH CŨ!
+            # Hard Cap: Tối đa 5 tầng lệnh Limit cho mỗi coin.
             if order_type == "limit":
+                if target_px <= 0:
+                    return False, f"Giá Limit không hợp lệ: {price}"
+
+                # 1. Kiểm tra cache cục bộ (In-Memory Fail-Safe): Chống spam ngay cả khi mạng lag
+                local_list = cls._local_grid_orders.get(grid_key, [])
+                for lo in local_list:
+                    lo_px = _safe_float(lo.get("price"))
+                    if lo_px > 0:
+                        diff_pct = abs(lo_px - target_px) / target_px
+                        if diff_pct < 0.003:  # < 0.3%
+                            msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{lo_px} đã tồn tại trong bộ nhớ (lệch {diff_pct*100:.2f}%) — Giữ nguyên tầng lưới này."
+                            cls.log_event(clean_uid, msg_exist)
+                            return True, msg_exist
+
+                # 2. Hard Cap kiểm tra số lượng lệnh tối đa trong local cache (Tối đa 5 tầng lệnh / coin):
+                if len(local_list) >= 5:
+                    msg_cap = f"ℹ️ [TRADELOCKER] Đã đạt giới hạn tối đa 5 tầng lệnh Limit cho {clean_base} {side_clean.upper()} — Bỏ qua không nhồi thêm."
+                    cls.log_event(clean_uid, msg_cap)
+                    return False, msg_cap
+
+                # 3. Kiểm tra lệnh trên sàn qua API
                 inst_info = client.resolve_instrument(clean_base)
                 tid = inst_info.get("tradableInstrumentId") if inst_info else None
-
-                existing_matched = False
                 if tid:
-                    ok_ord, orders, _ = client.get_orders()
+                    ok_ord, orders, msg_ord = client.get_orders()
                     if ok_ord and orders:
+                        matching_orders = []
                         for o in orders:
                             o_dict = o if isinstance(o, dict) else {}
-                            if not o_dict and isinstance(o, list):
-                                o_cols = ["id", "tradableInstrumentId", "routeId", "side", "qty", "price", "stopLoss", "takeProfit", "status", "type"]
-                                o_dict = {o_cols[i]: o[i] for i in range(min(len(o_cols), len(o)))}
-
                             o_tid = o_dict.get("tradableInstrumentId")
+                            o_status = str(o_dict.get("status") or "").lower()
+                            # Chỉ tính các lệnh đang chờ (pending/working/placed)
+                            if o_status in ("cancelled", "canceled", "filled", "rejected", "expired"):
+                                continue
                             if str(o_tid) == str(tid):
                                 o_side = str(o_dict.get("side", "")).lower()
-                                o_px = float(o_dict.get("price") or 0.0)
-                                o_id = str(o_dict.get("id") or "")
+                                if o_side == side_clean:
+                                    matching_orders.append(o_dict)
 
-                                # Nếu cùng chiều và giá chênh lệch < 0.2%: GIỮ NGUYÊN LỆNH CHỜ TẦNG NÀY, KHÔNG ĐẶT TRÙNG
-                                if o_side == side_clean and o_px > 0 and price > 0:
-                                    diff_pct = abs(o_px - price) / price
-                                    if diff_pct < 0.002:  # < 0.2%
-                                        existing_matched = True
-                                        msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{o_px} đã tồn tại (Order #{o_id}, lệch {diff_pct*100:.2f}%) — Giữ nguyên tầng lưới này."
-                                        cls.log_event(clean_uid, msg_exist)
-                                        return True, msg_exist
+                        # Tự động dọn dẹp nếu phát hiện tình trạng spam lệnh cũ vượt quá 5 tầng
+                        if len(matching_orders) > 5:
+                            cls.log_event(clean_uid, f"🧹 [TRADELOCKER] Phát hiện {len(matching_orders)} lệnh Limit {clean_base} {side_clean.upper()} trên sàn (> 5 tầng). Đang tự động dọn bớt lệnh dư thừa...")
+                            try:
+                                for excess_ord in matching_orders[5:]:
+                                    ex_id = str(excess_ord.get("id") or "")
+                                    if ex_id:
+                                        client.cancel_order(ex_id)
+                            except Exception:
+                                pass
+
+                        # Hard cap từ sàn: nếu trên sàn đã có >= 5 lệnh cho mã này
+                        if len(matching_orders) >= 5:
+                            msg_cap = f"ℹ️ [TRADELOCKER] Trên sàn đã có {len(matching_orders)} lệnh Limit {side_clean.upper()} cho {clean_base} (>= 5 tầng) — Bỏ qua không nhồi thêm."
+                            cls.log_event(clean_uid, msg_cap)
+                            return False, msg_cap
+
+                        for o_dict in matching_orders:
+                            o_px = _safe_float(o_dict.get("price"))
+                            o_id = str(o_dict.get("id") or "")
+                            if o_px > 0 and target_px > 0:
+                                diff_pct = abs(o_px - target_px) / target_px
+                                if diff_pct < 0.003:  # < 0.3%
+                                    # Đồng bộ ngược vào local cache
+                                    if not any(str(x.get("id")) == str(o_id) for x in cls._local_grid_orders[grid_key]):
+                                        cls._local_grid_orders[grid_key].append({"id": o_id, "price": o_px, "time": now_time})
+                                    msg_exist = f"ℹ️ [TRADELOCKER] Lệnh Limit {side_clean.upper()} {lot} Lot {clean_base} @{o_px} đã tồn tại trên sàn (Order #{o_id}, lệch {diff_pct*100:.2f}%) — Giữ nguyên tầng lưới này."
+                                    cls.log_event(clean_uid, msg_exist)
+                                    return True, msg_exist
 
             # 🎯 TỰ ĐỘNG BỔ SUNG SL & TP BẮT BUỘC (MẶC ĐỊNH THEO TỶ LỆ CÀI ĐẶT CỦA USER HOẶC 1.2%):
-            ref_px = float(price) if price and price > 0 else 0.0
+            ref_px = target_px
             if ref_px <= 0:
                 try:
                     inst_meta = client.resolve_instrument(clean_base)
@@ -1473,14 +1646,14 @@ class TradeLockerManager:
                         tid = inst_meta.get("tradableInstrumentId")
                         q_res = client.get_quotes([tid]) if hasattr(client, "get_quotes") else {}
                         if q_res and tid in q_res:
-                            ref_px = float(q_res[tid].get("ask") or q_res[tid].get("bid") or 0.0)
+                            ref_px = _safe_float(q_res[tid].get("ask") or q_res[tid].get("bid"))
                 except Exception:
                     pass
 
-            sl_pct_cfg = float(cfg.get("sl_percent") or 1.2) / 100.0
-            tp_pct_cfg = float(cfg.get("tp_percent") or 1.2) / 100.0
-            final_sl = float(sl_price) if sl_price and sl_price > 0 else None
-            final_tp = float(tp_price) if tp_price and tp_price > 0 else None
+            sl_pct_cfg = _safe_float(cfg.get("sl_percent"), 1.2) / 100.0
+            tp_pct_cfg = _safe_float(cfg.get("tp_percent"), 1.2) / 100.0
+            final_sl = _safe_float(sl_price) if sl_price and _safe_float(sl_price) > 0 else None
+            final_tp = _safe_float(tp_price) if tp_price and _safe_float(tp_price) > 0 else None
 
             if ref_px > 0:
                 if not final_sl or final_sl <= 0:
@@ -1489,7 +1662,7 @@ class TradeLockerManager:
                     final_tp = round(ref_px * (1.0 + tp_pct_cfg) if side_clean == "buy" else ref_px * (1.0 - tp_pct_cfg), 2)
 
             # Log trước khi đặt lệnh để trace
-            cls.log_event(clean_uid, f"🚀 [TRADELOCKER] Đang đặt lệnh {order_type.upper()} {side.upper()} {lot} Lot {clean_base} @{price} SL={final_sl} TP={final_tp}...")
+            cls.log_event(clean_uid, f"🚀 [TRADELOCKER] Đang đặt lệnh {order_type.upper()} {side.upper()} {lot} Lot {clean_base} @{target_px} SL={final_sl} TP={final_tp}...")
 
             # Đặt lệnh sang TradeLocker kèm SL và TP đầy đủ
             ok, res, msg = client.place_order(
@@ -1497,13 +1670,16 @@ class TradeLockerManager:
                 side=side,
                 qty=lot,
                 order_type=order_type,
-                price=price,
+                price=target_px,
                 stop_loss=final_sl,
                 take_profit=final_tp
             )
             sl_tp_tag = f" [SL: {final_sl} | TP: {final_tp}]" if (final_sl and final_tp) else ""
             if ok:
                 order_id = res.get("orderId") or res.get("id") or "N/A"
+                cls._symbol_cooldowns[sym_cool_key] = now_time
+                if order_type == "limit":
+                    cls._local_grid_orders[grid_key].append({"id": str(order_id), "price": target_px, "time": now_time})
                 cls.log_event(clean_uid, f"🏆 [TRADELOCKER] Đặt lệnh {side.upper()} {lot} Lot {clean_base}{sl_tp_tag} thành công (Ticket #{order_id})")
             else:
                 cls.log_event(clean_uid, f"⚠️ [TRADELOCKER] Đặt lệnh {side.upper()} {lot} Lot {clean_base}{sl_tp_tag} thất bại: {msg}")

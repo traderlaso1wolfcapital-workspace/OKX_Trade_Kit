@@ -145,6 +145,7 @@ function App() {
     activeAccounts: wsActiveAccounts,
     positions: wsPositions,
     setPositions: setWsPositions,
+    availBal,
     closedPositions,
     setClosedPositions,
     refresh: refreshBotData,
@@ -167,6 +168,21 @@ function App() {
   const setPositions = useCallback((val) => {
     setWsPositions(val);
   }, [setWsPositions]);
+
+  // Tài khoản đang chọn và Số dư thực tế tương ứng để đồng bộ vào Terminal Logs
+  const currentAccountObj = useMemo(() => {
+    return accounts?.find(a => a.id === effectiveAccId || a.name === effectiveAccId) || null;
+  }, [accounts, effectiveAccId]);
+
+  const accountBalance = useMemo(() => {
+    const eq = Number(currentAccountObj?.totalEq ?? currentAccountObj?.equity ?? currentAccountObj?.balance ?? availBal ?? 0);
+    const av = Number(availBal || currentAccountObj?.availBal || currentAccountObj?.balance || 0);
+    return {
+      availBal: av,
+      totalEq: eq,
+      balance: Number(currentAccountObj?.balance ?? eq)
+    };
+  }, [availBal, currentAccountObj]);
 
   useEffect(() => {
     if (wsActiveAccounts && Object.keys(wsActiveAccounts).length > 0) {
@@ -2309,19 +2325,38 @@ function App() {
   }, [activeBotTab]);
 
   // Reset Capital & Nen
-  const handleResetCapital = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn Reset Vốn Gốc (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?")) return;
+  const handleResetCapital = async (specifiedAcc = null) => {
+    const isProp = currentPlatform === "e8";
+    const targetAcc = specifiedAcc || selectedAccount || effectiveAccId || "";
+    const promptMsg = isProp
+      ? "Bạn có chắc chắn muốn Reset Vốn Gốc cho Quỹ FX (lấy số dư thực tế hiện tại làm mốc vốn mới)?"
+      : `Bạn có chắc chắn muốn Reset Vốn Gốc cho tài khoản [${targetAcc || 'hiện tại'}] (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?`;
+
+    if (!window.confirm(promptMsg)) return;
+
     try {
-      const targetAcc = selectedAccount || effectiveAccId || "";
-      const resp = await fetch(`/api/bot/reset_capital?uid=${currentUid}&strategy=${activeBotTab}&account_id=${targetAcc}`, { method: "POST" });
-      const data = await resp.json();
-      if (resp.ok) {
-        const msg = data.message || `✅ Đã Reset Vốn Gốc thành công! Tổng vốn quét từ OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`;
-        alert(msg);
-        addSystemLog(`♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc thành công! Tổng vốn quét từ sàn OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`);
-        refreshBotData();
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      if (isProp) {
+        const resp = await fetch(`/api/tradelocker/reset_capital?uid=${encodeURIComponent(curUid)}&account_id=${encodeURIComponent(targetAcc)}`, { method: "POST" });
+        const data = await resp.json();
+        if (resp.ok) {
+          alert(data.message || `✅ Đã Reset Vốn Gốc Quỹ FX thành công! Vốn mới: $${Number(data.total_equity || 0).toLocaleString()}`);
+          addSystemLog(`♻️ [QUỸ FX]: Đã Reset Vốn Gốc thành công! Mốc vốn mới: $${Number(data.total_equity || 0).toLocaleString()}`);
+          if (typeof fetchPropLogs === "function") fetchPropLogs();
+        } else {
+          alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+        }
       } else {
-        alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+        const resp = await fetch(`/api/bot/reset_capital?uid=${encodeURIComponent(curUid)}&strategy=${activeBotTab}&account_id=${encodeURIComponent(targetAcc)}`, { method: "POST" });
+        const data = await resp.json();
+        if (resp.ok) {
+          const msg = data.message || `✅ Đã Reset Vốn Gốc thành công! Tổng vốn quét từ OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`;
+          alert(msg);
+          addSystemLog(`♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc cho tài khoản [${targetAcc}] thành công! Tổng vốn quét từ sàn OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`);
+          refreshBotData();
+        } else {
+          alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+        }
       }
     } catch (e) {
       alert("❌ Lỗi kết nối: " + e.message);
@@ -3359,6 +3394,11 @@ function App() {
                         hasActiveAccount={Boolean(effectiveAccId && accounts && accounts.length > 0 && accounts.some(a => a.id === effectiveAccId || a.name === effectiveAccId))}
                         accountsCount={accounts ? accounts.length : 0}
                         isAuthenticated={isAuthenticated}
+                        onResetCapital={handleResetCapital}
+                        positions={positions}
+                        accountBalance={accountBalance}
+                        runningAccId={mergedActiveAccounts[activeBotTab]}
+                        accounts={accounts}
                       />
                     )}
 

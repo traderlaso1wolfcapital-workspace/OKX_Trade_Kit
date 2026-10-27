@@ -892,17 +892,14 @@ export default function SystemSettingsModal({
                     </button>
                   </div>
 
-                  {/* Lệnh Can Thiệp Nhanh */}
-                  <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                    <button className="btn-audit" onClick={handleResetCapital}>
-                      ♻️ {t("reset_audit_btn")}
-                    </button>
-                    {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                  {/* Lệnh Can Thiệp Nhanh (Dành riêng cho Quản trị viên) */}
+                  {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
+                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                       <button className="btn-audit" onClick={handleResetNen}>
                         ♻️ {t("reset_nen_btn")}
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
               </div>

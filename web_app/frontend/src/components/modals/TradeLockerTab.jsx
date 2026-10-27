@@ -314,6 +314,8 @@ export default function TradeLockerTab({ currentUid, t = (k) => k, initialSelect
       setAccountData(null);
       setSuccessMsg(`Đã xóa ${targetName}.`);
       await fetchAccountsList();
+      if (onAccountsUpdated) onAccountsUpdated();
+      window.dispatchEvent(new CustomEvent("tls1_prop_account_changed", { detail: "" }));
     } catch (err) {
       setErrorMsg("Lỗi xóa tài khoản: " + err.message);
     } finally {

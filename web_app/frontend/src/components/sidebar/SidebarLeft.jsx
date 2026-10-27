@@ -182,13 +182,21 @@ export default function SidebarLeft({
     fetch(`/api/tradelocker/accounts?uid=${encodeURIComponent(curUid)}`, { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && d.status === "success" && Array.isArray(d.accounts) && d.accounts.length > 0) {
+        if (d && d.status === "success" && Array.isArray(d.accounts)) {
           setPropAccounts(d.accounts);
-          if (d.active_id) {
-            setActivePropId(d.active_id);
+          if (d.accounts.length > 0) {
+            if (d.active_id) {
+              setActivePropId(d.active_id);
+            }
+            if (d.bot_prop_map) setLocalBotPropMap(d.bot_prop_map);
+            if (d.running_prop_bots) setLocalRunningPropBots(d.running_prop_bots);
+          } else {
+            setActivePropId("");
+            setE8Account(null);
+            if (tradingPlatform !== "okx") {
+              handlePlatformSwitch("okx");
+            }
           }
-          if (d.bot_prop_map) setLocalBotPropMap(d.bot_prop_map);
-          if (d.running_prop_bots) setLocalRunningPropBots(d.running_prop_bots);
         }
       })
       .catch(() => {});
@@ -442,12 +450,12 @@ export default function SidebarLeft({
             }
 
             const okxRunningStrat = getOkxRunningBot(currentOkxAcc);
-            const isThisOkxRunning = isOkx && (okxRunningStrat === activeBotTab || (!okxRunningStrat && isOkxRunning && (!activeAccounts || !activeAccounts[activeBotTab])));
-            const otherOkxRunningStrat = (isOkx && okxRunningStrat && okxRunningStrat !== activeBotTab) ? okxRunningStrat : null;
+            const isThisOkxRunning = isOkx && (isOkxRunning || okxRunningStrat === activeBotTab);
+            const otherOkxRunningStrat = (isOkx && okxRunningStrat && okxRunningStrat !== activeBotTab && !isOkxRunning) ? okxRunningStrat : null;
 
             const propRunningStrat = getPropRunningBot(currentPropAcc);
-            const isThisPropRunning = !isOkx && (propRunningStrat === activeBotTab || (!propRunningStrat && isPropRunning && (currentPropAcc?.id === activePropId || propAccounts.length <= 1)));
-            const otherPropRunningStrat = (!isOkx && propRunningStrat && propRunningStrat !== activeBotTab) ? propRunningStrat : null;
+            const isThisPropRunning = !isOkx && (isPropRunning || propRunningStrat === activeBotTab);
+            const otherPropRunningStrat = (!isOkx && propRunningStrat && propRunningStrat !== activeBotTab && !isPropRunning) ? propRunningStrat : null;
 
             return (
               <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "10px" }}>
@@ -556,9 +564,10 @@ export default function SidebarLeft({
                         accounts.map((acc) => {
                           const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
                           const tag = formatOkxAccountTag(acc);
+                          const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
                           const accRunningStrat = getOkxRunningBot(acc);
-                          const isThisAccRunning = accRunningStrat === activeBotTab || (!accRunningStrat && isOkxRunning && isSelected && (!activeAccounts || !activeAccounts[activeBotTab]));
-                          const otherAccRunning = (accRunningStrat && accRunningStrat !== activeBotTab) ? accRunningStrat : null;
+                          const isThisAccRunning = !isAccMain && (isOkxRunning || accRunningStrat === activeBotTab || acc.is_running);
+                          const otherAccRunning = (accRunningStrat && accRunningStrat !== activeBotTab && !isOkxRunning) ? accRunningStrat : null;
 
                           return (
                             <button
@@ -662,8 +671,8 @@ export default function SidebarLeft({
                           const rawTag = (pAcc.account_id || pAcc.id || "").toString();
                           const tag = rawTag.replace(/^#/, "");
                           const pRunningStrat = getPropRunningBot(pAcc);
-                          const isThisPropAccRunning = pRunningStrat === activeBotTab || (!pRunningStrat && isPropRunning && (pAcc.id === activePropId || propAccounts.length <= 1));
-                          const otherPAccRunning = (pRunningStrat && pRunningStrat !== activeBotTab) ? pRunningStrat : null;
+                          const isThisPropAccRunning = isPropRunning || pRunningStrat === activeBotTab || pAcc.is_bot_running;
+                          const otherPAccRunning = (pRunningStrat && pRunningStrat !== activeBotTab && !isPropRunning) ? pRunningStrat : null;
 
                           return (
                             <button
