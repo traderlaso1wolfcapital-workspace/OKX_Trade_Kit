@@ -488,6 +488,11 @@ export default function SidebarLeft({
                       {displayAccountTag && (
                         <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{displayAccountTag}</span>
                       )}
+                      {isOkx && (currentOkxAcc?.is_main || currentOkxAcc?.name === "Tài khoản chính" || (currentOkxAcc?.name && currentOkxAcc.name.toLowerCase().startsWith("tài khoản chính"))) && (
+                        <span style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 700, background: "rgba(148, 163, 184, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title="Tài khoản chính (Chỉ dùng quản lý vốn & check Ref, không chạy bot)">
+                          TK CHÍNH
+                        </span>
+                      )}
                       {isOkx && isThisOkxRunning && (
                         <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                           LIVE
@@ -597,6 +602,11 @@ export default function SidebarLeft({
                                 <OkxLogo size={13} />
                                 <span>SÀN OKX</span>
                                 <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                                {(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính"))) && (
+                                  <span style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 700, background: "rgba(148, 163, 184, 0.15)", padding: "1px 4px", borderRadius: "3px" }} title="Tài khoản chính (Chỉ dùng quản lý vốn & check Ref, không chạy bot)">
+                                    TK CHÍNH
+                                  </span>
+                                )}
                                 {isThisAccRunning && (
                                   <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                                     LIVE

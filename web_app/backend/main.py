@@ -585,26 +585,89 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 # 3. Kết nối API OKX thành công: Luôn cho phép kết nối để xem số dư, biểu đồ và lưu cấu hình
                 # (Cơ chế đối chiếu Ref sẽ được kích hoạt chặt chẽ khi người dùng bấm Khởi động Bot)
 
-                # 4. Lưu thông tin API DUY NHẤT vào thư mục của UID này
-                acc = req.account_id if req.account_id else req.strategy
+                # 4. Lưu thông tin API DUY NHẤT vào thư mục của UID này (Tách biệt tuyệt đối từng tài khoản phụ)
+                api_uid = str(acc_info.get("api_uid", "")).strip() if acc_info else ""
                 base_dir = get_user_data_dir(uid)
-                fpath = os.path.join(base_dir, f"bots/{req.strategy}", f".api_{acc}")
-                _save_env_file(fpath, api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
-                _save_env_file(os.path.join(base_dir, f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
-                _save_env_file(os.path.join(base_dir, f"accounts/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
-                _save_env_file(os.path.join(base_dir, f"bots/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
+                os.makedirs(base_dir, exist_ok=True)
+                acc_file = os.path.join(base_dir, "accounts.json")
+                existing_accounts = []
+                if os.path.exists(acc_file):
+                    try:
+                        with open(acc_file, "r", encoding="utf-8") as rf:
+                            loaded = json.load(rf)
+                            if isinstance(loaded, list):
+                                existing_accounts = loaded
+                    except Exception:
+                        pass
+
+                # Xác định Account ID thông minh - TUYỆT ĐỐI không ghi đè tài khoản khác
+                acc = None
+                # Bước 1: Ưu tiên tìm tài khoản đã tồn tại có cùng OKX UID (re-authorization / refresh key)
+                if api_uid:
+                    for a in existing_accounts:
+                        if a.get("okx_uid") and str(a.get("okx_uid")).strip() == api_uid:
+                            acc = a.get("id")
+                            break
+
+                # Bước 2: Nếu chưa tìm thấy theo okx_uid, kiểm tra req.account_id gửi lên
+                if not acc and req.account_id and req.account_id.strip():
+                    req_acc = req.account_id.strip()
+                    matched_req = next((a for a in existing_accounts if a.get("id") == req_acc), None)
+                    if matched_req:
+                        existing_acc_okx = str(matched_req.get("okx_uid", "")).strip()
+                        # Chỉ cho phép gán nếu tài khoản này chưa có okx_uid hoặc trùng khớp okx_uid
+                        if not existing_acc_okx or existing_acc_okx == api_uid:
+                            acc = req_acc
+                    else:
+                        acc = req_acc
+
+                # Bước 3: Nếu vẫn chưa có ID, đây là tài khoản mới -> Tự động sinh ID duy nhất
+                if not acc:
+                    existing_ids = {a.get("id") for a in existing_accounts if a.get("id")}
+                    if is_main:
+                        candidate_id = "main"
+                        if candidate_id in existing_ids:
+                            candidate_id = f"main_{api_uid[-4:] if len(api_uid) >= 4 else int(time.time())}"
+                        acc = candidate_id
+                    else:
+                        clean_sfx = api_uid[-4:] if len(api_uid) >= 4 else str(int(time.time()))[-4:]
+                        candidate_id = f"sub_{clean_sfx}"
+                        counter = 1
+                        while candidate_id in existing_ids:
+                            candidate_id = f"sub_{clean_sfx}_{counter}"
+                            counter += 1
+                        acc = candidate_id
+
+                # Lưu credentials vào các thư mục định danh của tài khoản này
+                _save_env_file(os.path.join(base_dir, f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid, is_main=is_main, api_uid=api_uid)
+                _save_env_file(os.path.join(base_dir, f"accounts/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid, is_main=is_main, api_uid=api_uid)
+                _save_env_file(os.path.join(base_dir, f"bots/{acc}", f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid, is_main=is_main, api_uid=api_uid)
+
+                # Nếu có strategy chỉ định, kiểm tra an toàn trước khi ghi
                 if req.strategy:
-                    _save_env_file(os.path.join(base_dir, f"bots/{req.strategy}", f".api_{req.strategy}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid)
+                    strat_dir = os.path.join(base_dir, f"bots/{req.strategy}")
+                    os.makedirs(strat_dir, exist_ok=True)
+                    _save_env_file(os.path.join(strat_dir, f".api_{acc}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid, is_main=is_main, api_uid=api_uid)
+                    running_acc_file = os.path.join(strat_dir, f".running_account_{req.strategy}")
+                    current_running = ""
+                    if os.path.exists(running_acc_file):
+                        try:
+                            with open(running_acc_file, "r") as rf:
+                                current_running = rf.read().strip()
+                        except: pass
+                    if not current_running or current_running == acc:
+                        _save_env_file(os.path.join(strat_dir, f".api_{req.strategy}"), api_key, secret_key, passphrase, is_demo=False, main_uid=main_uid, is_main=is_main, api_uid=api_uid)
 
                 # Cập nhật hoặc lưu vào accounts.json của chính UID này
                 fast_api_label = acc_info.get("label", "") if acc_info else ""
-                updated_accounts = sync_account_name_in_storage(uid, acc, detected_name, api_label=fast_api_label)
+                updated_accounts = sync_account_name_in_storage(uid, acc, detected_name, api_label=fast_api_label, is_main=is_main, okx_uid=api_uid)
                 
                 return {
                     "status": "success",
                     "message": f"Kết nối OKX Fast Connect thành công: {detected_name}!",
                     "detected_name": detected_name,
                     "detected_uid": uid,
+                    "account_id": acc,
                     "is_main": is_main,
                     "accounts": updated_accounts
                 }
@@ -1014,7 +1077,7 @@ def proxy_market_ticker(instId: str):
         return {"code": "-1", "msg": str(e), "data": []}
 
 def _parse_env_file(fpath: str):
-    creds = {"api_key": "", "secret_key": "", "passphrase": "", "is_demo": False, "main_uid": ""}
+    creds = {"api_key": "", "secret_key": "", "passphrase": "", "is_demo": False, "main_uid": "", "is_main": False, "api_uid": ""}
     if os.path.exists(fpath):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
@@ -1027,6 +1090,8 @@ def _parse_env_file(fpath: str):
                         elif k == "OKX_PASSPHRASE": creds["passphrase"] = decrypt_value(v)
                         elif k == "OKX_IS_DEMO": creds["is_demo"] = (v.lower() == "true")
                         elif k in ("OKX_MAIN_UID", "OKX_UID"): creds["main_uid"] = v
+                        elif k == "OKX_IS_MAIN": creds["is_main"] = (v.lower() == "true")
+                        elif k == "OKX_API_UID": creds["api_uid"] = v
         except Exception:
             pass
     return creds
@@ -1153,7 +1218,7 @@ def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, sec
         return requests.request(method_upper, base_url + path, headers=headers, data=body, timeout=timeout)
 
 
-def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, main_uid: str = ""):
+def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, main_uid: str = "", is_main: bool = None, api_uid: str = ""):
     os.makedirs(os.path.dirname(fpath), exist_ok=True)
     lines = []
     if os.path.exists(fpath):
@@ -1174,6 +1239,10 @@ def _save_env_file(fpath: str, api_key: str, secret_key: str, passphrase: str, i
     }
     if main_uid:
         keys["OKX_MAIN_UID"] = str(main_uid)
+    if is_main is not None:
+        keys["OKX_IS_MAIN"] = "True" if is_main else "False"
+    if api_uid:
+        keys["OKX_API_UID"] = str(api_uid)
     new_lines = []
     found_keys = set()
     for line in lines:
@@ -1239,7 +1308,7 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
                     last4 = suffix[-4:] if len(suffix) >= 4 else suffix
                     detected_name = f"#{last4}" if last4 else "Fast API"
                 elif is_main:
-                    detected_name = f"#{main_uid[-4:]}" if main_uid else "Tài khoản chính"
+                    detected_name = f"Tài khoản chính ({main_uid[-4:]})" if main_uid else "Tài khoản chính"
                 else:
                     detected_name = f"#{api_uid[-4:]}" if api_uid else "Tài khoản phụ"
 
@@ -1255,12 +1324,14 @@ def detect_okx_account_info(api_key: str, secret_key: str, passphrase: str, is_d
         print(f"[DETECT OKX ACC ERROR] {e}", flush=True)
     return None
 
-def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, force_rename: bool = False, api_label: str = ""):
+def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, force_rename: bool = False, api_label: str = "", is_main: bool = None, okx_uid: str = ""):
     """
     Cập nhật hoặc đặt tên cho tài khoản trong accounts.json:
     - Nếu tài khoản chưa được tạo bằng dấu + với tên thủ công riêng (is_manual != True),
       hoặc tên hiện tại đang là tên mặc định (Tài khoản 1, sub1, ...), hoặc force_rename == True
       -> Tự động đặt tên cho tài khoản theo tên quét được trên sàn OKX.
+    - Định danh chính xác theo okx_uid, tuyệt đối không ghi đè lên tài khoản phụ khác.
+    - Lưu thuộc tính is_main (True nếu là tài khoản chính, False nếu là tài khoản phụ).
     - Trả về danh sách accounts mới nhất.
     """
     if not detected_name or not detected_name.strip():
@@ -1281,53 +1352,74 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
             pass
 
     found = False
-    # 1. Tìm theo ID trước
-    for acc in accounts:
-        if acc.get("id") == target_acc:
-            found = True
-            is_manual = acc.get("is_manual", False)
-            current_name = acc.get("name", "").strip()
-            # Kiểm tra xem có phải tên mặc định chưa qua đổi tên bằng dấu +
-            is_generic = (not is_manual) or (current_name in ["Tài khoản 1", "Tài khoản 2", "Tài khoản 3", "sub1", "sub2", "sub3"]) or current_name.startswith("Tài khoản ")
-            if is_generic or force_rename:
+    clean_okx_uid = str(okx_uid).strip() if okx_uid else ""
+
+    # 1. Ưu tiên tuyệt đối tìm theo OKX UID nếu có (Định danh chuẩn xác tài khoản sàn OKX)
+    if clean_okx_uid:
+        for acc in accounts:
+            if acc.get("okx_uid") and str(acc.get("okx_uid")).strip() == clean_okx_uid:
+                found = True
                 acc["name"] = detected_name
                 if api_label:
                     acc["api_label"] = api_label
-            break
-
-    # 2. Nếu chưa tìm thấy theo ID, tìm theo tên để tái sử dụng tài khoản cũ thay vì tạo trùng lặp
-    if not found:
-        for acc in accounts:
-            if acc.get("name", "").strip().lower() == detected_name.strip().lower():
-                found = True
+                if is_main is not None:
+                    acc["is_main"] = bool(is_main)
+                acc["okx_uid"] = clean_okx_uid
                 target_acc = acc.get("id", target_acc)
-                if api_label:
-                    acc["api_label"] = api_label
                 break
 
-    # 3. Nếu chưa từng tồn tại tài khoản nào cùng ID hoặc cùng Tên thì mới tạo mới
+    # 2. Nếu chưa tìm thấy theo OKX UID, tìm theo Account ID (target_acc)
+    if not found:
+        for acc in accounts:
+            if acc.get("id") == target_acc:
+                # 🛡️ BẢO VỆ CHỐNG ĐÈ: Nếu tài khoản này đã có okx_uid khác thì bỏ qua, không được ghi đè!
+                existing_okx = str(acc.get("okx_uid", "")).strip()
+                if existing_okx and clean_okx_uid and existing_okx != clean_okx_uid:
+                    continue
+                found = True
+                is_manual = acc.get("is_manual", False)
+                current_name = acc.get("name", "").strip()
+                is_generic = (not is_manual) or (current_name in ["Tài khoản 1", "Tài khoản 2", "Tài khoản 3", "sub1", "sub2", "sub3"]) or current_name.startswith("Tài khoản ")
+                if is_generic or force_rename:
+                    acc["name"] = detected_name
+                    if api_label:
+                        acc["api_label"] = api_label
+                if clean_okx_uid:
+                    acc["okx_uid"] = clean_okx_uid
+                if is_main is not None:
+                    acc["is_main"] = bool(is_main)
+                break
+
+    # 3. Nếu chưa từng tồn tại tài khoản nào cùng OKX UID hoặc cùng ID thì mới tạo mới
     if not found:
         new_acc = {
             "id": target_acc,
             "name": detected_name,
             "is_manual": False
         }
+        if clean_okx_uid:
+            new_acc["okx_uid"] = clean_okx_uid
         if api_label:
             new_acc["api_label"] = api_label
+        if is_main is not None:
+            new_acc["is_main"] = bool(is_main)
         accounts.append(new_acc)
 
-    # 4. Tự động khử trùng lặp (Deduplicate) theo tên và ID
+    # 4. Tự động khử trùng lặp (Deduplicate) AN TOÀN theo ID và OKX UID (Bảo toàn 100% các tài khoản khác nhau)
     deduped = []
-    seen_names = set()
     seen_ids = set()
+    seen_okx_uids = set()
     for a in accounts:
         aid = a.get("id", "")
-        aname = a.get("name", "").strip().lower()
-        if aid and aid not in seen_ids and (not aname or aname not in seen_names):
-            seen_ids.add(aid)
-            if aname:
-                seen_names.add(aname)
-            deduped.append(a)
+        a_okx = str(a.get("okx_uid", "")).strip() if a.get("okx_uid") else ""
+        if not aid or aid in seen_ids:
+            continue
+        if a_okx and a_okx in seen_okx_uids:
+            continue
+        seen_ids.add(aid)
+        if a_okx:
+            seen_okx_uids.add(a_okx)
+        deduped.append(a)
     accounts = deduped
 
     try:
@@ -1598,19 +1690,47 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     if not (api_key and secret_key and passphrase):
         raise HTTPException(status_code=400, detail=f"Cần cấu hình API Key cho tài khoản '{target_acc}' trước khi khởi động Bot {strategy}!")
 
-    # ── ĐỐI CHIẾU REF GOOGLE SHEETS KHI KHỞI ĐỘNG BOT ──
+    # ── ĐỐI CHIẾU REF GOOGLE SHEETS & KHÓA GIAO DỊCH TÀI KHOẢN CHÍNH KHI KHỞI ĐỘNG BOT ──
     # Miễn trừ đối với Admin (admtls12021) và chế độ Quỹ FX (đánh Quỹ độc lập)
     if not is_admin_uid(uid) and not is_prop_mode:
+        acc_info = None
+        try:
+            acc_info = detect_okx_account_info(api_key, secret_key, passphrase, is_demo)
+        except Exception as e:
+            print(f"[START_BOT] Lỗi quét thông tin OKX: {e}", flush=True)
+
+        # 🛡️ KHÓA GIAO DỊCH TRÊN TÀI KHOẢN CHÍNH (MASTER ACCOUNT):
+        is_main_account = False
+        if acc_info and acc_info.get("is_main"):
+            is_main_account = True
+        else:
+            target_env = os.path.join(data_dir, f".api_{target_acc}")
+            c_env = _parse_env_file(target_env) if os.path.exists(target_env) else {}
+            if c_env.get("is_main"):
+                is_main_account = True
+            else:
+                acc_file = os.path.join(data_dir, "accounts.json")
+                if os.path.exists(acc_file):
+                    try:
+                        with open(acc_file, "r", encoding="utf-8") as af:
+                            acc_list = json.load(af)
+                        for a in acc_list:
+                            if a.get("id") == target_acc and (a.get("is_main") is True or str(a.get("name", "")).startswith("Tài khoản chính")):
+                                is_main_account = True
+                                break
+                    except Exception:
+                        pass
+
+        if is_main_account:
+            raise HTTPException(
+                status_code=400,
+                detail="🛡️ BẢO VỆ TÀI SẢN: Bot KHÔNG CHO PHÉP giao dịch trên Tài khoản chính (Master Account)!\n\nĐể đảm bảo an toàn vốn tuyệt đối, quý khách vui lòng:\n1. Tạo Tài khoản phụ (Sub-account) trên sàn OKX.\n2. Chuyển số vốn bạn muốn chạy bot vào Tài khoản phụ đó.\n3. Kết nối API của Tài khoản phụ để Chạy Bot.\n\n💡 Tài khoản chính chỉ dùng để quản lý vốn và xác thực bản quyền Ref."
+            )
+
         master_uid = _get_master_uid(uid, target_acc)
-        if not master_uid or not master_uid.isdigit():
-            try:
-                acc_info = detect_okx_account_info(api_key, secret_key, passphrase, is_demo)
-                if acc_info and acc_info.get("main_uid"):
-                    master_uid = str(acc_info["main_uid"]).strip()
-                    data_dir = get_user_data_dir(uid)
-                    _save_env_file(os.path.join(data_dir, f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo, main_uid=master_uid)
-            except Exception as e:
-                print(f"[START_BOT] Lỗi quét UID từ OKX: {e}", flush=True)
+        if acc_info and acc_info.get("main_uid"):
+            master_uid = str(acc_info["main_uid"]).strip()
+            _save_env_file(os.path.join(data_dir, f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo, main_uid=master_uid, is_main=False)
 
         if not master_uid and uid.isdigit() and len(uid) >= 8:
             master_uid = uid
@@ -2234,18 +2354,36 @@ def get_bot_accounts(uid: str):
             with open(acc_file, "r", encoding="utf-8") as f:
                 accounts = json.load(f)
                 if isinstance(accounts, list):
-                    # Tự động khử trùng lặp (Deduplicate) theo tên và ID
+                    # Tự động khử trùng lặp (Deduplicate) AN TOÀN theo ID và OKX UID
                     deduped = []
-                    seen_names = set()
                     seen_ids = set()
+                    seen_okx_uids = set()
                     has_duplicate = False
                     for a in accounts:
                         aid = a.get("id", "")
-                        aname = a.get("name", "").strip().lower()
-                        if aid and aid not in seen_ids and (not aname or aname not in seen_names):
+                        a_okx = str(a.get("okx_uid", "")).strip() if a.get("okx_uid") else ""
+                        if aid and aid not in seen_ids and (not a_okx or a_okx not in seen_okx_uids):
                             seen_ids.add(aid)
-                            if aname:
-                                seen_names.add(aname)
+                            if a_okx:
+                                seen_okx_uids.add(a_okx)
+                            if "is_main" not in a:
+                                if a.get("name", "").startswith("Tài khoản chính") or a.get("id") == "main":
+                                    a["is_main"] = True
+                                else:
+                                    t_env = os.path.join(data_dir, f".api_{aid}")
+                                    if os.path.exists(t_env):
+                                        c_env = _parse_env_file(t_env)
+                                        a["is_main"] = c_env.get("is_main", False)
+                                        if not a.get("okx_uid") and c_env.get("api_uid"):
+                                            a["okx_uid"] = c_env["api_uid"]
+                                    else:
+                                        a["is_main"] = False
+                            elif not a.get("okx_uid"):
+                                t_env = os.path.join(data_dir, f".api_{aid}")
+                                if os.path.exists(t_env):
+                                    c_env = _parse_env_file(t_env)
+                                    if c_env.get("api_uid"):
+                                        a["okx_uid"] = c_env["api_uid"]
                             deduped.append(a)
                         else:
                             has_duplicate = True
@@ -2508,7 +2646,7 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
                     last4 = suffix[-4:] if len(suffix) >= 4 else suffix
                     detected_name = f"#{last4}" if last4 else "Fast API"
                 elif is_main:
-                    detected_name = f"#{owner_uid[-4:]}" if owner_uid else "Tài khoản chính"
+                    detected_name = f"Tài khoản chính ({owner_uid[-4:]})" if owner_uid else "Tài khoản chính"
                 else:
                     detected_name = f"#{api_uid[-4:]}" if api_uid else "Tài khoản phụ"
             else:
@@ -2538,27 +2676,27 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     u_data_dir = get_user_data_dir(owner_uid)
     os.makedirs(os.path.join(u_data_dir, f"bots/{target_acc}"), exist_ok=True)
     os.makedirs(os.path.join(u_data_dir, f"accounts/{target_acc}"), exist_ok=True)
-    _save_env_file(os.path.join(u_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-    _save_env_file(os.path.join(u_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-    _save_env_file(os.path.join(u_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-    _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+    _save_env_file(os.path.join(u_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+    _save_env_file(os.path.join(u_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+    _save_env_file(os.path.join(u_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+    _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
     if strategy:
-        _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        _save_env_file(os.path.join(u_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
 
     if uid and uid != owner_uid:
         session_data_dir = get_user_data_dir(uid)
         os.makedirs(os.path.join(session_data_dir, f"bots/{target_acc}"), exist_ok=True)
         os.makedirs(os.path.join(session_data_dir, f"accounts/{target_acc}"), exist_ok=True)
-        _save_env_file(os.path.join(session_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-        _save_env_file(os.path.join(session_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-        _save_env_file(os.path.join(session_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-        _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
+        _save_env_file(os.path.join(session_data_dir, f"bots/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+        _save_env_file(os.path.join(session_data_dir, f"accounts/{target_acc}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+        _save_env_file(os.path.join(session_data_dir, f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+        _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{target_acc}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
         if strategy:
-            _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid)
-        sync_account_name_in_storage(uid, target_acc, detected_name, api_label=label)
+            _save_env_file(os.path.join(session_data_dir, f"bots/{strategy}", f".api_{strategy}"), creds.api_key, creds.secret_key, creds.passphrase, main_uid=owner_uid, is_main=is_main, api_uid=api_uid)
+        sync_account_name_in_storage(uid, target_acc, detected_name, api_label=label, is_main=is_main, okx_uid=api_uid)
         
     # Đồng bộ tên quét được từ sàn OKX vào accounts.json của riêng UID này
-    updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name, api_label=label)
+    updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name, api_label=label, is_main=is_main, okx_uid=api_uid)
 
     data_dir = get_user_data_dir(owner_uid)
     running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")

@@ -19,14 +19,15 @@ import "./App.css";
 
 const dedupeAccounts = (accList) => {
   if (!Array.isArray(accList)) return [];
-  const seenNames = new Set();
   const seenIds = new Set();
+  const seenOkxUids = new Set();
   return accList.filter(a => {
     const aid = a?.id;
-    const aname = a?.name?.trim()?.toLowerCase();
-    if (!aid || seenIds.has(aid) || (aname && seenNames.has(aname))) return false;
+    const aOkx = a?.okx_uid ? String(a.okx_uid).trim() : "";
+    if (!aid || seenIds.has(aid)) return false;
+    if (aOkx && seenOkxUids.has(aOkx)) return false;
     seenIds.add(aid);
-    if (aname) seenNames.add(aname);
+    if (aOkx) seenOkxUids.add(aOkx);
     return true;
   });
 };
@@ -1624,13 +1625,8 @@ function App() {
       if (code) {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
         try {
-          let acc = callbackAcc;
+          let acc = callbackAcc || "";
           const strat = callbackStrat;
-
-          // Nếu chưa có account ID gán, dùng ID tạm và để backend tự detect tên chuẩn, KHÔNG tạo rác Tài khoản 1
-          if (!acc) {
-            acc = `sub_${Date.now()}`;
-          }
 
           addSystemLog("⏳ [FAST CONNECT] Đang xác thực với OKX...");
           setFastConnectStatus({ type: "info", msg: "Đang xử lý cấp quyền từ OKX, vui lòng chờ..." });
@@ -1662,8 +1658,13 @@ function App() {
               setAccounts(cleanAccs);
               localStorage.setItem("tls1_accounts", JSON.stringify(cleanAccs));
 
-              // Tìm account ID thực tế (có thể backend đã gán cho tài khoản có cùng tên)
-              const matchedAcc = cleanAccs.find(a => a.name === data.detected_name) || cleanAccs.find(a => a.id === acc) || cleanAccs[0];
+              // Tìm account ID thực tế (ưu tiên ID chính xác do backend trả về)
+              const returnedAccId = data.account_id;
+              const matchedAcc = (returnedAccId && cleanAccs.find(a => a.id === returnedAccId))
+                || cleanAccs.find(a => a.name === data.detected_name)
+                || (acc && cleanAccs.find(a => a.id === acc))
+                || cleanAccs[cleanAccs.length - 1]
+                || cleanAccs[0];
               if (matchedAcc) {
                 setSelectedAccount(matchedAcc.id);
                 setBotAccountMap(prev => {
@@ -1714,7 +1715,8 @@ function App() {
       const clientId = "6038d061f79a421ea44b3d1777bbef5dBRWpzwlb";
       const redirectUri = encodeURIComponent("https://autotrader.fun/okx-callback");
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const stateObj = { uid: currentUid, acc: effectiveAccId, strat: activeBotTab || "sub1", pwa: isStandalone };
+      // Để acc rỗng để backend tự động định danh theo OKX UID và detected_name, không ghi đè tài khoản đang chọn
+      const stateObj = { uid: currentUid, acc: "", strat: activeBotTab || "sub1", pwa: isStandalone };
       const stateJson = JSON.stringify(stateObj);
       const state = btoa(stateJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       
@@ -1722,7 +1724,7 @@ function App() {
       localStorage.setItem("okx_oauth_state_raw", stateJson);
       setOkxOAuthUrl(`https://www.okx.com/vi/account/oauth?response_type=code&access_type=offline&client_id=${clientId}&redirect_uri=${redirectUri}&scope=fast_api&state=${state}&authLogout=1`);
     }
-  }, [showConnectModal, currentUid, effectiveAccId, activeBotTab]);
+  }, [showConnectModal, currentUid, activeBotTab]);
 
   const handleFastConnectClick = () => {
     localStorage.setItem("okx_oauth_state", okxOAuthState);
@@ -1911,6 +1913,26 @@ function App() {
       return;
     }
 
+    // 🛡️ KHÓA GIAO DỊCH TRÊN TÀI KHOẢN CHÍNH (MASTER ACCOUNT):
+    const currentAccObj = accounts.find(a => a.id === currentAcc || a.name === currentAcc);
+    const isMainAccount = currentAccObj?.is_main === true ||
+                          currentAccObj?.name === "Tài khoản chính" ||
+                          (currentAccObj?.name && currentAccObj.name.toLowerCase().startsWith("tài khoản chính"));
+
+    if (isMainAccount) {
+      alert(
+        "🛡️ BẢO VỆ TÀI SẢN: Bot KHÔNG CHO PHÉP giao dịch trên Tài khoản chính!\n\n" +
+        "Để đảm bảo an toàn vốn tuyệt đối, quý khách vui lòng:\n" +
+        "1. Tạo Tài khoản phụ (Sub-account) trên sàn OKX.\n" +
+        "2. Chuyển số vốn bạn muốn chạy bot vào Tài khoản phụ đó.\n" +
+        "3. Kết nối API của Tài khoản phụ để Chạy Bot.\n\n" +
+        "💡 Tài khoản chính chỉ dùng để quản lý vốn và xác thực bản quyền Ref."
+      );
+      setConnectModalTab("fast");
+      setShowConnectModal(true);
+      return;
+    }
+
     // 🛡️ KHÓA ĐỘC QUYỀN SÀN OKX: 1 Tài khoản chỉ được chạy 1 phương pháp Bot duy nhất
     const runningBotStrat = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => {
       return strat !== activeBotTab && (id === currentAcc || String(id).replace(/^#/, "") === String(currentAcc).replace(/^#/, ""));
@@ -1984,7 +2006,11 @@ function App() {
         } catch {
           errMsg = await r.text();
         }
-        if (errMsg.includes("liên hệ Admin") || errMsg.includes("kích hoạt") || errMsg.includes("bị khóa")) {
+        if (errMsg.includes("BẢO VỆ TÀI SẢN") || errMsg.includes("Tài khoản chính")) {
+          alert(errMsg);
+          setConnectModalTab("fast");
+          setShowConnectModal(true);
+        } else if (errMsg.includes("liên hệ Admin") || errMsg.includes("kích hoạt") || errMsg.includes("bị khóa")) {
           alert("Vui lòng liên hệ Admin để kích hoạt.");
         } else if (r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký dưới link") || errMsg.includes("chưa đăng ký")) {
           alert("UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!");

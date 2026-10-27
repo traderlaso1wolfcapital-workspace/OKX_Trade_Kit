@@ -33,6 +33,49 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[27/10/2026]** - Khắc Phục Lỗi Fast API OKX Kết Nối Đè Tài Khoản Phụ (Connect Tài Khoản 2 #5156 Làm Mất Thẻ Tài Khoản 1 #4531):
+  - **Mô tả hiện tượng từ CEO:** Khi kết nối Fast API với tài khoản 1 `#4531`, sau đó kết nối Fast API với tài khoản 2 thì tài khoản 1 bị đá ra, không còn thẻ `#4531` nữa mà bị thay bằng thẻ `#5156`. Yêu cầu xác minh đây là lỗi hay cơ chế của OKX và khắc phục để có thể kết nối đồng thời nhiều tài khoản phụ thông qua Fast API.
+  - **Kết luận bản chất:** **Không phải do sàn OKX giới hạn!** OKX OAuth (Fast API) hoàn toàn cho phép authorize không giới hạn tài khoản phụ độc lập, mỗi sub-account sinh ra API Key riêng với `api_uid` riêng biệt. Vấn đề tài khoản 1 bị đá ra là do **lỗi logic định danh và ghi đè của Web App local**.
+  - **Nguyên nhân gốc rễ (Root Cause):**
+    1. **Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):** Khi người dùng mở `ConnectModal` để kết nối tài khoản mới, biến `okxOAuthUrl` khởi tạo `stateObj = { uid, acc: effectiveAccId, ... }`. Lúc này `effectiveAccId` đang mang ID của tài khoản 1 (`sub1`). Khi callback trả về, Frontend gửi `account_id: "sub1"` lên Backend.
+    2. **Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Hàm `okx_oauth_callback` nhận `req.account_id = "sub1"` $\rightarrow$ ghi đè credentials mới của tài khoản 2 vào file `.api_sub1` của tài khoản 1!
+       - Sau đó gọi `sync_account_name_in_storage(uid, "sub1", detected_name)`: tìm thấy ID `sub1` và đổi tên nó từ `#4531` thành `#5156`!
+    3. **Deduplication:** Cơ chế khử trùng lặp cũ lọc theo `name` khiến tài khoản bị nuốt thẻ nếu trùng tên hiển thị.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+       - Sửa `stateObj.acc = ""` khi tạo kết nối Fast API mới, để Backend tự động định danh theo `okx_uid` của OKX thay vì ép đè vào tài khoản đang chọn.
+       - Trong callback, ưu tiên nhận `data.account_id` trả về từ Backend để gán chính xác thẻ tài khoản mới kết nối.
+       - Sửa `dedupeAccounts` khử trùng an toàn theo `id` và `okx_uid`, bảo toàn 100% tất cả các tài khoản khác nhau.
+    2. **Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Trong `okx_oauth_callback`: Đọc `api_uid` từ API OKX. Kiểm tra `accounts.json`: nếu đã có tài khoản mang `okx_uid == api_uid` thì cập nhật đúng tài khoản đó; nếu là sub-account mới, tự động cấp phát một ID duy nhất `sub_{clean_sfx}` (tránh tuyệt đối mọi ID đã tồn tại).
+       - Lưu credentials độc lập vào `.api_{new_acc}` của riêng tài khoản đó, không ghi đè vào bot đang chạy của tài khoản khác.
+       - Cập nhật `sync_account_name_in_storage(..., okx_uid=api_uid)`: kiểm tra khóa bảo vệ, nếu tài khoản đã mang `okx_uid` khác thì tuyệt đối không ghi đè.
+       - Lưu và parse `OKX_API_UID` trong `_save_env_file` và `_parse_env_file`.
+       - Nâng cấp `get_bot_accounts` tự động backfill `okx_uid` từ `.api` file và deduplicate an toàn.
+    3. **Kiểm thử nghiệm thu:**
+       - Kiểm tra cú pháp AST Python: `AST SYNTAX OK`.
+       - Build Vite: `✓ built in 314ms`.
+
+- **[27/10/2026]** - Khóa Hoàn Toàn Giao Dịch Trên Tài Khoản Chính Sàn OKX (Bắt Buộc Chạy Trên Tài Khoản Phụ) & Bảo Toàn 100% Logic Kiểm Tra Ref Whitelist Bằng UID Tài Khoản Chính:
+  - **Mô tả yêu cầu CEO:** Khóa hoàn toàn giao dịch trên tài khoản chính ở sàn OKX. Khi khách hàng kết nối tài khoản chính và bấm "CHẠY BOT" thì hiện thông báo yêu cầu kết nối tài khoản phụ để CHẠY BOT (chỉ được chạy bot trên tài khoản phụ OKX). Đồng thời bảo toàn nguyên vẹn logic kiểm tra UID của tài khoản chính xem đã dưới link ref / có trong whitelist Google Sheet chưa mới cấp quyền chạy bot.
+  - **Giải pháp kỹ thuật đã triển khai:**
+    1. **Khóa 2 lớp (Frontend + Backend):**
+       - **Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+         - Quét real-time từ API OKX `/api/v5/account/config` qua `detect_okx_account_info`. Nếu `api_uid == main_uid` $\rightarrow$ `is_main = True`.
+         - Trong `start_bot`: Nếu tài khoản mục tiêu là tài khoản chính (`is_main_account == True`), lập tức chặn đứng với HTTP 400: `"🛡️ BẢO VỆ TÀI SẢN: Bot KHÔNG CHO PHÉP giao dịch trên Tài khoản chính (Master Account)! Vui lòng tạo Tài khoản phụ (Sub-account) trên OKX và dùng API Key của tài khoản phụ để Chạy Bot."`.
+         - Bổ sung lưu và đọc thuộc tính `OKX_IS_MAIN` trong `.api_{acc}` và `accounts.json`.
+       - **Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+         - Kiểm tra ngay trong `handleStartBot`: Nếu tài khoản đang chọn là tài khoản chính (`is_main === true` hoặc tên "Tài khoản chính") $\rightarrow$ Hiện cảnh báo bảo vệ tài sản và tự động mở modal Connect để khách hàng kết nối tài khoản phụ ngay lập tức.
+       - **UI Phân biệt ([SidebarLeft.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/sidebar/SidebarLeft.jsx)):**
+         - Hiển thị badge `TK CHÍNH` tinh tế cạnh tên tài khoản trên cả nút trigger dropdown và popup menu danh sách tài khoản để người dùng dễ dàng phân biệt giữa tài khoản chính và các tài khoản phụ.
+    2. **Bảo Toàn Tuyệt Đối Logic Kiểm Tra Ref Whitelist Google Sheet:**
+       - Khi chạy bot trên tài khoản phụ, API OKX trả về `mainUid` là UID của tài khoản chính sở hữu tài khoản phụ đó.
+       - Hệ thống tự động trích xuất `master_uid = str(acc_info["main_uid"]).strip()` và truyền vào `check_uid_active_ref(master_uid)` để đối chiếu Google Sheet. Nếu tài khoản chính thuộc link ref / whitelist $\rightarrow$ Tài khoản phụ được cấp quyền chạy bot 100% trơn tru.
+    3. **Kiểm thử nghiệm thu:**
+       - Kiểm tra cú pháp AST Python: `MAIN.PY SYNTAX OK`.
+       - Build Vite frontend: `✓ built in 283ms`.
+
 - **[27/10/2026]** - Hoàn Thiện Khóa Độc Quyền Sàn OKX (Chống Trùng Bot Trên 1 Tài Khoản #bot-m15), Sửa Lỗi Quỹ FX Bung Modal Connect & Khắc Phục Lỗi Xóa Tài Khoản F5 Vẫn Còn:
   - **Mô tả hiện tượng từ CEO:**
     1. Khi chạy bot ở tài khoản `#bot-m15` thì hiện nút `LIVE`, chuyển sang bot SMC chọn 1 TF rồi ấn chạy bot thì cả 2 pp bot vẫn chạy đồng thời trên cùng tài khoản `#bot-m15`.
