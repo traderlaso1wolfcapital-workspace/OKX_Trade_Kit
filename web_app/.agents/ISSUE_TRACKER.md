@@ -33,6 +33,28 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Nâng Cấp Hệ Thống Cho Phép Nhiều Tài Khoản Cùng Chạy Chung Một Phương Pháp Bot (EMA200 / SMC / Liquidation) Song Song Độc Lập 100%:
+  - **Yêu cầu & Mục tiêu:**
+    - Thay đổi logic hệ thống: Cho phép 2 hoặc nhiều tài khoản khác nhau (ví dụ Account 1 `#7768` và Account 2 `#7829`) cùng chạy chung một phương pháp bot (ví dụ cả hai cùng chạy `EMA200 Bot`) đồng thời một cách độc lập 100%.
+    - Xóa bỏ hộp thoại cảnh báo chặn: `⚠️ ${thisBotName} hiện đang chạy trên tài khoản [${runningName}]. Bạn có chắc chắn muốn DỪNG bot trên [${runningName}] để CHUYỂN sang chạy trên [${targetName}] không?`.
+    - Quản lý trạng thái và tiến trình bot độc lập theo tài khoản:
+      - Khi xem tài khoản nào: Nếu tài khoản đó đang chạy bot thì hiện nút "DỪNG BOT", nút chọn chiến thuật có 🔒. Nếu tài khoản đó chưa chạy bot thì hiện "CHẠY BOT", nút chọn chiến thuật có ▲ (tự do chọn chiến thuật và bấm chạy bot).
+      - Cả 2 tài khoản đều hiển thị dấu chấm đỏ trên Header capsule và dropdown menu khi đang chạy song song.
+  - **Giải pháp & Khắc phục hoàn chỉnh:**
+    1. **Backend (`main.py`): Quản lý tiến trình bot độc lập theo tài khoản (`bot_key = f"{strategy}_{target_acc}"`):**
+       - Khởi tạo key tiến trình độc lập theo tổ hợp `{strategy}_{target_acc}` thay vì dùng chung key `{strategy}` duy nhất.
+       - Cập nhật `get_running_pid(uid, strategy, account_id)`: Quét đúng file PID của tài khoản đó (`{account_id}.pid`).
+       - Cập nhật `get_bot_status(uid, strategy, account_id)`: Trả về trạng thái `RUNNING`/`STOPPED` chuẩn xác của riêng tài khoản đang truy vấn; đồng thời quét toàn bộ tài khoản của user để sinh map đa tài khoản `active_accounts` (`{strategy}_{acc_id}: acc_id`, `{acc_id}: strategy`).
+       - Cập nhật `start_bot`: Khởi tạo tiến trình mới cho tài khoản đích mà không kill tiến trình của tài khoản khác chạy cùng chiến thuật.
+       - Cập nhật `stop_bot`: Chỉ dừng và dọn dẹp cờ flags, file lock, kill tiến trình của riêng tài khoản được chỉ định, bảo toàn 100% các tài khoản khác đang chạy.
+       - Cập nhật `log_reader_task` & `websocket_logs`: Lưu trữ logs theo queue độc lập `f"{strategy}_{account_id}"` và hỗ trợ truyền `account_id` qua query params/message để cô lập luồng nhật ký theo từng tài khoản, không bị lẫn logs.
+    2. **Frontend (`App.jsx`, `AppHeader.jsx`, `SidebarLeft.jsx`, `ConnectModal.jsx`):**
+       - `App.jsx`: Gỡ bỏ hoàn toàn popup `window.confirm` ép dừng tài khoản cũ trong `handleStartBot`. Cập nhật `isTargetOkxRunning` nhận diện chính xác trạng thái chạy của tài khoản hiện tại theo format đa tài khoản (`sub1_#7768`, `#7768`, mảng).
+       - `App.jsx`: Cập nhật `useEffect` quản lý WebSocket Logs phụ thuộc vào `effectiveAccId`, reset logs ngay khi đổi tài khoản và truyền `account_id` vào WebSocket URL.
+       - `AppHeader.jsx`: Cập nhật `isThisAccRunning` quét toàn diện danh sách tài khoản đang chạy để bật chấm đỏ độc lập cho từng tài khoản đang chạy bot.
+       - `SidebarLeft.jsx`: `isCurrentBotRunning` chỉ khóa 🔒 trên tài khoản đang thực sự chạy bot, tài khoản chưa chạy vẫn tự do chọn phương pháp và bấm CHẠY BOT.
+       - `ConnectModal.jsx`: Nhận diện chuẩn xác nhãn chiến thuật đang chạy của từng tài khoản theo cấu trúc map mới.
+
 - **[29/10/2026]** - Sửa Lỗi Dấu Chấm Đỏ Báo Trạng Thái Bot Trên Header Dropdown Tài Khoản Bị Hiện Sai Khi Bot Không Chạy:
   - **Hiện tượng:**
     - Dấu chấm đỏ phát sáng (`#ef4444`) ở khu vực chọn tài khoản báo trạng thái đang chạy bot hoạt động không đúng: tài khoản đang dừng hoặc không chạy bot vẫn bị hiện chấm đỏ.
@@ -5073,6 +5095,28 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Nâng Cấp Hệ Thống Cho Phép Nhiều Tài Khoản Cùng Chạy Chung Một Phương Pháp Bot (EMA200 / SMC / Liquidation) Song Song Độc Lập 100%:
+  - **Yêu cầu & Mục tiêu:**
+    - Thay đổi logic hệ thống: Cho phép 2 hoặc nhiều tài khoản khác nhau (ví dụ Account 1 `#7768` và Account 2 `#7829`) cùng chạy chung một phương pháp bot (ví dụ cả hai cùng chạy `EMA200 Bot`) đồng thời một cách độc lập 100%.
+    - Xóa bỏ hộp thoại cảnh báo chặn: `⚠️ ${thisBotName} hiện đang chạy trên tài khoản [${runningName}]. Bạn có chắc chắn muốn DỪNG bot trên [${runningName}] để CHUYỂN sang chạy trên [${targetName}] không?`.
+    - Quản lý trạng thái và tiến trình bot độc lập theo tài khoản:
+      - Khi xem tài khoản nào: Nếu tài khoản đó đang chạy bot thì hiện nút "DỪNG BOT", nút chọn chiến thuật có 🔒. Nếu tài khoản đó chưa chạy bot thì hiện "CHẠY BOT", nút chọn chiến thuật có ▲ (tự do chọn chiến thuật và bấm chạy bot).
+      - Cả 2 tài khoản đều hiển thị dấu chấm đỏ trên Header capsule và dropdown menu khi đang chạy song song.
+  - **Giải pháp & Khắc phục hoàn chỉnh:**
+    1. **Backend (`main.py`): Quản lý tiến trình bot độc lập theo tài khoản (`bot_key = f"{strategy}_{target_acc}"`):**
+       - Khởi tạo key tiến trình độc lập theo tổ hợp `{strategy}_{target_acc}` thay vì dùng chung key `{strategy}` duy nhất.
+       - Cập nhật `get_running_pid(uid, strategy, account_id)`: Quét đúng file PID của tài khoản đó (`{account_id}.pid`).
+       - Cập nhật `get_bot_status(uid, strategy, account_id)`: Trả về trạng thái `RUNNING`/`STOPPED` chuẩn xác của riêng tài khoản đang truy vấn; đồng thời quét toàn bộ tài khoản của user để sinh map đa tài khoản `active_accounts` (`{strategy}_{acc_id}: acc_id`, `{acc_id}: strategy`).
+       - Cập nhật `start_bot`: Khởi tạo tiến trình mới cho tài khoản đích mà không kill tiến trình của tài khoản khác chạy cùng chiến thuật.
+       - Cập nhật `stop_bot`: Chỉ dừng và dọn dẹp cờ flags, file lock, kill tiến trình của riêng tài khoản được chỉ định, bảo toàn 100% các tài khoản khác đang chạy.
+       - Cập nhật `log_reader_task` & `websocket_logs`: Lưu trữ logs theo queue độc lập `f"{strategy}_{account_id}"` và hỗ trợ truyền `account_id` qua query params/message để cô lập luồng nhật ký theo từng tài khoản, không bị lẫn logs.
+    2. **Frontend (`App.jsx`, `AppHeader.jsx`, `SidebarLeft.jsx`, `ConnectModal.jsx`):**
+       - `App.jsx`: Gỡ bỏ hoàn toàn popup `window.confirm` ép dừng tài khoản cũ trong `handleStartBot`. Cập nhật `isTargetOkxRunning` nhận diện chính xác trạng thái chạy của tài khoản hiện tại theo format đa tài khoản (`sub1_#7768`, `#7768`, mảng).
+       - `App.jsx`: Cập nhật `useEffect` quản lý WebSocket Logs phụ thuộc vào `effectiveAccId`, reset logs ngay khi đổi tài khoản và truyền `account_id` vào WebSocket URL.
+       - `AppHeader.jsx`: Cập nhật `isThisAccRunning` quét toàn diện danh sách tài khoản đang chạy để bật chấm đỏ độc lập cho từng tài khoản đang chạy bot.
+       - `SidebarLeft.jsx`: `isCurrentBotRunning` chỉ khóa 🔒 trên tài khoản đang thực sự chạy bot, tài khoản chưa chạy vẫn tự do chọn phương pháp và bấm CHẠY BOT.
+       - `ConnectModal.jsx`: Nhận diện chuẩn xác nhãn chiến thuật đang chạy của từng tài khoản theo cấu trúc map mới.
 
 - **[29/10/2026]** - Sửa Lỗi Dấu Chấm Đỏ Báo Trạng Thái Bot Trên Header Dropdown Tài Khoản Bị Hiện Sai Khi Bot Không Chạy:
   - **Hiện tượng:**

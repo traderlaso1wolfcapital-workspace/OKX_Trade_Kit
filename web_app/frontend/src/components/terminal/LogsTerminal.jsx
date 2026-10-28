@@ -151,7 +151,8 @@ export default function LogsTerminal({
       if (!isMounted) return;
       const uid = localStorage.getItem("tls1_uid") || loginUid;
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const url = `${protocol}//${window.location.host}/ws/logs/${uid}/${activeBotTab}`;
+      const accQuery = selectedAccount ? `?account_id=${encodeURIComponent(selectedAccount)}` : "";
+      const url = `${protocol}//${window.location.host}/ws/logs/${uid}/${activeBotTab}${accQuery}`;
       ws = new WebSocket(url);
       wsRef.current = ws;
 
@@ -279,7 +280,7 @@ export default function LogsTerminal({
         ws.close();
       }
     };
-  }, [isSelfManaged, activeBotTab, loginUid]);
+  }, [isSelfManaged, activeBotTab, loginUid, selectedAccount]);
 
   // Phân rã dữ liệu: Bảng Dashboard cố định ở trên + Dải Event Logs ở dưới
   const { dashboardLines, eventLogs } = React.useMemo(() => {

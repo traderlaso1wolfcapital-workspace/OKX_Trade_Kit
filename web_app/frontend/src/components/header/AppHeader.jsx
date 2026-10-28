@@ -332,14 +332,29 @@ export default function AppHeader({
               const accBal = getOkxBalance(acc);
               const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
               const isThisAccRunning = !isAccMain && Boolean(
-                Object.entries(activeAccounts || {}).some(([strat, runningId]) => {
-                  if (!runningId) return false;
-                  // Nếu chiến thuật này trùng với activeBotTab đang mở mà botStatus không phải RUNNING, không hiển thị chấm đỏ
-                  if (strat === activeBotTab && botStatus && botStatus !== "RUNNING") return false;
-                  const c1 = String(runningId).trim().replace(/^#/, "");
-                  const c2 = String(acc.id || "").trim().replace(/^#/, "");
-                  const c3 = String(acc.name || "").trim().replace(/^#/, "");
-                  return c1 === c2 || (c3 && c1 === c3);
+                Object.entries(activeAccounts || {}).some(([k, runningVal]) => {
+                  if (!runningVal) return false;
+                  const cAccId = String(acc.id || "").trim().replace(/^#/, "");
+                  const cAccName = String(acc.name || "").trim().replace(/^#/, "");
+                  const cleanK = String(k).trim().replace(/^#/, "");
+
+                  // Nếu key là chiến thuật activeBotTab đang mở mà tài khoản này đang xem nhưng botStatus không phải RUNNING, bỏ qua
+                  if (k === activeBotTab && acc.id === effectiveAccId && botStatus && botStatus !== "RUNNING") return false;
+
+                  // 1. Key là acc_id (ví dụ { "#7768": "sub1" })
+                  if (cleanK === cAccId || (cAccName && cleanK === cAccName)) return true;
+
+                  // 2. runningVal là acc_id (ví dụ { "sub1_#7768": "#7768" })
+                  if (typeof runningVal === "string") {
+                    const cVal = runningVal.trim().replace(/^#/, "");
+                    if (cVal === cAccId || (cAccName && cVal === cAccName)) return true;
+                  } else if (Array.isArray(runningVal)) {
+                    if (runningVal.some(r => {
+                      const cVal = String(r).trim().replace(/^#/, "");
+                      return cVal === cAccId || (cAccName && cVal === cAccName);
+                    })) return true;
+                  }
+                  return false;
                 })
               );
               const theme = getAccountTheme("okx");

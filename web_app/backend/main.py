@@ -678,11 +678,15 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
     except Exception as e:
         return {"status": "error", "message": f"Lỗi server khi gọi OKX: {str(e)}"}
 
-async def log_reader_task(stream, uid, strategy):
+async def log_reader_task(stream, uid, strategy, target_acc: str = ""):
     """Đọc stdout/stderr của tiến trình bot và đẩy vào ring buffer (deque) riêng biệt của UID"""
     if uid not in bot_log_queues: bot_log_queues[uid] = {}
     if strategy not in bot_log_queues[uid]: bot_log_queues[uid][strategy] = deque(maxlen=400)
+    bot_key = f"{strategy}_{target_acc}" if target_acc else strategy
+    if bot_key not in bot_log_queues[uid]: bot_log_queues[uid][bot_key] = deque(maxlen=400)
+    
     log_deque = bot_log_queues[uid][strategy]
+    acc_deque = bot_log_queues[uid][bot_key]
     last_cf_warn_time = 0.0
     in_html_block = False  # Cờ theo dõi đang ở trong khối HTML nhiều dòng
     try:
@@ -724,9 +728,11 @@ async def log_reader_task(stream, uid, strategy):
                     last_cf_warn_time = now_t
                     warn_line = "⚠️ [KẾT NỐI MẠNG] Máy chủ OKX phản hồi chậm qua Cloudflare (502/504). Bot đang tự động giữ kết nối và thử lại..."
                     log_deque.append(warn_line)
+                    acc_deque.append(warn_line)
                     if uid in active_connections and strategy in active_connections[uid]:
-                        for connection in list(active_connections[uid][strategy]):
-                            try: await connection.send_text(warn_line)
+                        for item in list(active_connections[uid][strategy]):
+                            ws = item.get("ws") if isinstance(item, dict) else item
+                            try: await ws.send_text(warn_line)
                             except Exception: pass
                 continue
 
@@ -745,10 +751,18 @@ async def log_reader_task(stream, uid, strategy):
                 continue
 
             log_deque.append(line_str)
+            acc_deque.append(line_str)
             # CHỈ phát sóng cho các kết nối thuộc CHÍNH UID này và chiến thuật này
             if uid in active_connections and strategy in active_connections[uid]:
-                for connection in list(active_connections[uid][strategy]):
-                    try: await connection.send_text(line_str)
+                for item in list(active_connections[uid][strategy]):
+                    ws = item.get("ws") if isinstance(item, dict) else item
+                    c_acc = item.get("acc", "") if isinstance(item, dict) else ""
+                    if c_acc and target_acc:
+                        c_clean = c_acc.replace("#", "").strip()
+                        t_clean = target_acc.replace("#", "").strip()
+                        if c_clean != t_clean and c_acc != target_acc:
+                            continue
+                    try: await ws.send_text(line_str)
                     except Exception: pass
     except Exception as e:
         log_deque.append(f"[SYSTEM ERROR] Log reader task failed: {e}")
@@ -1432,79 +1446,85 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
 
     return accounts
 
-def get_running_pid(uid: str, strategy: str) -> int:
+def get_running_pid(uid: str, strategy: str, account_id: str = "") -> int:
     data_dir = get_user_data_dir(uid)
-    acc_name = strategy
+    acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
     
-    # Lấy tài khoản đang chạy hiện tại của strategy này
-    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-    if os.path.exists(running_acc_file):
-        try:
-            with open(running_acc_file, "r") as f:
-                content = f.read().strip()
-                if content:
-                    acc_name = content
-        except:
-            pass
-
-    pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{acc_name}.pid")
-    
-    # Fallback nếu dùng tên strategy mặc định
-    if not os.path.exists(pid_file):
-        pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{strategy}.pid")
-
-    if os.path.exists(pid_file):
-        try:
-            with open(pid_file, "r") as f:
-                pid = int(f.read().strip())
-            # Nếu có thư viện psutil, kiểm tra xem pid có thực sự đang chạy không
+    # Nếu không truyền account_id, lấy tài khoản đang chạy gần nhất của strategy
+    if not acc_name:
+        running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+        if os.path.exists(running_acc_file):
             try:
-                import psutil
-                if psutil.pid_exists(pid):
-                    _ = psutil.Process(pid)
-                    # Chỉ cần tiến trình tồn tại (vì lock file này là do chính bot tạo ra)
+                with open(running_acc_file, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        acc_name = content
+            except:
+                pass
+    if not acc_name:
+        acc_name = strategy
+
+    candidates = [
+        acc_name,
+        acc_name.replace("#", ""),
+        f"sub{acc_name.replace('#', '')}",
+        strategy
+    ]
+    for c in candidates:
+        pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{c}.pid")
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, "r") as f:
+                    pid = int(f.read().strip())
+                try:
+                    import psutil
+                    if psutil.pid_exists(pid):
+                        _ = psutil.Process(pid)
+                        return pid
+                except ImportError:
                     return pid
-            except ImportError:
-                # Nếu không có psutil (chạy trên môi trường server không cài đủ), fallback là tin tưởng file pid
-                return pid
+                except (OSError, IOError, ValueError):
+                    pass
             except (OSError, IOError, ValueError):
                 pass
-        except (OSError, IOError, ValueError):
-            pass
     return 0
 
 def _get_flag_dir(uid: str, strategy: str) -> str:
     return os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
 
-def _is_shadow_mode(uid: str, strategy: str) -> bool:
+def _is_shadow_mode(uid: str, strategy: str, account_id: str = "") -> bool:
     """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng"""
     data_dir = get_user_data_dir(uid)
-    acc_name = strategy
+    acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
     
-    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-    if os.path.exists(running_acc_file):
-        try:
-            with open(running_acc_file, "r") as f:
-                content = f.read().strip()
-                if content:
-                    acc_name = content
-        except (OSError, IOError, ValueError):
-            pass
+    if not acc_name:
+        running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+        if os.path.exists(running_acc_file):
+            try:
+                with open(running_acc_file, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        acc_name = content
+            except (OSError, IOError, ValueError):
+                pass
+    if not acc_name:
+        acc_name = strategy
 
     flag_dir = _get_flag_dir(uid, strategy)
+    check_names = {acc_name, acc_name.replace("#", ""), strategy}
 
     # 1. Kiểm tra cờ dừng trước tiên (nếu có stop flag thì chắc chắn là shadow/dừng)
-    for name in [strategy, acc_name]:
+    for name in check_names:
         if os.path.exists(os.path.join(flag_dir, f"stop_{name}.flag")):
             return True
 
     # 2. Kiểm tra cờ kích hoạt trực tiếp (Live mode)
-    for name in [strategy, acc_name]:
+    for name in check_names:
         if os.path.exists(os.path.join(flag_dir, f"activate_{name}.flag")):
             return False
 
     # 3. Kiểm tra cờ dry_run do bot engine ghi ra
-    for name in [strategy, acc_name]:
+    for name in check_names:
         flag_path = os.path.join(flag_dir, f"dry_run_{name}.flag")
         if os.path.exists(flag_path):
             try:
@@ -1516,43 +1536,71 @@ def _is_shadow_mode(uid: str, strategy: str) -> bool:
     return True
 
 @app.get("/api/bot/status")
-def get_bot_status(uid: str, strategy: str = "sub1"):
+def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
     if not uid or uid in ["default", "guest", "undefined", "null"]:
         return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True, "active_accounts": {}}
-    proc = get_nested(bot_processes, uid, strategy)
+    
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
+    bot_key = f"{strategy}_{target_acc}" if target_acc else strategy
+    proc = get_nested(bot_processes, uid, bot_key) or get_nested(bot_processes, uid, strategy)
     is_running = False
     uptime = 0
     
-    pid = get_running_pid(uid, strategy)
+    pid = get_running_pid(uid, strategy, target_acc)
     if pid > 0:
         is_running = True
-        uptime = int(time.time() - get_nested(bot_start_times, uid, strategy, time.time()))
+        uptime = int(time.time() - get_nested(bot_start_times, uid, bot_key, get_nested(bot_start_times, uid, strategy, time.time())))
     elif proc and proc.poll() is None:
         is_running = True
-        uptime = int(time.time() - get_nested(bot_start_times, uid, strategy, time.time()))
+        uptime = int(time.time() - get_nested(bot_start_times, uid, bot_key, get_nested(bot_start_times, uid, strategy, time.time())))
     else:
-        del_nested(bot_processes, uid, strategy)
+        if target_acc:
+            del_nested(bot_processes, uid, bot_key)
+        else:
+            del_nested(bot_processes, uid, strategy)
 
-    # Calculate active_accounts
+    # Calculate active_accounts - quét toàn bộ các tài khoản của user này
     data_dir = get_user_data_dir(uid)
     active_accounts = {}
+    
+    # 1. Quét theo danh sách tài khoản đã kết nối của user
+    user_accs = get_user_accounts(uid)
+    for strat in ["sub1", "sub2", "sub3"]:
+        for acc in user_accs:
+            a_id = acc.get("id") or acc.get("name")
+            if not a_id: continue
+            a_pid = get_running_pid(uid, strat, a_id)
+            a_proc = get_nested(bot_processes, uid, f"{strat}_{a_id}")
+            if (a_pid > 0 or (a_proc and a_proc.poll() is None)) and not _is_shadow_mode(uid, strat, a_id):
+                active_accounts[f"{strat}_{a_id}"] = a_id
+                active_accounts[a_id] = strat
+                if strat not in active_accounts:
+                    active_accounts[strat] = a_id
+                elif isinstance(active_accounts[strat], list):
+                    if a_id not in active_accounts[strat]:
+                        active_accounts[strat].append(a_id)
+                else:
+                    active_accounts[strat] = [active_accounts[strat], a_id]
+
+    # 2. Quét thêm fallback từ file .running_account_{strat} cũ
     for strat in ["sub1", "sub2", "sub3"]:
         s_proc = get_nested(bot_processes, uid, strat)
         s_pid = get_running_pid(uid, strat)
-        # CHỈ ĐƯỢC TÍNH LÀ ACTIVE KHI BOT THỰC SỰ ĐANG CHẠY LIVE (KHÔNG PHẢI SHADOW / STOPPED)
         if (s_pid > 0 or (s_proc and s_proc.poll() is None)) and not _is_shadow_mode(uid, strat):
             running_acc_file = os.path.join(data_dir, f"bots/{strat}", f".running_account_{strat}")
             if os.path.exists(running_acc_file):
                 try:
                     with open(running_acc_file, "r") as f:
                         acc = f.read().strip()
-                        if acc:
+                        if acc and acc not in active_accounts:
                             active_accounts[strat] = acc
+                            active_accounts[acc] = strat
+                            active_accounts[f"{strat}_{acc}"] = acc
                 except (OSError, IOError, ValueError): pass
 
     if is_running:
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
-        shadow = _is_shadow_mode(uid, strategy)
+        shadow = _is_shadow_mode(uid, strategy, target_acc)
         return {
             "status": "SHADOW" if shadow else "RUNNING",
             "uptime": uptime,
@@ -1799,56 +1847,38 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
         except Exception as e:
             print(f"[START_BOT] Lỗi kiểm tra/chuyển Chế độ phòng hộ: {e}", flush=True)
 
-    proc = get_nested(bot_processes, uid, strategy)
-    pid = get_running_pid(uid, strategy)
+    bot_key = f"{strategy}_{target_acc}"
+    proc = get_nested(bot_processes, uid, bot_key) or get_nested(bot_processes, uid, strategy)
+    pid = get_running_pid(uid, strategy, target_acc)
     process_alive = (pid > 0) or (proc and proc.poll() is None)
 
-    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-    current_running_acc = ""
-    if os.path.exists(running_acc_file):
-        with open(running_acc_file, "r") as f:
-            current_running_acc = f.read().strip()
+    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}_{target_acc}")
 
     if process_alive:
-        if current_running_acc != target_acc:
-            # Tài khoản thay đổi -> KILL process để khởi động lại với API key mới
-            if proc:
-                try:
-                    import psutil
-                    parent = psutil.Process(proc.pid)
-                    for child in parent.children(recursive=True): child.kill()
-                    parent.kill()
-                except: proc.kill()
-            elif pid > 0:
-                try:
-                    import psutil
-                    parent = psutil.Process(pid)
-                    for child in parent.children(recursive=True): child.kill()
-                    parent.kill()
+        # Process đang chạy cho chính tài khoản này -> chỉ cần kích hoạt bằng flag
+        acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
+        for nm in acc_flag_names:
+            stop_flag = os.path.join(flag_dir, f"stop_{nm}.flag")
+            if os.path.exists(stop_flag):
+                try: os.remove(stop_flag)
                 except: pass
-            del_nested(bot_processes, uid, strategy)
-            process_alive = False
-        else:
-            # Process đang chạy và cùng tài khoản -> chỉ cần kích hoạt bằng flag
-            acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
-            for nm in acc_flag_names:
-                stop_flag = os.path.join(flag_dir, f"stop_{nm}.flag")
-                if os.path.exists(stop_flag):
-                    try: os.remove(stop_flag)
-                    except: pass
-                try:
-                    with open(os.path.join(flag_dir, f"activate_{nm}.flag"), "w") as f:
-                        f.write("1")
-                    with open(os.path.join(flag_dir, f"dry_run_{nm}.flag"), "w") as f:
-                        f.write("0")
-                except: pass
-            set_nested(bot_start_times, uid, strategy, time.time())
-            clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
-            return {"status": "success", "message": f"⚡ Bot đã được KÍCH HOẠT!{clean_info} Lệnh thật sẽ được đặt lên OKX theo nến hiện tại.", "canceled_count": canceled_orders}
+            try:
+                with open(os.path.join(flag_dir, f"activate_{nm}.flag"), "w") as f:
+                    f.write("1")
+                with open(os.path.join(flag_dir, f"dry_run_{nm}.flag"), "w") as f:
+                    f.write("0")
+            except: pass
+        set_nested(bot_start_times, uid, bot_key, time.time())
+        set_nested(bot_start_times, uid, strategy, time.time())
+        clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
+        return {"status": "success", "message": f"⚡ Bot đã được KÍCH HOẠT!{clean_info} Lệnh thật sẽ được đặt lên OKX theo nến hiện tại.", "canceled_count": canceled_orders}
 
-    # Process chưa chạy — spawn mới (bắt đầu ở DRY_RUN, ngay sau đó activate)
+    # Process chưa chạy cho tài khoản này — spawn mới (hỗ trợ nhiều tài khoản cùng chạy 1 chiến thuật)
     try:
         with open(running_acc_file, "w") as f:
+            f.write(target_acc)
+        # Đồng thời lưu file mặc định để tương thích
+        with open(os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}"), "w") as f:
             f.write(target_acc)
     except: pass
 
@@ -1888,12 +1918,15 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
             env=custom_env,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         )
+        set_nested(bot_processes, uid, bot_key, new_proc)
         set_nested(bot_processes, uid, strategy, new_proc)
+        set_nested(bot_start_times, uid, bot_key, time.time())
         set_nested(bot_start_times, uid, strategy, time.time())
         if uid not in bot_log_queues: bot_log_queues[uid] = {}
+        bot_log_queues[uid][bot_key] = deque(maxlen=400)
         bot_log_queues[uid][strategy] = deque(maxlen=400)
         loop = asyncio.get_event_loop()
-        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
+        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy, target_acc))
 
         clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
         return {"status": "success", "message": f"Đã khởi động và kích hoạt Bot thành công!{clean_info}", "canceled_count": canceled_orders}
@@ -2028,30 +2061,41 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
     if target_acc in ["e8_prop", "e8"]:
         return tradelocker_stop_bot(uid)
 
-    acc_name = strategy
+    acc_name = target_acc if target_acc else strategy
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
 
     # 1. Quét và Hủy toàn bộ lệnh Limit chưa khớp trên sàn OKX (bảo lưu 100% TP/SL của các vị thế đang chạy)
     canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="STOP BOT")
 
-    # 2. Xóa running_account_{strategy}
+    # 2. Xóa running_account của riêng tài khoản này
     data_dir = get_user_data_dir(uid)
-    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-    if os.path.exists(running_acc_file):
-        try: os.remove(running_acc_file)
-        except: pass
-
-    # 3. Dọn dẹp cờ flag
-    for fname in [f"stop_{acc_name}.flag", f"activate_{acc_name}.flag", f"dry_run_{acc_name}.flag"]:
-        fp = os.path.join(flag_dir, fname)
-        if os.path.exists(fp):
-            try: os.remove(fp)
+    for f_p in [
+        os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}_{target_acc}"),
+        os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    ]:
+        if os.path.exists(f_p):
+            try: os.remove(f_p)
             except: pass
 
-    # 4. KILL HOÀN TOÀN TIẾN TRÌNH PYTHON CŨ (Giải phóng 100% RAM, chấm dứt triệt để Shadow Mode ngầm)
-    proc = get_nested(bot_processes, uid, strategy)
-    pid = get_running_pid(uid, strategy)
+    # 3. Dọn dẹp cờ flag cho riêng tài khoản này
+    acc_flag_names = {acc_name, acc_name.replace("#", ""), target_acc, target_acc.replace("#", "")}
+    for nm in acc_flag_names:
+        for fname in [f"activate_{nm}.flag", f"dry_run_{nm}.flag"]:
+            fp = os.path.join(flag_dir, fname)
+            if os.path.exists(fp):
+                try: os.remove(fp)
+                except: pass
+        # Tạo stop flag cho riêng tài khoản này
+        try:
+            with open(os.path.join(flag_dir, f"stop_{nm}.flag"), "w") as f:
+                f.write("1")
+        except: pass
+
+    # 4. KILL HOÀN TOÀN TIẾN TRÌNH PYTHON CỦA RIÊNG TÀI KHOẢN NÀY (Bảo toàn tiến trình của các tài khoản khác)
+    bot_key = f"{strategy}_{target_acc}"
+    proc = get_nested(bot_processes, uid, bot_key) or get_nested(bot_processes, uid, strategy)
+    pid = get_running_pid(uid, strategy, target_acc)
     if proc or pid > 0:
         if proc:
             try:
@@ -2073,13 +2117,18 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
                     except: pass
                 parent.kill()
             except: pass
-        del_nested(bot_processes, uid, strategy)
+        del_nested(bot_processes, uid, bot_key)
+        if get_nested(bot_processes, uid, strategy) == proc:
+            del_nested(bot_processes, uid, strategy)
 
-    # 5. Dọn sạch queue logs cũ trong RAM
-    if uid in bot_log_queues and strategy in bot_log_queues[uid]:
-        bot_log_queues[uid][strategy].clear()
+    # 5. Dọn sạch queue logs của riêng tài khoản này trong RAM
+    if uid in bot_log_queues:
+        if bot_key in bot_log_queues[uid]:
+            bot_log_queues[uid][bot_key].clear()
+        if strategy in bot_log_queues[uid]:
+            bot_log_queues[uid][strategy].clear()
 
-    msg = f"Bot {strategy} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
+    msg = f"Bot {strategy} cho tài khoản {target_acc} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
     return {"message": msg, "status": "STOPPED", "canceled_count": canceled_orders}
 
 @app.post("/api/bot/shadow/start")
@@ -2135,7 +2184,7 @@ async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = N
         if uid not in bot_log_queues: bot_log_queues[uid] = {}
         bot_log_queues[uid][strategy] = deque(maxlen=400)
         loop = asyncio.get_event_loop()
-        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy))
+        loop.create_task(log_reader_task(new_proc.stdout, uid, strategy, target_acc))
         return {"status": "success", "message": "Shadow Bot đã được khởi động (chạy ngầm)."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -3824,15 +3873,21 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
             pass
         return
 
+    init_acc = websocket.query_params.get("account_id", "").strip()
+    conn_obj = {"ws": websocket, "acc": init_acc}
+
     if uid not in active_connections: active_connections[uid] = {}
     if strategy not in active_connections[uid]: active_connections[uid][strategy] = []
-    active_connections[uid][strategy].append(websocket)
+    active_connections[uid][strategy].append(conn_obj)
     
     await websocket.send_text(f"🔄 Đã kết nối với TLS1 Trading Web Terminal Server ({strategy})...")
     
-    # Chỉ gửi ring buffer của chính UID này, TUYỆT ĐỐI không fallback sang UID của người khác
+    # Gửi ring buffer tương ứng của tài khoản này nếu có, nếu không thì gửi của strategy
     target_queue = None
-    if uid in bot_log_queues and strategy in bot_log_queues[uid] and len(bot_log_queues[uid][strategy]) > 0:
+    bot_key = f"{strategy}_{init_acc}" if init_acc else strategy
+    if uid in bot_log_queues and bot_key in bot_log_queues[uid] and len(bot_log_queues[uid][bot_key]) > 0:
+        target_queue = bot_log_queues[uid][bot_key]
+    elif uid in bot_log_queues and strategy in bot_log_queues[uid] and len(bot_log_queues[uid][strategy]) > 0:
         target_queue = bot_log_queues[uid][strategy]
 
     if target_queue:
@@ -3845,12 +3900,29 @@ async def websocket_logs(websocket: WebSocket, uid: str, strategy: str):
         
     try:
         while True:
-            await websocket.receive_text()
+            text = await websocket.receive_text()
+            try:
+                msg = json.loads(text)
+                if msg.get("action") in ["refresh", "switch_account"]:
+                    new_acc = str(msg.get("account_id") or "").strip()
+                    conn_obj["acc"] = new_acc
+                    new_key = f"{strategy}_{new_acc}" if new_acc else strategy
+                    t_q = None
+                    if uid in bot_log_queues and new_key in bot_log_queues[uid] and len(bot_log_queues[uid][new_key]) > 0:
+                        t_q = bot_log_queues[uid][new_key]
+                    elif uid in bot_log_queues and strategy in bot_log_queues[uid] and len(bot_log_queues[uid][strategy]) > 0:
+                        t_q = bot_log_queues[uid][strategy]
+                    if t_q:
+                        for l_line in list(t_q):
+                            try: await websocket.send_text(l_line)
+                            except Exception: break
+            except Exception:
+                pass
     except Exception:
         pass
     finally:
-        if uid in active_connections and strategy in active_connections[uid] and websocket in active_connections[uid][strategy]:
-            active_connections[uid][strategy].remove(websocket)
+        if uid in active_connections and strategy in active_connections[uid] and conn_obj in active_connections[uid][strategy]:
+            active_connections[uid][strategy].remove(conn_obj)
 
 bot_data_connections = {}
 
@@ -3872,7 +3944,7 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
             "closed_positions": []
         }
     try:
-        status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
+        status_data = await asyncio.to_thread(get_bot_status, uid, strategy, acc)
     except Exception:
         status_data = {"status": "STOPPED", "uptime": 0}
     try:
@@ -5344,6 +5416,7 @@ if __name__ == "__main__":
 # z7737 | Tự động hóa Port Bridge 5173 -> 8080, sửa lỗi ModuleNotFoundError requests/tradelocker_service, và tối ưu hóa Uvicorn production chạy qua PM2
 # z7738 | Khắc phục triệt để lỗi chuyển bot tự nhảy tài khoản và lỗi đống lệnh ảo trên web: định danh duy nhất posId/ticket_id, cấm ticket #MANUAL trùng lặp, cô lập cache theo tài khoản và chống xung đột key React.
 # z7739 | Khắc phục triệt để lỗi chuyển tài khoản bị lưu vết / pha trộn bảng vị thế và logs: cô lập 100% positions theo account_id, loại bỏ mock positions từ trade_markers cũ, reset logs và tái tạo dashboard độc lập cho tài khoản chờ.
+# z7740 | Nâng cấp hệ thống đa tài khoản chạy chung một phương pháp bot: tách độc lập tiến trình bot per-account (bot_key={strategy}_{account_id}), cho phép 2 hoặc nhiều tài khoản cùng chạy EMA200/SMC/Liquidation song song độc lập 100%, cô lập log stream theo account_id ngăn trộn lẫn logs giữa các tài khoản, gỡ bỏ popup chặn chuyển bot.
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 

@@ -338,17 +338,36 @@ export default function SidebarLeft({
     const accName = String(acc.name || "").trim();
     const cleanAccName = accName.replace(/^#/, "").toLowerCase();
 
+    // 1. Kiểm tra trực tiếp activeAccounts[accId]
+    if (activeAccounts) {
+      if (activeAccounts[accId]) return activeAccounts[accId];
+      if (activeAccounts[accName]) return activeAccounts[accName];
+    }
+
     for (const st of ["sub1", "sub2", "sub3"]) {
+      if (activeAccounts?.[`${st}_${accId}`] || activeAccounts?.[`${st}_${accName}`]) {
+        return st;
+      }
       const runningTarget = activeAccounts ? activeAccounts[st] : null;
       if (runningTarget) {
-        const targetStr = String(runningTarget).trim();
-        const cleanTarget = targetStr.replace(/^#/, "").toLowerCase();
-        if (
-          targetStr === accId ||
-          targetStr === accName ||
-          (cleanTarget && (cleanTarget === cleanAccName || cleanTarget === accId.toLowerCase()))
-        ) {
-          return st;
+        if (Array.isArray(runningTarget)) {
+          if (runningTarget.some(r => {
+            const tr = String(r).trim();
+            const cr = tr.replace(/^#/, "").toLowerCase();
+            return tr === accId || tr === accName || (cr && (cr === cleanAccName || cr === accId.toLowerCase()));
+          })) {
+            return st;
+          }
+        } else {
+          const targetStr = String(runningTarget).trim();
+          const cleanTarget = targetStr.replace(/^#/, "").toLowerCase();
+          if (
+            targetStr === accId ||
+            targetStr === accName ||
+            (cleanTarget && (cleanTarget === cleanAccName || cleanTarget === accId.toLowerCase()))
+          ) {
+            return st;
+          }
         }
       }
     }

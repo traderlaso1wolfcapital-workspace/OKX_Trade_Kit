@@ -438,13 +438,40 @@ function App() {
   const isTargetOkxRunning = useMemo(() => {
     if (overrideBotRunning !== null) return overrideBotRunning;
     if (botStatus !== "RUNNING") return false;
-    const runningAcc = mergedActiveAccounts[activeBotTab];
-    if (!runningAcc) return false;
-    const c1 = String(runningAcc).trim().replace(/^#/, "");
-    const c2 = String(effectiveAccId || "").trim().replace(/^#/, "");
+    const curClean = String(effectiveAccId || "").trim().replace(/^#/, "");
     const curObj = accounts.find(a => a.id === effectiveAccId || a.name === effectiveAccId);
-    const c3 = String(curObj?.name || "").trim().replace(/^#/, "");
-    return c1 === c2 || (c3 && c1 === c3);
+    const curName = String(curObj?.name || "").trim().replace(/^#/, "");
+
+    // 1. Kiểm tra key trực tiếp dạng sub1_#7768 hoặc sub1_thanhbot hoặc #7768
+    if (
+      mergedActiveAccounts[`${activeBotTab}_${effectiveAccId}`] || 
+      mergedActiveAccounts[`${activeBotTab}_${curClean}`] ||
+      (curName && mergedActiveAccounts[`${activeBotTab}_${curName}`])
+    ) {
+      return true;
+    }
+    if (
+      mergedActiveAccounts[effectiveAccId] === activeBotTab || 
+      mergedActiveAccounts[curClean] === activeBotTab ||
+      (curName && mergedActiveAccounts[curName] === activeBotTab)
+    ) {
+      return true;
+    }
+
+    // 2. Kiểm tra mảng hoặc string đơn trong mergedActiveAccounts[activeBotTab]
+    const runningVal = mergedActiveAccounts[activeBotTab];
+    if (Array.isArray(runningVal)) {
+      return runningVal.some(r => {
+        const rc = String(r).trim().replace(/^#/, "");
+        return rc === curClean || (curName && rc === curName);
+      });
+    }
+    if (runningVal) {
+      const rc = String(runningVal).trim().replace(/^#/, "");
+      return rc === curClean || (curName && rc === curName);
+    }
+
+    return false;
   }, [overrideBotRunning, botStatus, mergedActiveAccounts, activeBotTab, effectiveAccId, accounts]);
 
   const isOkxRunning = isTargetOkxRunning;
@@ -1490,10 +1517,16 @@ function App() {
         return;
       }
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs/${safeUid}/${activeBotTab}`);
+      const accQuery = effectiveAccId ? `?account_id=${encodeURIComponent(effectiveAccId)}` : '';
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs/${safeUid}/${activeBotTab}${accQuery}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (effectiveAccId) {
+          try {
+            ws.send(JSON.stringify({ action: "switch_account", account_id: effectiveAccId }));
+          } catch {}
+        }
         setLogs(prev => {
           const currentEvents = (prev && Array.isArray(prev.eventLogs)) ? prev.eventLogs : [];
           return {
@@ -1717,7 +1750,7 @@ function App() {
         ws.close();
       }
     };
-  }, [activeBotTab, currentUid]);
+  }, [activeBotTab, currentUid, effectiveAccId]);
 
   // 10b. Quỹ FX (TradeLocker) Logs Terminal Stream & Sync
   const propWsRef = useRef(null);
@@ -2234,24 +2267,6 @@ function App() {
       return;
     }
 
-    // Kiểm tra xem chiến lược này có đang chạy trên tài khoản phụ khác không -> Xác nhận chuyển tài khoản
-    const runningAccOnThisStrat = mergedActiveAccounts[activeBotTab];
-    if (runningAccOnThisStrat) {
-      const c1 = String(runningAccOnThisStrat).trim().replace(/^#/, "");
-      const c2 = String(currentAcc).trim().replace(/^#/, "");
-      const curObj = accounts.find(a => a.id === currentAcc || a.name === currentAcc);
-      const c3 = String(curObj?.name || "").trim().replace(/^#/, "");
-      if (c1 !== c2 && (!c3 || c1 !== c3)) {
-        const runningObj = accounts.find(a => a.id === runningAccOnThisStrat || a.name === runningAccOnThisStrat);
-        const runningName = runningObj?.name || runningAccOnThisStrat;
-        const targetName = curObj?.name || currentAcc;
-        const thisBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
-        const confirmSwitch = window.confirm(
-          `⚠️ ${thisBotName} hiện đang chạy trên tài khoản [${runningName}].\n\nBạn có chắc chắn muốn DỪNG bot trên [${runningName}] để CHUYỂN sang chạy trên [${targetName}] không?`
-        );
-        if (!confirmSwitch) return;
-      }
-    }
 
     // Kiểm tra xem đã có ít nhất 1 cặp giao dịch nào được cấu hình TF trade hay chưa
     let effectiveTfs = enabledTfs;
@@ -2299,6 +2314,18 @@ function App() {
         } catch { }
         setOverrideBotRunning(true);
         if (setBotStatus) setBotStatus("RUNNING");
+        setHttpActiveAccounts(prev => ({
+          ...prev,
+          [`${activeBotTab}_${currentAcc}`]: currentAcc,
+          [currentAcc]: activeBotTab,
+          [activeBotTab]: currentAcc,
+        }));
+        setWsActiveAccountsState(prev => ({
+          ...prev,
+          [`${activeBotTab}_${currentAcc}`]: currentAcc,
+          [currentAcc]: activeBotTab,
+          [activeBotTab]: currentAcc,
+        }));
         const accLabel = accounts.find(a => a.id === currentAcc)?.name || currentAcc;
         addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accLabel}${cleanMsg}`);
         refreshBotData();
@@ -2354,12 +2381,16 @@ function App() {
         if (setBotStatus) setBotStatus("SHADOW");
         setHttpActiveAccounts(prev => {
           const next = { ...prev };
-          delete next[targetStrat];
+          delete next[`${targetStrat}_${targetAcc}`];
+          delete next[targetAcc];
+          if (next[targetStrat] === targetAcc) delete next[targetStrat];
           return next;
         });
         setWsActiveAccountsState(prev => {
           const next = { ...prev };
-          delete next[targetStrat];
+          delete next[`${targetStrat}_${targetAcc}`];
+          delete next[targetAcc];
+          if (next[targetStrat] === targetAcc) delete next[targetStrat];
           return next;
         });
         const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";
