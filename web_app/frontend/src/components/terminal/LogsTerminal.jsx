@@ -86,12 +86,12 @@ export default function LogsTerminal({
         // Gốc -> Đồng nhất sắc thái Cyan (#38bdf8)
         content = <span style={{ color: "#38bdf8" }}>{col}</span>;
       } else if (col.includes("Tổng:")) {
-        // Tổng -> Đồng nhất sắc thái Xanh ngọc Emerald sáng (#34d399)
-        content = <span style={{ color: "#34d399" }}>{col}</span>;
+        // Tổng -> Đồng nhất sắc thái Xanh lá (#4ade80)
+        content = <span style={{ color: "#4ade80" }}>{col}</span>;
       } else if (col.includes("PNL:")) {
-        // PNL -> Đồng nhất sắc thái: Xanh lá mạ tươi nếu dương (#4ade80), Đỏ san hô nếu âm (#f87171)
+        // PNL -> Đồng nhất sắc thái: Xanh ngọc nếu dương (#34d399), Đỏ san hô nếu âm (#f87171)
         const isNegative = col.includes("-");
-        content = <span style={{ color: isNegative ? "#f87171" : "#4ade80" }}>{col}</span>;
+        content = <span style={{ color: isNegative ? "#f87171" : "#34d399" }}>{col}</span>;
       }
 
       return (

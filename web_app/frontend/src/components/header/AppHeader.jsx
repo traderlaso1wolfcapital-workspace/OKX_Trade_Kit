@@ -212,15 +212,15 @@ export default function AppHeader({
             {activeBalanceStr && (
               <span
                 style={{
-                  color: "#34d399",
+                  color: "#4ade80",
                   fontWeight: 600,
                   fontSize: "11px",
                   fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
                   fontVariantNumeric: "tabular-nums",
-                  background: "rgba(52, 211, 153, 0.10)",
+                  background: "rgba(74, 222, 128, 0.10)",
                   padding: "1px 5px",
                   borderRadius: "4px",
-                  border: "1px solid rgba(52, 211, 153, 0.22)",
+                  border: "1px solid rgba(74, 222, 128, 0.22)",
                   letterSpacing: "-0.2px"
                 }}
               >
@@ -235,40 +235,49 @@ export default function AppHeader({
               TK CHÍNH
             </span>
           )}
-          {((isOkx && isThisOkxRunning) || (!isOkx && isThisPropRunning)) && (
-            <span
-              title="Bot đang chạy"
-              style={{
-                width: "6px",
-                height: "6px",
-                backgroundColor: "#ef4444",
-                borderRadius: "50%",
-                boxShadow: "0 0 6px #ef4444, 0 0 10px rgba(239, 68, 68, 0.6)",
-                transform: "translateY(-3px)",
-                flexShrink: 0,
-                display: "inline-block"
-              }}
-            />
-          )}
-
-          {/* Pure SVG Dropdown Arrow */}
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={isOpen ? "#38bdf8" : "#ffffff"}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {/* Cụm tín hiệu LIVE (chấm đỏ trên) + Mũi tên dropdown (dưới) */}
+          <div
             style={{
-              marginLeft: "2px",
-              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 0.18s ease"
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: ((isOkx && isThisOkxRunning) || (!isOkx && isThisPropRunning)) ? "2px" : "0px",
+              marginLeft: "3px",
+              height: "22px",
+              flexShrink: 0
             }}
           >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+            {((isOkx && isThisOkxRunning) || (!isOkx && isThisPropRunning)) && (
+              <span
+                title="Bot đang chạy"
+                style={{
+                  width: "5px",
+                  height: "5px",
+                  backgroundColor: "#ef4444",
+                  borderRadius: "50%",
+                  boxShadow: "0 0 5px #ef4444, 0 0 8px rgba(239, 68, 68, 0.7)",
+                  display: "block"
+                }}
+              />
+            )}
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={isOpen ? "#38bdf8" : "#9ca3af"}
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.18s ease"
+              }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </button>
 
         {/* Custom Popover Dropdown Menu - GIỮ NGUYÊN 100% STYLE MENU HEADER */}
@@ -362,15 +371,15 @@ export default function AppHeader({
                     {accBal && (
                       <span
                         style={{
-                          color: "#34d399",
+                          color: "#4ade80",
                           fontWeight: 600,
                           fontSize: "11px",
                           fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
                           fontVariantNumeric: "tabular-nums",
-                          background: "rgba(52, 211, 153, 0.10)",
+                          background: "rgba(74, 222, 128, 0.10)",
                           padding: "1px 5px",
                           borderRadius: "4px",
-                          border: "1px solid rgba(52, 211, 153, 0.22)",
+                          border: "1px solid rgba(74, 222, 128, 0.22)",
                           letterSpacing: "-0.2px"
                         }}
                       >
@@ -467,15 +476,15 @@ export default function AppHeader({
                     {propBal && (
                       <span
                         style={{
-                          color: "#34d399",
+                          color: "#4ade80",
                           fontWeight: 600,
                           fontSize: "11px",
                           fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
                           fontVariantNumeric: "tabular-nums",
-                          background: "rgba(52, 211, 153, 0.10)",
+                          background: "rgba(74, 222, 128, 0.10)",
                           padding: "1px 5px",
                           borderRadius: "4px",
-                          border: "1px solid rgba(52, 211, 153, 0.22)",
+                          border: "1px solid rgba(74, 222, 128, 0.22)",
                           letterSpacing: "-0.2px"
                         }}
                       >

@@ -11,5 +11,18 @@
   - Tuyệt đối không xóa cơ chế **Port Bridge 5173 ➔ 8080** trong `main.py`: đây là cầu nối TCP chuyển tiếp lưu lượng để tương thích 100% với cấu hình Cloudflare Zero Trust của domain `autotrader.fun`, chống lỗi 502 Bad Gateway.
   - Mọi thư viện mới của backend bắt buộc phải cập nhật đồng bộ vào `web_app/backend/requirements.txt` (đặc biệt là `requests`, `pydantic`). Cấu hình PM2 `ecosystem.config.js` bắt buộc dùng `path.resolve(__dirname, 'web_app/backend')` và `PYTHONUNBUFFERED: "1"`.
 
+- **Đồng Bộ Tuyệt Đối Giữa "Tổng" Trên Dashboard Và Số Tiền $ Sau Tag `#xxxx`:**
+  - Mục **"Tổng:"** trên bảng điều khiển Terminal Logs và **Số tiền $ hiển thị ngay sau thẻ `#xxxx`** (trên nút Header capsule chính và trong từng mục dropdown của mọi tài khoản) **BẮT BUỘC LUÔN LUÔN PHẢI ĐỒNG BỘ 100% VỚI NHAU**:
+    1. **Về con số:** Phản ánh chính xác cùng một con số số dư thực tế (Live Equity / Total Balance) từ WebSocket và API, không được lệch dù chỉ 1 xu.
+    2. **Về màu sắc & kiểu dáng:** Sử dụng cùng một mã màu thống nhất là **Xanh lá tươi (`#4ade80`)** (hoặc mã màu mà CEO chỉ định cho Tổng).
+    3. **Bảng màu chuẩn toàn hệ thống:**
+       - **Gốc:** Xanh Cyan (`#38bdf8`) [Tùy chọn 2 dự phòng: Vàng cam sáng `#fbbf24`]
+       - **Tổng & Số tiền sau `#xxxx`:** Xanh lá tươi (`#4ade80`, nền `rgba(74, 222, 128, 0.10)`, viền `rgba(74, 222, 128, 0.22)`)
+       - **PNL Dương (Lãi):** Xanh ngọc Emerald (`#34d399`)
+       - **PNL Âm (Lỗ):** Đỏ san hô (`#f87171`)
+       - **Trạng thái Bot LIVE:** Chấm tròn đỏ phát sáng 5px (`#ef4444`) đặt ngay TRÊN mũi tên dropdown (nút capsule), không dùng nhãn chữ [LIVE] to cồng kềnh.
+       - **Lưu ý màu Gốc:** Luôn lưu trữ 2 mã màu chuẩn đã nghiệm thu: 🔵 **Cyan (`#38bdf8`)** và 🟡 **Vàng cam (`#fbbf24`)** để chuyển đổi theo yêu cầu CEO.
+
 ## BẢO MẬT MÃ NGUỒN
 - TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ Ý PUSH MÃ NGUỒN LÊN GITHUB NẾU KHÔNG CÓ LỆNH TRỰC TIẾP TỪ CEO.
+

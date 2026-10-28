@@ -266,3 +266,23 @@ bot_main.py .env
 - **Thêm cột vào bảng MTF**: Phải tính lại tổng độ rộng đảm bảo ≤ 97 ký tự.
 - **Thêm trường vào các phần chi tiết**: Luôn dùng `smart_print()` để tránh tràn dòng và tự thụt dòng sau 4 khoảng trắng.
 - **Không bao giờ** để lý luận (reason/logic) lẫn với trạng thái số liệu (ROI/MAE/SL) trong cùng 1 khối.
+
+---
+
+## 11. Quy Chuẩn Đồng Bộ Màu Sắc & Số Dư ("Tổng" vs Tag Tài Khoản #xxxx)
+
+- **Nguyên tắc bất biến:** Mục **"Tổng:"** trên bảng điều khiển Terminal Logs và **Số tiền $ ngay sau tag `#xxxx`** của từng tài khoản (cả ở nút Header chính lẫn trong từng mục Dropdown) **PHẢI LUÔN LUÔN ĐỒNG BỘ 100% CẢ VỀ CON SỐ VÀ MÀU SẮC**:
+  1. **Về con số:** Phải lấy từ cùng nguồn số dư thực tế (Live Equity / Total Balance).
+  2. **Về màu sắc:**
+     - **Tổng & Số tiền sau `#xxxx`:** Màu Xanh lá tươi (`#4ade80`), nền mờ `rgba(74, 222, 128, 0.10)`, viền `rgba(74, 222, 128, 0.22)`.
+     - **Gốc:** Màu Xanh Cyan (`#38bdf8`).
+     - **PNL Dương (Lãi):** Màu Xanh ngọc Emerald (`#34d399`).
+     - **PNL Âm (Lỗ):** Màu Đỏ san hô (`#f87171`).
+     - **Trạng thái Bot LIVE:** Chấm tròn đỏ 5px (`#ef4444`) đặt ngay TRÊN mũi tên dropdown (nút capsule), không dùng nhãn chữ to cồng kềnh.
+
+### 📌 Bảng Lưu Trữ 2 Mã Màu Chuẩn Cho Mục "Gốc" (Tra Cứu & Đổi Khi Cần):
+- 🔵 **Màu Xanh Cyan:** `#38bdf8` (Đang kích hoạt, đồng bộ thương hiệu TLS1).
+- 🟡 **Màu Vàng Cam Sáng:** `#fbbf24` (Tùy chọn ấm áp, phân tách cột cực rõ).
+*(Cả 2 mã màu đều chuẩn thẩm mỹ đã nghiệm thu, sẵn sàng đổi lại bất kỳ khi nào CEO yêu cầu).*
+
+
