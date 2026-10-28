@@ -135,7 +135,9 @@ def main():
     user = cfg.get("username") or "tls1clawbot"
     pwd = cfg.get("password") or ""
     remote_path = cfg.get("remote_path") or "/Users/tls1clawbot/Desktop/OKX_Trade_Kit/web_app"
-    command = cfg.get("command") or "git pull origin main && bash start_web_server.sh"
+    command = cfg.get("command") or "git checkout -- . && git pull origin main && bash start_web_server.sh"
+    if "checkout" not in command and "restore" not in command:
+        command = f"git checkout -- . && {command}"
 
     # 1. Kiểm tra kết nối tới IP hiện tại
     if not check_port(host, port, timeout=2.5):
