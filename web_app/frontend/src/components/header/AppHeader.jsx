@@ -236,9 +236,19 @@ export default function AppHeader({
             </span>
           )}
           {((isOkx && isThisOkxRunning) || (!isOkx && isThisPropRunning)) && (
-            <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
-              LIVE
-            </span>
+            <span
+              title="Bot đang chạy"
+              style={{
+                width: "6px",
+                height: "6px",
+                backgroundColor: "#ef4444",
+                borderRadius: "50%",
+                boxShadow: "0 0 6px #ef4444, 0 0 10px rgba(239, 68, 68, 0.6)",
+                transform: "translateY(-3px)",
+                flexShrink: 0,
+                display: "inline-block"
+              }}
+            />
           )}
 
           {/* Pure SVG Dropdown Arrow */}
@@ -373,9 +383,19 @@ export default function AppHeader({
                       </span>
                     )}
                     {isThisAccRunning && (
-                      <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
-                        LIVE
-                      </span>
+                      <span
+                        title="Bot đang chạy"
+                        style={{
+                          width: "6px",
+                          height: "6px",
+                          backgroundColor: "#ef4444",
+                          borderRadius: "50%",
+                          boxShadow: "0 0 6px #ef4444, 0 0 10px rgba(239, 68, 68, 0.6)",
+                          transform: "translateY(-3px)",
+                          flexShrink: 0,
+                          display: "inline-block"
+                        }}
+                      />
                     )}
                   </div>
                   {isSelected && (
@@ -463,9 +483,19 @@ export default function AppHeader({
                       </span>
                     )}
                     {isThisPropAccRunning && (
-                      <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
-                        LIVE
-                      </span>
+                      <span
+                        title="Bot đang chạy"
+                        style={{
+                          width: "6px",
+                          height: "6px",
+                          backgroundColor: "#ef4444",
+                          borderRadius: "50%",
+                          boxShadow: "0 0 6px #ef4444, 0 0 10px rgba(239, 68, 68, 0.6)",
+                          transform: "translateY(-3px)",
+                          flexShrink: 0,
+                          display: "inline-block"
+                        }}
+                      />
                     )}
                   </div>
                   {isSelected && (

@@ -83,8 +83,8 @@ export default function LogsTerminal({
       let content = col;
 
       if (col.includes("Gốc:")) {
-        // Gốc -> Đồng nhất sắc thái Vàng Cam Sáng (#fbbf24)
-        content = <span style={{ color: "#fbbf24" }}>{col}</span>;
+        // Gốc -> Đồng nhất sắc thái Cyan (#38bdf8)
+        content = <span style={{ color: "#38bdf8" }}>{col}</span>;
       } else if (col.includes("Tổng:")) {
         // Tổng -> Đồng nhất sắc thái Xanh ngọc Emerald sáng (#34d399)
         content = <span style={{ color: "#34d399" }}>{col}</span>;

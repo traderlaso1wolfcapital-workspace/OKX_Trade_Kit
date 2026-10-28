@@ -41,7 +41,7 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
   - **Giải pháp & Thiết kế:**
     1. **Thiết kế hiển thị số dư chuẩn tài chính:**
        - **Font chữ:** Font thẳng (`fontStyle: "normal"`), Monospace Tabular (`Roboto Mono`, `'SF Pro Text', monospace`, `fontVariantNumeric: "tabular-nums"`, `fontWeight: 600`, `fontSize: 11px`). Số thẳng giúp các chữ số thẳng hàng, chính xác và không bị nhầm lẫn con số như font nghiêng.
-       - **Màu sắc & Thẻ huy hiệu (Badge):** Đồng nhất hệ thống màu sắc theo chuẩn Dashboard chuyên nghiệp: Gốc = Vàng cam (#fbbf24), Tổng & Số tiền sau #xxxx = Xanh ngọc Emerald (#34d399, nền mờ rgba(52, 211, 153, 0.10), viền rgba(52, 211, 153, 0.22)), PNL Dương = Xanh lá mạ (#4ade80), PNL Âm = Đỏ san hô (#f87171).
+       - **Màu sắc & Thẻ huy hiệu (Badge):** Gốc = Xanh Cyan (#38bdf8), Tổng & Số tiền sau #xxxx = Xanh ngọc Emerald (#34d399, nền mờ rgba(52, 211, 153, 0.10), viền rgba(52, 211, 153, 0.22)), PNL Dương = Xanh lá mạ (#4ade80), PNL Âm = Đỏ san hô (#f87171). Thay thế nhãn chữ [LIVE] to cồng kềnh bằng chấm đỏ phát sáng nhỏ 6px (#ef4444) đặt chếch lên trên.
        - **Vị trí:** Đặt ngay sau nhãn `#xxxx`: `OKX #7768  $1,420.50  [LIVE]  ✓`.
        - **Header Capsule Button:** Hiển thị luôn số dư của tài khoản đang chọn trên thanh header chính: `OKX #7768  $1,420.50  [LIVE]  ▼`.
     2. **Backend & Frontend Data Pipeline:**
