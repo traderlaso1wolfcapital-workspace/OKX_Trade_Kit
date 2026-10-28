@@ -377,8 +377,20 @@ function App() {
   const [overrideBotRunning, setOverrideBotRunning] = useState(null);
 
   const isPropRunning = overridePropBotRunning !== null ? overridePropBotRunning : (propBotStatus === "RUNNING");
-  const isOkxRunning = overrideBotRunning !== null ? overrideBotRunning : (botStatus === "RUNNING");
-  const isRunning = currentPlatform === "e8" ? isPropRunning : isOkxRunning;
+  const isTargetOkxRunning = useMemo(() => {
+    if (overrideBotRunning !== null) return overrideBotRunning;
+    if (botStatus !== "RUNNING") return false;
+    const runningAcc = mergedActiveAccounts[activeBotTab];
+    if (!runningAcc) return false;
+    const c1 = String(runningAcc).trim().replace(/^#/, "");
+    const c2 = String(effectiveAccId || "").trim().replace(/^#/, "");
+    const curObj = accounts.find(a => a.id === effectiveAccId || a.name === effectiveAccId);
+    const c3 = String(curObj?.name || "").trim().replace(/^#/, "");
+    return c1 === c2 || (c3 && c1 === c3);
+  }, [overrideBotRunning, botStatus, mergedActiveAccounts, activeBotTab, effectiveAccId, accounts]);
+
+  const isOkxRunning = isTargetOkxRunning;
+  const isRunning = currentPlatform === "e8" ? isPropRunning : isTargetOkxRunning;
 
   // Tự động giải phóng cờ ép trạng thái khi WebSocket hoặc Server đã xác nhận đồng bộ
   useEffect(() => {
@@ -755,7 +767,8 @@ function App() {
     setActivePairs(prev => {
       const updated = prev.includes(pair) ? prev.filter(p => p !== pair) : [...prev, pair];
       try {
-        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+        const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}${accParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled_coins: updated.map(p => p.split("-")[0]) }),
@@ -768,7 +781,7 @@ function App() {
       } catch { }
       return updated;
     });
-  }, [activeBotTab, currentUid]);
+  }, [activeBotTab, currentUid, effectiveAccId]);
 
   const handleToggleWatchlistCoin = (coinValue) => {
     const isCurrentlySelected = watchlistCoins.includes(coinValue);
@@ -808,7 +821,8 @@ function App() {
     setEnabledTfs(updatedTfs);
 
     try {
-      fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+      const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+      fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}${accParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled_tfs: updatedTfs }),
@@ -877,18 +891,18 @@ function App() {
     }
   };
 
-  // 9. Risk & Strategy Settings State (Ưu tiên nạp từ localStorage để không bị giật về 1$)
+  // 9. Risk & Strategy Settings State (Ưu tiên nạp từ localStorage để không bị giật về 0.4$)
   const [risk, setRisk] = useState(() => {
     try {
       const active = localStorage.getItem("tls1_active_bot_tab") || "sub1";
       const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}`));
-      const initVol = (savedVol && savedVol > 0) ? savedVol : 1;
+      const initVol = (savedVol && savedVol > 0) ? savedVol : 0.4;
       if (active === "sub2") {
         return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false };
       }
-      return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 0.60, slPct: 0.60, volUnit: "USDT", multiplyVolumeByTf: false };
+      return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false };
     } catch {
-      return { posVol: 1, volUsdt: 1, volPct: 0.1, tpPct: 0.60, slPct: 0.60, volUnit: "USDT", multiplyVolumeByTf: false };
+      return { posVol: 0.4, volUsdt: 0.4, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false };
     }
   });
   const hasLoadedConfigFromBackendRef = useRef(false);
@@ -896,7 +910,7 @@ function App() {
   const [isRiskCollapsed, setIsRiskCollapsed] = useState(false);
   const [strat, setStrat] = useState({
     main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
-    dynamicPingpongTp: false, altcoinFollowBtc: true,
+    dynamicPingpongTp: false, altcoinFollowBtc: false,
     sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
     trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
     timeframeBase: "1H",
@@ -906,7 +920,7 @@ function App() {
     dcaGapPct: "0.20",
     confluencePct: "0.23",
     accumCandles: 60,
-    altcoinFollowBtc: true,
+    altcoinFollowBtc: false,
     ethVolMult: "1.30",
   });
   const [smcEntryCfg, setSmcEntryCfg] = useState({
@@ -1019,7 +1033,7 @@ function App() {
 
   // Sync Risk settings to backend (chỉ sync khi đã nạp xong từ backend và bot KHÔNG chạy)
   useEffect(() => {
-    if (!hasLoadedConfigFromBackendRef.current || isRunning) return;
+    if (!hasLoadedConfigFromBackendRef.current || isRunning || !effectiveAccId) return;
     if (prevRiskRef.current && JSON.stringify(prevRiskRef.current) === JSON.stringify(risk)) return;
     prevRiskRef.current = risk;
 
@@ -1027,7 +1041,8 @@ function App() {
       try {
         const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
         const isSub2 = activeBotTab === "sub2";
-        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}`, {
+        const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+        fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}${accParam}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1039,17 +1054,18 @@ function App() {
           }),
         }).then((res) => {
           if (res.ok) {
+            const accName = accounts.find(a => a.id === effectiveAccId)?.name || effectiveAccId;
             if (isSub2) {
-              addSystemLog(`⚙️ [SYSTEM] Cập nhật cấu hình SMC: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời Thuận = ${risk.tpPct}R | Chốt lời Ngược = ${risk.slPct}R`);
+              addSystemLog(`⚙️ [SYSTEM] Cập nhật cấu hình SMC cho [${accName}]: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời Thuận = ${risk.tpPct}R | Chốt lời Ngược = ${risk.slPct}R`);
             } else {
-              addSystemLog(`⚙️ [SYSTEM] Cập nhật cấu hình: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
+              addSystemLog(`⚙️ [SYSTEM] Cập nhật cấu hình cho [${accName}]: Volume = ${risk.posVol} ${risk.volUnit} | Chốt lời = ${risk.tpPct}% | Cắt lỗ = ${risk.slPct}%`);
             }
           }
         });
       } catch {}
     }, 600);
     return () => clearTimeout(timer);
-  }, [risk, isRunning, activeBotTab, currentUid]);
+  }, [risk, isRunning, activeBotTab, currentUid, effectiveAccId, accounts]);
 
   // Bootstrap accounts & credentials unconditionally on mount
   useEffect(() => {
@@ -1205,6 +1221,8 @@ function App() {
   // Load bot configuration (enabled TFs, coins)
   useEffect(() => {
     const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+    if (!effectiveAccId) return;
+    hasLoadedConfigFromBackendRef.current = false;
     fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${curUid}&account_id=${effectiveAccId}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -1215,41 +1233,40 @@ function App() {
           const bVol = Number(d.POSITION_VOLUME_HIGH_CONFIDENCE);
           if (bVol > 0) {
             try {
-              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(bVol));
+              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`, String(bVol));
             } catch {}
           }
           const isSub2 = activeBotTab === "sub2";
-          let parsedTp = r.tpPct;
-          let parsedSl = r.slPct;
+          let parsedTp = isSub2 ? 5.0 : 0.80;
+          let parsedSl = isSub2 ? 1.0 : 0.80;
           if (isSub2) {
             if (d.OB_RR_RATIO_TREND !== undefined) {
               parsedTp = Number(d.OB_RR_RATIO_TREND);
             } else if (d.SCALPING_TP_PCT) {
               const tpVal = Number((d.SCALPING_TP_PCT * 100).toFixed(2));
               parsedTp = (tpVal === 0.60 || tpVal === 1.5) ? 5.0 : tpVal;
-            } else {
-              parsedTp = 5.0;
             }
             if (d.OB_RR_RATIO_COUNTER !== undefined) {
               parsedSl = Number(d.OB_RR_RATIO_COUNTER);
             } else if (d.SCALPING_SL_PCT) {
               const slVal = Number((d.SCALPING_SL_PCT * 100).toFixed(2));
               parsedSl = (slVal === 0.60 || slVal === 1.5) ? 1.0 : slVal;
-            } else {
-              parsedSl = 1.0;
             }
           } else {
-            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct;
-            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct;
+            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : 0.80;
+            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : 0.80;
           }
-          setRisk((r) => ({
-            ...r,
-            posVol: bVol > 0 ? bVol : r.posVol,
-            volUsdt: bVol > 0 ? bVol : r.volUsdt,
+          const nextRisk = {
+            posVol: bVol > 0 ? bVol : 0.4,
+            volUsdt: bVol > 0 ? bVol : 0.4,
+            volPct: 0.1,
+            volUnit: d.VOL_UNIT || "USDT",
             tpPct: parsedTp,
             slPct: parsedSl,
-            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : r.multiplyVolumeByTf,
-          }));
+            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : false,
+          };
+          prevRiskRef.current = nextRisk;
+          setRisk(nextRisk);
         }
         hasLoadedConfigFromBackendRef.current = true;
         if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined || d.ENABLE_MULTITF_GRID !== undefined) {
@@ -1679,7 +1696,8 @@ function App() {
     const nextVal = Boolean(val);
     setRisk(r => ({ ...r, multiplyVolumeByTf: nextVal }));
     try {
-      await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}`, {
+      const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+      await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}${accParam}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1689,7 +1707,8 @@ function App() {
           }
         })
       });
-      addSystemLog(`⚙️ [CẤU HÌNH] Đã lưu thiết lập Nhân hệ số Ký quỹ (Vốn): ${nextVal ? "BẬT" : "TẮT"}`);
+      const accLabel = accounts.find(a => a.id === effectiveAccId)?.name || effectiveAccId;
+      addSystemLog(`⚙️ [CẤU HÌNH] Đã lưu thiết lập Nhân hệ số Ký quỹ cho [${accLabel}]: ${nextVal ? "BẬT" : "TẮT"}`);
     } catch (err) {
       console.error("Lỗi cập nhật ENABLE_TF_VOLUME_MULTIPLIER:", err);
     }
@@ -2080,6 +2099,25 @@ function App() {
       return;
     }
 
+    // Kiểm tra xem chiến lược này có đang chạy trên tài khoản phụ khác không -> Xác nhận chuyển tài khoản
+    const runningAccOnThisStrat = mergedActiveAccounts[activeBotTab];
+    if (runningAccOnThisStrat) {
+      const c1 = String(runningAccOnThisStrat).trim().replace(/^#/, "");
+      const c2 = String(currentAcc).trim().replace(/^#/, "");
+      const curObj = accounts.find(a => a.id === currentAcc || a.name === currentAcc);
+      const c3 = String(curObj?.name || "").trim().replace(/^#/, "");
+      if (c1 !== c2 && (!c3 || c1 !== c3)) {
+        const runningObj = accounts.find(a => a.id === runningAccOnThisStrat || a.name === runningAccOnThisStrat);
+        const runningName = runningObj?.name || runningAccOnThisStrat;
+        const targetName = curObj?.name || currentAcc;
+        const thisBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
+        const confirmSwitch = window.confirm(
+          `⚠️ ${thisBotName} hiện đang chạy trên tài khoản [${runningName}].\n\nBạn có chắc chắn muốn DỪNG bot trên [${runningName}] để CHUYỂN sang chạy trên [${targetName}] không?`
+        );
+        if (!confirmSwitch) return;
+      }
+    }
+
     // Kiểm tra xem đã có ít nhất 1 cặp giao dịch nào được cấu hình TF trade hay chưa
     let effectiveTfs = enabledTfs;
     let pairsWithTf = (activePairs || []).filter(pair => {
@@ -2096,12 +2134,12 @@ function App() {
       setIsStartingBot(true);
       const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
 
-      // Tự động đồng bộ Ký quỹ cơ sở và Hệ số nhân trước khi Start bot (lưu chặt vào localStorage)
+      // Tự động đồng bộ Ký quỹ cơ sở và Hệ số nhân cho tài khoản đang chọn trước khi Start bot
       try {
         try {
-          localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(risk.posVol));
+          localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${currentAcc}`, String(risk.posVol));
         } catch {}
-        await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${botUid}`, {
+        await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${botUid}&account_id=${encodeURIComponent(currentAcc)}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2602,13 +2640,13 @@ function App() {
   };
 
   const handleResetDefaultStrat = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH chuẩn (XAU, BTC, ETH - Ký quỹ 1$ - Lưới Đa Khung (Hedge) - Đồng pha H4 BTC) không?")) return;
+    if (!window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ cấu hình chiến thuật về MẶC ĐỊNH chuẩn (XAU, BTC, ETH - Ký quỹ 0.4$ - Chốt lời 0.8% - Cắt lỗ 0.8% - Lưới Đa Khung Hedge) không?")) return;
 
     setIsSavingConfig(true);
     try {
       const targetAcc = selectedAccount || effectiveAccId || "";
       if (activeBotTab === "sub1") {
-        const defaultRisk = { posVol: 1, volUsdt: 1, volPct: 0.1, volUnit: "USDT", tpPct: 0.60, slPct: 0.60, multiplyVolumeByTf: false };
+        const defaultRisk = { posVol: 0.4, volUsdt: 0.4, volPct: 0.1, volUnit: "USDT", tpPct: 0.80, slPct: 0.80, multiplyVolumeByTf: false };
         const defaultStrat = {
           main: true, pyramidDca: false, negativeDca: false, multiTfGrid: true, hedge: false, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false,
@@ -2620,7 +2658,7 @@ function App() {
           dcaGapPct: "0.20",
           confluencePct: "0.23",
           accumCandles: 60,
-          altcoinFollowBtc: true,
+          altcoinFollowBtc: false,
           ethVolMult: "1.30",
         };
         const defaultCoins = ["XAU", "BTC", "ETH"];
@@ -2652,7 +2690,7 @@ function App() {
           ENABLE_MAX_ROI_EXIT: false,
           ENABLE_SIDEWAY_VAP_EXIT: false,
           ENABLE_H4_FLIP_CLOSE: false,
-          ALTCOIN_FOLLOW_BTC_EMA: true,
+          ALTCOIN_FOLLOW_BTC_EMA: false,
           ENTRY_OFFSET_PCT: 0.05,
           DCA_GAP_PCT: 0.20,
           CONFLUENCE_PCT: 0.23,
@@ -2666,9 +2704,9 @@ function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             enabled_coins: defaultCoins,
-            position_volume: 1,
-            scalping_tp_pct: 0.006,
-            scalping_sl_pct: 0.006,
+            position_volume: 0.4,
+            scalping_tp_pct: 0.008,
+            scalping_sl_pct: 0.008,
             strategy_config: strategyConfig
           })
         });
@@ -2681,13 +2719,13 @@ function App() {
           }
         }
         alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho EMA200 Bot thành công!${cancelMsg}`);
-        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 1$, Lưới Đa Khung (Hedge), Đồng pha H4 BTC, XAU/BTC/ETH${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 0.4$, TP 0.8%, SL 0.8%, Lưới Đa Khung (Hedge), XAU/BTC/ETH${cancelMsg}`);
         refreshBotData();
       } else if (activeBotTab === "sub2") {
-        setRisk({ posVol: 1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false });
+        setRisk({ posVol: 0.4, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false });
         setStrat({
           main: true, xole: false, dynamicEma200Tp: false,
-          dynamicPingpongTp: false, altcoinFollowBtc: true,
+          dynamicPingpongTp: false, altcoinFollowBtc: false,
           sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
           trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
           timeframeBase: "1H",
@@ -2696,7 +2734,7 @@ function App() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            position_volume: 1,
+            position_volume: 0.4,
             scalping_tp_pct: 0.05,
             scalping_sl_pct: 0.01,
             ob_rr_ratio_trend: 5.0,
@@ -2913,7 +2951,9 @@ function App() {
     };
     const fetchConfig = async () => {
       try {
-        const r = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        if (!effectiveAccId) return;
+        const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+        const r = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}${accParam}`);
         if (r.ok) {
           const d = await r.json();
           if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
@@ -2923,41 +2963,41 @@ function App() {
           const bVol = (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : null;
           if (bVol !== null && bVol > 0) {
             try {
-              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}`, String(bVol));
+              localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`, String(bVol));
             } catch {}
           }
           const isSub2 = activeBotTab === "sub2";
-          let parsedTp = r.tpPct;
-          let parsedSl = r.slPct;
+          let parsedTp = isSub2 ? 5.0 : 0.60;
+          let parsedSl = isSub2 ? 1.0 : 0.60;
           if (isSub2) {
             if (d.OB_RR_RATIO_TREND !== undefined) {
               parsedTp = Number(d.OB_RR_RATIO_TREND);
             } else if (d.SCALPING_TP_PCT) {
               const tpVal = Number((d.SCALPING_TP_PCT * 100).toFixed(2));
               parsedTp = (tpVal === 0.60 || tpVal === 1.5) ? 5.0 : tpVal;
-            } else {
-              parsedTp = 5.0;
             }
             if (d.OB_RR_RATIO_COUNTER !== undefined) {
               parsedSl = Number(d.OB_RR_RATIO_COUNTER);
             } else if (d.SCALPING_SL_PCT) {
               const slVal = Number((d.SCALPING_SL_PCT * 100).toFixed(2));
               parsedSl = (slVal === 0.60 || slVal === 1.5) ? 1.0 : slVal;
-            } else {
-              parsedSl = 1.0;
             }
           } else {
-            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : r.tpPct;
-            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : r.slPct;
+            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : 0.60;
+            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : 0.60;
           }
-          setRisk((r) => ({
-            ...r,
-            posVol: (bVol !== null && bVol > 0) ? bVol : r.posVol,
-            volUsdt: (bVol !== null && bVol > 0) ? bVol : r.volUsdt,
-            tpPct: parsedTp,
-            slPct: parsedSl,
-            multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? false),
-          }));
+          setRisk((r) => {
+            const nextRisk = {
+              ...r,
+              posVol: (bVol !== null && bVol > 0) ? bVol : r.posVol,
+              volUsdt: (bVol !== null && bVol > 0) ? bVol : r.volUsdt,
+              tpPct: parsedTp,
+              slPct: parsedSl,
+              multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? false),
+            };
+            prevRiskRef.current = nextRisk;
+            return nextRisk;
+          });
           hasLoadedConfigFromBackendRef.current = true;
         }
       } catch { }

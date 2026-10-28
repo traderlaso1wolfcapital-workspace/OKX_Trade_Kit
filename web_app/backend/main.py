@@ -1751,15 +1751,18 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
 
     # Đồng bộ API key đã chọn vào các file env của bot
     data_dir = get_user_data_dir(uid)
-    strat_env_file = f".api_{strategy}"
+    clean_target = target_acc.replace("#", "").strip()
+    clean_no_under = clean_target.replace("_", "").strip()
+    strat_env_file = f".api_{clean_target}" if clean_target and clean_target != strategy else f".api_{strategy}"
     strat_env_path = os.path.join(data_dir, f"bots/{strategy}", strat_env_file)
     _save_env_file(strat_env_path, api_key, secret_key, passphrase, is_demo)
     _save_env_file(os.path.join(data_dir, strat_env_file), api_key, secret_key, passphrase, is_demo)
-    _save_env_file(os.path.join(data_dir, f"bots/{strategy}", f".api_{target_acc}"), api_key, secret_key, passphrase, is_demo)
+    for env_variant in [f".api_{strategy}", f".api_{target_acc}", f".api_{clean_no_under}"]:
+        _save_env_file(os.path.join(data_dir, f"bots/{strategy}", env_variant), api_key, secret_key, passphrase, is_demo)
 
     flag_dir = _get_flag_dir(uid, strategy)
     os.makedirs(flag_dir, exist_ok=True)
-    acc_name = strategy
+    acc_name = clean_target if clean_target and clean_target != strategy else strategy
 
     # 🧹 Dọn sạch toàn bộ lệnh Limit cũ chưa khớp trên OKX để bot đặt lại theo logic mới (bảo lưu 100% TP/SL)
     canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="START BOT") if not is_prop_mode else 0
@@ -1825,18 +1828,19 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
             process_alive = False
         else:
             # Process đang chạy và cùng tài khoản -> chỉ cần kích hoạt bằng flag
-            stop_flag = os.path.join(flag_dir, f"stop_{acc_name}.flag")
-            if os.path.exists(stop_flag):
-                try: os.remove(stop_flag)
+            acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
+            for nm in acc_flag_names:
+                stop_flag = os.path.join(flag_dir, f"stop_{nm}.flag")
+                if os.path.exists(stop_flag):
+                    try: os.remove(stop_flag)
+                    except: pass
+                try:
+                    with open(os.path.join(flag_dir, f"activate_{nm}.flag"), "w") as f:
+                        f.write("1")
+                    with open(os.path.join(flag_dir, f"dry_run_{nm}.flag"), "w") as f:
+                        f.write("0")
                 except: pass
-            try:
-                with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
-                    f.write("1")
-                with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
-                    f.write("0")
-                set_nested(bot_start_times, uid, strategy, time.time())
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Lỗi ghi activate flag: {e}")
+            set_nested(bot_start_times, uid, strategy, time.time())
             clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
             return {"status": "success", "message": f"⚡ Bot đã được KÍCH HOẠT!{clean_info} Lệnh thật sẽ được đặt lên OKX theo nến hiện tại.", "canceled_count": canceled_orders}
 
@@ -1848,21 +1852,24 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
 
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
     try:
+        acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
         # Xoá stop/kill flag cũ
-        for fname in [f"stop_{acc_name}.flag", f"kill_{acc_name}.flag"]:
-            fp = os.path.join(flag_dir, fname)
-            if os.path.exists(fp):
-                try: os.remove(fp)
-                except: pass
+        for nm in acc_flag_names:
+            for fname in [f"stop_{nm}.flag", f"kill_{nm}.flag"]:
+                fp = os.path.join(flag_dir, fname)
+                if os.path.exists(fp):
+                    try: os.remove(fp)
+                    except: pass
 
         # Viết flag Kích hoạt & Tắt Shadow mode ngay lập tức trước khi chạy process
         # để UI không bị giật (flicker) trạng thái "Dừng" trong 2 giây đầu.
-        try:
-            with open(os.path.join(flag_dir, f"activate_{acc_name}.flag"), "w") as f:
-                f.write("1")
-            with open(os.path.join(flag_dir, f"dry_run_{acc_name}.flag"), "w") as f:
-                f.write("0")
-        except: pass
+        for nm in acc_flag_names:
+            try:
+                with open(os.path.join(flag_dir, f"activate_{nm}.flag"), "w") as f:
+                    f.write("1")
+                with open(os.path.join(flag_dir, f"dry_run_{nm}.flag"), "w") as f:
+                    f.write("0")
+            except: pass
 
         custom_env = os.environ.copy()
         custom_env["PYTHONPATH"] = OKX_TRADE_KIT_DIR
@@ -2131,76 +2138,94 @@ async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = N
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _resolve_bot_config_path(config_dir: str, strategy: str, target_acc: Optional[str]) -> tuple[str, bool]:
+    """Trả về (config_path, is_specific_account) chuẩn xác cho từng tài khoản riêng biệt."""
+    acc = (target_acc or "").strip()
+    if not acc or acc == strategy:
+        return os.path.join(config_dir, f"{strategy}_global_config.json"), False
+    
+    clean_acc = acc.replace("#", "").strip()
+    clean_no_under = clean_acc.replace("_", "").strip()
+    candidates = [
+        os.path.join(config_dir, f"{clean_acc}_global_config.json"),
+        os.path.join(config_dir, f"{clean_no_under}_global_config.json"),
+        os.path.join(config_dir, f"{acc}_global_config.json")
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p, True
+    # Mặc định file mới sẽ tạo theo clean_acc
+    return os.path.join(config_dir, f"{clean_acc}_global_config.json"), True
+
 @app.get("/api/bot/config")
 def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] = None):
-    # Đọc cấu hình JSON
+    # Đọc cấu hình JSON riêng cho từng tài khoản
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
-    config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
-    if target_acc and target_acc != strategy:
-        acc_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
-        if os.path.exists(acc_path):
-            config_path = acc_path
+    config_path, is_specific_acc = _resolve_bot_config_path(config_dir, strategy, target_acc)
+
     if not os.path.exists(config_path):
-        # Mặc định cấu hình chuẩn xác cho người dùng mới
-        if strategy == "sub2":
-            default_cfg = {
-                "ENABLED_TFS": {},
-                "ENABLED_COINS": ["BTC", "ETH", "XAU"],
-                "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
-                "VOL_UNIT": "USDT",
-                "POSITION_VOLUME_USDT": 0.4,
-                "POSITION_VOLUME_PCT": 0.1,
-                "USE_DYNAMIC_RISK": False,
-                "DYNAMIC_RISK_PCT": 0.001,
-                "OB_RR_RATIO_TREND": 5.0,
-                "OB_RR_RATIO_COUNTER": 1.0,
-                "SCALPING_TP_PCT": 0.05,
-                "SCALPING_SL_PCT": 0.01,
-                "ENABLE_TF_VOLUME_MULTIPLIER": False,
-                "ENABLE_STRATEGY_MAIN": True,
-                "ENABLE_STRATEGY_SMC": True,
-                "ENABLE_PYRAMID_DCA": False,
-                "ENABLE_NEGATIVE_DCA": False,
-                "ENABLE_MULTITF_GRID": True,
-                "ENABLE_STRATEGY_HEDGE": False,
-                "ENABLE_DYNAMIC_EMA200_TP": False,
-                "ALTCOIN_FOLLOW_BTC_EMA": False,
-                "ENTRY_OFFSET_PCT": 0.05,
-                "DCA_GAP_PCT": 0.20,
-                "CONFLUENCE_PCT": 0.23,
-                "ACCUM_CANDLES": 60,
-                "ETH_VOL_MULT": 1.30,
-                "ETH_VOLATILITY_FACTOR": 1.30
-            }
-        else:
-            default_cfg = {
-                "ENABLED_TFS": {},
-                "ENABLED_COINS": ["BTC", "ETH", "XAU"],
-                "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
-                "VOL_UNIT": "USDT",
-                "POSITION_VOLUME_USDT": 0.4,
-                "POSITION_VOLUME_PCT": 0.1,
-                "USE_DYNAMIC_RISK": False,
-                "DYNAMIC_RISK_PCT": 0.001,
-                "SCALPING_TP_PCT": 0.006,
-                "SCALPING_SL_PCT": 0.006,
-                "ENABLE_TF_VOLUME_MULTIPLIER": False,
-                "ENABLE_STRATEGY_MAIN": True,
-                "ENABLE_PYRAMID_DCA": False,
-                "ENABLE_NEGATIVE_DCA": False,
-                "ENABLE_MULTITF_GRID": True,
-                "ENABLE_STRATEGY_HEDGE": False,
-                "ENABLE_DYNAMIC_EMA200_TP": False,
-                "ALTCOIN_FOLLOW_BTC_EMA": False,
-                "ENTRY_OFFSET_PCT": 0.05,
-                "DCA_GAP_PCT": 0.20,
-                "CONFLUENCE_PCT": 0.23,
-                "ACCUM_CANDLES": 60,
-                "ETH_VOL_MULT": 1.30,
-                "ETH_VOLATILITY_FACTOR": 1.30
-            }
+        # Mặc định cấu hình chuẩn xác cho người dùng mới (chuẩn hóa theo yêu cầu CEO)
+        default_cfg = None
+        if not default_cfg:
+            if strategy == "sub2":
+                default_cfg = {
+                    "ENABLED_TFS": {},
+                    "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                    "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
+                    "VOL_UNIT": "USDT",
+                    "POSITION_VOLUME_USDT": 0.4,
+                    "POSITION_VOLUME_PCT": 0.1,
+                    "USE_DYNAMIC_RISK": False,
+                    "DYNAMIC_RISK_PCT": 0.001,
+                    "OB_RR_RATIO_TREND": 5.0,
+                    "OB_RR_RATIO_COUNTER": 1.0,
+                    "SCALPING_TP_PCT": 0.05,
+                    "SCALPING_SL_PCT": 0.01,
+                    "ENABLE_TF_VOLUME_MULTIPLIER": False,
+                    "ENABLE_STRATEGY_MAIN": True,
+                    "ENABLE_STRATEGY_SMC": True,
+                    "ENABLE_PYRAMID_DCA": False,
+                    "ENABLE_NEGATIVE_DCA": False,
+                    "ENABLE_MULTITF_GRID": True,
+                    "ENABLE_STRATEGY_HEDGE": False,
+                    "ENABLE_DYNAMIC_EMA200_TP": False,
+                    "ALTCOIN_FOLLOW_BTC_EMA": False,
+                    "ENTRY_OFFSET_PCT": 0.05,
+                    "DCA_GAP_PCT": 0.20,
+                    "CONFLUENCE_PCT": 0.23,
+                    "ACCUM_CANDLES": 60,
+                    "ETH_VOL_MULT": 1.30,
+                    "ETH_VOLATILITY_FACTOR": 1.30
+                }
+            else:
+                default_cfg = {
+                    "ENABLED_TFS": {},
+                    "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                    "POSITION_VOLUME_HIGH_CONFIDENCE": 0.4,
+                    "VOL_UNIT": "USDT",
+                    "POSITION_VOLUME_USDT": 0.4,
+                    "POSITION_VOLUME_PCT": 0.1,
+                    "USE_DYNAMIC_RISK": False,
+                    "DYNAMIC_RISK_PCT": 0.001,
+                    "SCALPING_TP_PCT": 0.008,
+                    "SCALPING_SL_PCT": 0.008,
+                    "ENABLE_TF_VOLUME_MULTIPLIER": False,
+                    "ENABLE_STRATEGY_MAIN": True,
+                    "ENABLE_PYRAMID_DCA": False,
+                    "ENABLE_NEGATIVE_DCA": False,
+                    "ENABLE_MULTITF_GRID": True,
+                    "ENABLE_STRATEGY_HEDGE": False,
+                    "ENABLE_DYNAMIC_EMA200_TP": False,
+                    "ALTCOIN_FOLLOW_BTC_EMA": False,
+                    "ENTRY_OFFSET_PCT": 0.05,
+                    "DCA_GAP_PCT": 0.20,
+                    "CONFLUENCE_PCT": 0.23,
+                    "ACCUM_CANDLES": 60,
+                    "ETH_VOL_MULT": 1.30,
+                    "ETH_VOLATILITY_FACTOR": 1.30
+                }
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(default_cfg, f, indent=4, ensure_ascii=False)
@@ -2243,10 +2268,10 @@ def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] =
                 dirty = True
         else:
             if "SCALPING_TP_PCT" not in cfg:
-                cfg["SCALPING_TP_PCT"] = 0.006
+                cfg["SCALPING_TP_PCT"] = 0.008
                 dirty = True
             if "SCALPING_SL_PCT" not in cfg:
-                cfg["SCALPING_SL_PCT"] = 0.006
+                cfg["SCALPING_SL_PCT"] = 0.008
                 dirty = True
         if "ENABLE_TF_VOLUME_MULTIPLIER" not in cfg:
             cfg["ENABLE_TF_VOLUME_MULTIPLIER"] = False
@@ -2269,7 +2294,6 @@ def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] =
         if "ENABLE_DYNAMIC_EMA200_TP" not in cfg:
             cfg["ENABLE_DYNAMIC_EMA200_TP"] = False
             dirty = True
-            dirty = True
         if dirty:
             try:
                 with open(config_path, "w", encoding="utf-8") as f:
@@ -2285,11 +2309,7 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
-    config_path = os.path.join(config_dir, f"{strategy}_global_config.json")
-    if target_acc and target_acc != strategy:
-        acc_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
-        if os.path.exists(acc_path):
-            config_path = acc_path
+    config_path, is_specific_acc = _resolve_bot_config_path(config_dir, strategy, target_acc)
     
     cfg = {}
     if os.path.exists(config_path):
@@ -2298,6 +2318,14 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
                 cfg = json.load(f)
         except Exception:
             cfg = {}
+    elif is_specific_acc:
+        strat_path = os.path.join(config_dir, f"{strategy}_global_config.json")
+        if os.path.exists(strat_path):
+            try:
+                with open(strat_path, "r", encoding="utf-8") as sf:
+                    cfg = json.load(sf)
+            except Exception:
+                cfg = {}
             
     if update_data.enabled_tfs is not None:
         cfg["ENABLED_TFS"] = update_data.enabled_tfs
@@ -2359,14 +2387,18 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
 
-        target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
-        if target_acc and target_acc != strategy:
-            acc_config_path = os.path.join(config_dir, f"{target_acc}_global_config.json")
-            try:
-                with open(acc_config_path, "w", encoding="utf-8") as f:
-                    json.dump(cfg, f, indent=4, ensure_ascii=False)
-            except Exception:
-                pass
+        # Nếu là tài khoản cụ thể, lưu đồng bộ vào các định dạng tên biến thể (kèm & không kèm #)
+        if is_specific_acc:
+            clean_acc = target_acc.replace("#", "").strip()
+            clean_no_under = clean_acc.replace("_", "").strip()
+            for alias_name in [f"{clean_acc}_global_config.json", f"{clean_no_under}_global_config.json", f"{target_acc}_global_config.json"]:
+                alias_path = os.path.join(config_dir, alias_name)
+                if alias_path != config_path:
+                    try:
+                        with open(alias_path, "w", encoding="utf-8") as af:
+                            json.dump(cfg, af, indent=4, ensure_ascii=False)
+                    except Exception:
+                        pass
 
         # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh để bắt đầu chu trình chạy bot mới (bảo lưu 100% TP/SL)
         canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")

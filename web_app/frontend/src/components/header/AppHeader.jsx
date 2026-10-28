@@ -240,7 +240,15 @@ export default function AppHeader({
               const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
               const tag = formatOkxAccountTag(acc);
               const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
-              const isThisAccRunning = !isAccMain && (isOkxRunning || acc.is_running);
+              const isThisAccRunning = !isAccMain && Boolean(
+                Object.entries(activeAccounts || {}).some(([strat, runningId]) => {
+                  if (!runningId) return false;
+                  const c1 = String(runningId).trim().replace(/^#/, "");
+                  const c2 = String(acc.id || "").trim().replace(/^#/, "");
+                  const c3 = String(acc.name || "").trim().replace(/^#/, "");
+                  return c1 === c2 || (c3 && c1 === c3);
+                }) || acc.is_running
+              );
               const theme = getAccountTheme("okx");
 
               return (

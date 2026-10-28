@@ -33,6 +33,52 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Chuẩn Hóa Bộ Cài Đặt Mặc Định Cho Tài Khoản Mới Lần Đầu Đăng Nhập App (Theo Ảnh Thực Tế CEO):
+  - **Thông số chuẩn hóa:**
+    1. **Sàn OKX (Cả 3 Bot):**
+       - Ký quỹ: `0.4 $` (Cố định, USDT).
+       - Mức chốt lời gốc M5: `0.8 %`.
+       - Mức cắt lỗ gốc M5: `0.8 %`.
+       - Danh sách coin mặc định: `XAU`, `BTC`, `ETH` (các coin còn lại tắt).
+       - Công tắc chiến thuật:
+         - DCA Dương: `OFF`
+         - DCA Âm: `OFF`
+         - Lưới Đa Khung (Hedge): `ON`
+         - Đảo Chiều EMA200 H4 >8%: `OFF`
+         - Đồng pha H4 BTC: `OFF`
+    2. **Quỹ FX (Tradelocker / E8):**
+       - Khối lượng: `0.01 L` (Lot).
+       - Mức chốt lời gốc M5: `0.8 %`.
+       - Mức cắt lỗ gốc M5: `0.8 %`.
+  - **Triển khai kỹ thuật:**
+    - Cập nhật [main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py): Khởi tạo mặc định `POSITION_VOLUME_HIGH_CONFIDENCE = 0.4`, `SCALPING_TP_PCT = 0.008`, `SCALPING_SL_PCT = 0.008`, `ALTCOIN_FOLLOW_BTC_EMA = False`, `ENABLED_COINS = ["XAU", "BTC", "ETH"]`.
+    - Cập nhật [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Cập nhật `useState` khởi tạo, loader fallback và nút `handleResetDefaultStrat` đồng bộ toàn diện với các thông số chuẩn trên.
+
+- **[28/10/2026]** - Phân Tách Cô Lập Tuyệt Đối Cấu Hình (Ký Quỹ, TP, SL, TF, Coins) & Trạng Thái Chạy Bot Theo Từng Tài Khoản OKX:
+  - **Hiện tượng & Phản hồi từ CEO:**
+    1. Khi chỉnh sửa Ký quỹ, Mức chốt lời gốc M5, Mức cắt lỗ gốc M5 trên một tài khoản OKX thì toàn bộ các tài khoản OKX khác đều bị đổi theo.
+    2. Khi ấn CHẠY BOT trên một tài khoản OKX, toàn bộ các tài khoản OKX khác đều hiện đang chạy (nút DỪNG BOT màu đỏ và huy hiệu LIVE).
+  - **Nguyên nhân kỹ thuật sâu:**
+    1. *Cấu hình:*
+       - Tại Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)), các hook gửi cấu hình (`togglePair`, `handleTfToggle`, `useEffect` sync risk, và `fetchConfig` định kỳ) chỉ gửi param `strategy=${activeBotTab}&uid=...` mà KHÔNG truyền kèm `account_id=${effectiveAccId}`.
+       - Tại Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)), `update_bot_config` và `get_bot_config` khi không có `account_id` đều đọc/ghi đè vào file chung `{strategy}_global_config.json`, và `update_bot_config` cũ có đoạn code ghi đè luôn file global khi cập nhật, dẫn tới các tài khoản đều chia sẻ chung một cấu hình.
+       - Khi chuyển tài khoản trên frontend, cờ `hasLoadedConfigFromBackendRef` không được reset, dẫn tới giá trị risk của tài khoản cũ bị push ghi đè lên tài khoản mới vừa chọn.
+    2. *Trạng thái Chạy Bot (Start/Stop):*
+       - `isOkxRunning` trong [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) chỉ kiểm tra `botStatus === "RUNNING"` của phương pháp (`sub1`), không kiểm tra xem tài khoản đang chọn (`effectiveAccId`) có trùng với tài khoản đang thực sự chạy trên server (`mergedActiveAccounts[activeBotTab]`) hay không. Do đó khi `sub1` chạy trên `#7768`, người dùng chuyển sang `#7829` vẫn thấy nút "DỪNG BOT".
+       - Trong [AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx), `isThisAccRunning` trong dropdown kiểm tra `isOkxRunning || acc.is_running`, làm cho TẤT CẢ tài khoản trong dropdown đều gắn cờ `LIVE` / `RUNNING`.
+  - **Triển khai khắc phục:**
+    1. *Backend ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):*
+       - Xây dựng hàm `_resolve_bot_config_path(config_dir, strategy, target_acc)` phân giải file cấu hình độc lập `json_data/{clean_acc}_global_config.json` cho từng tài khoản riêng biệt.
+       - Khi nạp cấu hình tài khoản mới chưa từng lưu, tự động clone từ file cấu hình mẫu hoặc default để có giá trị ban đầu chuẩn.
+       - Khi lưu cấu hình tài khoản cụ thể, chỉ ghi vào file của tài khoản đó (và alias tên), TUYỆT ĐỐI không ghi đè vào file `{strategy}_global_config.json`.
+       - Trong `start_bot`: Truyền đúng tên file env độc lập `strat_env_file = f".api_{clean_target}"`, đồng thời ghi toàn bộ các cờ kích hoạt `activate_{nm}.flag` cho cả strategy và target_acc để bot engine đọc đúng cấu hình riêng của tài khoản đó.
+    2. *Frontend ([App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx) & [AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx)):*
+       - Tính toán `isTargetOkxRunning`: So khớp chính xác tài khoản đang chọn `effectiveAccId` với tài khoản đang chạy thực tế trên server `mergedActiveAccounts[activeBotTab]`. Nếu tài khoản đang chọn không chạy bot, nút trên đỉnh hiển thị màu xanh **"CHẠY BOT"**, chỉ tài khoản đang chạy mới hiện màu đỏ **"DỪNG BOT"**.
+       - Trong [AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx), `isThisAccRunning` kiểm tra xem ID hoặc Tên tài khoản có nằm trong danh sách `activeAccounts` hay không. Chỉ tài khoản thực sự chạy mới hiện huy hiệu `LIVE` / `RUNNING`.
+       - Mọi thao tác đổi Ký quỹ, TP, SL, Cặp tiền, Khung thời gian TF đều gửi kèm `&account_id=${effectiveAccId}` và lưu cache riêng `tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`.
+       - Khi chuyển tài khoản, reset `hasLoadedConfigFromBackendRef = false` và cập nhật `prevRiskRef.current` ngay khi dữ liệu mới về để chặn mọi sự ghi đè chéo.
+       - Thêm hộp thoại xác nhận an toàn khi người dùng bấm CHẠY BOT trên tài khoản B nếu phương pháp đó đang chạy trên tài khoản A.
+
 - **[28/10/2026]** - Phát Triển Công Cụ Điều Khiển Triển Khai Từ Xa Cho Mac Mini M1 ([zzzGit_Pull_bash_web.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.py) & [zzzGit_Pull_bash_web.bat](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.bat)):
   - **Yêu cầu từ CEO:**
     - Thay vì phải sang máy Mac Mini M1 mở terminal chạy lệnh `git pull origin main && bash start_web_server.sh` thủ công, CEO muốn chạy trực tiếp 1 click trên máy tính Windows này ngay sau khi `zzPush_To_GitHub.py` hoàn tất.
