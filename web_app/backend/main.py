@@ -290,6 +290,7 @@ class CloseTicketRequest(BaseModel):
     pos: str
     upl: Optional[str] = None
     exitPx: Optional[str] = None
+    is_limit: Optional[bool] = False
 
 class OAuthCallbackRequest(BaseModel):
     code: str
@@ -2964,6 +2965,42 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         "auto_capital_init": auto_reset_equity,
     }
 
+OKX_CT_VAL_CACHE = {
+    "BTC-USDT-SWAP": 0.01,
+    "ETH-USDT-SWAP": 0.1,
+    "XAU-USDT-SWAP": 0.001,
+    "SOL-USDT-SWAP": 1.0,
+    "DOGE-USDT-SWAP": 100.0,
+    "XRP-USDT-SWAP": 100.0,
+    "ADA-USDT-SWAP": 100.0,
+    "BNB-USDT-SWAP": 0.01,
+    "AVAX-USDT-SWAP": 1.0,
+    "LINK-USDT-SWAP": 1.0,
+    "DOT-USDT-SWAP": 1.0,
+    "NEAR-USDT-SWAP": 10.0,
+    "SUI-USDT-SWAP": 1.0,
+    "PEPE-USDT-SWAP": 10000000.0,
+    "SHIB-USDT-SWAP": 1000000.0,
+}
+
+def _get_okx_contract_val(inst_id: str) -> float:
+    if not inst_id:
+        return 1.0
+    inst_id_upper = inst_id.strip().upper()
+    if inst_id_upper in OKX_CT_VAL_CACHE:
+        return OKX_CT_VAL_CACHE[inst_id_upper]
+    try:
+        url = f"https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId={inst_id_upper}"
+        resp = requests.get(url, timeout=2.0).json()
+        if resp.get("code") == "0" and resp.get("data"):
+            val = float(resp["data"][0].get("ctVal", 1.0))
+            if val > 0:
+                OKX_CT_VAL_CACHE[inst_id_upper] = val
+                return val
+    except Exception:
+        pass
+    return 1.0
+
 @app.get("/api/bot/positions")
 def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
     if not uid or uid in ["default", "guest", "undefined", "null"]:
@@ -3026,6 +3063,17 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                         res_algo = resp_algo.json()
                         if res_algo.get("code") == "0":
                             algo_data = res_algo.get("data", [])
+
+                    # LẤY TRỰC TIẾP LỆNH LIMIT CHỜ KHỚP ĐANG TREO TRÊN SÀN OKX
+                    raw_pending_orders = []
+                    try:
+                        resp_pending = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+                        if resp_pending.status_code == 200:
+                            res_pending = resp_pending.json()
+                            if res_pending.get("code") == "0":
+                                raw_pending_orders = res_pending.get("data", [])
+                    except Exception as e_pend:
+                        print(f"[OKX] Lỗi lấy live orders-pending: {e_pend}")
                             
                     formatted_positions = []
                     
@@ -3207,7 +3255,68 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                                     "tf": c_tf
                                 })
 
-                    return formatted_positions
+                    # ĐỊNH DẠNG CÁC LỆNH LIMIT CHỜ KHỚP TRÊN SÀN OKX
+                    formatted_limit_orders = []
+                    for o in raw_pending_orders:
+                        if o.get("ordType") != "limit" or str(o.get("reduceOnly", "")).lower() == "true":
+                            continue
+                        ord_id = o.get("ordId")
+                        inst_id = o.get("instId", "")
+                        coin = inst_id.split("-")[0] if "-" in inst_id else inst_id
+                        pos_side = o.get("posSide", "net").lower()
+                        side = o.get("side", "").lower()
+                        if pos_side == "net" or not pos_side:
+                            pos_side = "long" if side == "buy" else "short"
+
+                        px = o.get("px") or o.get("avgPx") or "0"
+                        sz = o.get("sz") or "0"
+                        lever = o.get("lever") or "100"
+
+                        ct_val = _get_okx_contract_val(inst_id)
+                        try:
+                            f_px = float(px)
+                            f_sz = float(sz)
+                            f_lev = float(lever) if float(lever) > 0 else 100.0
+                            # Ký quỹ chuẩn OKX: (Số hợp đồng * ctVal * Giá) / Đòn bẩy
+                            est_margin = (f_sz * ct_val * f_px) / f_lev if f_lev > 0 else 0.0
+                            margin_str = f"{est_margin:.2f}"
+                        except Exception:
+                            margin_str = "0.00"
+
+                        c_tf = ""
+                        for item in markers.get(coin, []):
+                            if item.get("order_id") == ord_id or (item.get("status") == "pending" and item.get("side", "").lower() == pos_side):
+                                c_tf = item.get("tf", "").upper()
+                                break
+
+                        formatted_limit_orders.append({
+                            "ticket_id": f"ord_{ord_id}",
+                            "order_id": ord_id,
+                            "is_limit": True,
+                            "is_aggregate": False,
+                            "is_child": False,
+                            "status": "Chờ khớp (Limit)",
+                            "instId": inst_id,
+                            "posSide": pos_side,
+                            "side": side,
+                            "pos": sz,
+                            "margin": margin_str,
+                            "avgPx": px,
+                            "lastPx": px,
+                            "roi": "0.00",
+                            "upl": "0.00",
+                            "tp": "---",
+                            "sl": "---",
+                            "lever": lever,
+                            "tf": c_tf,
+                            "cTime": int(o.get("cTime") or 0)
+                        })
+
+                    # Sắp xếp các lệnh Limit theo thời gian tạo mới nhất
+                    formatted_limit_orders.sort(key=lambda x: x.get("cTime", 0), reverse=True)
+
+                    # Đẩy toàn bộ vị thế đã khớp lên trên, đưa toàn bộ lệnh Limit chờ xuống dưới
+                    return formatted_positions + formatted_limit_orders
                 else:
                     print(f"OKX Fetch Position Error: {res_pos}", flush=True)
         except Exception as e:
@@ -3375,6 +3484,19 @@ def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub
             
             ticket_vol = float(req.pos)
             ticket_id = getattr(req, "ticket_id", "")
+            is_limit = bool(getattr(req, "is_limit", False) or ticket_id.startswith("ord_"))
+
+            # ── 1. NẾU LÀ LỆNH LIMIT ĐANG CHỜ KHỚP ──> GỌI HỦY LỆNH TRÊN SÀN OKX
+            if is_limit or ticket_id.startswith("ord_"):
+                clean_ord_id = ticket_id.replace("ord_", "")
+                cancel_payload = json.dumps([{"instId": inst_id, "ordId": clean_ord_id}])
+                c_resp = _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", cancel_payload, api_key, secret_key, passphrase, is_demo)
+                if c_resp.status_code == 200 and c_resp.json().get("code") == "0":
+                    print(f"🧹 [OKX] Đã hủy lệnh Limit #{clean_ord_id} ({inst_id}) thành công trên sàn!", flush=True)
+                    return {"status": "success", "message": f"Đã hủy lệnh Limit #{clean_ord_id} thành công!"}
+                else:
+                    err_msg = c_resp.json().get("msg") if c_resp.status_code == 200 else f"HTTP {c_resp.status_code}"
+                    raise HTTPException(status_code=400, detail=f"OKX từ chối hủy lệnh: {err_msg}")
             
             # Fetch current position from OKX to know the real total size
             import requests as req_lib

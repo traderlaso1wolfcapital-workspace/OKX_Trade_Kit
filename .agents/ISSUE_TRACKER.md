@@ -33,6 +33,42 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Sửa Lỗi Hiển Thị Ký Quỹ Lệnh Limit OKX Bị Đội Lên Hàng Chục/Trăm Đô (Thiếu Nhân Hệ Số Hợp Đồng `ctVal`):
+  - **Hiện tượng:** CEO nhận thấy trên Bảng Vị Thế, các lệnh Limit của OKX hiển thị mức ký quỹ lên đến vài chục tới vài trăm $ (VD: `XAU-USDT Limit Short`: `496.40 $` và `285.61 $`; `BTC-USDT Limit Short`: `24.42 $`; `BTC-USDT Limit Long`: `8.07 $`; `ETH-USDT Limit Short`: `4.91 $`), trong khi bot chỉ cài đặt ký quỹ 0.5$ (hoặc 0.1U - 0.5U tùy TF).
+  - **Kiểm tra thực tế:**
+    - Bot thực tế trên sàn đặt lệnh hoàn toàn đúng khối lượng theo chiến thuật (0.08$ - 0.50$). Terminal hiển thị đúng: `XAU H4: 4136.7 (VOL: 0.5 U)`, `XAU H2: 4080.1 (VOL: 0.3 U)`, `BTC H2: 81411.8 (ký quỹ: 0.3 U)`, `ETH H4: 2454.79 (ký quỹ: 0.5 U)`.
+    - Nguyên nhân sai lệch thuần túy nằm ở hàm render backend `get_bot_positions` trong `main.py`: Khi đọc `sz` (số hợp đồng) từ API OKX `/api/v5/trade/orders-pending`, backend tính nhầm: `est_margin = (f_sz * f_px) / f_lev`. Công thức này bỏ quên nhân với `ctVal` (Contract Value - giá trị quy đổi của 1 hợp đồng sang coin):
+      - `XAU-USDT-SWAP`: `ctVal = 0.001` (1 hợp đồng = 0.001 oz Vàng). Quên nhân `0.001` khiến ký quỹ bị nhân khống lên 1000 lần (`496.40 $` thay vì `0.50 $`)!
+      - `BTC-USDT-SWAP`: `ctVal = 0.01` (1 hợp đồng = 0.01 BTC). Quên nhân `0.01` khiến ký quỹ bị nhân khống lên 100 lần (`24.42 $` thay vì `0.24 $`)!
+      - `ETH-USDT-SWAP`: `ctVal = 0.1` (1 hợp đồng = 0.1 ETH). Quên nhân `0.1` khiến ký quỹ bị nhân khống lên 10 lần (`4.91 $` thay vì `0.49 $`)!
+  - **Giải pháp & Khắc phục:**
+    - Bổ sung bộ nhớ đệm `OKX_CT_VAL_CACHE` và hàm `_get_okx_contract_val(inst_id)` trong `web_app/backend/main.py`.
+    - Chuẩn hóa công thức tính ký quỹ lệnh Limit OKX: `est_margin = (f_sz * ct_val * f_px) / f_lev` (với đòn bẩy mặc định 100x).
+    - Sau bản vá, tất cả các lệnh Limit hiển thị trên Bảng Vị Thế đúng tuyệt đối từng xu theo cấu hình của bot (`0.08 $` - `0.50 $`).
+
+
+- **[28/10/2026]** - Đồng Bộ Lệnh Limit Trực Tiếp Từ Sàn OKX Vào Bảng Vị Thế & Chuẩn Hóa Phân Tầng Tuyệt Đối 2 Tầng Thông Minh (OKX & FX):
+  - **Yêu cầu từ CEO:**
+    1. Đưa các lệnh Limit đang chờ khớp trực tiếp trên sàn OKX ra Bảng Vị Thế (tương tự như bên FX / E8 Markets TradeLocker).
+    2. Tuyệt đối chỉ lấy các lệnh Limit ĐANG THẬT SỰ CÓ TRÊN SÀN (không đọc qua file logs tạm để tránh sai lệch dữ liệu).
+    3. Bỏ ký tự `@` đằng trước điểm giá limit (hiển thị dạng `Limit Short 4,078.2` thay vì `Limit Short @4,078.2`).
+    4. **Phân tầng tuyệt đối 2 tầng thông minh toàn bảng:**
+       - 🔼 **Tầng 1 (Ở trên cùng):** 100% các lệnh ĐÃ KHỚP (Active Positions) đang chạy của TẤT CẢ các coin, có số PNL xanh/đỏ và nút đỏ [Đóng], sắp xếp theo % PNL (roi) từ cao xuống thấp (không bị ngắt quãng bởi lệnh limit).
+       - 🔽 **Tầng 2 (Ở phía dưới):** 100% các lệnh CHỜ KHỚP (Limit Orders), hiển thị chữ vàng Chờ khớp (Limit) và nút cam [Hủy]. Gom cùng chủng loại (cùng cặp coin theo thứ tự COIN_LIST), trong mỗi cặp coin sắp xếp thứ tự theo ký quỹ thấp đến cao dần từ trên xuống dưới (VD: 0.08$ -> 0.29$ -> 0.50$).
+       - ⚪ **Tầng 3 (Dưới cùng):** Các cặp coin đang đứng ngoài (chờ tín hiệu) hiển thị gạch ngang `--`.
+  - **Giải pháp & Triển khai:**
+    1. **Backend OKX (`main.py`):**
+       - Tích hợp gọi trực tiếp API sàn OKX `GET /api/v5/trade/orders-pending?instType=SWAP` trong `get_bot_positions`.
+       - Lọc chính xác các lệnh Limit mở vị thế (`ordType == "limit" and reduceOnly != "true"`), gắn cờ `is_limit: True`, `status: "Chờ khớp (Limit)"`.
+       - Nhân đúng hệ số hợp đồng `ctVal` để tính ký quỹ chuẩn xác từng cent.
+       - Trong `close_virtual_ticket`: Bổ sung nhánh xử lý riêng cho lệnh Limit, gọi `POST /api/v5/trade/cancel-batch-orders` để hủy trực tiếp trên sàn OKX khi bấm nút `[Hủy]`.
+    2. **Frontend (`PositionsTable.jsx`):**
+       - Tách biệt hoàn toàn `filledParents` (Tầng 1) và `limitOrders` (Tầng 2) ở cấp độ bảng toàn diện (không loop theo từng coin ở ngoài vỏ bọc).
+       - Tầng 1: `filledParents.sort((a,b) => b.roi - a.roi)` gom toàn bộ lệnh đã khớp lên trên cùng.
+       - Tầng 2: `limitOrders.sort(...)` gom theo từng cặp coin, bên trong sắp xếp theo ký quỹ tăng dần (`marginA - marginB`).
+       - Bỏ ký tự `@` trên dòng giá limit: hiển thị chuẩn `Limit Short 4,078.2`.
+
+
 - **[28/10/2026]** - Hiển Thị Số Dư USDT/USD Sau Nhãn #xxxx Trên Menu Header & Chuẩn Hóa Kiến Trúc Tài Khoản Bố (Master Root Context):
   - **Hiện tượng & Yêu cầu từ CEO:**
     1. Thêm số tiền USDT/USD hiện tại vào sau nhãn `#xxxx` của từng tài khoản (cả OKX và Prop Firm) trên thanh chọn tài khoản để khách hàng dễ nhận biết và theo dõi tài khoản.
@@ -4956,6 +4992,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[28/10/2026]** - Đồng Bộ Lệnh Limit Trực Tiếp Từ Sàn OKX Vào Bảng Vị Thế & Chuẩn Hóa Phân Tầng Hiển Thị (OKX & FX):
+  - **Yêu cầu từ CEO:**
+    1. Đưa các lệnh Limit đang chờ khớp trực tiếp trên sàn OKX ra Bảng Vị Thế (tương tự như bên FX / E8 Markets TradeLocker).
+    2. Tuyệt đối chỉ lấy các lệnh Limit ĐANG THẬT SỰ CÓ TRÊN SÀN (không đọc qua file logs tạm để tránh sai lệch dữ liệu).
+    3. Bỏ ký tự `@` đằng trước điểm giá limit (hiển thị dạng `Limit Short 4,078.2` thay vì `Limit Short @4,078.2`).
+    4. Phân tầng sắp xếp 2 tầng thông minh: Đẩy toàn bộ các lệnh ĐÃ KHỚP (Filled) lên trên cùng (xếp theo % PNL giảm dần), đưa toàn bộ các lệnh CHỜ KHỚP (Limit) xuống phía dưới (xếp theo thời gian/giá).
+  - **Giải pháp & Triển khai:**
+    1. **Backend OKX (`main.py`):**
+       - Tích hợp gọi trực tiếp API sàn OKX `GET /api/v5/trade/orders-pending?instType=SWAP` trong `get_bot_positions`.
+       - Lọc chính xác các lệnh Limit mở vị thế (`ordType == "limit" and reduceOnly != "true"`), gắn cờ `is_limit: True`, `status: "Chờ khớp (Limit)"`.
+       - Trong `close_virtual_ticket`: Bổ sung nhánh xử lý riêng cho lệnh Limit, gọi `POST /api/v5/trade/cancel-batch-orders` để hủy trực tiếp trên sàn OKX khi bấm nút `[Hủy]`.
+    2. **Frontend (`PositionsTable.jsx`):**
+       - Bỏ ký tự `@` trên dòng giá limit: hiển thị dạng `Limit Short 4,078.2` / `Limit Long 4,031.4`.
+       - Triển khai thuật toán sắp xếp 2 tầng cả ở cấp độ đồng coin (`sortedCoins`) lẫn cấp độ từng vị thế con (`parentList`): Lệnh đã khớp luôn nằm tầng trên, lệnh Limit chờ khớp nằm tầng dưới.
+
 
 - **[09/08/2026]** - Tạo script launcher zRun_Web.bat hỗ trợ chạy giao diện Web:
   - **Cập nhật:** Tạo file `zRun_Web.bat` ở gốc dự án, tự động kiểm tra/cài đặt `node_modules` cho frontend Next.js, và chạy song song FastAPI backend (port 8000) cùng Next.js frontend (port 3000) để phục vụ việc xem và kiểm thử giao diện Web.
