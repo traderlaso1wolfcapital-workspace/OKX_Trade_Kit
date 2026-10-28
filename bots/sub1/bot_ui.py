@@ -559,8 +559,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             else:
                 sorted_tfs = [getattr(tk, "active_pos_tf", "M5")]
                 filled_str = fmt_tf(sorted_tfs[0])
-            long_margin_val = (tk.long_pos_vol / Decimal(str(leverage))) if getattr(tk, "long_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
-            total_margin = long_margin_val if long_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
+            actual_m = getattr(tk, "actual_margin_long", Decimal("0"))
+            if actual_m > 0:
+                total_margin = actual_m
+            else:
+                long_margin_val = (tk.long_pos_vol / Decimal(str(leverage))) if getattr(tk, "long_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
+                total_margin = long_margin_val if long_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "long")
             line_main = f"    {coin_name} ╭─ {mode_tag}Đã khớp LONG [{filled_str.strip()}] - ký quỹ: {total_margin:.2f} U (+{tk.max_roi_long:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
@@ -573,7 +577,11 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 if not px_raw or px_raw in ("---", "ERR"):
                     px_raw = tk.active_avg_px_long
                 px_str = format_with_commas(px_raw, 1 if Decimal(str(px_raw)) >= 10 else 4)
-                tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                tf_m_dict = getattr(tk, "tf_margin_long", {})
+                if tf_m_dict and tf in tf_m_dict:
+                    tf_vol_str = f"{tf_m_dict[tf]:.2f} U"
+                else:
+                    tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
                 lines.append(f"{indent_branch}├─ Entry {tf.upper()}: {px_str} - {tf_vol_str}")
 
             placed_long_dict = getattr(tk, "placed_entry_px_long_by_tf", {})
@@ -600,8 +608,12 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             else:
                 sorted_tfs = [getattr(tk, "active_pos_tf", "M5")]
                 filled_str = fmt_tf(sorted_tfs[0])
-            short_margin_val = (tk.short_pos_vol / Decimal(str(leverage))) if getattr(tk, "short_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
-            total_margin_s = short_margin_val if short_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
+            actual_m_s = getattr(tk, "actual_margin_short", Decimal("0"))
+            if actual_m_s > 0:
+                total_margin_s = actual_m_s
+            else:
+                short_margin_val = (tk.short_pos_vol / Decimal(str(leverage))) if getattr(tk, "short_pos_vol", 0) > 0 and leverage > 0 else Decimal("0")
+                total_margin_s = short_margin_val if short_margin_val > 0 else sum([_get_vol_val(tk, t) for t in sorted_tfs])
             mode_tag = _get_mode_tag(tk, "short")
             line_main = f"    {coin_name} ╭─ {mode_tag}Đã khớp SHORT [{filled_str.strip()}] - ký quỹ: {total_margin_s:.2f} U (+{tk.max_roi_short:.1f}% / -{mae_lev:.1f}%)"
             indent_branch = "        "  # 8 spaces
@@ -614,7 +626,11 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
                 if not px_raw or px_raw in ("---", "ERR"):
                     px_raw = tk.active_avg_px_short
                 px_str = format_with_commas(px_raw, 1 if Decimal(str(px_raw)) >= 10 else 4)
-                tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
+                tf_m_dict_s = getattr(tk, "tf_margin_short", {})
+                if tf_m_dict_s and tf in tf_m_dict_s:
+                    tf_vol_str = f"{tf_m_dict_s[tf]:.2f} U"
+                else:
+                    tf_vol_str = _fmt_vol_u(_get_vol_val(tk, tf))
                 lines.append(f"{indent_branch}├─ Entry {tf.upper()}: {px_str} - {tf_vol_str}")
 
             placed_short_dict = getattr(tk, "placed_entry_px_short_by_tf", {})

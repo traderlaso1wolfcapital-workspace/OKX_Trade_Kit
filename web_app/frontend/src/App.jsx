@@ -127,25 +127,17 @@ function App() {
   });
 
   const effectiveAccId = useMemo(() => {
-    // 1. Ưu tiên tài khoản người dùng đang chọn (state hoặc localStorage) để xem vị thế & chart độc lập
-    const targetCandidate = selectedAccount || localStorage.getItem(`tls1_selected_account_${activeBotTab}`) || localStorage.getItem("tls1_selected_account");
+    // Primary: user-selected account (state or persisted per-bot/global)
+    const targetCandidate = selectedAccount
+      || localStorage.getItem(`tls1_selected_account_${activeBotTab}`)
+      || localStorage.getItem("tls1_selected_account");
     if (targetCandidate && accounts.some(a => a.id === targetCandidate || a.name === targetCandidate)) {
       const matched = accounts.find(a => a.id === targetCandidate || a.name === targetCandidate);
       return matched ? matched.id : targetCandidate;
     }
-    // 2. Fallback sang tài khoản đã gán trước đó trong botAccountMap
-    if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
-      return botAccountMap[activeBotTab];
-    }
-    // 3. Fallback: Tài khoản đang chạy thực tế trên server ở tab hiện tại
-    const runningAcc = mergedActiveAccounts[activeBotTab];
-    if (runningAcc) {
-      const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
-      if (matched) return matched.id;
-      return runningAcc;
-    }
+    // Default to first available account if none selected
     return accounts[0]?.id || "";
-  }, [selectedAccount, mergedActiveAccounts, activeBotTab, accounts, botAccountMap]);
+  }, [selectedAccount, activeBotTab, accounts]);
 
   // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
   const currentUid = localStorage.getItem("tls1_uid") || loginUid || "";
@@ -391,41 +383,20 @@ function App() {
     const isTabSwitch = prevBotTabRef.current !== activeBotTab;
     prevBotTabRef.current = activeBotTab;
 
-    // Kiểm tra tài khoản đã chọn hiện tại (state hoặc localStorage) có hợp lệ không
     const savedForThisBot = localStorage.getItem(`tls1_selected_account_${activeBotTab}`);
     const savedGlobal = localStorage.getItem("tls1_selected_account");
     const currentCandidate = selectedAccount || savedForThisBot || savedGlobal;
     const isCandidateValid = currentCandidate && accounts.some(a => a.id === currentCandidate || a.name === currentCandidate);
 
-    // Chỉ tự động điều chỉnh selectedAccount khi:
-    // 1. Chuyển đổi tab bot VÀ tab mới chưa có tài khoản đã lưu hợp lệ
-    // 2. Hoặc ban đầu chưa có tài khoản nào được chọn hợp lệ (!isCandidateValid)
-    // Tuyệt đối KHÔNG ghi đè khi người dùng đang xem một tài khoản cụ thể (F5 giữ nguyên 100%)!
-    if (!isCandidateValid || (isTabSwitch && !savedForThisBot)) {
-      const runningAcc = mergedActiveAccounts[activeBotTab];
-      let target = "";
-      if (runningAcc) {
-        const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
-        target = matched ? matched.id : runningAcc;
-      } else if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
-        target = botAccountMap[activeBotTab];
-      } else if (accounts.length > 0) {
-        target = accounts[0].id;
-      }
-
-      if (target) {
-        setSelectedAccount(target);
+    // Auto-set only if no valid candidate (initial load) or switching to a bot tab without saved account
+    if (!isCandidateValid) {
+      const fallback = accounts[0]?.id || "";
+      if (fallback) {
+        setSelectedAccount(fallback);
         try {
-          localStorage.setItem("tls1_selected_account", target);
-          localStorage.setItem(`tls1_selected_account_${activeBotTab}`, target);
+          localStorage.setItem("tls1_selected_account", fallback);
+          localStorage.setItem(`tls1_selected_account_${activeBotTab}`, fallback);
         } catch {}
-        if (runningAcc && botAccountMap[activeBotTab] !== target) {
-          setBotAccountMap(prev => {
-            const next = { ...prev, [activeBotTab]: target };
-            localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
-            return next;
-          });
-        }
       } else {
         setSelectedAccount("");
         setPositions([]);
@@ -434,7 +405,7 @@ function App() {
     } else if (currentCandidate && selectedAccount !== currentCandidate) {
       setSelectedAccount(currentCandidate);
     }
-  }, [activeBotTab, mergedActiveAccounts, accounts, selectedAccount]);
+  }, [activeBotTab, accounts, selectedAccount]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);
@@ -900,14 +871,10 @@ function App() {
     } catch { }
   };
 
-  // Close Position / Cancel Limit Order Handler
+  // Close Position / Cancel Limit Order Handler (Không cần popup xác nhận, click đóng/hủy lập tức)
   const handleClosePosition = async (pos, coin) => {
     const coinName = (coin && coin.label) ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
     const isLimitOrder = pos?.is_limit || String(pos?.ticket_id || "").startsWith("ord_");
-    const confirmMsg = isLimitOrder 
-      ? `Bạn có chắc chắn muốn HỦY LỆNH LIMIT ${coinName} không?`
-      : `Bạn có chắc chắn muốn đóng vị thế ${coinName} không?`;
-    if (!window.confirm(confirmMsg)) return;
     try {
       if (pos.platform === "tradelocker" || pos.is_prop) {
         const curUid = localStorage.getItem('tls1_uid') || currentUid || "default";
@@ -923,16 +890,17 @@ function App() {
         });
         const data = await res.json();
         if (res.ok) {
-          alert(isLimitOrder ? `✅ Đã hủy lệnh Limit Quỹ ${coinName} thành công!` : `✅ Đã đóng vị thế Quỹ ${coinName} thành công!`);
+          const succMsg = isLimitOrder ? `✅ Đã gửi lệnh hủy Limit Quỹ ${coinName}` : `✅ Đã gửi lệnh đóng vị thế Quỹ ${coinName}`;
+          addSystemLog(succMsg);
           fetchPropPositions();
         } else {
-          alert(`❌ Lỗi khi đóng/hủy Quỹ: ` + (data.detail || data.message || "Lỗi máy chủ"));
+          addSystemLog(`❌ Lỗi khi đóng/hủy Quỹ: ` + (data.detail || data.message || "Lỗi máy chủ"));
         }
         return;
       }
 
-      const strat = selectedAccount || "sub1";
-      const res = await fetch(`/api/bot/positions/close_ticket?uid=${currentUid}&strategy=${strat}`, {
+      const strat = selectedAccount || effectiveAccId || "sub1";
+      const res = await fetch(`/api/bot/positions/close_ticket?uid=${currentUid}&strategy=${activeBotTab}&account_id=${strat}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -946,13 +914,13 @@ function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`✅ Đã đóng vị thế ${coinName} thành công!`);
+        addSystemLog(`✅ Đã gửi lệnh đóng vị thế ${coinName}`);
         refreshBotData();
       } else {
-        alert(`❌ Lỗi khi đóng vị thế ${coinName}: ` + (data.detail || data.message || "Lỗi máy chủ"));
+        addSystemLog(`❌ Lỗi khi đóng vị thế ${coinName}: ` + (data.detail || data.message || "Lỗi máy chủ"));
       }
     } catch (e) {
-      alert(`❌ Lỗi kết nối khi đóng vị thế ${coinName}: ` + e.message);
+      addSystemLog(`❌ Lỗi kết nối khi đóng vị thế ${coinName}: ` + e.message);
     }
   };
 
@@ -1190,8 +1158,15 @@ function App() {
             accList = data;
             if (isMounted) {
               const cleanData = dedupeAccounts(data).map(nAcc => {
-                const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || 0);
+                const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || localStorage.getItem(`tls1_bal_${nAcc.okx_uid}`) || 0);
                 const curBal = Number(nAcc?.balance ?? nAcc?.totalEq ?? 0);
+                if (curBal > 0) {
+                  try {
+                    localStorage.setItem(`tls1_bal_${nAcc.id}`, String(curBal));
+                    if (nAcc.okx_uid) localStorage.setItem(`tls1_bal_${nAcc.okx_uid}`, String(curBal));
+                  } catch {}
+                  return nAcc;
+                }
                 if (curBal <= 0 && oldBal > 0) {
                   return { ...nAcc, balance: oldBal, totalEq: oldBal, availBal: oldBal };
                 }
@@ -1434,8 +1409,15 @@ function App() {
       .then(data => {
         if (Array.isArray(data)) {
           const clean = dedupeAccounts(data).map(nAcc => {
-            const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || 0);
+            const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || localStorage.getItem(`tls1_bal_${nAcc.okx_uid}`) || 0);
             const curBal = Number(nAcc?.balance ?? nAcc?.totalEq ?? 0);
+            if (curBal > 0) {
+              try {
+                localStorage.setItem(`tls1_bal_${nAcc.id}`, String(curBal));
+                if (nAcc.okx_uid) localStorage.setItem(`tls1_bal_${nAcc.okx_uid}`, String(curBal));
+              } catch {}
+              return nAcc;
+            }
             if (curBal <= 0 && oldBal > 0) {
               return { ...nAcc, balance: oldBal, totalEq: oldBal, availBal: oldBal };
             }
@@ -3680,6 +3662,7 @@ function App() {
                     {/* 4. BẢNG VỊ THẾ */}
                     {activeTab === "positions" && (
                       <PositionsTable
+                        currentPlatform={currentPlatform}
                         watchlistCoins={watchlistCoins}
                         safePos={safePos}
                         positions={positions}

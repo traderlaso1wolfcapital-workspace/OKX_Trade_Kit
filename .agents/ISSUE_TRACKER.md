@@ -5424,3 +5424,36 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
   *(Mã patch: `z-fix-dashboard-leak-eth-scan-and-prop-terminal`)*
 
 
+
+
+- **[28/10/2026]** - Khắc Phục Triệt Để Lỗi Ẩn Lệnh Limit OKX, Lỗi Chập Chờn Số Dư $0.00 Dropdown, Và Logic 41 Lệnh Clustered E8 Markets:
+  - **Vấn đề CEO báo cáo:**
+    1. Tài khoản OKX thi thoảng bị mất toàn bộ các lệnh Limit chờ khớp ở Bảng Vị Thế dù trên sàn OKX đang treo 9 lệnh Limit.
+    2. Số dư tài khoản OKX trên header và dropdown thi thoảng hiện `$0.00`, F5 nhiều lần mới hiện `$1,241.17` rồi lại nhảy về `$0.00`.
+    3. Bot EMA200 trên Quỹ E8 Markets vào 41 lệnh san sát nhau, sai với logic bot EMA200 (6 TF x 3 coin tối đa 18 lệnh).
+    4. Bảng vị thế Quỹ E8 hiện 41 vị thế ảo trong khi sàn TradeLocker chỉ có 13 vị thế thật.
+    5. Nút [Đóng] và [Hủy] ở cột Cắt lệnh yêu cầu popup xác nhận `window.confirm`, cần đóng/hủy lập tức khi bấm.
+  - **Nguyên nhân kỹ thuật & Giải pháp:**
+    1. **Mất lệnh Limit OKX ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - *Nguyên nhân:* `get_bot_positions` gọi endpoint `/api/v5/trade/orders-pending` không có tham số query. Trên các tài khoản OKX có giao dịch SPOT, sàn mặc định trả về mảng rỗng `{"code": "0", "data": []}` của SPOT. Hàm thấy `code == "0"` nên không kích hoạt fallback SWAP, dẫn tới toàn bộ lệnh Limit SWAP bị bỏ qua và cache bị ghi đè thành 0 lệnh.
+       - *Đã xử lý:* Đổi thành gọi trực tiếp `/api/v5/trade/orders-pending?instType=SWAP` để luôn lấy chính xác 100% các lệnh Limit SWAP vĩnh cửu của bot. Thêm cơ chế bảo toàn cache khi mạng giật lag.
+    2. **Chập chờn số dư OKX $0.00 ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py), [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx), [AppHeader.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/header/AppHeader.jsx)):**
+       - *Nguyên nhân:* Trong `_get_single_account_balance`, biểu thức `float(d.get("eq", d.get("cashBal", 0.0)))` bị crash `ValueError: could not convert string to float: ''` khi tài khoản OKX trả về `"eq": ""` (chuỗi rỗng). Lỗi này khiến backend trả về 0.0, ghi đè cache bằng 0.0, và frontend ghi đè `localStorage` thành 0.
+       - *Đã xử lý:*
+         - Viết hàm `_extract_okx_balance` an toàn: kiểm tra `teq not in [None, "", "0", 0]`, duyệt các trường `cashBal`, `availBal`, `eq`, `availEq`, `eqUsd` an toàn chống mọi ngoại lệ ValueError.
+         - Tuyệt đối không ghi đè cache bằng 0 nếu đã có số dư hợp lệ trước đó.
+         - Cập nhật frontend `App.jsx` và `AppHeader.jsx`: tự động lưu số dư > 0 vào `localStorage` cho từng tài khoản và UID, luôn fallback về số dư hợp lệ gần nhất, bảo vệ không bao giờ bị rơi về `$0.00`.
+    3. **Chuẩn hóa Logic EMA200 Max 18 Lệnh Quỹ E8 ([tradelocker_service.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/tradelocker_service.py), [bot_orders.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub1/bot_orders.py)):**
+       - *Nguyên nhân:* `place_pure_limit` đẩy lệnh sang TradeLocker mà không truyền timeframe (`tf`), và TradeLocker chỉ chặn trùng khi `ordType == "market"`. Khi lệnh Limit khớp thành Position, danh sách orders trống khiến bot tiếp tục bắn thêm lệnh Limit ở các nến/TF khác, tích lũy tới 41 lệnh.
+       - *Đã xử lý:* Bổ sung `tradelocker_tf_state.json` theo dõi chính xác từng `(coin, tf)`. Khóa cứng: mỗi TF chỉ có tối đa 1 lệnh/vị thế; tối đa 6 lệnh/coin; tối đa 18 lệnh toàn sàn (3 coin x 6 TF). Nếu TF đã có vị thế mở, cấm đặt thêm lệnh mới. Nếu giá dịch chuyển > 0.1%, tự động hủy lệnh cũ và dời theo EMA200.
+    4. **Xóa vị thế ảo 41 vs 13 TradeLocker ([main.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/backend/main.py)):**
+       - Sửa lỗi stale cache trong `tradelocker_get_positions`: khi API trả về danh sách vị thế mới, dọn sạch vị thế đã đóng, không lưu cache cũ quá 15s.
+    5. **Bỏ popup xác nhận nút Đóng/Hủy ([PositionsTable.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/positions/PositionsTable.jsx), [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx)):**
+       - Gỡ bỏ hoàn toàn `window.confirm` và `alert()`. Click vào [Đóng] hoặc [Hủy] là gửi lệnh trực tiếp lên sàn ngay lập tức.
+  - **Kiểm chứng:**
+    - Cú pháp AST Python 5 file đạt 100%.
+    - Test live API OKX `get_bot_accounts` trích xuất chính xác `25.77` USDT không còn bị crash 0.0.
+    - Test live API TradeLocker trả về đúng 3 lệnh chờ khớp, 0 vị thế ảo.
+    - Build Vite bundle frontend production thành công 100% trong 458ms.
+    - Kích hoạt Rule 9 mở Desktop Browser `http://localhost:5173`.
+  *(Mã patch: `z-fix-okx-limit-balance-and-e8-max18-orders`)*

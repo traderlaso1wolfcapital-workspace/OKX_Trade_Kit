@@ -296,7 +296,7 @@ def _clean_num_str(val) -> str:
     except Exception:
         return str(val)
 
-def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, dry_run: bool = False):
+def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, tf: str = None, dry_run: bool = False, strategy: str = "sub1"):
     """Chuyển tiếp lệnh sang tài khoản Quỹ TradeLocker (E8 Markets) nếu user có kích hoạt"""
     try:
         from web_app.backend.tradelocker_service import TradeLockerManager
@@ -313,15 +313,30 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
                 price=price,
                 sl_price=sl_price,
                 tp_price=tp_price,
+                tf=tf,
                 dry_run=dry_run,
-                strategy="sub1"
+                strategy=strategy
             )
     except Exception as e:
-        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side}: {e}", flush=True)
+        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side} [{tf}]: {e}", flush=True)
+
+def _cancel_tradelocker_tf_order(inst_id: str, tf: str, strategy: str = "sub1"):
+    """Hủy lệnh chờ trên TradeLocker cho timeframe tương ứng khi OKX hủy mục tiêu"""
+    try:
+        from web_app.backend.tradelocker_service import TradeLockerManager
+        uid = os.environ.get("BOT_USER_UID", "")
+        if not uid:
+            local_app = os.environ.get("LOCALAPPDATA", "")
+            if local_app:
+                uid = os.path.basename(local_app)
+        if uid and tf:
+            TradeLockerManager.cancel_tf_order_async(uid=uid, symbol=inst_id, tf=tf, strategy=strategy)
+    except Exception:
+        pass
 
 def place_market_entry(client, inst_id: str, side: str, pos_side: str, size: str, td_mode: str = "cross", dry_run: bool = False):
     # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
-    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=False)
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, dry_run=False, strategy="sub1")
 
     # 🔒 DRY-RUN SÀN OKX
     if dry_run:
@@ -382,8 +397,16 @@ def place_pure_limit(client, inst_id: str, side: str, pos_side: str, size: str, 
         if tl_tp_px is None or tl_tp_px <= 0:
             tl_tp_px = round(px_float * 1.012 if side.lower() == "buy" else px_float * 0.988, 2)
 
+    # Trích xuất timeframe từ cl_id:
+    tf_extracted = None
+    if cl_id:
+        for cand_tf in ("M5", "M15", "M30", "H1", "H2", "H4"):
+            if f"EL{cand_tf}" in cl_id or f"ES{cand_tf}" in cl_id:
+                tf_extracted = cand_tf
+                break
+
     # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) độc lập nếu user có bật chạy Bot Quỹ
-    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, dry_run=False)
+    _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=px_float, sl_price=tl_sl_px, tp_price=tl_tp_px, tf=tf_extracted, dry_run=False, strategy="sub1")
 
     # 🔒 DRY-RUN SÀN OKX: Ghi log ảo thay vì đặt lệnh thật lên OKX
     if dry_run:

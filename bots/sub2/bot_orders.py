@@ -72,7 +72,7 @@ def clean_ob_orders(client, inst_id: str, cl_prefix: str, side: str = None):
 # Global counter để tránh trùng clOrdId trong cùng 1 giây
 _ORDER_COUNTER = 0
 
-def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, dry_run: bool = False):
+def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_price: float = None, tp_price: float = None, tf: str = None, dry_run: bool = False, strategy: str = "sub2"):
     """Chuyển tiếp lệnh sang tài khoản Quỹ TradeLocker (E8 Markets) nếu user có kích hoạt"""
     try:
         from web_app.backend.tradelocker_service import TradeLockerManager
@@ -89,11 +89,12 @@ def _dispatch_to_tradelocker(inst_id: str, side: str, price: float = 0.0, sl_pri
                 price=price,
                 sl_price=sl_price,
                 tp_price=tp_price,
+                tf=tf,
                 dry_run=dry_run,
-                strategy="sub2"
+                strategy=strategy
             )
     except Exception as e:
-        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side}: {e}", flush=True)
+        print(f"⚠️ [TRADELOCKER E8 DISPATCH LỖI] Không thể chuyển tiếp lệnh {inst_id} {side} [{tf}]: {e}", flush=True)
 
 def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, tick_sz: Decimal, cl_prefix: str) -> tuple[bool, str]:
     global _ORDER_COUNTER
@@ -111,7 +112,7 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         tl_sl = float(setup.stop_loss) if setup.stop_loss else None
         tl_tp = float(setup.take_profit) if setup.take_profit else None
         tl_px = float(setup.entry_price) if setup.entry_price else 0.0
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=tl_px, sl_price=tl_sl, tp_price=tl_tp, dry_run=False)
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=tl_px, sl_price=tl_sl, tp_price=tl_tp, tf=setup.ob_source, dry_run=False, strategy="sub2")
     except Exception:
         pass
         
@@ -210,7 +211,7 @@ def place_ob_market_order(client, inst_id: str, setup: TradeSetup, sz_str: str, 
     try:
         tl_sl = float(setup.stop_loss) if setup.stop_loss else None
         tl_tp = float(setup.take_profit) if setup.take_profit else None
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, sl_price=tl_sl, tp_price=tl_tp, dry_run=False)
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, sl_price=tl_sl, tp_price=tl_tp, tf=setup.ob_source, dry_run=False, strategy="sub2")
     except Exception:
         pass
 

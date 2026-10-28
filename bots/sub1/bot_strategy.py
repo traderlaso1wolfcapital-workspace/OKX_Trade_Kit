@@ -1017,14 +1017,17 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
         positions = client.fetch_positions(swap_id)
         cross_long_amt = Decimal("0")
         cross_long_vol = Decimal("0")
+        cross_long_margin = Decimal("0")
         cross_short_amt = Decimal("0")
         cross_short_vol = Decimal("0")
+        cross_short_margin = Decimal("0")
 
         for p in positions:
             pos_amt = Decimal(p.get("pos", "0"))
             if pos_amt == 0: continue
             pos_side = p.get("posSide", "")
             td_mode = p.get("mgnMode", "cross")
+            p_margin = Decimal(str(p.get("margin") or p.get("imr") or "0"))
             
             norm_side = "long" if (pos_side == "long" or (pos_side == "net" and pos_amt > 0)) else "short"
             if norm_side == "long":
@@ -1035,6 +1038,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     if avg_px <= 0: avg_px = getattr(tracker, "live_price", Decimal("1"))
                     cross_long_amt += abs(pos_amt)
                     cross_long_vol += abs(pos_amt) * contract_val * avg_px
+                    cross_long_margin += p_margin
             else:
                 if td_mode == "cross":
                     active_short_pos.append(p); tracker.has_short = True
@@ -1043,14 +1047,19 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     if avg_px <= 0: avg_px = getattr(tracker, "live_price", Decimal("1"))
                     cross_short_amt += abs(pos_amt)
                     cross_short_vol += abs(pos_amt) * contract_val * avg_px
+                    cross_short_margin += p_margin
+
+        tracker.actual_margin_long = cross_long_margin
+        tracker.actual_margin_short = cross_short_margin
 
         def reconstruct_filled_tfs_from_volume(side_str: str, pos_vol_usdt: Decimal, pos_ctime: int = 0) -> list[str]:
             """
             Quét và quy đổi chính xác TẤT CẢ các khung thời gian (TF) đã khớp cho vị thế hiện tại.
-            Kết hợp:
-            1. Lịch sử khớp lệnh fills thực tế từ sàn OKX (/api/v5/trade/fills) với clOrdId có tag TF (chỉ lấy fill thuộc chu kỳ vị thế hiện tại).
-            2. Quy đổi volume thực tế trên sàn dựa trên Base Volume * Leverage * TF Multipliers.
+            Sử dụng trực tiếp số liệu KÝ QUỸ THỰC TẾ TRÊN SÀN (actual_margin) làm mốc chuẩn.
+            Thiết lập phương trình tổ hợp kết hợp Base Volume * TF Multiplier để giải chính xác danh sách TF đã khớp.
             """
+            import itertools
+
             # 1. Quét lịch sử khớp lệnh fills từ sàn OKX (chỉ lấy lệnh fill của vị thế hiện tại)
             fills_detected = []
             try:
@@ -1059,7 +1068,6 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 prefix = f"{CL_ORD_PREFIX}EL" if side_str == "long" else f"{CL_ORD_PREFIX}ES"
                 for f in fills:
                     fill_ts = int(f.get("ts", "0"))
-                    # BẮT BUỘC: Lệnh fill phải thuộc chu kỳ vị thế hiện tại (ts >= cTime - 10s)
                     if pos_ctime > 0 and fill_ts < (pos_ctime - 10000):
                         continue
                     cl_id = f.get("clOrdId", "")
@@ -1082,11 +1090,14 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             except Exception:
                 pass
 
-            if fills_detected:
-                # Có bằng chứng fill trực tiếp từ sàn cho chu kỳ này -> Dùng trực tiếp 100% chuẩn xác
-                return fills_detected
+            # 2. Lấy Ký Quỹ Thực Tế chuẩn xác nhất từ sàn làm mốc
+            _actual_m = cross_long_margin if side_str == "long" else cross_short_margin
+            _leverage = Decimal(str(cfg.get("leverage", 100)))
+            if _actual_m <= Decimal("0"):
+                _actual_m = pos_vol_usdt / _leverage if _leverage > 0 else pos_vol_usdt
 
-            _target_usdt = Decimal("1")
+            # 3. Lấy cấu hình Base Volume M5 và Hệ số nhân Multipliers
+            _target_usdt = Decimal("4")
             try:
                 gcfg_path = env_paths.get("FILE_GLOBAL_CONFIG") if env_paths else None
                 if gcfg_path and os.path.exists(gcfg_path):
@@ -1097,17 +1108,13 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 elif hasattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE"):
                     _target_usdt = Decimal(str(globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE))
             except Exception:
-                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "1")))
+                _target_usdt = Decimal(str(getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", "4")))
 
             _coin_vol_mult = Decimal("1.0")
             for item in getattr(globals_ref, "COIN_PORTFOLIO", []):
                 if item["coin"] == coin_name:
                     _coin_vol_mult = Decimal(str(item.get("vol_mult", "1.0")))
                     break
-
-            # 🔒 Tính toán mức Ký Quỹ thực tế (Margin) của vị thế trên sàn
-            _leverage = Decimal(str(cfg.get("leverage", 100)))
-            actual_margin = pos_vol_usdt / _leverage if _leverage > 0 else pos_vol_usdt
 
             is_tf_vol_mult = getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)
             vol_mults = getattr(globals_ref, "TF_VOLUME_MULTIPLIERS", {
@@ -1120,14 +1127,52 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if not valid_tfs:
                 valid_tfs = ["M5"]
 
-            if is_tf_vol_mult:
-                # Đo độ lệch margin thực tế với margin cấu hình của từng TF để tìm TF khớp nhất
-                best_tf = min(valid_tfs, key=lambda tf: abs(actual_margin - (_target_usdt * _coin_vol_mult * vol_mults.get(tf, Decimal("1.0")))))
-                return [best_tf]
+            # 4. Lập phương trình tổ hợp tìm tập hợp TF có tổng ký quỹ sát nhất với sàn
+            w = {}
+            for tf in valid_tfs:
+                mult = vol_mults.get(tf, Decimal("1.0")) if is_tf_vol_mult else Decimal("1.0")
+                w[tf] = _target_usdt * _coin_vol_mult * mult
+
+            best_combo = None
+            best_diff = Decimal("Infinity")
+
+            for k in range(1, len(valid_tfs) + 1):
+                for combo in itertools.combinations(valid_tfs, k):
+                    tot = sum(w[tf] for tf in combo)
+                    diff = abs(tot - _actual_m)
+                    if fills_detected:
+                        common = len(set(combo) & set(fills_detected))
+                        diff_adj = diff - (Decimal("0.1") * Decimal(str(common)))
+                    else:
+                        diff_adj = diff
+
+                    if diff_adj < best_diff:
+                        best_diff = diff_adj
+                        best_combo = list(combo)
+
+            # Nếu có bằng chứng fill từ sàn mà tổ hợp tính ra sai lệch quá nhiều, dùng fills_detected
+            if fills_detected and best_diff > (_target_usdt * Decimal("0.8")):
+                best_combo = fills_detected
+
+            if not best_combo:
+                best_combo = [valid_tfs[0]]
+
+            # 5. Cân đối phân bổ chính xác từng phần ký quỹ cho từng TF sao cho tổng đúng bằng _actual_m trên sàn
+            tot_w = sum(w.get(tf, _target_usdt) for tf in best_combo)
+            tf_margins = {}
+            if tot_w > 0:
+                for tf in best_combo:
+                    tf_margins[tf] = (_actual_m * (w.get(tf, _target_usdt) / tot_w)).quantize(Decimal("0.01"))
             else:
-                # Không nhân margin: TF mặc định là TF đang active hoặc M5
-                cur_tf = getattr(tracker, "active_pos_tf", "M5")
-                return [cur_tf if cur_tf in valid_tfs else valid_tfs[0]]
+                for tf in best_combo:
+                    tf_margins[tf] = (_actual_m / Decimal(str(len(best_combo)))).quantize(Decimal("0.01"))
+
+            if side_str == "long":
+                tracker.tf_margin_long = tf_margins
+            else:
+                tracker.tf_margin_short = tf_margins
+
+            return best_combo
 
         if cross_long_amt > 0:
             tracker.active_avg_px_long = cross_long_vol / (cross_long_amt * contract_val)
@@ -2867,6 +2912,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             print(f"🗑️ [TF / DCA CLEANUP] Đã hủy {len(long_orders_tf)} lệnh Limit LONG {tf} của {coin_name} vì không thuộc mục tiêu hợp lệ")
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     tracker.placed_entry_px_long_by_tf[tf] = "---"
+                    try:
+                        from bots.sub1.bot_orders import _cancel_tradelocker_tf_order
+                        _cancel_tradelocker_tf_order(swap_id, tf)
+                    except Exception:
+                        pass
 
                 for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                     try:
@@ -2882,6 +2932,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     if tracker.placed_entry_px_long_by_tf.get(tf, "---") != "---":
                         if tf not in exchange_longs_cross:
                             tracker.placed_entry_px_long_by_tf[tf] = "---"
+                            try:
+                                from bots.sub1.bot_orders import _cancel_tradelocker_tf_order
+                                _cancel_tradelocker_tf_order(swap_id, tf)
+                            except Exception:
+                                pass
 
             # 2. Đặt hoặc cập nhật lệnh LONG ở các TF mục tiêu
             for tf in target_long_tfs:
@@ -3147,6 +3202,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             print(f"🗑️ [TF / DCA CLEANUP] Đã hủy {len(short_orders_tf)} lệnh Limit SHORT {tf} của {coin_name} vì không thuộc mục tiêu hợp lệ")
                     except Exception as e: hft_logger.error(f"Lỗi API (Hủy/Đặt lệnh): {e}")
                     tracker.placed_entry_px_short_by_tf[tf] = "---"
+                    try:
+                        from bots.sub1.bot_orders import _cancel_tradelocker_tf_order
+                        _cancel_tradelocker_tf_order(swap_id, tf)
+                    except Exception:
+                        pass
 
                 for tf in ["M5", "M15", "M30", "H1", "H2", "H4"]:
                     try:
@@ -3162,6 +3222,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     if tracker.placed_entry_px_short_by_tf.get(tf, "---") != "---":
                         if tf not in exchange_shorts_cross:
                             tracker.placed_entry_px_short_by_tf[tf] = "---"
+                            try:
+                                from bots.sub1.bot_orders import _cancel_tradelocker_tf_order
+                                _cancel_tradelocker_tf_order(swap_id, tf)
+                            except Exception:
+                                pass
 
             # 2. Đặt hoặc cập nhật lệnh SHORT ở các TF mục tiêu
             for tf in target_short_tfs:

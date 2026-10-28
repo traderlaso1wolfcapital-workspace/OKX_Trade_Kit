@@ -136,13 +136,20 @@ export default function AppHeader({
 
   const getOkxBalance = (acc) => {
     let bal = acc?.totalEq ?? acc?.balance ?? acc?.equity ?? acc?.availBal;
-    if ((bal === undefined || bal === null || Number(bal) === 0) && acc?.id) {
+    const bNum = Number(bal);
+    if ((bal === undefined || bal === null || isNaN(bNum) || bNum === 0) && acc?.id) {
       const cached = localStorage.getItem(`tls1_bal_${acc.id}`);
       if (cached && Number(cached) > 0) {
         bal = Number(cached);
       }
     }
-    if ((bal === undefined || bal === null || Number(bal) === 0) && acc?.id === effectiveAccId) {
+    if ((bal === undefined || bal === null || isNaN(Number(bal)) || Number(bal) === 0) && acc?.okx_uid) {
+      const cachedUid = localStorage.getItem(`tls1_bal_${acc.okx_uid}`);
+      if (cachedUid && Number(cachedUid) > 0) {
+        bal = Number(cachedUid);
+      }
+    }
+    if ((bal === undefined || bal === null || isNaN(Number(bal)) || Number(bal) === 0) && acc?.id === effectiveAccId) {
       if (accountBalance?.totalEq && Number(accountBalance.totalEq) > 0) {
         bal = accountBalance.totalEq;
       } else if (accountBalance?.balance && Number(accountBalance.balance) > 0) {
@@ -150,6 +157,12 @@ export default function AppHeader({
       } else if (accountBalance?.availBal && Number(accountBalance.availBal) > 0) {
         bal = accountBalance.availBal;
       }
+    }
+    if (bal !== undefined && bal !== null && !isNaN(Number(bal)) && Number(bal) > 0 && acc?.id) {
+      try {
+        localStorage.setItem(`tls1_bal_${acc.id}`, String(bal));
+        if (acc.okx_uid) localStorage.setItem(`tls1_bal_${acc.okx_uid}`, String(bal));
+      } catch {}
     }
     return bal !== undefined && bal !== null ? formatBalance(bal) : "";
   };

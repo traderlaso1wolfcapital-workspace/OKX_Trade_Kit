@@ -3,6 +3,7 @@ import { COIN_LIST } from "../../constants/tradeConfig";
 import { useTranslation } from "../../i18n";
 
 export default function PositionsTable({
+  currentPlatform = "okx",
   positions = [],
   safePos = [],
   activePairs = [],
@@ -94,10 +95,6 @@ export default function PositionsTable({
     }
     const coinName = coin?.label ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
     const isLimit = isLimitOrder(pos);
-    const confirmMsg = isLimit 
-      ? `Bạn có chắc chắn muốn HỦY LỆNH LIMIT ${coinName} không?`
-      : t("close_pos_confirm").replace("{coin}", coinName);
-    if (!window.confirm(confirmMsg)) return;
     try {
       if (pos.platform === "tradelocker" || pos.is_prop || (localStorage.getItem("tls1_trading_platform") === "e8")) {
         const u = localStorage.getItem("tls1_uid") || loginUid || "default";
@@ -113,10 +110,10 @@ export default function PositionsTable({
         });
         const data = await res.json();
         if (res.ok) {
-          alert(isLimit ? `✅ Đã hủy lệnh Limit ${coinName} thành công!` : ("✅ " + t("close_pos_success").replace("{coin}", coinName)));
+          console.log(isLimit ? `✅ Đã hủy lệnh Limit ${coinName} thành công!` : `✅ Đã đóng vị thế ${coinName} thành công!`);
           if (onRefreshPositions) onRefreshPositions();
         } else {
-          alert("❌ " + t("close_pos_fail").replace("{coin}", coinName) + (data.detail || data.message || t("server_error")));
+          console.error("❌ " + (data.detail || data.message || "Lỗi đóng vị thế"));
         }
         return;
       }
@@ -138,13 +135,13 @@ export default function PositionsTable({
       });
       const data = await res.json();
       if (res.ok) {
-        alert(isLimit ? `✅ Đã hủy lệnh Limit ${coinName} thành công!` : ("✅ " + t("close_pos_success").replace("{coin}", coinName)));
+        console.log(isLimit ? `✅ Đã hủy lệnh Limit ${coinName} thành công!` : `✅ Đã đóng vị thế ${coinName} thành công!`);
         if (onRefreshPositions) onRefreshPositions();
       } else {
-        alert("❌ " + t("close_pos_fail").replace("{coin}", coinName) + (data.detail || data.message || t("server_error")));
+        console.error("❌ " + (data.detail || data.message || "Lỗi đóng vị thế"));
       }
     } catch (e) {
-      alert("❌ " + t("close_pos_conn_fail").replace("{coin}", coinName) + e.message);
+      console.error("❌ Lỗi kết nối: " + e.message);
     }
   };
 
@@ -154,11 +151,12 @@ export default function PositionsTable({
     const upl = parseFloat(pos.upl || "0");
     const margin = parseFloat(pos.margin || "0");
     const isFxOrProp =
-      pos.is_prop ||
-      pos.platform === "tradelocker" ||
-      pos.platform === "mt5" ||
-      (localStorage.getItem("tls1_trading_platform") === "e8") ||
-      (pos.lots !== undefined && pos.lots !== null);
+      (pos.is_prop ||
+       pos.platform === "tradelocker" ||
+       pos.platform === "mt5" ||
+       (currentPlatform === "e8" && pos.platform !== "okx") ||
+       (pos.lots !== undefined && pos.lots !== null && pos.platform !== "okx")) &&
+      pos.platform !== "okx";
     const lotVal =
       pos.lots !== undefined && pos.lots !== null
         ? parseFloat(pos.lots)

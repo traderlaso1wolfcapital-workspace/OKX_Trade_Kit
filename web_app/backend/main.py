@@ -2414,6 +2414,67 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
 
 _okx_account_balances_cache = {}
 
+def _extract_okx_balance(bdata: dict, target_ccy: str = "USDT") -> float:
+    """Trích xuất số dư tài khoản OKX an toàn tuyệt đối, chống lỗi ValueError chuỗi rỗng và tương thích mọi loại tài khoản."""
+    if not isinstance(bdata, dict):
+        return 0.0
+
+    # 1. Thử totalEq
+    teq = bdata.get("totalEq")
+    if teq not in [None, "", "0", 0, "0.0", "0.00"]:
+        try:
+            val = float(teq)
+            if val > 0:
+                return round(val, 2)
+        except (ValueError, TypeError):
+            pass
+
+    details = bdata.get("details", [])
+    if not isinstance(details, list) or not details:
+        return 0.0
+
+    # 2. Tìm đồng target_ccy (thường là USDT)
+    target_d = None
+    for d in details:
+        if isinstance(d, dict) and str(d.get("ccy", "")).upper() == target_ccy.upper():
+            target_d = d
+            break
+
+    candidates = [target_d] if target_d else details
+    for d in candidates:
+        if not isinstance(d, dict):
+            continue
+        # Thử lần lượt các trường số dư: eq, cashBal, availBal, availEq, eqUsd, disEq
+        for field in ["cashBal", "availBal", "eq", "availEq", "eqUsd", "disEq"]:
+            val_str = d.get(field)
+            if val_str not in [None, "", "0", 0, "0.0", "0.00"]:
+                try:
+                    val = float(val_str)
+                    if val > 0:
+                        return round(val, 2)
+                except (ValueError, TypeError):
+                    pass
+
+    # 3. Tính tổng eqUsd hoặc cashBal nếu có nhiều tài sản
+    total_usd = 0.0
+    for d in details:
+        if not isinstance(d, dict):
+            continue
+        for f in ["eqUsd", "cashBal", "eq"]:
+            v = d.get(f)
+            if v not in [None, "", "0", 0, "0.0", "0.00"]:
+                try:
+                    vf = float(v)
+                    if vf > 0:
+                        total_usd += vf
+                        break
+                except Exception:
+                    pass
+    if total_usd > 0:
+        return round(total_usd, 2)
+
+    return 0.0
+
 def _get_single_account_balance(uid: str, aid: str) -> float:
     key = f"{uid}:{aid}"
     now = time.time()
@@ -2429,23 +2490,14 @@ def _get_single_account_balance(uid: str, aid: str) -> float:
             res_j = resp.json()
             if res_j.get("code") == "0" and res_j.get("data"):
                 bdata = res_j["data"][0]
-                teq = bdata.get("totalEq")
-                bal_val = 0.0
-                if teq:
-                    bal_val = round(float(teq), 2)
-                else:
-                    for d in bdata.get("details", []):
-                        if d.get("ccy") == "USDT":
-                            bal_val = round(float(d.get("eq", d.get("cashBal", 0.0))), 2)
-                            break
+                bal_val = _extract_okx_balance(bdata, "USDT")
                 if bal_val > 0:
                     _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
                     return bal_val
                 elif cached and cached.get("balance", 0) > 0:
                     return cached["balance"]
                 else:
-                    _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
-                    return bal_val
+                    return 0.0
     except Exception:
         pass
     return cached["balance"] if cached else 0.0
@@ -2506,14 +2558,22 @@ def get_bot_accounts(uid: str):
                         import concurrent.futures
                         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(deduped) or 1, 5)) as executor:
                             future_to_acc = {executor.submit(_get_single_account_balance, uid, a.get("id", "")): a for a in deduped}
-                            for future in concurrent.futures.as_completed(future_to_acc, timeout=5.0):
+                            for future in concurrent.futures.as_completed(future_to_acc, timeout=8.0):
                                 acc_item = future_to_acc[future]
                                 try:
                                     bal = future.result()
-                                    if bal > 0 or "balance" not in acc_item:
+                                    if bal > 0:
                                         acc_item["balance"] = bal
                                         acc_item["totalEq"] = bal
                                         acc_item["availBal"] = bal
+                                    elif acc_item.get("balance", 0) > 0:
+                                        pass
+                                    else:
+                                        cached_bal = _okx_account_balances_cache.get(f"{uid}:{acc_item.get('id', '')}", {}).get("balance", 0)
+                                        if cached_bal > 0:
+                                            acc_item["balance"] = cached_bal
+                                            acc_item["totalEq"] = cached_bal
+                                            acc_item["availBal"] = cached_bal
                                 except Exception:
                                     pass
                     except Exception:
@@ -3056,7 +3116,7 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
 
         # 2. Fetch algo orders (TP/SL)
         try:
-            resp_algo = _okx_signed_request("GET", "/api/v5/trade/orders-algo-pending?ordType=conditional", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+            resp_algo = _okx_signed_request("GET", "/api/v5/trade/orders-algo-pending?ordType=conditional&instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
             if resp_algo.status_code == 200:
                 res_algo = resp_algo.json()
                 if res_algo.get("code") == "0":
@@ -3064,26 +3124,30 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
         except Exception:
             pass
 
-        # 3. LẤY TRỰC TIẾP LỆNH LIMIT CHỜ KHỚP ĐANG TREO TRÊN SÀN OKX (Độc lập, không bị đứt đoạn theo positions)
+        # 3. LẤY TRỰC TIẾP LỆNH LIMIT CHỜ KHỚP ĐANG TREO TRÊN SÀN OKX (BẮT BUỘC instType=SWAP CHO HỢP ĐỒNG VĨNH CỬU)
         try:
-            resp_pending = _okx_signed_request("GET", "/api/v5/trade/orders-pending", "", api_key, secret_key, passphrase, is_demo, timeout=5)
+            resp_pending = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=5)
             if resp_pending.status_code == 200:
                 res_pending = resp_pending.json()
                 if res_pending.get("code") == "0":
                     raw_pending_orders = res_pending.get("data", [])
                     pending_fetched = True
-                elif res_pending.get("code") in ["51000", "51001"]:
-                    resp_pending2 = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
-                    if resp_pending2.status_code == 200 and resp_pending2.json().get("code") == "0":
-                        raw_pending_orders = resp_pending2.json().get("data", [])
-                        pending_fetched = True
+                else:
+                    print(f"[OKX] Lỗi orders-pending SWAP code: {res_pending.get('code')} - {res_pending.get('msg')}")
             else:
-                resp_pending2 = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+                print(f"[OKX] Lỗi orders-pending SWAP HTTP {resp_pending.status_code}")
+        except Exception as e_pend:
+            print(f"[OKX] Lỗi lấy live orders-pending SWAP: {e_pend}")
+
+        # Thử lấy thêm lệnh SPOT nếu chưa lấy được hoặc tài khoản có lệnh SPOT
+        if not pending_fetched:
+            try:
+                resp_pending2 = _okx_signed_request("GET", "/api/v5/trade/orders-pending", "", api_key, secret_key, passphrase, is_demo, timeout=4)
                 if resp_pending2.status_code == 200 and resp_pending2.json().get("code") == "0":
                     raw_pending_orders = resp_pending2.json().get("data", [])
                     pending_fetched = True
-        except Exception as e_pend:
-            print(f"[OKX] Lỗi lấy live orders-pending: {e_pend}")
+            except Exception:
+                pass
 
         # Chống giật lag: Nếu lỗi kết nối tạm thời / rate-limit 50011, tái sử dụng dữ liệu từ cache
         if not pending_fetched and cached_entry:
@@ -3710,28 +3774,15 @@ def get_account_balance(uid: str, strategy: str = "sub1", account_id: str = None
             data = resp.json()
             if data.get("code") == "0" and len(data.get("data", [])) > 0:
                 bdata = data["data"][0]
-                total_eq = float(bdata.get("totalEq", 0) or 0)
-                details = bdata.get("details", [])
-                avail_bal = 0.0
-                if details:
-                    for d in details:
-                        if d.get("ccy") == ccy:
-                            avail_bal = float(d.get("availBal", 0) or 0)
-                            if total_eq == 0:
-                                total_eq = float(d.get("eq", d.get("cashBal", 0)) or 0)
-                            break
-                    if avail_bal == 0 and details:
-                        avail_bal = float(details[0].get("availBal", 0) or 0)
-                
-                final_bal = total_eq if total_eq > 0 else avail_bal
+                final_bal = _extract_okx_balance(bdata, ccy)
                 if final_bal > 0:
                     _okx_account_balances_cache[key] = {"balance": round(final_bal, 2), "ts": time.time()}
-                return {
-                    "status": "success",
-                    "availBal": avail_bal if avail_bal > 0 else final_bal,
-                    "totalEq": round(final_bal, 2),
-                    "balance": round(final_bal, 2)
-                }
+                    return {
+                        "status": "success",
+                        "availBal": round(final_bal, 2),
+                        "totalEq": round(final_bal, 2),
+                        "balance": round(final_bal, 2)
+                    }
     except Exception:
         pass
         
@@ -4824,10 +4875,10 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
 
         # 🛡️ CƠ CHẾ CHỐNG FLICKER / GIẬT RỖNG:
         # Nếu cả 2 lệnh lấy positions và orders đều thất bại (lỗi mạng, Cloudflare timeout, token hết hạn):
-        # TUYỆT ĐỐI KHÔNG TRẢ VỀ RỖNG [] làm biến mất vị thế của người dùng!
+        # Tạm thời trả về cache trong vòng 15s để tránh chớp giật màn hình
         if not ok_pos and not ok_ord:
             cached = _prop_positions_cache.get(cache_key)
-            if cached and (now - cached.get("time", 0) < 90):
+            if cached and (now - cached.get("time", 0) < 15.0):
                 print(f"[TradeLocker] Network glitch for {clean_uid}, using cache ({len(cached['data'])} items): {msg_pos}")
                 return cached["data"]
             return []
@@ -4907,7 +4958,7 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
                     "is_limit": False,
                     "is_child": False
                 })
-        elif cached and cached.get("positions"):
+        elif not ok_pos and cached and cached.get("positions") and (now - cached.get("time", 0) < 15.0):
             mapped_list.extend(cached.get("positions", []))
 
         # B. PARSE PENDING ORDERS (LỆNH LIMIT / STOP ĐANG CHỜ KHỚP TRÊN SÀN)
@@ -4977,15 +5028,16 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
                     "status": "Pending Limit",
                     "is_child": False
                 })
-        elif not ok_ord and cached and cached.get("orders"):
+        elif not ok_ord and cached and cached.get("orders") and (now - cached.get("time", 0) < 15.0):
             mapped_list.extend(cached.get("orders", []))
 
-        # Lưu trữ cache hợp lệ
+        # Lưu trữ cache hợp lệ: chỉ cập nhật time mới nếu kết nối sàn thành công thực sự
+        cache_time = now if (ok_pos and ok_ord) else (cached.get("time", now) if cached else now)
         _prop_positions_cache[cache_key] = {
             "data": mapped_list,
             "positions": [m for m in mapped_list if not m.get("is_limit")],
             "orders": [m for m in mapped_list if m.get("is_limit")],
-            "time": now
+            "time": cache_time
         }
         return mapped_list
 
