@@ -3162,9 +3162,19 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
         formatted_positions = []
         
         # Read trade_markers for virtual tickets
+        # CHỈ đọc trade_markers nếu bot hiện tại thực sự đang chạy trên tài khoản này
         markers = {}
+        running_acc_file = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", f".running_account_{strategy}")
+        is_current_running = False
+        if os.path.exists(running_acc_file):
+            try:
+                with open(running_acc_file, "r", encoding="utf-8") as rf:
+                    is_current_running = (rf.read().strip() == target_acc)
+            except Exception:
+                pass
+
         positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
-        if os.path.exists(positions_path):
+        if is_current_running and os.path.exists(positions_path):
             for _ in range(5):
                 try:
                     with open(positions_path, "r", encoding="utf-8") as f:
@@ -3188,22 +3198,23 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
 
         # Auto-sync: Clean up zombie virtual tickets in trade_markers if OKX position is closed
         dirty_markers = False
-        for coin, items in markers.items():
-            inst_id = f"{coin.upper()}-USDT-SWAP"
-            for side in ["long", "short"]:
-                side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
-                if side_items and (inst_id, side) not in okx_pos_map:
-                    for item in side_items: item["status"] = "closed"
-                    dirty_markers = True
+        if is_current_running and markers:
+            for coin, items in markers.items():
+                inst_id = f"{coin.upper()}-USDT-SWAP"
+                for side in ["long", "short"]:
+                    side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
+                    if side_items and (inst_id, side) not in okx_pos_map:
+                        for item in side_items: item["status"] = "closed"
+                        dirty_markers = True
 
-        if dirty_markers:
-            for _ in range(5):
-                try:
-                    with open(positions_path, "w", encoding="utf-8") as f:
-                        json.dump(markers, f)
-                    break
-                except Exception:
-                    time.sleep(0.05)
+            if dirty_markers:
+                for _ in range(5):
+                    try:
+                        with open(positions_path, "w", encoding="utf-8") as f:
+                            json.dump(markers, f)
+                        break
+                    except Exception:
+                        time.sleep(0.05)
 
         # Build formatted positions
         for key, items_okx in okx_pos_map.items():
@@ -3244,11 +3255,16 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
             tf_str = " ".join(active_tfs).lower() if active_tfs else ""
             
             parent_id = f"AGG_{inst_id}_{pos_side}"
+            # Lấy posId trực tiếp từ OKX hoặc tổng hợp định danh duy nhất (chống trùng ticket_id #MANUAL)
+            okx_pos_id = first_okx.get("posId") or ""
+            unique_tid = parent_id if len(items_okx) > 1 else (okx_pos_id or (active_items[-1].get("ticket_id") if active_items else f"{inst_id}_{pos_side}"))
             
             # Add Aggregated Row (Total Position)
             formatted_positions.append({
-                "ticket_id": parent_id if len(items_okx) > 1 else (active_items[-1].get("ticket_id") if active_items else "#MANUAL"),
+                "ticket_id": unique_tid,
+                "posId": okx_pos_id,
                 "is_aggregate": True,
+                "is_child": False,
                 "instId": inst_id,
                 "posSide": pos_side,
                 "pos": str(total_pos),
@@ -3414,78 +3430,12 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
         }
         return final_result
     except Exception as e:
-        print(f"Error fetching OKX positions: {e}")
+        print(f"Error fetching OKX positions for {target_acc}: {e}")
         if cached_entry and (now - cached_entry.get("ts", 0) < 45):
             return cached_entry.get("result", [])
+        return []
 
-    # 3. Fallback: Đọc các vị thế từ trade_markers.json
-    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
-    if not os.path.exists(positions_path):
-        return []
-    try:
-        with open(positions_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            
-        mock_positions = []
-        for coin, items in data.items():
-            inst_id = f"{coin}-USDT-SWAP"
-            for side in ["long", "short"]:
-                active_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
-                if not active_items: continue
-                
-                total_pos = sum(float(i.get("volume", "1.0")) for i in active_items)
-                if total_pos == 0: continue
-                avg_px = sum(float(i.get("price", 0)) * float(i.get("volume", "1.0")) for i in active_items) / total_pos
-                
-                parent_id = f"AGG_{inst_id}_{side}_MOCK"
-                
-                active_tfs = []
-                for item in active_items:
-                    tf = item.get("tf", "").upper()
-                    if tf and tf not in active_tfs:
-                        active_tfs.append(tf)
-                active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                
-                mock_positions.append({
-                    "ticket_id": parent_id if len(active_items) > 1 else active_items[-1].get("ticket_id", "#MOCK"),
-                    "is_aggregate": True,
-                    "instId": inst_id,
-                    "posSide": side,
-                    "pos": str(total_pos),
-                    "margin": "0.00",
-                    "avgPx": str(avg_px),
-                    "lastPx": str(avg_px),
-                    "roi": "0.00",
-                    "upl": "0.00",
-                    "tp": "---",
-                    "sl": "---",
-                    "lever": "100",
-                    "tf": " ".join(active_tfs).lower(),
-                    "children_count": len(active_items) if len(active_items) > 1 else 0
-                })
-                
-                if len(active_items) > 1:
-                    for idx, item in enumerate(active_items):
-                        mock_positions.append({
-                            "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
-                            "is_child": True,
-                            "parent_id": parent_id,
-                            "instId": inst_id,
-                            "posSide": side,
-                            "pos": str(item.get("volume", "1.0")),
-                            "margin": "0.00",
-                            "avgPx": str(item.get("price")),
-                            "lastPx": str(item.get("price")),
-                            "roi": "0.00",
-                            "upl": "0.00",
-                            "tp": "---",
-                            "sl": "---",
-                            "lever": "100",
-                            "tf": item.get("tf", "").upper()
-                        })
-        return mock_positions
-    except Exception:
-        return []
+    return []
 
 @app.get("/api/bot/closed_positions")
 def get_closed_positions(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -3938,7 +3888,7 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
         c_bal = cached.get("balance", 0) if cached else 0
         bal_data = {"status": "success" if c_bal > 0 else "error", "availBal": c_bal, "totalEq": c_bal, "balance": c_bal}
     try:
-        closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy)
+        closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy, acc)
     except Exception:
         closed_data = []
         
@@ -5392,6 +5342,8 @@ if __name__ == "__main__":
         uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
 
 # z7737 | Tự động hóa Port Bridge 5173 -> 8080, sửa lỗi ModuleNotFoundError requests/tradelocker_service, và tối ưu hóa Uvicorn production chạy qua PM2
+# z7738 | Khắc phục triệt để lỗi chuyển bot tự nhảy tài khoản và lỗi đống lệnh ảo trên web: định danh duy nhất posId/ticket_id, cấm ticket #MANUAL trùng lặp, cô lập cache theo tài khoản và chống xung đột key React.
+# z7739 | Khắc phục triệt để lỗi chuyển tài khoản bị lưu vết / pha trộn bảng vị thế và logs: cô lập 100% positions theo account_id, loại bỏ mock positions từ trade_markers cũ, reset logs và tái tạo dashboard độc lập cho tài khoản chờ.
 
 # z20260813 | Added auto-delete for trade history older than 30 days to free up memory
 

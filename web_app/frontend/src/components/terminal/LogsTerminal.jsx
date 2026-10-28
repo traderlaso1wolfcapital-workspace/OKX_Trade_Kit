@@ -370,19 +370,22 @@ export default function LogsTerminal({
     }
 
     // 🛡️ TÁCH BIỆT LOGS & VỊ THẾ TỪNG TÀI KHOẢN HOÀN TOÀN:
-    // Nếu tài khoản đang chọn khác với tài khoản đang in stdout (hoặc khi chuyển đổi tài khoản),
-    // tự động tái tạo khối Header & Bảng vị thế của tài khoản đang chọn, ghép với bảng nến đa khung:
-    const isMismatchAccount = Boolean(
-      selectedAccount && 
+    // Nếu tài khoản đang xem KHÔNG PHẢI là tài khoản đang chạy live bot,
+    // tự động tái tạo bảng Dashboard và lọc triệt để 100% Event Logs của tài khoản đang chọn:
+    const isCurrentAccountRunning = Boolean(
+      isOkxRunning && 
       runningAccId && 
-      selectedAccount !== runningAccId
+      selectedAccount && 
+      (selectedAccount === runningAccId || selectedAccount.replace("#", "") === runningAccId.replace("#", ""))
     );
 
-    if (isMismatchAccount && rawDashboard.length > 0) {
+    if (!isCurrentAccountRunning && selectedAccount) {
       const totalEq = Number(accountBalance?.totalEq ?? accountBalance?.availBal ?? accountBalance?.balance ?? 0);
       let totalPnl = 0;
       if (Array.isArray(positions)) {
-        totalPnl = positions.reduce((sum, p) => sum + Number(p.upl || p.pnl || 0), 0);
+        totalPnl = positions
+          .filter(p => !p.is_child && !Boolean(p.is_limit))
+          .reduce((sum, p) => sum + Number(p.upl || p.pnl || 0), 0);
       }
       const pnlSign = totalPnl >= 0 ? "+" : "";
       const pnlStr = `${pnlSign}${totalPnl.toFixed(2)}`;
@@ -408,15 +411,18 @@ export default function LogsTerminal({
       
       const coins = ["XAU", "BTC", "ETH"];
       coins.forEach(c => {
-        const matchPos = Array.isArray(positions) ? positions.find(p => (p.instId || p.symbol || "").toUpperCase().includes(c)) : null;
+        const matchPos = Array.isArray(positions)
+          ? positions.find(p => (p.instId || p.symbol || "").toUpperCase().includes(c) && !p.is_child && !Boolean(p.is_limit))
+          : null;
         if (matchPos) {
           const side = (matchPos.posSide || matchPos.side || "short").toUpperCase();
           const margin = Number(matchPos.margin || matchPos.initialMargin || 0).toFixed(2);
-          const uplPct = Number(matchPos.uplRatio ? matchPos.uplRatio * 100 : 0).toFixed(1);
+          const uplPct = Number(matchPos.uplRatio ? matchPos.uplRatio * 100 : (matchPos.roi || 0)).toFixed(1);
           const uplPctSign = Number(uplPct) >= 0 ? "+" : "";
           const entryPx = Number(matchPos.avgPx || matchPos.openPrice || 0).toLocaleString();
-          const markPx = Number(matchPos.markPx || matchPos.last || 0).toLocaleString();
-          tailoredHeader.push(`    ${c} ╭─ Đã khớp ${side} [m30] - ký quỹ: ${margin} U (${uplPctSign}${uplPct}%)`);
+          const markPx = Number(matchPos.markPx || matchPos.last || matchPos.lastPx || entryPx).toLocaleString();
+          const tfStr = matchPos.tf ? ` [${matchPos.tf.split(" ")[0].toLowerCase()}]` : "";
+          tailoredHeader.push(`    ${c} ╭─ Đã khớp ${side}${tfStr} - ký quỹ: ${margin} U (${uplPctSign}${uplPct}%)`);
           tailoredHeader.push(`        ├─ Entry: ${entryPx} ⭢ Mark: ${markPx}`);
           tailoredHeader.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
         } else {
@@ -425,6 +431,7 @@ export default function LogsTerminal({
         }
       });
 
+      // Lấy bảng nến đa khung từ snapshot nếu có
       let tableIndex = -1;
       for (let i = 0; i < rawDashboard.length; i++) {
         if (rawDashboard[i].includes("Coin |") || (rawDashboard[i].includes("Coin") && rawDashboard[i].includes("Price"))) {
@@ -432,21 +439,44 @@ export default function LogsTerminal({
           break;
         }
       }
-      if (tableIndex !== -1 && tableIndex >= 0) {
-        return {
-          dashboardLines: [...tailoredHeader, ...rawDashboard.slice(tableIndex)],
-          eventLogs: rawEvents
-        };
+      const finalDashboard = (tableIndex !== -1 && tableIndex >= 0)
+        ? [...tailoredHeader, ...rawDashboard.slice(tableIndex)]
+        : [...tailoredHeader, dbar];
+
+      // 🛡️ LỌC TUYỆT ĐỐI EVENT LOGS: Loại bỏ 100% nhật ký lệnh của tài khoản khác
+      const otherAccounts = (accounts || [])
+        .map(a => a?.id || a?.name)
+        .filter(id => id && id !== selectedAccount && id !== String(selectedAccount).replace("#", ""));
+
+      const filteredEvents = rawEvents.filter(line => {
+        if (typeof line !== "string") return false;
+        for (const oId of otherAccounts) {
+          const clean = String(oId).replace("#", "");
+          if (line.includes(`#${clean}`) || line.includes(`[${oId}]`) || line.includes(`ACC:${oId}`)) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      const currentAccObj = (accounts || []).find(a => a.id === selectedAccount || a.name === selectedAccount);
+      const currentAccLabel = currentAccObj?.name || (String(selectedAccount).startsWith("#") ? selectedAccount : `#${selectedAccount}`);
+
+      const cleanEvents = [...filteredEvents];
+      if (!isOkxRunning) {
+        cleanEvents.unshift(`ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản ${currentAccLabel}. Bấm [CHẠY BOT] để bắt đầu giao dịch.`);
+      } else if (runningAccId && runningAccId !== selectedAccount) {
+        cleanEvents.unshift(`ℹ️ [HỆ THỐNG] Tài khoản ${currentAccLabel} đang ở trạng thái CHỜ (Bot đang kích hoạt trên tài khoản khác). Bấm [CHẠY BOT] để chuyển bot sang tài khoản này.`);
       }
-      tailoredHeader.push(dbar);
+
       return {
-        dashboardLines: tailoredHeader,
-        eventLogs: rawEvents
+        dashboardLines: finalDashboard,
+        eventLogs: cleanEvents
       };
     }
 
     return { dashboardLines: rawDashboard, eventLogs: rawEvents };
-  }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs, selectedAccount, runningAccId, positions, accountBalance]);
+  }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs, selectedAccount, runningAccId, positions, accountBalance, isOkxRunning, accounts]);
 
   // 🧹 Lọc bỏ dòng đường dẫn file hệ thống cục bộ bot_sub*.py (không cần thiết trên giao diện Web)
   const cleanDashboardLines = React.useMemo(() => {

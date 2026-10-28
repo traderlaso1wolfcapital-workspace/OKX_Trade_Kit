@@ -33,6 +33,45 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Đổi Tài Khoản Bị Lưu Vết / Pha Trộn Bảng Vị Thế & Nhật Ký Terminal Logs:
+  - **Hiện tượng:**
+    1. Khi chuyển sang tài khoản khác (ví dụ từ `#7768` có 11 lệnh sang `#7829` có 0 lệnh), Bảng Vị Thế đôi khi vẫn lưu vết hoặc hiển thị danh sách vị thế của tài khoản trước đó.
+    2. Phần Terminal Logs quét đúng dòng `Tổng:` theo số dư của tài khoản mới rồi, nhưng nội dung các dòng vị thế và dải nhật ký sự kiện bên dưới (Event Logs) lại bị pha trộn thông tin lệnh / trade của tài khoản cũ.
+  - **Nguyên nhân cốt lõi:**
+    1. **Fallback Mock Positions từ `trade_markers.json` trên Backend:** Trong `web_app/backend/main.py` hàm `get_bot_positions`, khi truy vấn OKX API gặp lỗi timeout hoặc không có kết nối, backend tự động nhảy vào khối fallback ở dòng 3426 và đọc `json_data/trade_markers.json`. Do file này lưu vết lệnh của bot đang chạy ở tài khoản trước (#7768), hệ thống trả về toàn bộ 11 vị thế mock này cho tài khoản mới (#7829). Ngoài ra, bộ phận ghép lệnh con (Child Rows) tự động nạp các vé từ `trade_markers.json` mà không kiểm tra xem bot có đang chạy trên tài khoản đó hay không.
+    2. **Chưa dọn sạch State Logs & Positions khi đổi tài khoản trên Frontend:** Trong `App.jsx`, khi người dùng chọn tài khoản mới trong Header dropdown, state `logs` (chứa `dashboardLines` và `eventLogs`) không được reset. State `logs` tiếp tục giữ nguyên toàn bộ frame hiển thị và các dòng sự kiện của tài khoản cũ. Đồng thời, `PositionsTable` không có dynamic key gắn theo tài khoản, khiến React giữ lại DOM table của tài khoản trước.
+    3. **Pha trộn Event Logs trong `LogsTerminal.jsx`:** Khi tài khoản đang chọn khác với tài khoản đang chạy bot (`isMismatchAccount`), `LogsTerminal.jsx` đã tự tính lại dòng `Tổng:` theo `accountBalance`, nhưng lại trả về trực tiếp `eventLogs: rawEvents` nguyên vẹn của tài khoản đang chạy bot (#7768), dẫn đến việc tài khoản mới hiển thị đầy đủ các lệnh đặt, hủy, khớp của tài khoản cũ.
+  - **Giải pháp & Khắc phục hoàn chỉnh:**
+    1. **Loại bỏ triệt để Mock Positions Fallback trên Backend:** Trong `web_app/backend/main.py` hàm `get_bot_positions`, xóa bỏ 100% khối fallback đọc `trade_markers.json`. Nếu tài khoản chưa có vị thế hoặc OKX API không có dữ liệu, luôn trả về mảng rỗng `[]`. Chỉ đọc `trade_markers.json` khi và chỉ khi bot chiến thuật đó ĐANG CHẠY THỰC TẾ trên chính tài khoản đang truy vấn (`is_current_running == True`).
+    2. **Cô lập và Dọn sạch State tức thì trên Frontend:**
+       - Trong `App.jsx`, ngay khi `handleAssignAccountToActiveBot` hoặc `effectiveAccId` thay đổi, lập tức dọn sạch `setPositions([])`, `setClosedPositions([])` và reset `logs` về trạng thái tải tài khoản mới, xóa tan hoàn toàn dữ liệu cũ trong 0ms.
+       - Gán key định danh độc nhất `key={`${currentPlatform}-${effectiveAccId || "none"}`}` cho `<PositionsTable />`, buộc React unmount và khởi tạo bảng mới tinh khôi cho tài khoản mới (hiển thị đúng 100% danh sách các cặp đứng ngoài "Chờ tín hiệu...").
+       - Trong `useBotWebSocket.js`, kiểm tra điều kiện nghiêm ngặt: chỉ cho phép gói tin WebSocket cập nhật dữ liệu khi `data.account_id` trùng khớp 100% với `accountIdRef.current`.
+    3. **Lọc tuyệt đối Event Logs theo tài khoản trong `LogsTerminal.jsx`:**
+       - Tách biệt rõ ràng 2 trạng thái: `isCurrentAccountRunning` (đang xem chính tài khoản đang chạy bot) và tài khoản ở trạng thái CHỜ / STOPPED.
+       - Với tài khoản không chạy bot: Tự động lọc sạch 100% các dòng Event Logs có chứa tag hoặc định danh của tài khoản khác (ví dụ `#7768`), thay thế bằng thông báo hệ thống trực quan: `ℹ️ [HỆ THỐNG] Tài khoản {tên} đang ở trạng thái CHỜ (Sẵn sàng chạy bot). Bấm [CHẠY BOT] để bắt đầu giao dịch.`
+       - Bảo đảm con số "Tổng:" trên Dashboard luôn đồng bộ 100% với số tiền sau tag `#xxxx` trên Header capsule theo màu `#4ade80`.
+
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Bot Tự Nhảy Tài Khoản Khác & Lỗi Sinh Đống Lệnh Ảo (F5 Mới Hết):
+  - **Lỗi 1 (Chuyển bot bị tự động nhảy sang tài khoản khác #1111):**
+    - **Nguyên nhân:**
+      1. Trong `App.jsx`, hook bootstrap nạp danh sách tài khoản (`bootstrap()`) có mảng phụ thuộc chứa `[activeBotTab]`. Mỗi khi người dùng chuyển bot trade (từ `sub1` sang `sub2`), hàm này chạy lại từ đầu, truy vấn server/localStorage `tls1_bot_accounts` của bot đó và cưỡng chế gọi `setSelectedAccount(targetAcc)` hoặc `setSelectedAccount("")` khiến hệ thống fallback về tài khoản đầu tiên `accounts[0]` (#1111).
+      2. Trong `handleSelectBotTab`, hệ thống chỉ lưu `activeBotTab` mà không đồng bộ gắn cứng tài khoản đang xem (`effectiveAccId`) vào chiến thuật mới, dẫn tới việc tab bot mới đọc cấu hình lưu cũ của bot đó.
+    - **Khắc phục:**
+      1. Đưa `[activeBotTab]` ra khỏi dependency array của `bootstrap()` (chỉ chạy khởi tạo 1 lần theo `[loginUid]`).
+      2. Thêm cơ chế bảo vệ tài khoản đang xem: Nếu tài khoản hiện tại (`selectedAccount` hoặc `tls1_selected_account`) đã tồn tại và hợp lệ trong danh sách, **TUYỆT ĐỐI GIỮ NGUYÊN 100%**, không cho phép bất kỳ luồng nào ghi đè sang tài khoản khác.
+      3. Cập nhật `handleSelectBotTab`: Khi chuyển bot, lưu đồng bộ `tls1_selected_account_${strat}` và `tls1_selected_account` bằng chính tài khoản hiện tại, giúp người dùng giữ nguyên tài khoản xuyên suốt các bot.
+  - **Lỗi 2 (Bảng Vị Thế sinh ra đống lệnh ảo / lệnh trùng lặp, F5 mới về lệnh thật):**
+    - **Nguyên nhân:**
+      1. **Xung đột Key React (Key Collision):** Trong `PositionsTable.jsx`, các dòng lệnh được render với key `filled-${parent.ticket_id || pIdx}` và `${pos.instId}-${pos.ticket_id || index}`. Do backend gán `ticket_id = "#MANUAL"` cho mọi vị thế thủ công hoặc chưa có trong `trade_markers.json`, toàn bộ các vị thế khác nhau (ETH, BTC, XAU...) đều mang chung một key `filled-#MANUAL`. Thuật toán React DOM Reconciliation bị vỡ, không thể xóa hoặc cập nhật đúng các nút DOM cũ, dẫn đến việc các dòng DOM của snapshot cũ bị giữ lại và nhân bản dồn dập (thành 8, 12 dòng trùng lặp). Khi F5, cây React DOM được tạo mới từ đầu nên tạm thời hết lỗi, nhưng sau vài nhịp cập nhật realtime lại tái phát.
+      2. **Rò rỉ dữ liệu tài khoản cũ qua WebSocket:** Trong `useBotWebSocket.js`, khi chuyển đổi `accountId`, state `positions` không được reset lập tức, và trong `onmessage` không kiểm tra `data.account_id === accountId`. Các gói tin WebSocket đến chậm của tài khoản cũ bị nạp đè vào tài khoản mới.
+      3. **Thiếu định danh chuẩn trên backend:** Trong `main.py` hàm `get_bot_positions`, backend gán cứng `ticket_id = "#MANUAL"` thay vì trích xuất `posId` thực tế duy nhất từ OKX API.
+    - **Khắc phục:**
+      1. **Định danh duy nhất 100% trên Backend:** Sử dụng trực tiếp `posId` duy nhất từ sàn OKX (`first_okx.get("posId")`) hoặc tổ hợp `f"{inst_id}_{pos_side}"`, loại bỏ hoàn toàn mã `#MANUAL` trùng lặp, gắn cờ `is_child: False` rõ ràng.
+      2. **Triệt tiêu xung đột Key trên Frontend:** Cấu hình key React đa chiều `filled-${parent.instId}-${sideClean}-${parent.ticket_id || parent.posId || pIdx}`, đảm bảo 100% phần tử trong bảng đều có key độc nhất.
+      3. **Bộ lọc khử trùng lặp an toàn (Self-Deduplication):** Bao bọc `filledParents` và `limitOrders` trong `useMemo`, lọc triệt để mọi vị thế trùng lặp theo `(instId, side, ticket_id/order_id)`, đảm bảo không bao giờ có 2 dòng giống nhau xuất hiện trên giao diện.
+      4. **Cô lập dữ liệu tài khoản trong WebSocket & HTTP:** Trong `useBotWebSocket.js`, tự động xóa sạch `setPositions([])` ngay khi chuyển `accountId`, đồng thời chặn mọi gói tin `data.account_id` không khớp với tài khoản hiện tại. Trong `fetchPositions`, kiểm tra `currentTarget === acc` trước khi ghi vào state để chặn race condition mạng.
+
 - **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
   - **Lỗi 1: Thi thoảng không hiện các lệnh đang Limit ở Bảng Vị Thế mặc dù trên sàn OKX đang có:**
     - **Nguyên nhân:**
@@ -5010,11 +5049,32 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## 🐞 CÁC LỖI HIỆN TẠI ĐANG CHỜ XỬ LÝ (PENDING BUGS)
 
-*(Danh sách trống — tất cả lỗi đã được xử lý)*
+- **[29/10/2026]** - Lỗi chuyển Bot tự động nhảy sang tài khoản khác & Lỗi sinh ra đống lệnh ảo (F5 mới hết):
+  - **Mô tả:** Đang ở tài khoản #2222, bấm chuyển bot trade (ví dụ EMA200 sang SMC) thì bị tự động đổi sang tài khoản khác #1111; Bảng vị thế nhiều lúc sinh ra một đống lệnh ảo / trùng lặp (F5 mới về lệnh thật trên sàn).
+  - **Trạng thái:** Đang xử lý.
 
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Đổi Tài Khoản Bị Lưu Vết / Pha Trộn Bảng Vị Thế & Nhật Ký Terminal Logs:
+  - **Hiện tượng:**
+    1. Khi chuyển sang tài khoản khác (ví dụ từ `#7768` có 11 lệnh sang `#7829` có 0 lệnh), Bảng Vị Thế đôi khi vẫn lưu vết hoặc hiển thị danh sách vị thế của tài khoản trước đó.
+    2. Phần Terminal Logs quét đúng dòng `Tổng:` theo số dư của tài khoản mới rồi, nhưng nội dung các dòng vị thế và dải nhật ký sự kiện bên dưới (Event Logs) lại bị pha trộn thông tin lệnh / trade của tài khoản cũ.
+  - **Nguyên nhân cốt lõi:**
+    1. **Fallback Mock Positions từ `trade_markers.json` trên Backend:** Trong `web_app/backend/main.py` hàm `get_bot_positions`, khi truy vấn OKX API gặp lỗi timeout hoặc không có kết nối, backend tự động nhảy vào khối fallback ở dòng 3426 và đọc `json_data/trade_markers.json`. Do file này lưu vết lệnh của bot đang chạy ở tài khoản trước (#7768), hệ thống trả về toàn bộ 11 vị thế mock này cho tài khoản mới (#7829). Ngoài ra, bộ phận ghép lệnh con (Child Rows) tự động nạp các vé từ `trade_markers.json` mà không kiểm tra xem bot có đang chạy trên tài khoản đó hay không.
+    2. **Chưa dọn sạch State Logs & Positions khi đổi tài khoản trên Frontend:** Trong `App.jsx`, khi người dùng chọn tài khoản mới trong Header dropdown, state `logs` (chứa `dashboardLines` và `eventLogs`) không được reset. State `logs` tiếp tục giữ nguyên toàn bộ frame hiển thị và các dòng sự kiện của tài khoản cũ. Đồng thời, `PositionsTable` không có dynamic key gắn theo tài khoản, khiến React giữ lại DOM table của tài khoản trước.
+    3. **Pha trộn Event Logs trong `LogsTerminal.jsx`:** Khi tài khoản đang chọn khác với tài khoản đang chạy bot (`isMismatchAccount`), `LogsTerminal.jsx` đã tự tính lại dòng `Tổng:` theo `accountBalance`, nhưng lại trả về trực tiếp `eventLogs: rawEvents` nguyên vẹn của tài khoản đang chạy bot (#7768), dẫn đến việc tài khoản mới hiển thị đầy đủ các lệnh đặt, hủy, khớp của tài khoản cũ.
+  - **Giải pháp & Khắc phục hoàn chỉnh:**
+    1. **Loại bỏ triệt để Mock Positions Fallback trên Backend:** Trong `web_app/backend/main.py` hàm `get_bot_positions`, xóa bỏ 100% khối fallback đọc `trade_markers.json`. Nếu tài khoản chưa có vị thế hoặc OKX API không có dữ liệu, luôn trả về mảng rỗng `[]`. Chỉ đọc `trade_markers.json` khi và chỉ khi bot chiến thuật đó ĐANG CHẠY THỰC TẾ trên chính tài khoản đang truy vấn (`is_current_running == True`).
+    2. **Cô lập và Dọn sạch State tức thì trên Frontend:**
+       - Trong `App.jsx`, ngay khi `handleAssignAccountToActiveBot` hoặc `effectiveAccId` thay đổi, lập tức dọn sạch `setPositions([])`, `setClosedPositions([])` và reset `logs` về trạng thái tải tài khoản mới, xóa tan hoàn toàn dữ liệu cũ trong 0ms.
+       - Gán key định danh độc nhất `key={`${currentPlatform}-${effectiveAccId || "none"}`}` cho `<PositionsTable />`, buộc React unmount và khởi tạo bảng mới tinh khôi cho tài khoản mới (hiển thị đúng 100% danh sách các cặp đứng ngoài "Chờ tín hiệu...").
+       - Trong `useBotWebSocket.js`, kiểm tra điều kiện nghiêm ngặt: chỉ cho phép gói tin WebSocket cập nhật dữ liệu khi `data.account_id` trùng khớp 100% với `accountIdRef.current`.
+    3. **Lọc tuyệt đối Event Logs theo tài khoản trong `LogsTerminal.jsx`:**
+       - Tách biệt rõ ràng 2 trạng thái: `isCurrentAccountRunning` (đang xem chính tài khoản đang chạy bot) và tài khoản ở trạng thái CHỜ / STOPPED.
+       - Với tài khoản không chạy bot: Tự động lọc sạch 100% các dòng Event Logs có chứa tag hoặc định danh của tài khoản khác (ví dụ `#7768`), thay thế bằng thông báo hệ thống trực quan: `ℹ️ [HỆ THỐNG] Tài khoản {tên} đang ở trạng thái CHỜ (Sẵn sàng chạy bot). Bấm [CHẠY BOT] để bắt đầu giao dịch.`
+       - Bảo đảm con số "Tổng:" trên Dashboard luôn đồng bộ 100% với số tiền sau tag `#xxxx` trên Header capsule theo màu `#4ade80`.
 
 - **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
   - **Lỗi 1: Thi thoảng không hiện các lệnh đang Limit ở Bảng Vị Thế mặc dù trên sàn OKX đang có:**

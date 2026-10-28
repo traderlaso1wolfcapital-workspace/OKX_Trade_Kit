@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { COIN_LIST } from "../../constants/tradeConfig";
 import { useTranslation } from "../../i18n";
 
@@ -53,31 +53,52 @@ export default function PositionsTable({
     String(p.status || "").toLowerCase().includes("pending");
 
   // 🔼 TẦNG 1: 100% các lệnh ĐÃ KHỚP (Active Positions) đang chạy, có số PNL xanh/đỏ và nút đỏ [Đóng], sắp xếp theo % PNL từ cao xuống thấp
-  const filledParents = safePos
-    .filter((p) => !p.is_child && !isLimitOrder(p))
-    .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+  // Lọc trùng lặp tuyệt đối (chống sinh lệnh ảo trên giao diện)
+  const filledParents = useMemo(() => {
+    const seen = new Set();
+    return (safePos || [])
+      .filter((p) => !p.is_child && !isLimitOrder(p))
+      .filter((p) => {
+        const sideKey = (p.posSide || p.side || "long").toLowerCase();
+        const tid = p.ticket_id || p.posId || p.position_id || "";
+        const uKey = tid ? `${p.instId}_${sideKey}_${tid}` : `${p.instId}_${sideKey}_${p.avgPx || ""}_${p.margin || ""}`;
+        if (seen.has(uKey)) return false;
+        seen.add(uKey);
+        return true;
+      })
+      .sort((a, b) => parseFloat(b.roi || 0) - parseFloat(a.roi || 0));
+  }, [safePos]);
 
   // 🔽 TẦNG 2: 100% các lệnh CHỜ KHỚP (Limit Orders), hiển thị chữ vàng Chờ khớp (Limit) và nút cam [Hủy]
   // Gom cùng cặp coin, và sắp xếp thứ tự theo ký quỹ thấp đến cao dần từ trên xuống dưới
-  const limitOrders = safePos
-    .filter((p) => !p.is_child && isLimitOrder(p))
-    .sort((a, b) => {
-      // 1. Gom cùng chủng loại (cùng cặp coin theo thứ tự danh mục COIN_LIST)
-      const idxA = COIN_LIST.findIndex((c) => c.value === a.instId);
-      const idxB = COIN_LIST.findIndex((c) => c.value === b.instId);
-      const coinDiff = (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
-      if (coinDiff !== 0) return coinDiff;
+  const limitOrders = useMemo(() => {
+    const seen = new Set();
+    return (safePos || [])
+      .filter((p) => !p.is_child && isLimitOrder(p))
+      .filter((p) => {
+        const ordId = p.order_id || p.ticket_id || `${p.instId}_${p.avgPx}_${p.margin}`;
+        if (seen.has(ordId)) return false;
+        seen.add(ordId);
+        return true;
+      })
+      .sort((a, b) => {
+        // 1. Gom cùng chủng loại (cùng cặp coin theo thứ tự danh mục COIN_LIST)
+        const idxA = COIN_LIST.findIndex((c) => c.value === a.instId);
+        const idxB = COIN_LIST.findIndex((c) => c.value === b.instId);
+        const coinDiff = (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
+        if (coinDiff !== 0) return coinDiff;
 
-      // 2. Trong cùng cặp coin: sắp xếp thứ tự theo ký quỹ thấp đến cao dần từ trên xuống dưới
-      const marginA = parseFloat(a.margin || 0);
-      const marginB = parseFloat(b.margin || 0);
-      if (marginA !== marginB) {
-        return marginA - marginB; // Thấp ở trên, cao dần ở dưới
-      }
+        // 2. Trong cùng cặp coin: sắp xếp thứ tự theo ký quỹ thấp đến cao dần từ trên xuống dưới
+        const marginA = parseFloat(a.margin || 0);
+        const marginB = parseFloat(b.margin || 0);
+        if (marginA !== marginB) {
+          return marginA - marginB; // Thấp ở trên, cao dần ở dưới
+        }
 
-      // 3. Nếu cùng ký quỹ: xếp theo giá
-      return parseFloat(b.avgPx || 0) - parseFloat(a.avgPx || 0);
-    });
+        // 3. Nếu cùng ký quỹ: xếp theo giá
+        return parseFloat(b.avgPx || 0) - parseFloat(a.avgPx || 0);
+      });
+  }, [safePos]);
 
   // ⚪ TẦNG 3: Các cặp coin đang đứng ngoài (chờ tín hiệu)
   const activeInstIds = new Set(safePos.map((p) => p.instId));
@@ -171,10 +192,10 @@ export default function PositionsTable({
     const margin = parseFloat(pos.margin || "0");
     const isFxOrProp =
       (pos.is_prop ||
-       pos.platform === "tradelocker" ||
-       pos.platform === "mt5" ||
-       (currentPlatform === "e8" && pos.platform !== "okx") ||
-       (pos.lots !== undefined && pos.lots !== null && pos.platform !== "okx")) &&
+        pos.platform === "tradelocker" ||
+        pos.platform === "mt5" ||
+        (currentPlatform === "e8" && pos.platform !== "okx") ||
+        (pos.lots !== undefined && pos.lots !== null && pos.platform !== "okx")) &&
       pos.platform !== "okx";
     const lotVal =
       pos.lots !== undefined && pos.lots !== null
@@ -182,15 +203,18 @@ export default function PositionsTable({
         : parseFloat(pos.pos) || 0.01;
     const coin = getCoinObj(pos.instId);
 
+    const sideClean = (pos.posSide || pos.side || "pos").toLowerCase();
+    const rowKey = `${pos.instId || "coin"}-${sideClean}-${pos.ticket_id || pos.posId || pos.order_id || index}`;
+
     return (
       <tr
-        key={`${pos.instId}-${pos.ticket_id || index}`}
+        key={rowKey}
         style={{
           borderBottom: isLast
             ? "1px solid #262626"
             : isChild
-            ? "1px solid transparent"
-            : "1px solid rgba(255, 255, 255, 0.03)",
+              ? "1px solid transparent"
+              : "1px solid rgba(255, 255, 255, 0.03)",
           backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent",
         }}
       >
@@ -274,22 +298,22 @@ export default function PositionsTable({
               <div style={{ color: "#888", fontSize: "11.5px", marginLeft: isChild ? "26px" : "22px" }}>
                 {pos.avgPx
                   ? parseFloat(pos.avgPx).toLocaleString("en-US", {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })
                   : "0.0"}{" "}
                 ➔{" "}
                 {pos.lastPx
                   ? parseFloat(pos.lastPx).toLocaleString("en-US", {
-                      minimumFractionDigits: 1,
-                      maximumFractionDigits: 1,
-                    })
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })
                   : pos.avgPx
-                  ? parseFloat(pos.avgPx).toLocaleString("en-US", {
+                    ? parseFloat(pos.avgPx).toLocaleString("en-US", {
                       minimumFractionDigits: 1,
                       maximumFractionDigits: 1,
                     })
-                  : "0.0"}
+                    : "0.0"}
               </div>
             )}
           </div>
@@ -520,10 +544,11 @@ export default function PositionsTable({
           {filledParents.map((parent, pIdx) => {
             const children = (positions || []).filter((p) => p.is_child && p.parent_id === parent.ticket_id);
             const hasChildren = children.length > 0;
+            const parentKey = `filled-${parent.instId || "coin"}-${(parent.posSide || parent.side || "pos").toLowerCase()}-${parent.ticket_id || parent.posId || pIdx}`;
             return (
-              <React.Fragment key={`filled-${parent.ticket_id || pIdx}`}>
+              <React.Fragment key={parentKey}>
                 {renderPosRow(parent, pIdx, false, !hasChildren)}
-                {children.map((child, cIdx) => 
+                {children.map((child, cIdx) =>
                   renderPosRow(child, `${pIdx}-${cIdx}`, true, cIdx === children.length - 1)
                 )}
               </React.Fragment>
@@ -531,8 +556,8 @@ export default function PositionsTable({
           })}
 
           {/* 🔽 TẦNG 2: 100% CÁC LỆNH CHỜ KHỚP (LIMIT ORDERS) */}
-          {limitOrders.map((limitPos, lIdx) => 
-            renderPosRow(limitPos, `limit-${limitPos.ticket_id || lIdx}`, false, true)
+          {limitOrders.map((limitPos, lIdx) =>
+            renderPosRow(limitPos, `limit-${limitPos.instId || "coin"}-${limitPos.order_id || limitPos.ticket_id || lIdx}`, false, true)
           )}
 
           {/* ⚪ TẦNG 3: CÁC CẶP COIN ĐỨNG NGOÀI (CHỜ TÍN HIỆU) */}

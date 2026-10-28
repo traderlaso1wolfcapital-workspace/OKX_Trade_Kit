@@ -11,6 +11,11 @@ export function useBotWebSocket(uid, strategy, accountId) {
 
   const wsRef = useRef(null);
   const isMountedRef = useRef(true);
+  const accountIdRef = useRef(accountId);
+
+  useEffect(() => {
+    accountIdRef.current = accountId;
+  }, [accountId]);
 
   const connectWS = useCallback(() => {
     if (!uid) return;
@@ -22,7 +27,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
     ws.onopen = () => {
       if (!isMountedRef.current) return;
       setIsConnected(true);
-      ws.send(JSON.stringify({ action: "switch_account", account_id: accountId || "" }));
+      ws.send(JSON.stringify({ action: "switch_account", account_id: accountIdRef.current || "" }));
     };
 
     ws.onmessage = (event) => {
@@ -37,10 +42,16 @@ export function useBotWebSocket(uid, strategy, accountId) {
               setActiveAccounts(data.status.active_accounts);
             }
           }
-          if (!accountId) {
+          if (!accountIdRef.current) {
             setPositions([]);
             setClosedPositions([]);
             // preserve availBal
+            return;
+          }
+          // Chống rò rỉ dữ liệu chéo tài khoản:
+          // Nếu payload từ WebSocket không trùng khớp 100% với account_id đang chọn,
+          // TUYỆT ĐỐI không ghi đè dữ liệu của account cũ vào account mới!
+          if (String(data.account_id || "").trim() !== String(accountIdRef.current || "").trim()) {
             return;
           }
           if (Array.isArray(data.positions)) {
@@ -77,7 +88,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
         ws.close();
       } catch {}
     };
-  }, [uid, strategy, accountId]);
+  }, [uid, strategy]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -94,10 +105,10 @@ export function useBotWebSocket(uid, strategy, accountId) {
 
   // Handle switching account
   useEffect(() => {
+    // Ngay khi đổi account: reset positions và closedPositions để tránh lưu vết lệnh của tài khoản trước
+    setPositions([]);
+    setClosedPositions([]);
     if (!accountId) {
-      setPositions([]);
-      setClosedPositions([]);
-      // preserve availBal
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ action: "switch_account", account_id: "" }));
       }

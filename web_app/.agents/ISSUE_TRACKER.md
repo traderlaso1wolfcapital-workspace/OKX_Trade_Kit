@@ -32,6 +32,14 @@ Nhật ký theo dõi các Tasks, Bugs và Lịch sử chỉnh sửa giao diện 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Đổi Tài Khoản Bị Lưu Vết / Pha Trộn Bảng Vị Thế & Nhật Ký Terminal Logs:
+  - **Lỗi 1 (Bảng Vị Thế lưu vết hoặc hiện vị thế của tài khoản cũ):** Loại bỏ 100% khối fallback đọc `trade_markers.json` trên backend trong `get_bot_positions` (không bao giờ sinh mock positions từ bot khác), chỉ nạp `trade_markers.json` khi bot thực sự đang chạy trên chính tài khoản đó. Dọn sạch `positions` tức thì ngay khi đổi tài khoản trên frontend, đồng thời cấp dynamic key độc nhất `key={`${currentPlatform}-${effectiveAccId}`}` cho `PositionsTable` để reset sạch sẽ toàn bộ cây React DOM khi chuyển tài khoản.
+  - **Lỗi 2 (Terminal Logs quét đúng tổng nhưng pha trộn thông tin / event logs của tài khoản khác):** Tái tạo bảng Dashboard độc lập, chuẩn xác cho tài khoản đang ở trạng thái CHỜ / STOPPED (đồng bộ 100% số dư Tổng và con số sau thẻ `#xxxx` với màu `#4ade80`). Lọc sạch 100% các dòng Event Logs có chứa tag/mã của tài khoản khác, hiển thị thông báo hướng dẫn trực quan theo từng tài khoản. Reset sạch `logs` state trong `App.jsx` ngay khi người dùng chuyển tài khoản.
+
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Bot Tự Nhảy Tài Khoản Khác & Lỗi Sinh Đống Lệnh Ảo (F5 Mới Hết):
+  - **Lỗi 1 (Chuyển bot nhảy tài khoản #1111):** Bỏ `activeBotTab` khỏi bootstrap effect để không tự gọi lại `setSelectedAccount`, lưu cứng tài khoản đang xem (`effectiveAccId`) xuyên suốt mọi chiến thuật bot.
+  - **Lỗi 2 (Sinh đống lệnh ảo / lệnh trùng lặp, F5 mới hết):** Khắc phục triệt để lỗi xung đột key React DOM (`filled-#MANUAL`) bằng key độc nhất đa chiều `instId-posSide-ticketId`, trích xuất `posId` thực tế từ OKX API, bổ sung bộ lọc deduplication an toàn trong `PositionsTable.jsx` và cô lập luồng dữ liệu WebSocket / HTTP theo đúng tài khoản active.
+
 - **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
   - **Lỗi 1 (Lệnh Limit chập chờn / mất tích):** Tách độc lập fetch vị thế và pending orders với timeout 5s, mở rộng bộ lọc hỗ trợ đầy đủ `limit`, `post_only`, `fok`, `ioc` (kể cả cờ `reduceOnly`), tính chuẩn khối lượng còn lại `sz - accFillSz` và thêm bộ đệm `_okx_positions_cache` chống giật lag khi OKX chạm rate limit.
   - **Lỗi 2 (Dropdown số dư nhấp nháy về $0.00):** Sửa hoán đổi tham số trong `get_state_payload`, trích xuất đúng tổng tài sản `totalEq` ($1,230.49) từ OKX thay vì availBal cục bộ, chặn triệt để hành vi ghi đè $0.00 vào state và localStorage trong `useBotWebSocket.js`, `App.jsx` và `AppHeader.jsx`.

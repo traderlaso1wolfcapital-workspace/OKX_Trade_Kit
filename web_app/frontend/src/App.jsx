@@ -127,10 +127,10 @@ function App() {
   });
 
   const effectiveAccId = useMemo(() => {
-    // Primary: user-selected account (state or persisted per-bot/global)
+    // Primary: user-selected account (state or persisted global/per-bot)
     const targetCandidate = selectedAccount
-      || localStorage.getItem(`tls1_selected_account_${activeBotTab}`)
-      || localStorage.getItem("tls1_selected_account");
+      || localStorage.getItem("tls1_selected_account")
+      || localStorage.getItem(`tls1_selected_account_${activeBotTab}`);
     if (targetCandidate && accounts.some(a => a.id === targetCandidate || a.name === targetCandidate)) {
       const matched = accounts.find(a => a.id === targetCandidate || a.name === targetCandidate);
       return matched ? matched.id : targetCandidate;
@@ -244,6 +244,8 @@ function App() {
       localStorage.setItem("tls1_active_bot_tab", strat);
       if (effectiveAccId) {
         localStorage.setItem(`tls1_bot_strat_${effectiveAccId}`, strat);
+        localStorage.setItem(`tls1_selected_account_${strat}`, effectiveAccId);
+        localStorage.setItem("tls1_selected_account", effectiveAccId);
       }
     } catch {}
   }, [effectiveAccId]);
@@ -302,6 +304,12 @@ function App() {
 
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
+    setPositions([]);
+    setClosedPositions([]);
+    setLogs({
+      dashboardLines: [],
+      eventLogs: accId ? [`🔄 Đang đồng bộ tài khoản ${accId}...`] : [],
+    });
     try {
       if (accId) {
         localStorage.setItem("tls1_selected_account", accId);
@@ -377,6 +385,20 @@ function App() {
       setClosedPositions([]);
     }
   }, [activeBotTab, loginUid, mergedActiveAccounts, setPositions, setClosedPositions]);
+
+  const prevEffectiveAccRef = useRef(effectiveAccId);
+  useEffect(() => {
+    if (prevEffectiveAccRef.current !== effectiveAccId) {
+      prevEffectiveAccRef.current = effectiveAccId;
+      // Dọn sạch vị thế và logs cũ của tài khoản trước ngay khi đổi tài khoản
+      setPositions([]);
+      setClosedPositions([]);
+      setLogs({
+        dashboardLines: [],
+        eventLogs: effectiveAccId ? [`🔄 Đang đồng bộ tài khoản ${effectiveAccId}...`] : [],
+      });
+    }
+  }, [effectiveAccId, setPositions, setClosedPositions]);
 
   useEffect(() => {
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
@@ -1186,33 +1208,49 @@ function App() {
           }
         }
 
+        // ƯU TIÊN TUYỆT ĐỐI TÀI KHOẢN ĐANG CHỌN (KHÓA CỨNG KHÔNG TỰ ĐỔI SANG TÀI KHOẢN KHÁC):
+        const currentSavedAcc = selectedAccount || localStorage.getItem("tls1_selected_account");
+        const isCurrentValid = currentSavedAcc && accList.some(a => a.id === currentSavedAcc || a.name === currentSavedAcc);
+
         let targetAcc = "";
-        try {
-          const resStat = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${uidToUse}`);
-          if (resStat.ok) {
-            const statData = await resStat.json();
-            if (statData?.active_accounts) {
-              setHttpActiveAccounts(statData.active_accounts);
-              const serverRunning = statData.active_accounts[activeBotTab];
-              if (serverRunning) {
-                const matched = accList.find(a => a.id === serverRunning || a.name === serverRunning);
-                targetAcc = matched ? matched.id : serverRunning;
+        if (isCurrentValid) {
+          targetAcc = currentSavedAcc;
+        } else {
+          try {
+            const resStat = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${uidToUse}`);
+            if (resStat.ok) {
+              const statData = await resStat.json();
+              if (statData?.active_accounts) {
+                setHttpActiveAccounts(statData.active_accounts);
+                const serverRunning = statData.active_accounts[activeBotTab];
+                if (serverRunning) {
+                  const matched = accList.find(a => a.id === serverRunning || a.name === serverRunning);
+                  targetAcc = matched ? matched.id : serverRunning;
+                }
               }
             }
-          }
-        } catch { }
-
-        if (!targetAcc) {
-          try {
-            const savedMap = JSON.parse(localStorage.getItem("tls1_bot_accounts") || "{}");
-            if (savedMap[activeBotTab] && accList.some(a => a.id === savedMap[activeBotTab])) {
-              targetAcc = savedMap[activeBotTab];
-            }
           } catch { }
+
+          if (!targetAcc) {
+            try {
+              const savedMap = JSON.parse(localStorage.getItem("tls1_bot_accounts") || "{}");
+              if (savedMap[activeBotTab] && accList.some(a => a.id === savedMap[activeBotTab])) {
+                targetAcc = savedMap[activeBotTab];
+              }
+            } catch { }
+          }
+
+          if (!targetAcc && accList.length > 0) {
+            targetAcc = accList[0]?.id || "";
+          }
         }
 
         if (targetAcc && isMounted) {
           setSelectedAccount(targetAcc);
+          try {
+            localStorage.setItem("tls1_selected_account", targetAcc);
+            localStorage.setItem(`tls1_selected_account_${activeBotTab}`, targetAcc);
+          } catch {}
           setBotAccountMap(prev => {
             const next = { ...prev, [activeBotTab]: targetAcc };
             localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
@@ -1257,7 +1295,7 @@ function App() {
     };
     bootstrap();
     return () => { isMounted = false; };
-  }, [activeBotTab]);
+  }, [loginUid]);
 
   // Load account credentials
   useEffect(() => {
@@ -2980,11 +3018,21 @@ function App() {
         return;
       }
       const r = await fetch(`/api/bot/positions?strategy=${activeBotTab}&account_id=${acc}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
-      if (r.ok) setPositions(await r.json());
+      if (r.ok) {
+        const fetched = await r.json();
+        const currentTarget = selectedAccount || localStorage.getItem("tls1_selected_account") || "";
+        if (!currentTarget || currentTarget === acc) {
+          setPositions(Array.isArray(fetched) ? fetched : []);
+        }
+      }
 
       const r2 = await fetch(`/api/bot/closed_positions?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}&account_id=${acc}`);
       if (r2.ok) {
-        setClosedPositions(await r2.json());
+        const fetchedClosed = await r2.json();
+        const currentTarget = selectedAccount || localStorage.getItem("tls1_selected_account") || "";
+        if (!currentTarget || currentTarget === acc) {
+          setClosedPositions(Array.isArray(fetchedClosed) ? fetchedClosed : []);
+        }
       }
 
       // Fetch admin data for backtest stats
@@ -2993,7 +3041,7 @@ function App() {
         setAdminClosedPositions(await rAdmin.json());
       }
     } catch { }
-  }, [effectiveAccId, activeBotTab, loginUid, fetchPropPositions, setPositions, setClosedPositions]);
+  }, [effectiveAccId, activeBotTab, loginUid, selectedAccount, fetchPropPositions, setPositions, setClosedPositions]);
 
   // Listener khi chuyển đổi giữa SÀN OKX và QUỸ E8, hoặc đổi tài khoản Quỹ
   useEffect(() => {
@@ -3664,6 +3712,7 @@ function App() {
                     {/* 4. BẢNG VỊ THẾ */}
                     {activeTab === "positions" && (
                       <PositionsTable
+                        key={`${currentPlatform}-${effectiveAccId || "none"}`}
                         currentPlatform={currentPlatform}
                         watchlistCoins={watchlistCoins}
                         safePos={safePos}
