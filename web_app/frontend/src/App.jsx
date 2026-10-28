@@ -295,9 +295,7 @@ function App() {
   }, [availBal, effectiveAccId]);
 
   useEffect(() => {
-    if (wsActiveAccounts && Object.keys(wsActiveAccounts).length > 0) {
-      setWsActiveAccountsState(wsActiveAccounts);
-    }
+    setWsActiveAccountsState(wsActiveAccounts || {});
   }, [wsActiveAccounts]);
 
   const prevBotTabRef = useRef(activeBotTab);
@@ -2354,7 +2352,16 @@ function App() {
         const resData = await r.json().catch(() => ({}));
         setOverrideBotRunning(false);
         if (setBotStatus) setBotStatus("SHADOW");
-        setHttpActiveAccounts({});
+        setHttpActiveAccounts(prev => {
+          const next = { ...prev };
+          delete next[targetStrat];
+          return next;
+        });
+        setWsActiveAccountsState(prev => {
+          const next = { ...prev };
+          delete next[targetStrat];
+          return next;
+        });
         const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";
         addSystemLog(`🛑 [BOT] Đã dừng bot thành công${cancelCount}.`);
         refreshBotData();
@@ -3312,6 +3319,8 @@ function App() {
             accountBalance={accountBalance}
             slotCount={slotCount}
             maxSlots={100}
+            botStatus={botStatus}
+            runningPropBots={runningPropBots}
           />
 
           {/* BOT PANEL CARD */}

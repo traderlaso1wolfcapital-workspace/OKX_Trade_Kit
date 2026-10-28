@@ -19,6 +19,8 @@ export default function AppHeader({
   accountBalance = null,
   slotCount = 10,
   maxSlots = 100,
+  botStatus = "STOPPED",
+  runningPropBots = {},
 }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -332,11 +334,13 @@ export default function AppHeader({
               const isThisAccRunning = !isAccMain && Boolean(
                 Object.entries(activeAccounts || {}).some(([strat, runningId]) => {
                   if (!runningId) return false;
+                  // Nếu chiến thuật này trùng với activeBotTab đang mở mà botStatus không phải RUNNING, không hiển thị chấm đỏ
+                  if (strat === activeBotTab && botStatus && botStatus !== "RUNNING") return false;
                   const c1 = String(runningId).trim().replace(/^#/, "");
                   const c2 = String(acc.id || "").trim().replace(/^#/, "");
                   const c3 = String(acc.name || "").trim().replace(/^#/, "");
                   return c1 === c2 || (c3 && c1 === c3);
-                }) || acc.is_running
+                })
               );
               const theme = getAccountTheme("okx");
 
@@ -442,7 +446,10 @@ export default function AppHeader({
               const rawTag = (pAcc.account_id || pAcc.id || "").toString();
               const tag = rawTag.replace(/^#/, "");
               const propBal = getPropBalance(pAcc);
-              const isThisPropAccRunning = isPropRunning || pAcc.is_bot_running;
+              const isThisPropAccRunning = Boolean(
+                (isPropRunning && (String(pAcc.id) === String(activePropId) || String(pAcc.account_id) === String(activePropId))) ||
+                (runningPropBots && Object.values(runningPropBots).some((rId) => String(rId) === String(pAcc.id || pAcc.account_id)))
+              );
               const theme = getAccountTheme("prop", pAcc.firm || pAcc.server);
 
               return (

@@ -5366,3 +5366,4 @@ if __name__ == "__main__":
 # z7734 | Hỗ trợ lưu trữ và đồng bộ tham số fixed_lot cho cấu hình Quỹ TradeLocker qua endpoint REST API
 # z7735 | Khắc phục triệt để lỗi TradeLocker không hiển thị vị thế trên web (chuẩn hóa ma trận list sang dict), lọc rác HTML 502/504 Cloudflare trong log OKX, và truyền BOT_USER_UID đồng bộ vào shadow bot
 # z7736 | Triệt tiêu 100% rác HTML Cloudflare: mở rộng bộ lọc regex và token Cloudflare trong log_reader_task ngăn không cho bất kỳ fragment nào lọt vào OKX log stream
+# z7737 | Khắc phục triệt để lỗi hiển thị chấm đỏ trạng thái bot: dọn sạch activeAccounts khi bot dừng/chuyển trạng thái, loại bỏ cờ is_running cứng, cô lập chấm đỏ theo tài khoản thực tế đang chạy cho cả OKX và Quỹ FX.

@@ -33,6 +33,23 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Sửa Lỗi Dấu Chấm Đỏ Báo Trạng Thái Bot Trên Header Dropdown Tài Khoản Bị Hiện Sai Khi Bot Không Chạy:
+  - **Hiện tượng:**
+    - Dấu chấm đỏ phát sáng (`#ef4444`) ở khu vực chọn tài khoản báo trạng thái đang chạy bot hoạt động không đúng: tài khoản đang dừng hoặc không chạy bot vẫn bị hiện chấm đỏ.
+  - **Nguyên nhân cốt lõi:**
+    1. **Toán tử `|| acc.is_running` và `|| pAcc.is_bot_running` trong `AppHeader.jsx`:** Trong danh sách dropdown, code kiểm tra điều kiện `isThisAccRunning` có gắn đuôi `|| acc.is_running`. Nếu object tài khoản mang thuộc tính `is_running: true` (lưu từ snapshot trước), chấm đỏ sẽ bật vĩnh viễn dù bot đã dừng. Đối với Quỹ FX, `isThisPropAccRunning = isPropRunning || pAcc.is_bot_running`, khiến khi 1 tài khoản chạy thì mọi tài khoản quỹ khác đều dính chấm đỏ.
+    2. **State `wsActiveAccountsState` trong `App.jsx` không dọn sạch khi bot dừng:** Hook `useEffect` lắng nghe `wsActiveAccounts` chỉ cập nhật khi `Object.keys(wsActiveAccounts).length > 0`. Khi bot dừng, backend trả về `{}` (rỗng), dẫn tới điều kiện không thỏa mãn và `wsActiveAccountsState` lưu giữ tài khoản chạy cũ trong RAM mãi mãi.
+    3. **Dropdown chưa kiểm tra `botStatus` của chiến thuật:** `AppHeader` không nhận `botStatus`, dẫn tới việc nếu chiến thuật đang dừng (`botStatus !== "RUNNING"`), dropdown vẫn căn cứ theo key lưu cũ để bật chấm đỏ.
+  - **Khắc phục hoàn chỉnh:**
+    1. **Frontend `AppHeader.jsx`:**
+       - Loại bỏ hoàn toàn `|| acc.is_running` và `|| pAcc.is_bot_running`.
+       - Với tài khoản OKX: Chỉ bật chấm đỏ khi tài khoản đó có trong `activeAccounts` VÀ nếu là `activeBotTab` thì `botStatus === "RUNNING"`.
+       - Với tài khoản Quỹ FX: Chỉ bật khi chính ID tài khoản đó đang chạy trong `runningPropBots` hoặc khớp với `activePropId` đang chạy.
+    2. **Frontend `App.jsx`:**
+       - Sửa `setWsActiveAccountsState(wsActiveAccounts || {})` không kiểm tra độ dài để reset về `{}` ngay khi bot dừng.
+       - Khi người dùng bấm `DỪNG BOT` (`handleStopBot`), lập tức xóa chiến thuật khỏi `wsActiveAccountsState` và `httpActiveAccounts` trong 0ms.
+       - Truyền đầy đủ `botStatus={botStatus}` và `runningPropBots={runningPropBots}` vào `<AppHeader />`.
+
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Đổi Tài Khoản Bị Lưu Vết / Pha Trộn Bảng Vị Thế & Nhật Ký Terminal Logs:
   - **Hiện tượng:**
     1. Khi chuyển sang tài khoản khác (ví dụ từ `#7768` có 11 lệnh sang `#7829` có 0 lệnh), Bảng Vị Thế đôi khi vẫn lưu vết hoặc hiển thị danh sách vị thế của tài khoản trước đó.
@@ -5056,6 +5073,23 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Sửa Lỗi Dấu Chấm Đỏ Báo Trạng Thái Bot Trên Header Dropdown Tài Khoản Bị Hiện Sai Khi Bot Không Chạy:
+  - **Hiện tượng:**
+    - Dấu chấm đỏ phát sáng (`#ef4444`) ở khu vực chọn tài khoản báo trạng thái đang chạy bot hoạt động không đúng: tài khoản đang dừng hoặc không chạy bot vẫn bị hiện chấm đỏ.
+  - **Nguyên nhân cốt lõi:**
+    1. **Toán tử `|| acc.is_running` và `|| pAcc.is_bot_running` trong `AppHeader.jsx`:** Trong danh sách dropdown, code kiểm tra điều kiện `isThisAccRunning` có gắn đuôi `|| acc.is_running`. Nếu object tài khoản mang thuộc tính `is_running: true` (lưu từ snapshot trước), chấm đỏ sẽ bật vĩnh viễn dù bot đã dừng. Đối với Quỹ FX, `isThisPropAccRunning = isPropRunning || pAcc.is_bot_running`, khiến khi 1 tài khoản chạy thì mọi tài khoản quỹ khác đều dính chấm đỏ.
+    2. **State `wsActiveAccountsState` trong `App.jsx` không dọn sạch khi bot dừng:** Hook `useEffect` lắng nghe `wsActiveAccounts` chỉ cập nhật khi `Object.keys(wsActiveAccounts).length > 0`. Khi bot dừng, backend trả về `{}` (rỗng), dẫn tới điều kiện không thỏa mãn và `wsActiveAccountsState` lưu giữ tài khoản chạy cũ trong RAM mãi mãi.
+    3. **Dropdown chưa kiểm tra `botStatus` của chiến thuật:** `AppHeader` không nhận `botStatus`, dẫn tới việc nếu chiến thuật đang dừng (`botStatus !== "RUNNING"`), dropdown vẫn căn cứ theo key lưu cũ để bật chấm đỏ.
+  - **Khắc phục hoàn chỉnh:**
+    1. **Frontend `AppHeader.jsx`:**
+       - Loại bỏ hoàn toàn `|| acc.is_running` và `|| pAcc.is_bot_running`.
+       - Với tài khoản OKX: Chỉ bật chấm đỏ khi tài khoản đó có trong `activeAccounts` VÀ nếu là `activeBotTab` thì `botStatus === "RUNNING"`.
+       - Với tài khoản Quỹ FX: Chỉ bật khi chính ID tài khoản đó đang chạy trong `runningPropBots` hoặc khớp với `activePropId` đang chạy.
+    2. **Frontend `App.jsx`:**
+       - Sửa `setWsActiveAccountsState(wsActiveAccounts || {})` không kiểm tra độ dài để reset về `{}` ngay khi bot dừng.
+       - Khi người dùng bấm `DỪNG BOT` (`handleStopBot`), lập tức xóa chiến thuật khỏi `wsActiveAccountsState` và `httpActiveAccounts` trong 0ms.
+       - Truyền đầy đủ `botStatus={botStatus}` và `runningPropBots={runningPropBots}` vào `<AppHeader />`.
 
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Chuyển Đổi Tài Khoản Bị Lưu Vết / Pha Trộn Bảng Vị Thế & Nhật Ký Terminal Logs:
   - **Hiện tượng:**
