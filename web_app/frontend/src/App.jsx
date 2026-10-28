@@ -280,6 +280,24 @@ function App() {
     };
   }, [availBal, currentAccountObj]);
 
+  // Cập nhật số dư realtime vào tài khoản và lưu cache localStorage
+  useEffect(() => {
+    if (availBal !== undefined && availBal !== null && effectiveAccId) {
+      const bNum = Number(availBal);
+      if (!isNaN(bNum)) {
+        try {
+          localStorage.setItem(`tls1_bal_${effectiveAccId}`, String(bNum));
+        } catch {}
+        setAccounts(prev => (prev || []).map(a => {
+          if (a.id === effectiveAccId || a.name === effectiveAccId) {
+            return { ...a, balance: bNum, totalEq: bNum, availBal: bNum };
+          }
+          return a;
+        }));
+      }
+    }
+  }, [availBal, effectiveAccId]);
+
   useEffect(() => {
     if (wsActiveAccounts && Object.keys(wsActiveAccounts).length > 0) {
       setWsActiveAccountsState(wsActiveAccounts);
@@ -3243,6 +3261,7 @@ function App() {
             activeAccounts={mergedActiveAccounts}
             onOpenConnectModal={(tab) => { setShowConnectModal(true); if (tab) setConnectModalTab(tab); }}
             activeBotTab={activeBotTab}
+            accountBalance={accountBalance}
             slotCount={slotCount}
             maxSlots={100}
           />

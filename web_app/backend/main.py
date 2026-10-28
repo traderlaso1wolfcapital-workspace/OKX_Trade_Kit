@@ -2410,6 +2410,38 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write config: {e}")
 
+_okx_account_balances_cache = {}
+
+def _get_single_account_balance(uid: str, aid: str) -> float:
+    key = f"{uid}:{aid}"
+    now = time.time()
+    cached = _okx_account_balances_cache.get(key)
+    if cached and (now - cached["ts"] < 40):
+        return cached["balance"]
+    try:
+        api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, "sub1", aid)
+        if not api_key:
+            return cached["balance"] if cached else 0.0
+        resp = _okx_signed_request("GET", "/api/v5/account/balance?ccy=USDT", "", api_key, secret_key, passphrase, is_demo, timeout=2.0)
+        if resp.status_code == 200:
+            res_j = resp.json()
+            if res_j.get("code") == "0" and res_j.get("data"):
+                bdata = res_j["data"][0]
+                teq = bdata.get("totalEq")
+                bal_val = 0.0
+                if teq:
+                    bal_val = round(float(teq), 2)
+                else:
+                    for d in bdata.get("details", []):
+                        if d.get("ccy") == "USDT":
+                            bal_val = round(float(d.get("eq", d.get("cashBal", 0.0))), 2)
+                            break
+                _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
+                return bal_val
+    except Exception:
+        pass
+    return cached["balance"] if cached else 0.0
+
 @app.get("/api/bot/accounts")
 def get_bot_accounts(uid: str):
     if not uid or uid in ["default", "guest", "undefined", "null"]:
@@ -2460,6 +2492,24 @@ def get_bot_accounts(uid: str):
                                 json.dump(deduped, wf, indent=4, ensure_ascii=False)
                         except Exception:
                             pass
+
+                    # Gắn số dư live/cached cho từng tài khoản OKX
+                    try:
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(deduped) or 1, 5)) as executor:
+                            future_to_acc = {executor.submit(_get_single_account_balance, uid, a.get("id", "")): a for a in deduped}
+                            for future in concurrent.futures.as_completed(future_to_acc, timeout=2.0):
+                                acc_item = future_to_acc[future]
+                                try:
+                                    bal = future.result()
+                                    acc_item["balance"] = bal
+                                    acc_item["totalEq"] = bal
+                                    acc_item["availBal"] = bal
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
                     return deduped
         except Exception:
             pass

@@ -16,6 +16,7 @@ export default function AppHeader({
   activeAccounts = {},
   onOpenConnectModal,
   activeBotTab = "sub1",
+  accountBalance = null,
   slotCount = 10,
   maxSlots = 100,
 }) {
@@ -127,6 +128,35 @@ export default function AppHeader({
   const isThisOkxRunning = isOkx && isOkxRunning;
   const isThisPropRunning = !isOkx && isPropRunning;
 
+  const formatBalance = (val) => {
+    if (val === undefined || val === null || isNaN(Number(val))) return "";
+    const num = Number(val);
+    return `$${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const getOkxBalance = (acc) => {
+    let bal = acc?.balance ?? acc?.totalEq ?? acc?.availBal ?? acc?.equity;
+    if ((bal === undefined || bal === null) && acc?.id === effectiveAccId && accountBalance?.availBal !== undefined) {
+      bal = accountBalance.availBal;
+    }
+    if (bal === undefined || bal === null) {
+      const cached = localStorage.getItem(`tls1_bal_${acc?.id}`);
+      if (cached) bal = Number(cached);
+    }
+    return bal !== undefined && bal !== null ? formatBalance(bal) : "";
+  };
+
+  const getPropBalance = (pAcc) => {
+    let bal = pAcc?.balance ?? pAcc?.equity ?? pAcc?.fund_size;
+    if (bal === undefined || bal === null) {
+      const cached = localStorage.getItem(`tls1_bal_${pAcc?.id}`);
+      if (cached) bal = Number(cached);
+    }
+    return bal !== undefined && bal !== null ? formatBalance(bal) : "";
+  };
+
+  const activeBalanceStr = isOkx ? getOkxBalance(currentOkxAcc) : getPropBalance(currentPropAcc);
+
   return (
     <header className="bot-tabs-bar">
       <div className="bot-tabs-group" data-tour="account-selector" ref={dropdownRef} style={{ position: "relative" }}>
@@ -162,7 +192,7 @@ export default function AppHeader({
             )}
           </span>
 
-          {/* Tên Sàn/Quỹ + Mã Tag tài khoản */}
+          {/* Tên Sàn/Quỹ + Mã Tag tài khoản + Số dư */}
           <span
             style={{
               fontSize: "13.5px",
@@ -172,12 +202,30 @@ export default function AppHeader({
               textAlign: "center",
               display: "inline-flex",
               alignItems: "center",
-              gap: "5px"
+              gap: "6px"
             }}
           >
             <span>{displayPlatformName}</span>
             {displayAccountTag && (
               <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "12px" }}>#{displayAccountTag}</span>
+            )}
+            {activeBalanceStr && (
+              <span
+                style={{
+                  color: "#34d399",
+                  fontWeight: 600,
+                  fontSize: "11px",
+                  fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
+                  fontVariantNumeric: "tabular-nums",
+                  background: "rgba(52, 211, 153, 0.10)",
+                  padding: "1px 5px",
+                  borderRadius: "4px",
+                  border: "1px solid rgba(52, 211, 153, 0.22)",
+                  letterSpacing: "-0.2px"
+                }}
+              >
+                {activeBalanceStr}
+              </span>
             )}
           </span>
 
@@ -220,8 +268,8 @@ export default function AppHeader({
               position: "absolute",
               top: "calc(100% + 5px)",
               left: 0,
-              minWidth: "250px",
-              maxWidth: "320px",
+              minWidth: "260px",
+              maxWidth: "380px",
               backgroundColor: "#181920",
               border: "1px solid #3a3c48",
               borderRadius: "6px",
@@ -239,6 +287,7 @@ export default function AppHeader({
             {validOkxAccounts.map((acc) => {
               const isSelected = isOkx && (acc.id === effectiveAccId || acc.name === effectiveAccId || (!effectiveAccId && accounts[0]?.id === acc.id));
               const tag = formatOkxAccountTag(acc);
+              const accBal = getOkxBalance(acc);
               const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
               const isThisAccRunning = !isAccMain && Boolean(
                 Object.entries(activeAccounts || {}).some(([strat, runningId]) => {
@@ -272,6 +321,7 @@ export default function AppHeader({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    gap: "8px",
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
@@ -293,12 +343,30 @@ export default function AppHeader({
                     }
                   }}
                 >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {theme.logo}
                     <span style={{ fontSize: "12.5px", fontWeight: isSelected ? 800 : 700, color: "#ffffff" }}>
                       {theme.name}
                     </span>
                     <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                    {accBal && (
+                      <span
+                        style={{
+                          color: "#34d399",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
+                          fontVariantNumeric: "tabular-nums",
+                          background: "rgba(52, 211, 153, 0.10)",
+                          padding: "1px 5px",
+                          borderRadius: "4px",
+                          border: "1px solid rgba(52, 211, 153, 0.22)",
+                          letterSpacing: "-0.2px"
+                        }}
+                      >
+                        {accBal}
+                      </span>
+                    )}
                     {isAccMain && (
                       <span style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 700, background: "rgba(148, 163, 184, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                         TK CHÍNH
@@ -323,6 +391,7 @@ export default function AppHeader({
               const isSelected = !isOkx && (pAcc.id === activePropId || (!activePropId && propAccounts[0]?.id === pAcc.id));
               const rawTag = (pAcc.account_id || pAcc.id || "").toString();
               const tag = rawTag.replace(/^#/, "");
+              const propBal = getPropBalance(pAcc);
               const isThisPropAccRunning = isPropRunning || pAcc.is_bot_running;
               const theme = getAccountTheme("prop", pAcc.firm || pAcc.server);
 
@@ -347,6 +416,7 @@ export default function AppHeader({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    gap: "8px",
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
@@ -368,12 +438,30 @@ export default function AppHeader({
                     }
                   }}
                 >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {theme.logo}
                     <span style={{ fontSize: "12.5px", fontWeight: isSelected ? 800 : 700, color: "#ffffff" }}>
                       {theme.name}
                     </span>
                     <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: "11px" }}>#{tag}</span>
+                    {propBal && (
+                      <span
+                        style={{
+                          color: "#34d399",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          fontFamily: "'Roboto Mono', 'SF Pro Text', -apple-system, monospace",
+                          fontVariantNumeric: "tabular-nums",
+                          background: "rgba(52, 211, 153, 0.10)",
+                          padding: "1px 5px",
+                          borderRadius: "4px",
+                          border: "1px solid rgba(52, 211, 153, 0.22)",
+                          letterSpacing: "-0.2px"
+                        }}
+                      >
+                        {propBal}
+                      </span>
+                    )}
                     {isThisPropAccRunning && (
                       <span style={{ fontSize: "9px", color: "#4ade80", fontWeight: 800, background: "rgba(74, 222, 128, 0.15)", padding: "1px 4px", borderRadius: "3px" }}>
                         LIVE

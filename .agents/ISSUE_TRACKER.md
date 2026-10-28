@@ -33,6 +33,23 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Hiển Thị Số Dư USDT/USD Sau Nhãn #xxxx Trên Menu Header & Chuẩn Hóa Kiến Trúc Tài Khoản Bố (Master Root Context):
+  - **Hiện tượng & Yêu cầu từ CEO:**
+    1. Thêm số tiền USDT/USD hiện tại vào sau nhãn `#xxxx` của từng tài khoản (cả OKX và Prop Firm) trên thanh chọn tài khoản để khách hàng dễ nhận biết và theo dõi tài khoản.
+    2. Thiết kế font chữ, màu sắc, thẳng hay nghiêng chuẩn tài chính sang trọng.
+    3. Tái khẳng định triết lý cốt lõi: Mọi tài khoản kết nối đều là **Tab bố / Tab chủ**, bao hàm toàn bộ setting cài đặt và thông số web bot riêng biệt, tách biệt 100%, tuyệt đối không chung đụng hay mượn đường dẫn của nhau.
+  - **Giải pháp & Thiết kế:**
+    1. **Thiết kế hiển thị số dư chuẩn tài chính:**
+       - **Font chữ:** Font thẳng (`fontStyle: "normal"`), Monospace Tabular (`Roboto Mono`, `'SF Pro Text', monospace`, `fontVariantNumeric: "tabular-nums"`, `fontWeight: 600`, `fontSize: 11px`). Số thẳng giúp các chữ số thẳng hàng, chính xác và không bị nhầm lẫn con số như font nghiêng.
+       - **Màu sắc & Thẻ huy hiệu (Badge):** Đồng nhất hệ thống màu sắc theo chuẩn Dashboard chuyên nghiệp: Gốc = Vàng cam (#fbbf24), Tổng & Số tiền sau #xxxx = Xanh ngọc Emerald (#34d399, nền mờ rgba(52, 211, 153, 0.10), viền rgba(52, 211, 153, 0.22)), PNL Dương = Xanh lá mạ (#4ade80), PNL Âm = Đỏ san hô (#f87171).
+       - **Vị trí:** Đặt ngay sau nhãn `#xxxx`: `OKX #7768  $1,420.50  [LIVE]  ✓`.
+       - **Header Capsule Button:** Hiển thị luôn số dư của tài khoản đang chọn trên thanh header chính: `OKX #7768  $1,420.50  [LIVE]  ▼`.
+    2. **Backend & Frontend Data Pipeline:**
+       - Backend (`/api/bot/accounts`): Tích hợp ThreadPool quét số dư live song song qua OKX API v5 (cache 40s) và gán `balance`, `totalEq` cho từng tài khoản.
+       - Frontend (`App.jsx` & `AppHeader.jsx`): Realtime WebSocket balance được lưu vào `localStorage` (`tls1_bal_${acc.id}`) và cập nhật tức thì vào state.
+    3. **Kiến trúc Tab Bố (Master Root Context):**
+       - Khẳng định và đảm bảo 100% tính độc lập: Mỗi tài khoản sở hữu file cấu hình riêng (`{clean_acc}_global_config.json`), kho lưu trữ localStorage riêng (`tls1_risk_${activeBotTab}_${effectiveAccId}`), API credentials riêng, và tiến trình bot riêng.
+
 - **[28/10/2026]** - Phân Lập LocalStorage Độc Lập Cho Từng Tài Khoản & Mở Khóa Chốt Lời / Cắt Lỗ Linh Hoạt Khi Bot Đang Chạy:
   - **Hiện tượng & Phản hồi từ CEO:**
     - Khi thay đổi mức chốt lời M5 (ví dụ từ `0.8%` lên `1.8%`) trong lúc bot đang chạy, nhấn F5 thì giao diện lại bị đẩy ngược về `0.8%`.
