@@ -1127,6 +1127,20 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             if not valid_tfs:
                 valid_tfs = ["M5"]
 
+            # ⚡ FILTER BY TREND DIRECTION: Chỉ xét TF có xu hướng khớp với side_str
+            # Long → chỉ TF đang "above" EMA200, Short → chỉ TF đang "under" EMA200
+            _expected_side = "above" if side_str == "long" else "under"
+            _trend_filtered = []
+            for tf in valid_tfs:
+                _st = tracker.mtf_states.get(tf, {})
+                if _st.get("side") == _expected_side:
+                    _trend_filtered.append(tf)
+            # Fallback: nếu không có TF nào khớp trend (trường hợp mới khởi tạo), dùng fills_detected hoặc tất cả
+            if _trend_filtered:
+                valid_tfs = _trend_filtered
+            elif fills_detected:
+                valid_tfs = fills_detected
+
             # 4. Lập phương trình tổ hợp tìm tập hợp TF có tổng ký quỹ sát nhất với sàn
             w = {}
             for tf in valid_tfs:
@@ -1174,6 +1188,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             return best_combo
 
+        # ⚡ TÁCH RIÊNG pos_cycle_filled_tfs cho Long và Short (Lưới Đa Khung cần cả 2 song song)
         if cross_long_amt > 0:
             tracker.active_avg_px_long = cross_long_vol / (cross_long_amt * contract_val)
             tracker.entry_price_long = tracker.active_avg_px_long
@@ -1182,8 +1197,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             pos_l_ctime = int(active_long_pos[0].get("cTime", 0)) if active_long_pos and active_long_pos[0].get("cTime") else 0
             detected_long_tfs = reconstruct_filled_tfs_from_volume("long", cross_long_vol, pos_ctime=pos_l_ctime)
-            tracker.pos_cycle_filled_tfs = detected_long_tfs
-            tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+            tracker.pos_cycle_filled_tfs_long = detected_long_tfs
             tracker.active_pos_tf = detected_long_tfs[-1] if detected_long_tfs else "M5"
             
             import bots.sub1.bot_models as bm
@@ -1197,12 +1211,16 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 
             pos_s_ctime = int(active_short_pos[0].get("cTime", 0)) if active_short_pos and active_short_pos[0].get("cTime") else 0
             detected_short_tfs = reconstruct_filled_tfs_from_volume("short", cross_short_vol, pos_ctime=pos_s_ctime)
-            tracker.pos_cycle_filled_tfs = detected_short_tfs
-            tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
+            tracker.pos_cycle_filled_tfs_short = detected_short_tfs
             tracker.active_pos_tf = detected_short_tfs[-1] if detected_short_tfs else "M5"
             
             import bots.sub1.bot_models as bm
             bm.sync_initial_marker_if_needed(cfg.get("coin", ""), "SHORT", float(tracker.active_avg_px_short), float(cross_short_amt), tf=tracker.active_pos_tf)
+
+        # Merge cả 2 vào pos_cycle_filled_tfs (backward compatible, dùng cho DCA/single-side)
+        _all_filled = list(set(getattr(tracker, "pos_cycle_filled_tfs_long", []) + getattr(tracker, "pos_cycle_filled_tfs_short", [])))
+        tracker.pos_cycle_filled_tfs = _all_filled
+        tracker.pos_cycle_closed_tfs = list(_all_filled)
     except Exception as e:
         hft_logger.error(f"Lỗi lấy position {coin_name}: {e}", exc_info=True)
         tracker.has_long, tracker.has_short = old_has_l, old_has_s
@@ -2466,6 +2484,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             # 🔒 NẾU ĐANG CÓ VỊ THẾ LONG: Chỉ coi là ĐÃ KHỚP khi trước đó bot ĐÃ ĐẶT lệnh limit này trên sàn!
                             was_placed_l = tracker.placed_entry_px_long_by_tf.get(tf, "---") not in ("---", "ERR", "")
                             if tracker.has_long and was_placed_l:
+                                if not hasattr(tracker, "pos_cycle_filled_tfs_long"):
+                                    tracker.pos_cycle_filled_tfs_long = []
+                                if tf not in tracker.pos_cycle_filled_tfs_long:
+                                    tracker.pos_cycle_filled_tfs_long.append(tf)
                                 if tf not in tracker.pos_cycle_filled_tfs:
                                     tracker.pos_cycle_filled_tfs.append(tf)
                                     tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
@@ -2497,6 +2519,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             # 🔒 NẾU ĐANG CÓ VỊ THẾ SHORT: Chỉ coi là ĐÃ KHỚP khi trước đó bot ĐÃ ĐẶT lệnh limit này trên sàn!
                             was_placed_s = tracker.placed_entry_px_short_by_tf.get(tf, "---") not in ("---", "ERR", "")
                             if tracker.has_short and was_placed_s:
+                                if not hasattr(tracker, "pos_cycle_filled_tfs_short"):
+                                    tracker.pos_cycle_filled_tfs_short = []
+                                if tf not in tracker.pos_cycle_filled_tfs_short:
+                                    tracker.pos_cycle_filled_tfs_short.append(tf)
                                 if tf not in tracker.pos_cycle_filled_tfs:
                                     tracker.pos_cycle_filled_tfs.append(tf)
                                     tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
@@ -2636,8 +2662,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             _blocked_tfs = [tf for tf in ["M5", "M15", "M30", "H1", "H2", "H4"] if tf in getattr(globals_ref, "ENABLED_TFS", ["M5", "M15", "M30", "H1", "H2", "H4"])] if _is_overextended else []
 
             aligned_long_tfs = get_aligned_tfs(start_tf, "UPTREND") if allowed_long else []
-            # ⚡ DCA FILTER MỚI: Dùng pos_cycle_filled_tfs thay vì active_pos_tf
-            _filled_long = tracker.pos_cycle_filled_tfs if tracker.has_long else []
+            # ⚡ DCA FILTER MỚI: Dùng pos_cycle_filled_tfs TÁCH RIÊNG Long/Short (Lưới Đa Khung)
+            _filled_long = getattr(tracker, "pos_cycle_filled_tfs_long", tracker.pos_cycle_filled_tfs) if tracker.has_long else []
             
             _is_pyramid = getattr(globals_ref, "ENABLE_PYRAMID_DCA", False)
             _is_negative_dca = getattr(globals_ref, "ENABLE_NEGATIVE_DCA", False)
@@ -2710,7 +2736,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             target_long_tfs = [tf for tf in target_long_tfs if tf not in _blocked_tfs]
 
             aligned_short_tfs = get_aligned_tfs(start_tf, "DOWNTREND") if allowed_short else []
-            _filled_short = tracker.pos_cycle_filled_tfs if tracker.has_short else []
+            _filled_short = getattr(tracker, "pos_cycle_filled_tfs_short", tracker.pos_cycle_filled_tfs) if tracker.has_short else []
             
             if _is_pyramid:
                 reversed_tfs = [tf for tf in reversed(["M5", "M15", "M30", "H1", "H2", "H4"]) if tf in TFS]
@@ -2938,11 +2964,37 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             except Exception:
                                 pass
 
+            # ⚡ CANCEL OPPOSITE STALE LIMITS: Hủy lệnh Limit ngược chiều trước khi đặt mới
+            # Khi canh LONG ở TF nào → hủy tất cả Limit SHORT đang treo của TF đó (và ngược lại)
+            _prefix_l = f"{CL_ORD_PREFIX}EL"
+            _prefix_s = f"{CL_ORD_PREFIX}ES"
+            _stale_to_cancel = []
+            for tf in target_long_tfs:
+                # TF này sẽ đặt LONG → tìm và hủy SHORT pending trên sàn cho TF này
+                for o in actual_pending:
+                    cl_id = o.get("clOrdId", "")
+                    if cl_id.startswith(_prefix_s) and cl_id[len(_prefix_s):].startswith(tf):
+                        _stale_to_cancel.append({"ordId": o["ordId"], "instId": swap_id})
+                        print(f"🚫 [STALE LIMIT] Hủy lệnh SHORT {tf} ngược chiều (trend ▲): ordId={o['ordId']}")
+            for tf in target_short_tfs:
+                # TF này sẽ đặt SHORT → tìm và hủy LONG pending trên sàn cho TF này
+                for o in actual_pending:
+                    cl_id = o.get("clOrdId", "")
+                    if cl_id.startswith(_prefix_l) and cl_id[len(_prefix_l):].startswith(tf):
+                        _stale_to_cancel.append({"ordId": o["ordId"], "instId": swap_id})
+                        print(f"🚫 [STALE LIMIT] Hủy lệnh LONG {tf} ngược chiều (trend ▼): ordId={o['ordId']}")
+            if _stale_to_cancel:
+                try:
+                    client.request("POST", "/api/v5/trade/cancel-batch-orders", body=_stale_to_cancel)
+                    print(f"✅ [STALE LIMIT] Đã hủy {len(_stale_to_cancel)} lệnh Limit ngược chiều cho {coin_name}")
+                except Exception as e:
+                    hft_logger.error(f"Lỗi hủy Stale Limit ngược chiều: {e}")
+
             # 2. Đặt hoặc cập nhật lệnh LONG ở các TF mục tiêu
             for tf in target_long_tfs:
                 # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN LIMIT VÔ TỘI VẠ):
-                # Khi đã có vị thế LONG: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs) -> CẤM TUYỆT ĐỐI!
-                if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                # Khi đã có vị thế LONG: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs_long) -> CẤM TUYỆT ĐỐI!
+                if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs_long", getattr(tracker, "pos_cycle_filled_tfs", [])):
                     continue
 
                 is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
@@ -3028,6 +3080,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ khi cần (hết cooldown hoặc size đổi hoặc giá lệch > 1%)
                 amend_ok = False
                 if matching_order:
+                    # Cooldown cứng tối thiểu 5s cho mỗi cặp coin/TF dời lệnh limit theo EMA200 (chống rate limit 50011)
+                    last_amend_sec = getattr(tracker, "last_amend_limit_sec_long", {}).get(tf, 0)
+                    if (now_sec - last_amend_sec) < 5:
+                        tracker.placed_entry_px_long_by_tf[tf] = matching_order["px"]
+                        continue
                     try:
                         old_px = Decimal(matching_order["px"])
                         new_px = Decimal(px_str)
@@ -3045,6 +3102,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         if Decimal(str(sz_for_tf)) != Decimal(matching_order["sz"]):
                             amend_body["newSz"] = str(sz_for_tf)
                         resp = client.request("POST", "/api/v5/trade/amend-order", body=amend_body)
+                        if not hasattr(tracker, "last_amend_limit_sec_long"): tracker.last_amend_limit_sec_long = {}
+                        tracker.last_amend_limit_sec_long[tf] = now_sec
                         if resp.get("code") in ("0", "51403"):
                             tracker.placed_entry_px_long_by_tf[tf] = px_str
                             amend_ok = True
@@ -3064,7 +3123,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
                         # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT KHI ĐÃ CÓ VỊ THẾ):
-                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs_long", getattr(tracker, "pos_cycle_filled_tfs", [])):
                             tracker.placed_entry_px_long_by_tf[tf] = "---"
                             continue
 
@@ -3110,6 +3169,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 # Quá 3 chu kỳ: Nếu đang có vị thế thì đánh dấu đã khớp, cấm re-place
                                 tracker.missing_count_long[tf] = 0
                                 if tracker.has_long:
+                                    if not hasattr(tracker, "pos_cycle_filled_tfs_long"):
+                                        tracker.pos_cycle_filled_tfs_long = []
+                                    if tf not in tracker.pos_cycle_filled_tfs_long:
+                                        tracker.pos_cycle_filled_tfs_long.append(tf)
                                     if tf not in tracker.pos_cycle_filled_tfs:
                                         tracker.pos_cycle_filled_tfs.append(tf)
                                         tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
@@ -3124,7 +3187,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             
                         # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT):
                         # 1. Nếu TF này đã từng khớp trong vị thế này: CẤM TUYỆT ĐỐI
-                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                        if tracker.has_long and tf in getattr(tracker, "pos_cycle_filled_tfs_long", getattr(tracker, "pos_cycle_filled_tfs", [])):
                             tracker.placed_entry_px_long_by_tf[tf] = "---"
                             continue
                         # 2. Khóa Cooldown chống bắn liên tục (mỗi TF chỉ được bắn 1 lần trong tối thiểu 60s)
@@ -3231,8 +3294,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             # 2. Đặt hoặc cập nhật lệnh SHORT ở các TF mục tiêu
             for tf in target_short_tfs:
                 # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN LIMIT VÔ TỘI VẠ):
-                # Khi đã có vị thế SHORT: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs) -> CẤM TUYỆT ĐỐI!
-                if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                # Khi đã có vị thế SHORT: Nếu TF này ĐÃ KHỚP (đã có trong pos_cycle_filled_tfs_short) -> CẤM TUYỆT ĐỐI!
+                if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs_short", getattr(tracker, "pos_cycle_filled_tfs", [])):
                     continue
 
                 is_hedge = getattr(tracker, "is_hedge_pos", getattr(tracker, "is_xole_pos", False))
@@ -3318,6 +3381,11 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                 # ⚡ AMEND-FIRST: Sửa lệnh tại chỗ khi cần (hết cooldown hoặc size đổi hoặc giá lệch > 1%)
                 amend_ok = False
                 if matching_order:
+                    # Cooldown cứng tối thiểu 5s cho mỗi cặp coin/TF dời lệnh limit theo EMA200 (chống rate limit 50011)
+                    last_amend_sec = getattr(tracker, "last_amend_limit_sec_short", {}).get(tf, 0)
+                    if (now_sec - last_amend_sec) < 5:
+                        tracker.placed_entry_px_short_by_tf[tf] = matching_order["px"]
+                        continue
                     try:
                         old_px = Decimal(matching_order["px"])
                         new_px = Decimal(px_str)
@@ -3335,6 +3403,8 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                         if Decimal(str(sz_for_tf)) != Decimal(matching_order["sz"]):
                             amend_body["newSz"] = str(sz_for_tf)
                         resp = client.request("POST", "/api/v5/trade/amend-order", body=amend_body)
+                        if not hasattr(tracker, "last_amend_limit_sec_short"): tracker.last_amend_limit_sec_short = {}
+                        tracker.last_amend_limit_sec_short[tf] = now_sec
                         if resp.get("code") in ("0", "51403"):
                             tracker.placed_entry_px_short_by_tf[tf] = px_str
                             amend_ok = True
@@ -3354,7 +3424,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                     # Fallback: Chỉ đặt lệnh mới khi trên sàn chưa có lệnh cho TF này
                     try:
                         # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT KHI ĐÃ CÓ VỊ THẾ):
-                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs_short", getattr(tracker, "pos_cycle_filled_tfs", [])):
                             tracker.placed_entry_px_short_by_tf[tf] = "---"
                             continue
 
@@ -3398,6 +3468,10 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                                 # Quá 3 chu kỳ: Nếu đang có vị thế thì đánh dấu đã khớp, cấm re-place
                                 tracker.missing_count_short[tf] = 0
                                 if tracker.has_short:
+                                    if not hasattr(tracker, "pos_cycle_filled_tfs_short"):
+                                        tracker.pos_cycle_filled_tfs_short = []
+                                    if tf not in tracker.pos_cycle_filled_tfs_short:
+                                        tracker.pos_cycle_filled_tfs_short.append(tf)
                                     if tf not in tracker.pos_cycle_filled_tfs:
                                         tracker.pos_cycle_filled_tfs.append(tf)
                                         tracker.pos_cycle_closed_tfs = list(tracker.pos_cycle_filled_tfs)
@@ -3412,7 +3486,7 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             
                         # 🛑 CẦU DAO TỬ HUYỆT (CHỐNG BẮN SPAM LIMIT):
                         # 1. Nếu TF này đã từng khớp trong vị thế này: CẤM TUYỆT ĐỐI
-                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs", []):
+                        if tracker.has_short and tf in getattr(tracker, "pos_cycle_filled_tfs_short", getattr(tracker, "pos_cycle_filled_tfs", [])):
                             tracker.placed_entry_px_short_by_tf[tf] = "---"
                             continue
                         # 2. Khóa Cooldown chống bắn liên tục (mỗi TF chỉ được bắn 1 lần trong tối thiểu 60s)

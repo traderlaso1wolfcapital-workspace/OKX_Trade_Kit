@@ -305,7 +305,7 @@ def main():
                     "TP_TARGET_OPTIMAL": "0.00800",
                     "SL_TARGET_OPTIMAL": "0.00800",
                     "EVOLUTION_CYCLE_SECONDS": 3600,
-                    "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+                    "LEVERAGES": {"XAU": 100, "BTC": 100, "ETH": 100},
                     "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
                 }
                 with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:

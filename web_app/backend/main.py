@@ -2490,13 +2490,22 @@ def _get_single_account_balance(uid: str, aid: str) -> float:
             res_j = resp.json()
             if res_j.get("code") == "0" and res_j.get("data"):
                 bdata = res_j["data"][0]
-                bal_val = _extract_okx_balance(bdata, "USDT")
-                if bal_val > 0:
+                # Kiểm tra data có thực sự chứa giá trị số hay chỉ là rỗng do rate-limit mềm
+                _teq = bdata.get("totalEq", "")
+                _details = bdata.get("details", [])
+                _has_real_data = (_teq not in [None, ""]) or (isinstance(_details, list) and len(_details) > 0 and any(
+                    d.get("cashBal") not in [None, ""] or d.get("eq") not in [None, ""]
+                    for d in _details if isinstance(d, dict)
+                ))
+                if _has_real_data:
+                    bal_val = _extract_okx_balance(bdata, "USDT")
+                    # API trả thành công + data thật → cập nhật (kể cả $0.00)
                     _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
                     return bal_val
-                elif cached and cached.get("balance", 0) > 0:
-                    return cached["balance"]
                 else:
+                    # API trả 200 + code "0" nhưng data rỗng (rate-limit mềm) → giữ cache cũ
+                    if cached and cached.get("balance", 0) > 0:
+                        return cached["balance"]
                     return 0.0
     except Exception:
         pass
@@ -3033,31 +3042,22 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         "auto_capital_init": auto_reset_equity,
     }
 
-OKX_CT_VAL_CACHE = {
+OKX_CT_VAL_CACHE = {}  # Runtime cache — fetch từ OKX API lần đầu
+
+# Fallback chính xác khi API timeout/đứt mạng (không bao giờ dùng giá trị mù quáng)
+_DEFAULT_CT_VAL = {
     "BTC-USDT-SWAP": 0.01,
     "ETH-USDT-SWAP": 0.1,
-    "XAU-USDT-SWAP": 0.01,
+    "XAU-USDT-SWAP": 0.001,
     "XAG-USDT-SWAP": 1.0,
-    "CL-USDT-SWAP": 0.1,
     "SOL-USDT-SWAP": 1.0,
+    "BNB-USDT-SWAP": 0.01,
     "DOGE-USDT-SWAP": 100.0,
     "XRP-USDT-SWAP": 100.0,
-    "ADA-USDT-SWAP": 100.0,
-    "BNB-USDT-SWAP": 0.01,
-    "AVAX-USDT-SWAP": 1.0,
-    "LINK-USDT-SWAP": 1.0,
-    "DOT-USDT-SWAP": 1.0,
-    "NEAR-USDT-SWAP": 1.0,
-    "SUI-USDT-SWAP": 1.0,
-    "LTC-USDT-SWAP": 1.0,
-    "TRX-USDT-SWAP": 1000.0,
-    "HYPE-USDT-SWAP": 1.0,
-    "ZEC-USDT-SWAP": 0.1,
-    "PEPE-USDT-SWAP": 10000000.0,
-    "SHIB-USDT-SWAP": 1000000.0,
 }
 
 def _get_okx_contract_val(inst_id: str) -> float:
+    """Lấy ctVal (contract value) từ OKX API, cache tại runtime. Fallback từ dict chuẩn."""
     if not inst_id:
         return 1.0
     inst_id_upper = inst_id.strip().upper()
@@ -3065,15 +3065,19 @@ def _get_okx_contract_val(inst_id: str) -> float:
         return OKX_CT_VAL_CACHE[inst_id_upper]
     try:
         url = f"https://www.okx.com/api/v5/public/instruments?instType=SWAP&instId={inst_id_upper}"
-        resp = requests.get(url, timeout=2.0).json()
+        resp = requests.get(url, timeout=3.0).json()
         if resp.get("code") == "0" and resp.get("data"):
             val = float(resp["data"][0].get("ctVal", 1.0))
             if val > 0:
                 OKX_CT_VAL_CACHE[inst_id_upper] = val
+                print(f"[OKX] Cached ctVal for {inst_id_upper} = {val}")
                 return val
-    except Exception:
-        pass
-    return 1.0
+    except Exception as e:
+        print(f"[OKX] Lỗi fetch ctVal cho {inst_id_upper}: {e}")
+    # Fallback: tra từ điển chuẩn, default 1.0 nếu coin lạ
+    fallback = _DEFAULT_CT_VAL.get(inst_id_upper, 1.0)
+    OKX_CT_VAL_CACHE[inst_id_upper] = fallback
+    return fallback
 
 _okx_positions_cache = {}
 
@@ -5001,7 +5005,10 @@ def tradelocker_get_positions(uid: str = "default", account_id: Optional[str] = 
                 qty = _safe_float(o.get("qty"))
                 price = _safe_float(o.get("price"))
                 ord_type = str(o.get("type") or "LIMIT").upper()
-                margin = _safe_float(o.get("margin")) or (price * qty if qty > 0 else 1.0)
+                margin = _safe_float(o.get("margin"))
+                if margin <= 0:
+                    # Lệnh chờ chưa khớp: hiển thị "0.00" (chưa tốn ký quỹ thực tế trên sàn)
+                    margin = 0.0
 
                 mapped_list.append({
                     "ticket_id": f"ord_{order_id}",

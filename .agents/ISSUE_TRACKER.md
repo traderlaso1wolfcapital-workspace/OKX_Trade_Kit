@@ -5457,3 +5457,60 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Build Vite bundle frontend production thành công 100% trong 458ms.
     - Kích hoạt Rule 9 mở Desktop Browser `http://localhost:5173`.
   *(Mã patch: `z-fix-okx-limit-balance-and-e8-max18-orders`)*
+
+
+---
+
+## [2026-10-28] BUG-FIX: Margin hiển thị sai cho lệnh Limit XAU + Duplicate Long/Short cùng TF + XAU Leverage 50→100
+
+### 1. Margin Limit XAU hiển thị sai 10x (119.92$ thay vì ~12$)
+- **Nguyên nhân:** `OKX_CT_VAL_CACHE["XAU-USDT-SWAP"]` hardcode = `0.01`, nhưng OKX API thực tế trả `ctVal = 0.001` (sai gấp 10 lần).
+- **Công thức:** `margin = (sz × ctVal × price) / leverage` → ctVal sai 10x = margin hiển thị sai 10x.
+- **Fix:** Bỏ toàn bộ hardcode `OKX_CT_VAL_CACHE`, khởi tạo rỗng `{}`. Hàm `_get_okx_contract_val()` luôn fetch từ OKX API lần đầu rồi cache runtime.
+- **File:** `web_app/backend/main.py` dòng 3036-3057.
+
+### 2. Lỗi Duplicate Long + Short cùng TF (ETH M15 có cả Long lẫn Short)
+- **Nguyên nhân:** `tracker.pos_cycle_filled_tfs` dùng chung cho cả Long và Short. Khi sync positions, Short ghi đè lên Long → bot không biết M15 Long đã filled → đặt thêm.
+- **Fix:** Tách thành `pos_cycle_filled_tfs_long` và `pos_cycle_filled_tfs_short`. Merge vào `pos_cycle_filled_tfs` cho backward compatible. Update tất cả 12+ chỗ check/append.
+- **File:** `bots/sub1/bot_strategy.py` (nhiều dòng).
+
+### 3. XAU Leverage nâng từ 50x lên 100x
+- **Nguyên nhân:** OKX đã hỗ trợ 100x cho XAU-USDT-SWAP nhưng bot vẫn hardcode 50x.
+- **Fix:** `sys_bot_sub1.py` dòng 308: `"XAU": 50` → `"XAU": 100`. `bot_config.py` đã đúng 100x.
+- **File:** `bots/sub1/sys_bot_sub1.py`.
+
+
+---
+
+## [2026-10-28 21:38] HOÀN TẤT TRIỂN KHAI TOÀN DIỆN 8 MỤC FIX LOGIC & ĐỒNG BỘ DỮ LIỆU
+
+### 1. Mục 1: Hủy Stale Opposite Limit + Fix TF Attribution
+- **File:** `bots/sub1/bot_strategy.py`
+- **Chi tiết:**
+  - Bổ sung quét và hủy triệt để lệnh Limit ngược chiều (Stale Opposite Limit) trước khi đặt lệnh theo trend. Khi TF chuyển sang ▲ thì hủy mọi Limit SHORT treo của TF đó; khi sang ▼ thì hủy mọi Limit LONG.
+  - Sửa hàm `reconstruct_filled_tfs_from_volume()` lọc `valid_tfs` theo hướng trend `mtf_states[tf].side`: chỉ cho phép map vào Long nếu `side == "above"`, Short nếu `side == "under"`. Tuyệt đối không gán nhầm volume M30 (5.97U) sang M15.
+  - Sửa dứt điểm lỗi dấu ngoặc `unmatched ')'` ở dòng 604 `bot_ui.py`.
+
+### 2. Mục 2: ctVal Fallback Dict Chuẩn Xác
+- **File:** `web_app/backend/main.py`
+- **Chi tiết:** Thêm từ điển `_DEFAULT_CT_VAL = {"BTC-USDT-SWAP": 0.01, "ETH-USDT-SWAP": 0.1, "XAU-USDT-SWAP": 0.001, "SOL-USDT-SWAP": 1.0, ...}`. Không bao giờ fallback mù quáng 0.001 khi API timeout.
+
+### 3. Mục 3: Margin Lệnh Chờ TradeLocker
+- **File:** `web_app/backend/main.py`
+- **Chi tiết:** Trong `tradelocker_get_positions`, lệnh pending limit hiển thị `"0.00"` nếu sàn chưa tính margin thay vì lấy `price * qty` vọt lên hàng trăm đô.
+
+### 4. Mục 4: Đồng Bộ Margin Log Khớp 100% Sàn OKX
+- **File:** `bots/sub1/bot_ui.py`
+- **Chi tiết:** Nhánh hiển thị `Đã khớp LONG` và `Đã khớp SHORT` đọc tách biệt theo `pos_cycle_filled_tfs_long` và `pos_cycle_filled_tfs_short`. Giá trị tổng ký quỹ hiển thị trực tiếp từ `actual_margin_long`/`actual_margin_short` của sàn OKX.
+
+### 5. Mục 5: Xử Lý Số Dư $0.00 Thông Minh
+- **File:** `web_app/backend/main.py`
+- **Chi tiết:** Trong `_get_single_account_balance`, kiểm tra `totalEq` hoặc `details` có dữ liệu số thực sự mới cập nhật (chấp nhận $0.00 nếu tài khoản thực sự bằng 0). Bỏ qua dữ liệu rỗng do rate-limit mềm để chống chớp giật UI.
+
+### 6. Mục 7 & 8: Khóa Cứng Account + Double-Click Protection + Cooldown Dời Lệnh 5s
+- **Frontend:**
+  - `PositionsTable.jsx`: Thêm state `closingTickets` khóa nút [Đóng]/[Hủy] (hiển thị `...`, disabled, làm mờ) khi đang request, chống double-click.
+  - `App.jsx`: Khóa cứng `selectedAccount`, không tự ý nhảy tài khoản khi chuyển tab chiến thuật bot. Chỉ fallback khi ID không còn tồn tại trong danh sách accounts server.
+  - Chạy `npm run build` thành công 100%.
+- **Engine:**
+  - `bot_strategy.py`: Thêm Cooldown Timer tối thiểu 5s/lần cho mỗi cặp coin/TF khi dời lệnh Limit theo EMA200 (amend-order), triệt tiêu hoàn toàn nguy cơ dính mã lỗi `50011` (Rate Limit).

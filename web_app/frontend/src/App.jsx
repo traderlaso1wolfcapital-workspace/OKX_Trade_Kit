@@ -380,32 +380,34 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("tls1_active_bot_tab", activeBotTab);
-    const isTabSwitch = prevBotTabRef.current !== activeBotTab;
     prevBotTabRef.current = activeBotTab;
 
-    const savedForThisBot = localStorage.getItem(`tls1_selected_account_${activeBotTab}`);
-    const savedGlobal = localStorage.getItem("tls1_selected_account");
-    const currentCandidate = selectedAccount || savedForThisBot || savedGlobal;
-    const isCandidateValid = currentCandidate && accounts.some(a => a.id === currentCandidate || a.name === currentCandidate);
+    if (!accounts || accounts.length === 0) return;
 
-    // Auto-set only if no valid candidate (initial load) or switching to a bot tab without saved account
-    if (!isCandidateValid) {
-      const fallback = accounts[0]?.id || "";
-      if (fallback) {
+    // KHÓA CỨNG TÀI KHOẢN ĐANG CHỌN:
+    // Tuyệt đối không tự động đổi tài khoản khi chuyển tab bot (activeBotTab).
+    // Chỉ validate và fallback khi selectedAccount hiện tại không tồn tại trong accounts list.
+    const isValid = selectedAccount && accounts.some(a => a.id === selectedAccount || a.name === selectedAccount);
+    if (!isValid) {
+      // Kiểm tra localStorage xem có account hợp lệ không
+      const savedGlobal = localStorage.getItem("tls1_selected_account");
+      const isSavedValid = savedGlobal && accounts.some(a => a.id === savedGlobal || a.name === savedGlobal);
+      if (isSavedValid) {
+        setSelectedAccount(savedGlobal);
+      } else {
+        // ID rác hoặc tài khoản bị xóa -> xóa key và fallback về accounts[0]
+        const fallback = accounts[0]?.id || "";
         setSelectedAccount(fallback);
         try {
-          localStorage.setItem("tls1_selected_account", fallback);
-          localStorage.setItem(`tls1_selected_account_${activeBotTab}`, fallback);
+          if (fallback) {
+            localStorage.setItem("tls1_selected_account", fallback);
+          } else {
+            localStorage.removeItem("tls1_selected_account");
+          }
         } catch {}
-      } else {
-        setSelectedAccount("");
-        setPositions([]);
-        setClosedPositions([]);
       }
-    } else if (currentCandidate && selectedAccount !== currentCandidate) {
-      setSelectedAccount(currentCandidate);
     }
-  }, [activeBotTab, accounts, selectedAccount]);
+  }, [accounts, selectedAccount]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);

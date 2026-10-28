@@ -552,7 +552,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             icon, mode = _get_mode_icon(tk, "long")
             mae_lev = tk.mae_max_pct_long * Decimal(str(leverage))
             sl_px_str = f"{format_with_commas(tk.active_sl_px_long, 1):>8}"
-            filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
+            filled_tfs = getattr(tk, "pos_cycle_filled_tfs_long", getattr(tk, "pos_cycle_filled_tfs", []))
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])
@@ -601,7 +601,7 @@ def print_dashboard(state_matrix: dict, env_paths: dict, system_config: dict):
             icon, mode = _get_mode_icon(tk, "short")
             mae_lev = tk.mae_max_pct_short * Decimal(str(leverage))
             sl_px_str = f"{format_with_commas(tk.active_sl_px_short, 1):>8}"
-            filled_tfs = getattr(tk, "pos_cycle_filled_tfs", [])
+            filled_tfs = getattr(tk, "pos_cycle_filled_tfs_short", getattr(tk, "pos_cycle_filled_tfs", []))
             if filled_tfs:
                 sorted_tfs = sorted(filled_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t.upper(),0))
                 filled_str = " ".join([fmt_tf(t) for t in sorted_tfs])

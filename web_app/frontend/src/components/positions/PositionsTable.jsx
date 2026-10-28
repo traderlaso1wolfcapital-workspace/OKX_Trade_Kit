@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { COIN_LIST } from "../../constants/tradeConfig";
 import { useTranslation } from "../../i18n";
 
@@ -20,6 +20,7 @@ export default function PositionsTable({
   onCloseTicket,
 }) {
   const { t } = useTranslation();
+  const [closingTickets, setClosingTickets] = useState({});
 
   const handleCoinClick = (coinValue, tf = "1H") => {
     const rawCoin = coinValue || "BTC-USDT-SWAP";
@@ -89,8 +90,20 @@ export default function PositionsTable({
     });
 
   const handleClosePosition = async (coin, pos) => {
+    const tId = pos?.ticket_id || pos?.position_id || pos?.order_id || `${pos?.instId}-${pos?.posSide}`;
+    if (closingTickets[tId]) return; // Chống double-click
+    setClosingTickets((prev) => ({ ...prev, [tId]: true }));
+
     if (onCloseTicket) {
-      onCloseTicket(pos, coin);
+      try {
+        await onCloseTicket(pos, coin);
+      } finally {
+        setClosingTickets((prev) => {
+          const next = { ...prev };
+          delete next[tId];
+          return next;
+        });
+      }
       return;
     }
     const coinName = coin?.label ? coin.label.replace("-SWAP", "") : (pos?.coin || "Position");
@@ -142,6 +155,12 @@ export default function PositionsTable({
       }
     } catch (e) {
       console.error("❌ Lỗi kết nối: " + e.message);
+    } finally {
+      setClosingTickets((prev) => {
+        const next = { ...prev };
+        delete next[tId];
+        return next;
+      });
     }
   };
 
@@ -357,21 +376,30 @@ export default function PositionsTable({
           )}
         </td>
         <td style={{ textAlign: "center", padding: "4px 6px", whiteSpace: "nowrap" }}>
-          <button
-            onClick={() => handleClosePosition(coin, pos)}
-            style={{
-              background: isLimit ? "#d97706" : "#b32626",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              padding: "4px 14px",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: "bold",
-            }}
-          >
-            {isLimit ? "Hủy" : t("close_btn")}
-          </button>
+          {(() => {
+            const tId = pos?.ticket_id || pos?.position_id || pos?.order_id || `${pos?.instId}-${pos?.posSide}`;
+            const isClosing = Boolean(closingTickets[tId]);
+            return (
+              <button
+                disabled={isClosing}
+                onClick={() => handleClosePosition(coin, pos)}
+                style={{
+                  background: isClosing ? "#6b7280" : (isLimit ? "#d97706" : "#b32626"),
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  padding: "4px 14px",
+                  cursor: isClosing ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  opacity: isClosing ? 0.6 : 1,
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {isClosing ? "..." : (isLimit ? "Hủy" : t("close_btn"))}
+              </button>
+            );
+          })()}
         </td>
       </tr>
     );
