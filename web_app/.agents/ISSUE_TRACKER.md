@@ -32,6 +32,10 @@ Nhật ký theo dõi các Tasks, Bugs và Lịch sử chỉnh sửa giao diện 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
+  - **Lỗi 1 (Lệnh Limit chập chờn / mất tích):** Tách độc lập fetch vị thế và pending orders với timeout 5s, mở rộng bộ lọc hỗ trợ đầy đủ `limit`, `post_only`, `fok`, `ioc` (kể cả cờ `reduceOnly`), tính chuẩn khối lượng còn lại `sz - accFillSz` và thêm bộ đệm `_okx_positions_cache` chống giật lag khi OKX chạm rate limit.
+  - **Lỗi 2 (Dropdown số dư nhấp nháy về $0.00):** Sửa hoán đổi tham số trong `get_state_payload`, trích xuất đúng tổng tài sản `totalEq` ($1,230.49) từ OKX thay vì availBal cục bộ, chặn triệt để hành vi ghi đè $0.00 vào state và localStorage trong `useBotWebSocket.js`, `App.jsx` và `AppHeader.jsx`.
+
 - **[09/08/2026]** - Khắc phục lỗi giao diện Web đen xì do crash parse positions API:
   - **Nguyên nhân:**
     1. Backend API `/api/bot/positions` trả về Object (dict từ `trade_markers.json`) thay vì mảng (List) khiến React crash do gọi `positions.map` lỗi.

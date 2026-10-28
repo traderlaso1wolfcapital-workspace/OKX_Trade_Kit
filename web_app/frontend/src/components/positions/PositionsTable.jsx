@@ -123,7 +123,7 @@ export default function PositionsTable({
 
       const u = localStorage.getItem("tls1_uid") || loginUid;
       const strat = selectedAccount || "sub1";
-      const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}`, {
+      const res = await fetch(`/api/bot/positions/close_ticket?uid=${u}&strategy=${strat}&account_id=${strat}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -492,7 +492,7 @@ export default function PositionsTable({
         <tbody>
           {/* 🔼 TẦNG 1: 100% CÁC LỆNH ĐÃ KHỚP (ACTIVE POSITIONS) */}
           {filledParents.map((parent, pIdx) => {
-            const children = safePos.filter((p) => p.is_child && p.parent_id === parent.ticket_id);
+            const children = (positions || []).filter((p) => p.is_child && p.parent_id === parent.ticket_id);
             const hasChildren = children.length > 0;
             return (
               <React.Fragment key={`filled-${parent.ticket_id || pIdx}`}>

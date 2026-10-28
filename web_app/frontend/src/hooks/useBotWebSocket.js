@@ -5,7 +5,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
   const [uptime, setUptime] = useState(0);
   const [activeAccounts, setActiveAccounts] = useState({});
   const [positions, setPositions] = useState([]);
-  const [availBal, setAvailBal] = useState(0);
+  const [availBal, setAvailBal] = useState(null);
   const [closedPositions, setClosedPositions] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -40,14 +40,17 @@ export function useBotWebSocket(uid, strategy, accountId) {
           if (!accountId) {
             setPositions([]);
             setClosedPositions([]);
-            setAvailBal(0);
+            // preserve availBal
             return;
           }
           if (Array.isArray(data.positions)) {
             setPositions(data.positions);
           }
           if (data.balance && data.balance.status === "success") {
-            setAvailBal(data.balance.availBal || 0);
+            const bVal = Number(data.balance.totalEq ?? data.balance.balance ?? data.balance.availBal);
+            if (!isNaN(bVal) && bVal > 0) {
+              setAvailBal(bVal);
+            }
           }
           if (Array.isArray(data.closed_positions)) {
             setClosedPositions(data.closed_positions);
@@ -94,7 +97,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
     if (!accountId) {
       setPositions([]);
       setClosedPositions([]);
-      setAvailBal(0);
+      // preserve availBal
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ action: "switch_account", account_id: "" }));
       }

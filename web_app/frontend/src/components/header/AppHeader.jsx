@@ -135,13 +135,21 @@ export default function AppHeader({
   };
 
   const getOkxBalance = (acc) => {
-    let bal = acc?.balance ?? acc?.totalEq ?? acc?.availBal ?? acc?.equity;
-    if ((bal === undefined || bal === null) && acc?.id === effectiveAccId && accountBalance?.availBal !== undefined) {
-      bal = accountBalance.availBal;
+    let bal = acc?.totalEq ?? acc?.balance ?? acc?.equity ?? acc?.availBal;
+    if ((bal === undefined || bal === null || Number(bal) === 0) && acc?.id) {
+      const cached = localStorage.getItem(`tls1_bal_${acc.id}`);
+      if (cached && Number(cached) > 0) {
+        bal = Number(cached);
+      }
     }
-    if (bal === undefined || bal === null) {
-      const cached = localStorage.getItem(`tls1_bal_${acc?.id}`);
-      if (cached) bal = Number(cached);
+    if ((bal === undefined || bal === null || Number(bal) === 0) && acc?.id === effectiveAccId) {
+      if (accountBalance?.totalEq && Number(accountBalance.totalEq) > 0) {
+        bal = accountBalance.totalEq;
+      } else if (accountBalance?.balance && Number(accountBalance.balance) > 0) {
+        bal = accountBalance.balance;
+      } else if (accountBalance?.availBal && Number(accountBalance.availBal) > 0) {
+        bal = accountBalance.availBal;
+      }
     }
     return bal !== undefined && bal !== null ? formatBalance(bal) : "";
   };

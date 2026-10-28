@@ -271,12 +271,13 @@ function App() {
   }, [accounts, effectiveAccId]);
 
   const accountBalance = useMemo(() => {
-    const eq = Number(currentAccountObj?.totalEq ?? currentAccountObj?.equity ?? currentAccountObj?.balance ?? availBal ?? 0);
-    const av = Number(availBal || currentAccountObj?.availBal || currentAccountObj?.balance || 0);
+    const curBal = Number(currentAccountObj?.totalEq ?? currentAccountObj?.balance ?? currentAccountObj?.equity ?? 0);
+    const avBalNum = Number(availBal || 0);
+    const finalEq = avBalNum > 0 ? avBalNum : (curBal > 0 ? curBal : 0);
     return {
-      availBal: av,
-      totalEq: eq,
-      balance: Number(currentAccountObj?.balance ?? eq)
+      availBal: avBalNum > 0 ? avBalNum : (Number(currentAccountObj?.availBal) || finalEq),
+      totalEq: finalEq,
+      balance: finalEq
     };
   }, [availBal, currentAccountObj]);
 
@@ -284,7 +285,8 @@ function App() {
   useEffect(() => {
     if (availBal !== undefined && availBal !== null && effectiveAccId) {
       const bNum = Number(availBal);
-      if (!isNaN(bNum)) {
+      // Chỉ cập nhật khi số dư > 0, tuyệt đối không ghi đè $0.00 làm mất số dư thật
+      if (!isNaN(bNum) && bNum > 0) {
         try {
           localStorage.setItem(`tls1_bal_${effectiveAccId}`, String(bNum));
         } catch {}
@@ -1187,7 +1189,14 @@ function App() {
           if (Array.isArray(data)) {
             accList = data;
             if (isMounted) {
-              const cleanData = dedupeAccounts(data);
+              const cleanData = dedupeAccounts(data).map(nAcc => {
+                const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || 0);
+                const curBal = Number(nAcc?.balance ?? nAcc?.totalEq ?? 0);
+                if (curBal <= 0 && oldBal > 0) {
+                  return { ...nAcc, balance: oldBal, totalEq: oldBal, availBal: oldBal };
+                }
+                return nAcc;
+              });
               setAccounts(cleanData);
               localStorage.setItem("tls1_accounts", JSON.stringify(cleanData));
               if (cleanData.length === 0) {
@@ -1424,7 +1433,14 @@ function App() {
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data)) {
-          const clean = dedupeAccounts(data);
+          const clean = dedupeAccounts(data).map(nAcc => {
+            const oldBal = Number(localStorage.getItem(`tls1_bal_${nAcc.id}`) || 0);
+            const curBal = Number(nAcc?.balance ?? nAcc?.totalEq ?? 0);
+            if (curBal <= 0 && oldBal > 0) {
+              return { ...nAcc, balance: oldBal, totalEq: oldBal, availBal: oldBal };
+            }
+            return nAcc;
+          });
           setAccounts(clean);
           localStorage.setItem("tls1_accounts", JSON.stringify(clean));
         }

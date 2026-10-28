@@ -33,6 +33,29 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
+  - **Lỗi 1: Thi thoảng không hiện các lệnh đang Limit ở Bảng Vị Thế mặc dù trên sàn OKX đang có:**
+    - **Nguyên nhân:**
+      1. Trong `web_app/backend/main.py` hàm `get_bot_positions`, lệnh fetch `orders-pending` bị lồng bên trong khối `res_pos.get("code") == "0"`. Khi lệnh fetch vị thế bị trễ mạng hoặc OKX trả về mã lỗi tạm thời, toàn bộ lệnh Limit bị bỏ qua.
+      2. Bộ lọc `ordType` cũ chỉ chấp nhận `"limit"`, bỏ sót `"post_only"` (lệnh Limit Maker) và lọc nhầm `reduceOnly == "true"` (các lệnh Limit chốt lời giảm vị thế).
+      3. Thiếu cơ chế cache đệm chống giật lag: Khi OKX chạm giới hạn tần suất (Rate Limit 50011) hoặc timeout 4s, backend trả về danh sách rỗng `[]` khiến toàn bộ lệnh Limit trên web biến mất tạm thời rồi lại hiện lại.
+    - **Khắc phục:**
+      1. Tách độc lập 100% việc fetch `positions` và `orders-pending` với timeout an toàn 5.0s.
+      2. Mở rộng điều kiện nhận dạng mọi biến thể lệnh limit: `limit`, `post_only`, `fok`, `ioc` và bảo lưu lệnh limit dù có gắn cờ `reduceOnly`.
+      3. Tính toán chính xác khối lượng còn lại chưa khớp: `rem_sz = sz - accFillSz`.
+      4. Bổ sung bộ đệm `_okx_positions_cache` (30-45s) tự động giữ trạng thái vị thế và lệnh Limit nếu OKX gặp rate-limit hoặc ngắt quãng, xóa tan hiện tượng nhấp nháy biến mất.
+  - **Lỗi 2: Dropdown chọn tài khoản trade nhấp nháy về $0.00, F5 vài lần mới hiện $1,230.49 rồi lại tụt về $0.00:**
+    - **Nguyên nhân:**
+      1. Trong `web_app/backend/main.py` hàm `get_state_payload`, lời gọi `get_account_balance(uid, strategy, "USDT", acc)` bị đảo ngược thứ tự tham số: `account_id` nhận giá trị `"USDT"` và `ccy` nhận `acc`. Hệ quả là backend không tìm thấy API key của tài khoản `"USDT"`, luôn trả về lỗi và `availBal: 0`.
+      2. Frontend `useBotWebSocket.js` khởi tạo `availBal = 0` và gán `0` khi nhận gói tin lỗi từ WebSocket.
+      3. Frontend `App.jsx` có `useEffect` lắng nghe `availBal`: khi `availBal = 0`, nó ghi đè `balance: 0, totalEq: 0` vào state `accounts` và ghi đè `"0"` vào `localStorage.setItem('tls1_bal_...')`.
+      4. Trong `AppHeader.jsx`, toán tử `bal = acc?.balance ?? acc?.totalEq` gặp `acc.balance = 0` sẽ dừng lại ở `0` (vì `0` không phải `null/undefined`), render ra `$0.00`.
+    - **Khắc phục:**
+      1. Sửa đúng thứ tự tham số `get_account_balance(uid, strategy, acc, "USDT")` trong `get_state_payload`.
+      2. Bổ sung trích xuất `totalEq` (Total Equity = Tổng tài sản thực $1,230.49) từ OKX và lưu vào cache `_okx_account_balances_cache`.
+      3. Trong `useBotWebSocket.js`, `App.jsx` và `AppHeader.jsx`: Chỉ cập nhật số dư khi giá trị `> 0`, tuyệt đối không bao giờ ghi đè `0` lên số dư thực tế đã có trong tài khoản và localStorage.
+      4. Ưu tiên số dư tổng `totalEq` trước `availBal` để đảm bảo số tiền hiển thị trên Header luôn đồng bộ 100% với tổng tài sản của sàn OKX.
+
 - **[28/10/2026]** - Sửa Lỗi Hiển Thị Ký Quỹ Lệnh Limit OKX Bị Đội Lên Hàng Chục/Trăm Đô (Thiếu Nhân Hệ Số Hợp Đồng `ctVal`):
   - **Hiện tượng:** CEO nhận thấy trên Bảng Vị Thế, các lệnh Limit của OKX hiển thị mức ký quỹ lên đến vài chục tới vài trăm $ (VD: `XAU-USDT Limit Short`: `496.40 $` và `285.61 $`; `BTC-USDT Limit Short`: `24.42 $`; `BTC-USDT Limit Long`: `8.07 $`; `ETH-USDT Limit Short`: `4.91 $`), trong khi bot chỉ cài đặt ký quỹ 0.5$ (hoặc 0.1U - 0.5U tùy TF).
   - **Kiểm tra thực tế:**
@@ -4992,6 +5015,29 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[28/10/2026]** - Khắc Phục Triệt Để 2 Lỗi Đồng Bộ Lệnh Limit Bị Mất & Số Dư Dropdown OKX Nhấp Nháy Về $0.00:
+  - **Lỗi 1: Thi thoảng không hiện các lệnh đang Limit ở Bảng Vị Thế mặc dù trên sàn OKX đang có:**
+    - **Nguyên nhân:**
+      1. Trong `web_app/backend/main.py` hàm `get_bot_positions`, lệnh fetch `orders-pending` bị lồng bên trong khối `res_pos.get("code") == "0"`. Khi lệnh fetch vị thế bị trễ mạng hoặc OKX trả về mã lỗi tạm thời, toàn bộ lệnh Limit bị bỏ qua.
+      2. Bộ lọc `ordType` cũ chỉ chấp nhận `"limit"`, bỏ sót `"post_only"` (lệnh Limit Maker) và lọc nhầm `reduceOnly == "true"` (các lệnh Limit chốt lời giảm vị thế).
+      3. Thiếu cơ chế cache đệm chống giật lag: Khi OKX chạm giới hạn tần suất (Rate Limit 50011) hoặc timeout 4s, backend trả về danh sách rỗng `[]` khiến toàn bộ lệnh Limit trên web biến mất tạm thời rồi lại hiện lại.
+    - **Khắc phục:**
+      1. Tách độc lập 100% việc fetch `positions` và `orders-pending` với timeout an toàn 5.0s.
+      2. Mở rộng điều kiện nhận dạng mọi biến thể lệnh limit: `limit`, `post_only`, `fok`, `ioc` và bảo lưu lệnh limit dù có gắn cờ `reduceOnly`.
+      3. Tính toán chính xác khối lượng còn lại chưa khớp: `rem_sz = sz - accFillSz`.
+      4. Bổ sung bộ đệm `_okx_positions_cache` (30-45s) tự động giữ trạng thái vị thế và lệnh Limit nếu OKX gặp rate-limit hoặc ngắt quãng, xóa tan hiện tượng nhấp nháy biến mất.
+  - **Lỗi 2: Dropdown chọn tài khoản trade nhấp nháy về $0.00, F5 vài lần mới hiện $1,230.49 rồi lại tụt về $0.00:**
+    - **Nguyên nhân:**
+      1. Trong `web_app/backend/main.py` hàm `get_state_payload`, lời gọi `get_account_balance(uid, strategy, "USDT", acc)` bị đảo ngược thứ tự tham số: `account_id` nhận giá trị `"USDT"` và `ccy` nhận `acc`. Hệ quả là backend không tìm thấy API key của tài khoản `"USDT"`, luôn trả về lỗi và `availBal: 0`.
+      2. Frontend `useBotWebSocket.js` khởi tạo `availBal = 0` và gán `0` khi nhận gói tin lỗi từ WebSocket.
+      3. Frontend `App.jsx` có `useEffect` lắng nghe `availBal`: khi `availBal = 0`, nó ghi đè `balance: 0, totalEq: 0` vào state `accounts` và ghi đè `"0"` vào `localStorage.setItem('tls1_bal_...')`.
+      4. Trong `AppHeader.jsx`, toán tử `bal = acc?.balance ?? acc?.totalEq` gặp `acc.balance = 0` sẽ dừng lại ở `0` (vì `0` không phải `null/undefined`), render ra `$0.00`.
+    - **Khắc phục:**
+      1. Sửa đúng thứ tự tham số `get_account_balance(uid, strategy, acc, "USDT")` trong `get_state_payload`.
+      2. Bổ sung trích xuất `totalEq` (Total Equity = Tổng tài sản thực $1,230.49) từ OKX và lưu vào cache `_okx_account_balances_cache`.
+      3. Trong `useBotWebSocket.js`, `App.jsx` và `AppHeader.jsx`: Chỉ cập nhật số dư khi giá trị `> 0`, tuyệt đối không bao giờ ghi đè `0` lên số dư thực tế đã có trong tài khoản và localStorage.
+      4. Ưu tiên số dư tổng `totalEq` trước `availBal` để đảm bảo số tiền hiển thị trên Header luôn đồng bộ 100% với tổng tài sản của sàn OKX.
 
 - **[28/10/2026]** - Đồng Bộ Lệnh Limit Trực Tiếp Từ Sàn OKX Vào Bảng Vị Thế & Chuẩn Hóa Phân Tầng Hiển Thị (OKX & FX):
   - **Yêu cầu từ CEO:**

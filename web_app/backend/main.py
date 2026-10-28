@@ -1206,9 +1206,10 @@ def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, sec
         "OK-ACCESS-SIGN": signature,
         "OK-ACCESS-TIMESTAMP": ts,
         "OK-ACCESS-PASSPHRASE": passphrase,
-        "x-simulated-trading": "1" if is_demo else "0",
         "Content-Type": "application/json"
     }
+    if is_demo:
+        headers["x-simulated-trading"] = "1"
     if method_upper == "GET":
         return requests.get(base_url + path, headers=headers, timeout=timeout)
     elif method_upper == "POST":
@@ -2417,13 +2418,13 @@ def _get_single_account_balance(uid: str, aid: str) -> float:
     key = f"{uid}:{aid}"
     now = time.time()
     cached = _okx_account_balances_cache.get(key)
-    if cached and (now - cached["ts"] < 40):
+    if cached and (now - cached["ts"] < 40) and cached.get("balance", 0) > 0:
         return cached["balance"]
     try:
         api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, "sub1", aid)
         if not api_key:
             return cached["balance"] if cached else 0.0
-        resp = _okx_signed_request("GET", "/api/v5/account/balance?ccy=USDT", "", api_key, secret_key, passphrase, is_demo, timeout=2.0)
+        resp = _okx_signed_request("GET", "/api/v5/account/balance?ccy=USDT", "", api_key, secret_key, passphrase, is_demo, timeout=5.0)
         if resp.status_code == 200:
             res_j = resp.json()
             if res_j.get("code") == "0" and res_j.get("data"):
@@ -2437,8 +2438,14 @@ def _get_single_account_balance(uid: str, aid: str) -> float:
                         if d.get("ccy") == "USDT":
                             bal_val = round(float(d.get("eq", d.get("cashBal", 0.0))), 2)
                             break
-                _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
-                return bal_val
+                if bal_val > 0:
+                    _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
+                    return bal_val
+                elif cached and cached.get("balance", 0) > 0:
+                    return cached["balance"]
+                else:
+                    _okx_account_balances_cache[key] = {"balance": bal_val, "ts": now}
+                    return bal_val
     except Exception:
         pass
     return cached["balance"] if cached else 0.0
@@ -2499,13 +2506,14 @@ def get_bot_accounts(uid: str):
                         import concurrent.futures
                         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(deduped) or 1, 5)) as executor:
                             future_to_acc = {executor.submit(_get_single_account_balance, uid, a.get("id", "")): a for a in deduped}
-                            for future in concurrent.futures.as_completed(future_to_acc, timeout=2.0):
+                            for future in concurrent.futures.as_completed(future_to_acc, timeout=5.0):
                                 acc_item = future_to_acc[future]
                                 try:
                                     bal = future.result()
-                                    acc_item["balance"] = bal
-                                    acc_item["totalEq"] = bal
-                                    acc_item["availBal"] = bal
+                                    if bal > 0 or "balance" not in acc_item:
+                                        acc_item["balance"] = bal
+                                        acc_item["totalEq"] = bal
+                                        acc_item["availBal"] = bal
                                 except Exception:
                                     pass
                     except Exception:
@@ -2968,7 +2976,9 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
 OKX_CT_VAL_CACHE = {
     "BTC-USDT-SWAP": 0.01,
     "ETH-USDT-SWAP": 0.1,
-    "XAU-USDT-SWAP": 0.001,
+    "XAU-USDT-SWAP": 0.01,
+    "XAG-USDT-SWAP": 1.0,
+    "CL-USDT-SWAP": 0.1,
     "SOL-USDT-SWAP": 1.0,
     "DOGE-USDT-SWAP": 100.0,
     "XRP-USDT-SWAP": 100.0,
@@ -2977,8 +2987,12 @@ OKX_CT_VAL_CACHE = {
     "AVAX-USDT-SWAP": 1.0,
     "LINK-USDT-SWAP": 1.0,
     "DOT-USDT-SWAP": 1.0,
-    "NEAR-USDT-SWAP": 10.0,
+    "NEAR-USDT-SWAP": 1.0,
     "SUI-USDT-SWAP": 1.0,
+    "LTC-USDT-SWAP": 1.0,
+    "TRX-USDT-SWAP": 1000.0,
+    "HYPE-USDT-SWAP": 1.0,
+    "ZEC-USDT-SWAP": 0.1,
     "PEPE-USDT-SWAP": 10000000.0,
     "SHIB-USDT-SWAP": 1000000.0,
 }
@@ -3001,6 +3015,8 @@ def _get_okx_contract_val(inst_id: str) -> float:
         pass
     return 1.0
 
+_okx_positions_cache = {}
+
 @app.get("/api/bot/positions")
 def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
     if not uid or uid in ["default", "guest", "undefined", "null"]:
@@ -3014,313 +3030,325 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
     if not (api_key and secret_key and passphrase):
         return []
 
-    # 2. Nếu có credentials, gọi OKX API thật
-    if api_key and secret_key and passphrase:
+    cache_key = f"{uid}:{strategy}:{target_acc}"
+    now = time.time()
+    cached_entry = _okx_positions_cache.get(cache_key)
+
+    raw_positions = []
+    algo_data = []
+    raw_pending_orders = []
+    pos_fetched = False
+    pending_fetched = False
+
+    try:
+        # 1. Fetch positions from OKX (độc lập, timeout 5s)
         try:
-            domain = "www.okx.com"
-            base_url = f"https://{domain}"
-            path_pos = "/api/v5/account/positions?instType=SWAP"
-            ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-            
-            # Ký số
-            message = ts + "GET" + path_pos
-            mac = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message, encoding='utf-8'), digestmod=hashlib.sha256)
-            signature = base64.b64encode(mac.digest()).decode('utf-8')
-            
-            headers = {
-                "OK-ACCESS-KEY": api_key,
-                "OK-ACCESS-SIGN": signature,
-                "OK-ACCESS-TIMESTAMP": ts,
-                "OK-ACCESS-PASSPHRASE": passphrase,
-            }
-            if is_demo:
-                headers["x-simulated-trading"] = "1"
-            
-            resp = requests.get(base_url + path_pos, headers=headers, timeout=4)
+            resp = _okx_signed_request("GET", "/api/v5/account/positions?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=5)
             if resp.status_code == 200:
                 res_pos = resp.json()
                 if res_pos.get("code") == "0":
                     raw_positions = res_pos.get("data", [])
-                    
-                    # Fetch thêm TP/SL algo để đính vào vị thế
-                    path_algo = "/api/v5/trade/orders-algo-pending"
-                    ts2 = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-                    message2 = ts2 + "GET" + path_algo
-                    mac2 = hmac.new(bytes(secret_key, encoding='utf8'), bytes(message2, encoding='utf-8'), digestmod=hashlib.sha256)
-                    signature2 = base64.b64encode(mac2.digest()).decode('utf-8')
-                    
-                    headers2 = {
-                        "OK-ACCESS-KEY": api_key,
-                        "OK-ACCESS-SIGN": signature2,
-                        "OK-ACCESS-TIMESTAMP": ts2,
-                        "OK-ACCESS-PASSPHRASE": passphrase,
-                    }
-                    if is_demo:
-                        headers2["x-simulated-trading"] = "1"
-                    resp_algo = requests.get(base_url + path_algo, headers=headers2, timeout=4)
-                    algo_data = []
-                    if resp_algo.status_code == 200:
-                        res_algo = resp_algo.json()
-                        if res_algo.get("code") == "0":
-                            algo_data = res_algo.get("data", [])
-
-                    # LẤY TRỰC TIẾP LỆNH LIMIT CHỜ KHỚP ĐANG TREO TRÊN SÀN OKX
-                    raw_pending_orders = []
-                    try:
-                        resp_pending = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
-                        if resp_pending.status_code == 200:
-                            res_pending = resp_pending.json()
-                            if res_pending.get("code") == "0":
-                                raw_pending_orders = res_pending.get("data", [])
-                    except Exception as e_pend:
-                        print(f"[OKX] Lỗi lấy live orders-pending: {e_pend}")
-                            
-                    formatted_positions = []
-                    
-                    # Read trade_markers for virtual tickets
-                    markers = {}
-                    positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
-                    if os.path.exists(positions_path):
-                        for _ in range(5):
-                            try:
-                                with open(positions_path, "r", encoding="utf-8") as f:
-                                    markers = json.load(f)
-                                break
-                            except Exception:
-                                import time
-                                time.sleep(0.05)
-
-                    # Group OKX positions by instId and posSide (handling native OKX split positions)
-                    okx_pos_map = {}
-                    for pos in raw_positions:
-                        instId = pos.get("instId")
-                        posSide = pos.get("posSide", "long").lower()
-                        if posSide == "net":
-                            posSide = "long" if float(pos.get("pos", 0)) > 0 else "short"
-                        
-                        key = (instId, posSide)
-                        if key not in okx_pos_map:
-                            okx_pos_map[key] = []
-                        okx_pos_map[key].append(pos)
-
-                    # Auto-sync: Clean up zombie virtual tickets in trade_markers if OKX position is closed
-                    dirty_markers = False
-                    for coin, items in markers.items():
-                        inst_id = f"{coin.upper()}-USDT-SWAP"
-                        for side in ["long", "short"]:
-                            side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
-                            if side_items and (inst_id, side) not in okx_pos_map:
-                                for item in side_items: item["status"] = "closed"
-                                dirty_markers = True
-
-                    if dirty_markers:
-                        for _ in range(5):
-                            try:
-                                with open(positions_path, "w", encoding="utf-8") as f:
-                                    json.dump(markers, f)
-                                break
-                            except Exception:
-                                import time
-                                time.sleep(0.05)
-
-                    # Build formatted positions
-                    for key, items_okx in okx_pos_map.items():
-                        inst_id, pos_side = key
-                        coin = inst_id.split("-")[0]
-                        
-                        total_pos = sum(abs(float(i.get("pos", 0))) for i in items_okx)
-                        if total_pos == 0: continue
-                        
-                        total_margin = sum(float(i.get("margin") or i.get("imr") or "0") for i in items_okx)
-                        avg_px = sum(float(i.get("avgPx", 0)) * abs(float(i.get("pos", 0))) for i in items_okx) / total_pos if total_pos > 0 else 0
-                        
-                        first_okx = items_okx[0]
-                        # Use OKX's native 'last' price, fallback to markPx, then avgPx
-                        last_px = float(first_okx.get("last") or first_okx.get("markPx") or avg_px)
-                        leverage = float(first_okx.get("lever", 1))
-                        
-                        # Use OKX's native UPL and uplRatio directly (much more accurate)
-                        total_upl = sum(float(i.get("upl", 0)) for i in items_okx)
-                        total_upl_ratio = float(first_okx.get("uplRatio", 0)) * 100 if len(items_okx) == 1 else (total_upl / total_margin * 100 if total_margin > 0 else 0)
-                        
-                        tp_px = "---"
-                        sl_px = "---"
-                        for o in algo_data:
-                            if o.get("instId") == inst_id:
-                                if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
-                                if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
-                                
-                        # Get matching virtual tickets to extract the 'tf' labels
-                        active_items = [i for i in markers.get(coin, []) if i.get("side", "").lower() == pos_side and i.get("status") == "active"]
-                        active_tfs = []
-                        for item in active_items:
-                            tf = item.get("tf", "").upper()
-                            if tf and tf not in active_tfs:
-                                active_tfs.append(tf)
-                        
-                        active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
-                        tf_str = " ".join(active_tfs).lower() if active_tfs else ""
-                        
-                        parent_id = f"AGG_{inst_id}_{pos_side}"
-                        
-                        # Add Aggregated Row (Total Position)
-                        formatted_positions.append({
-                            "ticket_id": parent_id if len(items_okx) > 1 else (active_items[-1].get("ticket_id") if active_items else "#MANUAL"),
-                            "is_aggregate": True,
-                            "instId": inst_id,
-                            "posSide": pos_side,
-                            "pos": str(total_pos),
-                            "margin": f"{total_margin:.2f}",
-                            "avgPx": str(avg_px),
-                            "lastPx": str(last_px),
-                            "roi": f"{total_upl_ratio:.2f}",
-                            "upl": f"{total_upl:.4f}",
-                            "tp": tp_px,
-                            "sl": sl_px,
-                            "lever": str(int(leverage)),
-                            "tf": tf_str,
-                            "children_count": len(items_okx) if len(items_okx) > 1 else 0
-                        })
-                        
-                        # Add Child Rows (Synthesize from bot's trade_markers.json if OKX returns aggregated)
-                        if len(items_okx) == 1 and len(active_items) > 1:
-                            # Update parent children count
-                            formatted_positions[-1]["children_count"] = len(active_items)
-                            
-                            for idx, item in enumerate(active_items):
-                                c_pos = abs(float(item.get("sz", 0)))
-                                c_avg_px = float(item.get("px", 0))
-                                # Estimate margin based on proportion of total_pos
-                                c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
-                                
-                                if c_avg_px > 0:
-                                    if pos_side == "long":
-                                        c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
-                                    else:
-                                        c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
-                                    c_upl = c_margin * (c_roi / 100)
-                                else:
-                                    c_roi = 0
-                                    c_upl = 0
-                                
-                                formatted_positions.append({
-                                    "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
-                                    "is_child": True,
-                                    "parent_id": parent_id,
-                                    "instId": inst_id,
-                                    "posSide": pos_side,
-                                    "pos": str(c_pos),
-                                    "margin": f"{c_margin:.2f}",
-                                    "avgPx": str(c_avg_px),
-                                    "lastPx": str(last_px),
-                                    "roi": f"{c_roi:.2f}",
-                                    "upl": f"{c_upl:.4f}",
-                                    "tp": tp_px,
-                                    "sl": sl_px,
-                                    "lever": str(int(leverage)),
-                                    "tf": item.get("tf", "").upper()
-                                })
-
-                        # Add Child Rows (Native Split Positions)
-                        if len(items_okx) > 1:
-                            for idx, i_okx in enumerate(items_okx):
-                                c_pos = abs(float(i_okx.get("pos", 0)))
-                                c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
-                                c_avg_px = float(i_okx.get("avgPx", 0))
-                                
-                                # Use OKX native values directly
-                                c_upl = float(i_okx.get("upl", 0))
-                                c_roi = float(i_okx.get("uplRatio", 0)) * 100
-                                
-                                # Tìm TF tương ứng từ active_items nếu có
-                                c_tf = ""
-                                if idx < len(active_items):
-                                    c_tf = active_items[idx].get("tf", "").upper()
-                                    
-                                formatted_positions.append({
-                                    "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
-                                    "is_child": True,
-                                    "parent_id": parent_id,
-                                    "instId": inst_id,
-                                    "posSide": pos_side,
-                                    "pos": str(c_pos),
-                                    "margin": f"{c_margin:.2f}",
-                                    "avgPx": str(c_avg_px),
-                                    "lastPx": str(last_px),
-                                    "roi": f"{c_roi:.2f}",
-                                    "upl": f"{c_upl:.4f}",
-                                    "tp": tp_px,
-                                    "sl": sl_px,
-                                    "lever": str(int(leverage)),
-                                    "tf": c_tf
-                                })
-
-                    # ĐỊNH DẠNG CÁC LỆNH LIMIT CHỜ KHỚP TRÊN SÀN OKX
-                    formatted_limit_orders = []
-                    for o in raw_pending_orders:
-                        if o.get("ordType") != "limit" or str(o.get("reduceOnly", "")).lower() == "true":
-                            continue
-                        ord_id = o.get("ordId")
-                        inst_id = o.get("instId", "")
-                        coin = inst_id.split("-")[0] if "-" in inst_id else inst_id
-                        pos_side = o.get("posSide", "net").lower()
-                        side = o.get("side", "").lower()
-                        if pos_side == "net" or not pos_side:
-                            pos_side = "long" if side == "buy" else "short"
-
-                        px = o.get("px") or o.get("avgPx") or "0"
-                        sz = o.get("sz") or "0"
-                        lever = o.get("lever") or "100"
-
-                        ct_val = _get_okx_contract_val(inst_id)
-                        try:
-                            f_px = float(px)
-                            f_sz = float(sz)
-                            f_lev = float(lever) if float(lever) > 0 else 100.0
-                            # Ký quỹ chuẩn OKX: (Số hợp đồng * ctVal * Giá) / Đòn bẩy
-                            est_margin = (f_sz * ct_val * f_px) / f_lev if f_lev > 0 else 0.0
-                            margin_str = f"{est_margin:.2f}"
-                        except Exception:
-                            margin_str = "0.00"
-
-                        c_tf = ""
-                        for item in markers.get(coin, []):
-                            if item.get("order_id") == ord_id or (item.get("status") == "pending" and item.get("side", "").lower() == pos_side):
-                                c_tf = item.get("tf", "").upper()
-                                break
-
-                        formatted_limit_orders.append({
-                            "ticket_id": f"ord_{ord_id}",
-                            "order_id": ord_id,
-                            "is_limit": True,
-                            "is_aggregate": False,
-                            "is_child": False,
-                            "status": "Chờ khớp (Limit)",
-                            "instId": inst_id,
-                            "posSide": pos_side,
-                            "side": side,
-                            "pos": sz,
-                            "margin": margin_str,
-                            "avgPx": px,
-                            "lastPx": px,
-                            "roi": "0.00",
-                            "upl": "0.00",
-                            "tp": "---",
-                            "sl": "---",
-                            "lever": lever,
-                            "tf": c_tf,
-                            "cTime": int(o.get("cTime") or 0)
-                        })
-
-                    # Sắp xếp các lệnh Limit theo thời gian tạo mới nhất
-                    formatted_limit_orders.sort(key=lambda x: x.get("cTime", 0), reverse=True)
-
-                    # Đẩy toàn bộ vị thế đã khớp lên trên, đưa toàn bộ lệnh Limit chờ xuống dưới
-                    return formatted_positions + formatted_limit_orders
+                    pos_fetched = True
                 else:
-                    print(f"OKX Fetch Position Error: {res_pos}", flush=True)
-        except Exception as e:
-            print(f"Error fetching OKX positions: {e}")
+                    print(f"[OKX] Positions error: {res_pos.get('code')} - {res_pos.get('msg')}")
+        except Exception as e_pos:
+            print(f"[OKX] Lỗi lấy live positions: {e_pos}")
+
+        # 2. Fetch algo orders (TP/SL)
+        try:
+            resp_algo = _okx_signed_request("GET", "/api/v5/trade/orders-algo-pending?ordType=conditional", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+            if resp_algo.status_code == 200:
+                res_algo = resp_algo.json()
+                if res_algo.get("code") == "0":
+                    algo_data = res_algo.get("data", [])
+        except Exception:
+            pass
+
+        # 3. LẤY TRỰC TIẾP LỆNH LIMIT CHỜ KHỚP ĐANG TREO TRÊN SÀN OKX (Độc lập, không bị đứt đoạn theo positions)
+        try:
+            resp_pending = _okx_signed_request("GET", "/api/v5/trade/orders-pending", "", api_key, secret_key, passphrase, is_demo, timeout=5)
+            if resp_pending.status_code == 200:
+                res_pending = resp_pending.json()
+                if res_pending.get("code") == "0":
+                    raw_pending_orders = res_pending.get("data", [])
+                    pending_fetched = True
+                elif res_pending.get("code") in ["51000", "51001"]:
+                    resp_pending2 = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+                    if resp_pending2.status_code == 200 and resp_pending2.json().get("code") == "0":
+                        raw_pending_orders = resp_pending2.json().get("data", [])
+                        pending_fetched = True
+            else:
+                resp_pending2 = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=4)
+                if resp_pending2.status_code == 200 and resp_pending2.json().get("code") == "0":
+                    raw_pending_orders = resp_pending2.json().get("data", [])
+                    pending_fetched = True
+        except Exception as e_pend:
+            print(f"[OKX] Lỗi lấy live orders-pending: {e_pend}")
+
+        # Chống giật lag: Nếu lỗi kết nối tạm thời / rate-limit 50011, tái sử dụng dữ liệu từ cache
+        if not pending_fetched and cached_entry:
+            raw_pending_orders = cached_entry.get("raw_pending", [])
+        if not pos_fetched and cached_entry:
+            raw_positions = cached_entry.get("raw_positions", [])
+
+        formatted_positions = []
+        
+        # Read trade_markers for virtual tickets
+        markers = {}
+        positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
+        if os.path.exists(positions_path):
+            for _ in range(5):
+                try:
+                    with open(positions_path, "r", encoding="utf-8") as f:
+                        markers = json.load(f)
+                    break
+                except Exception:
+                    time.sleep(0.05)
+
+        # Group OKX positions by instId and posSide (handling native OKX split positions)
+        okx_pos_map = {}
+        for pos in raw_positions:
+            instId = pos.get("instId")
+            posSide = pos.get("posSide", "long").lower()
+            if posSide == "net":
+                posSide = "long" if float(pos.get("pos", 0)) > 0 else "short"
+            
+            key = (instId, posSide)
+            if key not in okx_pos_map:
+                okx_pos_map[key] = []
+            okx_pos_map[key].append(pos)
+
+        # Auto-sync: Clean up zombie virtual tickets in trade_markers if OKX position is closed
+        dirty_markers = False
+        for coin, items in markers.items():
+            inst_id = f"{coin.upper()}-USDT-SWAP"
+            for side in ["long", "short"]:
+                side_items = [i for i in items if i.get("side", "").lower() == side and i.get("status") == "active"]
+                if side_items and (inst_id, side) not in okx_pos_map:
+                    for item in side_items: item["status"] = "closed"
+                    dirty_markers = True
+
+        if dirty_markers:
+            for _ in range(5):
+                try:
+                    with open(positions_path, "w", encoding="utf-8") as f:
+                        json.dump(markers, f)
+                    break
+                except Exception:
+                    time.sleep(0.05)
+
+        # Build formatted positions
+        for key, items_okx in okx_pos_map.items():
+            inst_id, pos_side = key
+            coin = inst_id.split("-")[0]
+            
+            total_pos = sum(abs(float(i.get("pos", 0))) for i in items_okx)
+            if total_pos == 0: continue
+            
+            total_margin = sum(float(i.get("margin") or i.get("imr") or "0") for i in items_okx)
+            avg_px = sum(float(i.get("avgPx", 0)) * abs(float(i.get("pos", 0))) for i in items_okx) / total_pos if total_pos > 0 else 0
+            
+            first_okx = items_okx[0]
+            # Use OKX's native 'last' price, fallback to markPx, then avgPx
+            last_px = float(first_okx.get("last") or first_okx.get("markPx") or avg_px)
+            leverage = float(first_okx.get("lever", 1))
+            
+            # Use OKX's native UPL and uplRatio directly (much more accurate)
+            total_upl = sum(float(i.get("upl", 0)) for i in items_okx)
+            total_upl_ratio = float(first_okx.get("uplRatio", 0)) * 100 if len(items_okx) == 1 else (total_upl / total_margin * 100 if total_margin > 0 else 0)
+            
+            tp_px = "---"
+            sl_px = "---"
+            for o in algo_data:
+                if o.get("instId") == inst_id:
+                    if o.get("tpTriggerPx"): tp_px = o.get("tpTriggerPx")
+                    if o.get("slTriggerPx"): sl_px = o.get("slTriggerPx")
+                    
+            # Get matching virtual tickets to extract the 'tf' labels
+            active_items = [i for i in markers.get(coin, []) if i.get("side", "").lower() == pos_side and i.get("status") == "active"]
+            active_tfs = []
+            for item in active_items:
+                tf = item.get("tf", "").upper()
+                if tf and tf not in active_tfs:
+                    active_tfs.append(tf)
+            
+            active_tfs = sorted(active_tfs, key=lambda t: {"M5":1,"M15":2,"M30":3,"H1":4,"H2":5,"H4":6}.get(t,0))
+            tf_str = " ".join(active_tfs).lower() if active_tfs else ""
+            
+            parent_id = f"AGG_{inst_id}_{pos_side}"
+            
+            # Add Aggregated Row (Total Position)
+            formatted_positions.append({
+                "ticket_id": parent_id if len(items_okx) > 1 else (active_items[-1].get("ticket_id") if active_items else "#MANUAL"),
+                "is_aggregate": True,
+                "instId": inst_id,
+                "posSide": pos_side,
+                "pos": str(total_pos),
+                "margin": f"{total_margin:.2f}",
+                "avgPx": str(avg_px),
+                "lastPx": str(last_px),
+                "roi": f"{total_upl_ratio:.2f}",
+                "upl": f"{total_upl:.4f}",
+                "tp": tp_px,
+                "sl": sl_px,
+                "lever": str(int(leverage)),
+                "tf": tf_str,
+                "children_count": len(items_okx) if len(items_okx) > 1 else 0
+            })
+            
+            # Add Child Rows (Synthesize from bot's trade_markers.json if OKX returns aggregated)
+            if len(items_okx) == 1 and len(active_items) > 1:
+                # Update parent children count
+                formatted_positions[-1]["children_count"] = len(active_items)
+                
+                for idx, item in enumerate(active_items):
+                    c_pos = abs(float(item.get("sz", 0)))
+                    c_avg_px = float(item.get("px", 0))
+                    # Estimate margin based on proportion of total_pos
+                    c_margin = float(total_margin) * (c_pos / float(total_pos)) if float(total_pos) > 0 else 0
+                    
+                    if c_avg_px > 0:
+                        if pos_side == "long":
+                            c_roi = ((last_px - c_avg_px) / c_avg_px) * 100 * leverage
+                        else:
+                            c_roi = ((c_avg_px - last_px) / c_avg_px) * 100 * leverage
+                        c_upl = c_margin * (c_roi / 100)
+                    else:
+                        c_roi = 0
+                        c_upl = 0
+                    
+                    formatted_positions.append({
+                        "ticket_id": item.get("ticket_id", f"CHILD_{idx}_{inst_id}"),
+                        "is_child": True,
+                        "parent_id": parent_id,
+                        "instId": inst_id,
+                        "posSide": pos_side,
+                        "pos": str(c_pos),
+                        "margin": f"{c_margin:.2f}",
+                        "avgPx": str(c_avg_px),
+                        "lastPx": str(last_px),
+                        "roi": f"{c_roi:.2f}",
+                        "upl": f"{c_upl:.4f}",
+                        "tp": tp_px,
+                        "sl": sl_px,
+                        "lever": str(int(leverage)),
+                        "tf": item.get("tf", "").upper()
+                    })
+
+            # Add Child Rows (Native Split Positions)
+            if len(items_okx) > 1:
+                for idx, i_okx in enumerate(items_okx):
+                    c_pos = abs(float(i_okx.get("pos", 0)))
+                    c_margin = float(i_okx.get("margin") or i_okx.get("imr") or "0")
+                    c_avg_px = float(i_okx.get("avgPx", 0))
+                    
+                    # Use OKX native values directly
+                    c_upl = float(i_okx.get("upl", 0))
+                    c_roi = float(i_okx.get("uplRatio", 0)) * 100
+                    
+                    # Tìm TF tương ứng từ active_items nếu có
+                    c_tf = ""
+                    if idx < len(active_items):
+                        c_tf = active_items[idx].get("tf", "").upper()
+                        
+                    formatted_positions.append({
+                        "ticket_id": i_okx.get("posId", f"CHILD_{idx}_{inst_id}"),
+                        "is_child": True,
+                        "parent_id": parent_id,
+                        "instId": inst_id,
+                        "posSide": pos_side,
+                        "pos": str(c_pos),
+                        "margin": f"{c_margin:.2f}",
+                        "avgPx": str(c_avg_px),
+                        "lastPx": str(last_px),
+                        "roi": f"{c_roi:.2f}",
+                        "upl": f"{c_upl:.4f}",
+                        "tp": tp_px,
+                        "sl": sl_px,
+                        "lever": str(int(leverage)),
+                        "tf": c_tf
+                    })
+
+        # ĐỊNH DẠNG CÁC LỆNH LIMIT CHỜ KHỚP TRÊN SÀN OKX
+        formatted_limit_orders = []
+        for o in raw_pending_orders:
+            ord_type = str(o.get("ordType", "")).lower()
+            # Nhận mọi loại lệnh limit: limit, post_only (maker limit), fok, ioc
+            if ord_type not in ["limit", "post_only", "fok", "ioc"]:
+                continue
+            ord_id = o.get("ordId")
+            inst_id = o.get("instId", "")
+            coin = inst_id.split("-")[0] if "-" in inst_id else inst_id
+            pos_side = o.get("posSide", "net").lower()
+            side = o.get("side", "").lower()
+            if pos_side == "net" or not pos_side:
+                pos_side = "long" if side == "buy" else "short"
+
+            px = o.get("px") or o.get("avgPx") or "0"
+            sz_raw = float(o.get("sz", 0) or 0)
+            acc_fill = float(o.get("accFillSz", 0) or 0)
+            rem_sz = sz_raw - acc_fill
+            if rem_sz <= 0 and sz_raw > 0:
+                continue
+            sz_str = f"{rem_sz:g}" if rem_sz > 0 else (o.get("sz") or "0")
+
+            lever = o.get("lever")
+            f_lev = float(lever) if (lever and float(lever) > 0) else 100.0
+
+            ct_val = _get_okx_contract_val(inst_id)
+            try:
+                f_px = float(px)
+                f_sz = float(sz_str)
+                # Ký quỹ chuẩn OKX: (Số hợp đồng * ctVal * Giá) / Đòn bẩy
+                est_margin = (f_sz * ct_val * f_px) / f_lev if f_lev > 0 else 0.0
+                margin_str = f"{est_margin:.2f}"
+            except Exception:
+                margin_str = "0.00"
+
+            c_tf = ""
+            for item in markers.get(coin, []):
+                if item.get("order_id") == ord_id or (item.get("status") == "pending" and item.get("side", "").lower() == pos_side):
+                    c_tf = item.get("tf", "").upper()
+                    break
+
+            formatted_limit_orders.append({
+                "ticket_id": f"ord_{ord_id}",
+                "order_id": ord_id,
+                "is_limit": True,
+                "is_aggregate": False,
+                "is_child": False,
+                "status": "Chờ khớp (Limit)",
+                "instId": inst_id,
+                "posSide": pos_side,
+                "side": side,
+                "pos": sz_str,
+                "margin": margin_str,
+                "avgPx": px,
+                "lastPx": px,
+                "roi": "0.00",
+                "upl": "0.00",
+                "tp": "---",
+                "sl": "---",
+                "lever": str(int(f_lev)),
+                "tf": c_tf,
+                "cTime": int(o.get("cTime") or 0)
+            })
+
+        # Sắp xếp các lệnh Limit theo thời gian tạo mới nhất
+        formatted_limit_orders.sort(key=lambda x: x.get("cTime", 0), reverse=True)
+
+        final_result = formatted_positions + formatted_limit_orders
+        _okx_positions_cache[cache_key] = {
+            "result": final_result,
+            "raw_positions": raw_positions,
+            "raw_pending": raw_pending_orders,
+            "ts": now
+        }
+        return final_result
+    except Exception as e:
+        print(f"Error fetching OKX positions: {e}")
+        if cached_entry and (now - cached_entry.get("ts", 0) < 45):
+            return cached_entry.get("result", [])
 
     # 3. Fallback: Đọc các vị thế từ trade_markers.json
     positions_path = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data", "trade_markers.json")
@@ -3450,29 +3478,13 @@ def get_closed_positions(uid: str, strategy: str = "sub1", account_id: str = Non
         return []
 
 @app.post("/api/bot/positions/close_ticket")
-def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1"):
+def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub1", account_id: str = None):
     # 1. Call OKX API to execute close position on exchange FIRST
-    config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}")
-    env_file = f".api_{strategy}"
-    env_path = os.path.join(config_dir, env_file)
-    
-    api_key, secret_key, passphrase = "", "", ""
-    is_demo = False
-    if os.path.exists(env_path):
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    if "=" in line:
-                        k, v = line.strip().split("=", 1)
-                        v = v.strip("\"'")
-                        if k == "OKX_API_KEY": api_key = v
-                        elif k == "OKX_SECRET_KEY": secret_key = v
-                        elif k == "OKX_PASSPHRASE": passphrase = v
-                        elif k == "OKX_IS_DEMO": is_demo = (v.lower() == "true")
-        except Exception: pass
+    target_acc = account_id.strip() if (account_id and account_id.strip()) else strategy
+    api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
 
     if not (api_key and secret_key and passphrase):
-        raise HTTPException(status_code=400, detail=f"Chưa cấu hình API Key cho tài khoản {strategy}! Vui lòng nhập API Key trong mục Cài Đặt.")
+        raise HTTPException(status_code=400, detail=f"Chưa cấu hình API Key cho tài khoản {target_acc}! Vui lòng nhập API Key trong mục Cài Đặt.")
 
     if api_key and secret_key and passphrase:
         try:
@@ -3493,6 +3505,12 @@ def close_virtual_ticket(req: CloseTicketRequest, uid: str, strategy: str = "sub
                 c_resp = _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", cancel_payload, api_key, secret_key, passphrase, is_demo)
                 if c_resp.status_code == 200 and c_resp.json().get("code") == "0":
                     print(f"🧹 [OKX] Đã hủy lệnh Limit #{clean_ord_id} ({inst_id}) thành công trên sàn!", flush=True)
+                    # Cập nhật cache ngay lập tức
+                    for ck in list(_okx_positions_cache.keys()):
+                        if ck.startswith(f"{uid}:"):
+                            c_ent = _okx_positions_cache[ck]
+                            c_ent["raw_pending"] = [o for o in c_ent.get("raw_pending", []) if str(o.get("ordId")) != str(clean_ord_id)]
+                            c_ent["result"] = [p for p in c_ent.get("result", []) if str(p.get("order_id")) != str(clean_ord_id) and str(p.get("ticket_id")) != f"ord_{clean_ord_id}"]
                     return {"status": "success", "message": f"Đã hủy lệnh Limit #{clean_ord_id} thành công!"}
                 else:
                     err_msg = c_resp.json().get("msg") if c_resp.status_code == 200 else f"HTTP {c_resp.status_code}"
@@ -3674,27 +3692,54 @@ class OrderRequest(BaseModel):
 @app.get("/api/account/balance")
 def get_account_balance(uid: str, strategy: str = "sub1", account_id: str = None, ccy: str = "USDT"):
     if not uid or uid in ["default", "guest", "undefined", "null"]:
-        return {"status": "error", "message": "No account selected", "availBal": 0}
+        return {"status": "error", "message": "No account selected", "availBal": 0, "totalEq": 0, "balance": 0}
     if not account_id or not account_id.strip():
-        return {"status": "error", "message": "No account selected", "availBal": 0}
+        return {"status": "error", "message": "No account selected", "availBal": 0, "totalEq": 0, "balance": 0}
     target_acc = account_id.strip()
     api_key, secret_key, passphrase, is_demo = _get_okx_creds(uid, strategy, target_acc)
     if not api_key:
-        return {"status": "error", "message": "No OKX Credentials"}
+        return {"status": "error", "message": "No OKX Credentials", "availBal": 0, "totalEq": 0, "balance": 0}
+    
+    key = f"{uid}:{target_acc}"
+    cached = _okx_account_balances_cache.get(key)
     
     path = f"/api/v5/account/balance?ccy={ccy}"
     try:
-        resp = _okx_signed_request("GET", path, "", api_key, secret_key, passphrase, is_demo)
+        resp = _okx_signed_request("GET", path, "", api_key, secret_key, passphrase, is_demo, timeout=5.0)
         if resp.status_code == 200:
             data = resp.json()
             if data.get("code") == "0" and len(data.get("data", [])) > 0:
-                details = data["data"][0]["details"]
+                bdata = data["data"][0]
+                total_eq = float(bdata.get("totalEq", 0) or 0)
+                details = bdata.get("details", [])
+                avail_bal = 0.0
                 if details:
-                    avail_bal = details[0].get("availBal", "0")
-                    return {"status": "success", "availBal": avail_bal}
-        return {"status": "error", "message": resp.text}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+                    for d in details:
+                        if d.get("ccy") == ccy:
+                            avail_bal = float(d.get("availBal", 0) or 0)
+                            if total_eq == 0:
+                                total_eq = float(d.get("eq", d.get("cashBal", 0)) or 0)
+                            break
+                    if avail_bal == 0 and details:
+                        avail_bal = float(details[0].get("availBal", 0) or 0)
+                
+                final_bal = total_eq if total_eq > 0 else avail_bal
+                if final_bal > 0:
+                    _okx_account_balances_cache[key] = {"balance": round(final_bal, 2), "ts": time.time()}
+                return {
+                    "status": "success",
+                    "availBal": avail_bal if avail_bal > 0 else final_bal,
+                    "totalEq": round(final_bal, 2),
+                    "balance": round(final_bal, 2)
+                }
+    except Exception:
+        pass
+        
+    if cached and cached.get("balance", 0) > 0:
+        c_bal = cached["balance"]
+        return {"status": "success", "availBal": c_bal, "totalEq": c_bal, "balance": c_bal, "cached": True}
+        
+    return {"status": "error", "message": "Failed to fetch balance", "availBal": 0, "totalEq": 0, "balance": 0}
 
 @app.get("/api/bot/balance")
 def api_get_bot_balance(uid: str, account_id: str = "", strategy: str = "sub1", ccy: str = "USDT"):
@@ -3818,7 +3863,7 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
             "account_id": "",
             "status": status_data,
             "positions": [],
-            "balance": {"status": "error", "availBal": 0},
+            "balance": {"status": "error", "availBal": 0, "totalEq": 0, "balance": 0},
             "closed_positions": []
         }
     try:
@@ -3830,9 +3875,13 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
     except Exception:
         pos_data = []
     try:
-        bal_data = await asyncio.to_thread(get_account_balance, uid, strategy, "USDT", acc)
+        # Chuẩn hóa thứ tự tham số: uid, strategy, account_id (acc), ccy ("USDT")
+        bal_data = await asyncio.to_thread(get_account_balance, uid, strategy, acc, "USDT")
     except Exception:
-        bal_data = {"status": "error", "availBal": 0}
+        key = f"{uid}:{acc}"
+        cached = _okx_account_balances_cache.get(key)
+        c_bal = cached.get("balance", 0) if cached else 0
+        bal_data = {"status": "success" if c_bal > 0 else "error", "availBal": c_bal, "totalEq": c_bal, "balance": c_bal}
     try:
         closed_data = await asyncio.to_thread(get_closed_positions, uid, strategy)
     except Exception:
