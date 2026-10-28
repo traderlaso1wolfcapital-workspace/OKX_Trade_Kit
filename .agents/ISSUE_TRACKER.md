@@ -33,6 +33,67 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[28/10/2026]** - Phân Lập LocalStorage Độc Lập Cho Từng Tài Khoản & Mở Khóa Chốt Lời / Cắt Lỗ Linh Hoạt Khi Bot Đang Chạy:
+  - **Hiện tượng & Phản hồi từ CEO:**
+    - Khi thay đổi mức chốt lời M5 (ví dụ từ `0.8%` lên `1.8%`) trong lúc bot đang chạy, nhấn F5 thì giao diện lại bị đẩy ngược về `0.8%`.
+    - Mong muốn:
+      1. Mỗi tài khoản khi kết nối vào web đều có một vùng nhớ `localStorage` độc lập như E8 Markets hiện tại để không bị trộn lẫn thông số giữa các tài khoản.
+      2. Khi thay đổi Ký quỹ, Chốt lời, Cắt lỗ thì số mới phải hiển thị ngay lập tức và đẩy lên hệ thống (backend) lưu vĩnh viễn, F5 không bị đưa về số cũ.
+      3. Khi bot đang chạy: Vẫn KHÓA (lock) ô Ký quỹ để đảm bảo an toàn vốn, nhưng MỞ KHÓA (unlock) ô Chốt lời và Cắt lỗ để người dùng điều chỉnh linh hoạt mọi lúc.
+  - **Nguyên nhân kỹ thuật:**
+    1. Hook `useEffect` đồng bộ `risk` lên backend trước đây có điều kiện chặn: `if (isRunning) return;`. Do đó, khi bot đang chạy, mọi thao tác chỉnh `tpPct` hoặc `slPct` trên giao diện đều bị chặn lại, không gửi request `POST /api/bot/config` về server. File config trên backend vẫn giữ giá trị cũ (`0.008`).
+    2. Cấu hình `risk` không được lưu riêng theo từng `account_id` trong `localStorage`, dẫn đến khi F5 hệ thống chỉ đọc lại từ backend hoặc giá trị mặc định `0.80%`.
+  - **Giải pháp & Khắc phục:**
+    1. **Phân lập LocalStorage đa tài khoản:** Khởi tạo và lưu trữ cấu hình `risk` độc lập theo định dạng `tls1_risk_${activeBotTab}_${effectiveAccId}`. Khi chuyển đổi tài khoản hoặc F5, thông số của từng tài khoản được khôi phục chính xác 100%.
+    2. **Mở khóa đồng bộ TP/SL khi Bot chạy:** Loại bỏ rào cản `if (isRunning) return;` trong `useEffect` đồng bộ. Bất cứ khi nào CEO chỉnh Chốt lời / Cắt lỗ, giá trị mới lập tức được lưu vào `localStorage` và đẩy lên backend (`POST /api/bot/config`).
+    3. **Hot-reload tức thì trên tiến trình bot:** Lõi bot `sys_bot_sub1.py` tự động phát hiện file config JSON thay đổi mtime và nạp ngay mức TP/SL mới mà không làm gián đoạn vị thế hay khởi động lại bot.
+    4. **Bảo vệ an toàn vốn:** Ô nhập Ký quỹ (Volume) và chế độ Cố định/Nhân hệ số tiếp tục được khóa cứng (`disabled={isRunning}`) khi bot đang chạy, ngăn ngừa mọi thay đổi vốn ngoài ý muốn.
+    5. **Bảo vệ lệnh limit đang chờ:** Endpoint `POST /api/bot/config` chỉ hủy limit khi bot KHÔNG chạy. Khi bot đang chạy, bảo lưu 100% lệnh limit trên sàn.
+
+- **[28/10/2026]** - Sửa Lỗi F5 Tự Động Bị Nhảy Ngược Về Tài Khoản Đang Chạy (Bảo Lưu 100% Tài Khoản Đang Xem Sau F5):
+  - **Hiện tượng & Phản hồi từ CEO:**
+    - Khi CEO đang chọn xem tài khoản OKX `#7829`, nhấn F5 thì giao diện tự động nhảy về tài khoản `#7768` (tài khoản đang chạy LIVE), trong khi chọn tài khoản E8 Markets thì F5 vẫn giữ nguyên E8 Markets.
+  - **Nguyên nhân kỹ thuật:**
+    1. Biến `selectedAccount` trong `App.jsx` được khởi tạo rỗng (`useState("")`), không có cơ chế nạp từ `localStorage`.
+    2. Khi người dùng click chọn tài khoản khác trong dropdown, hàm `handleAssignAccountToActiveBot` chỉ cập nhật vào React state tạm thời mà không lưu vào `localStorage`.
+    3. Khi F5, `selectedAccount` rỗng (`""`), thỏa mãn điều kiện `!selectedAccount` trong `useEffect`. Effect này kiểm tra thấy bot `#7768` đang có cờ LIVE (`runningAcc`) trên server nên đã tự ý gán đè `selectedAccount = "#7768"`.
+  - **Giải pháp & Khắc phục:**
+    1. Khởi tạo `selectedAccount` ưu tiên nạp từ `localStorage`: `localStorage.getItem("tls1_selected_account_" + activeBotTab) || localStorage.getItem("tls1_selected_account")`.
+    2. Khi người dùng chọn bất kỳ tài khoản nào, lập tức lưu vào `localStorage` cho cả phạm vi tab bot lẫn phạm vi toàn cục.
+    3. Bổ sung kiểm tra `isCandidateValid` trong `useEffect`: Nếu tài khoản đang xem vẫn hợp lệ trong danh sách tài khoản, bảo lưu 100% tài khoản đó sau F5, tuyệt đối không bị tiến trình bot LIVE đè ngược lại.
+
+- **[28/10/2026]** - Khắc Phục Triệt Để Hiện Tượng Ký Quỹ Nhảy Lên 100$ Khi Khởi Động Bot (Bảo Vệ An Toàn Vốn Tuyệt Đối):
+  - **Hiện tượng & Phản hồi từ CEO:**
+    - CEO đang cài đặt mức ký quỹ là 4$ (hoặc 0.4$), nhưng khi bấm "CHẠY BOT" thì ô Ký quỹ tự động nhảy vọt lên 100$, tiềm ẩn nguy cơ vào lệnh quá lớn gây rủi ro cháy tài khoản.
+  - **Nguyên nhân kỹ thuật sâu:**
+    1. Trong các file lõi thực thi bot (`bots/sub1/sys_bot_sub1.py` dòng 283, `bots/sub2/sys_bot_sub2.py` dòng 276, và `desktop_app/gui_main.py` dòng 1690, 4931), biến mẫu `default_sub1_cfg` và `default_sub2_cfg` từ phiên bản Desktop app cũ bị gán cứng giá trị `"POSITION_VOLUME_HIGH_CONFIDENCE": "100.00"`.
+    2. Khi bot process được khởi tạo cho tài khoản phụ (ví dụ `.api_sub_6722`), hàm tách tên tài khoản trong `sys_bot_sub1.py` (`acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")`) đã loại bỏ dấu gạch dưới, tạo ra chuỗi `sub6722`.
+    3. Do Web App lưu file config theo tên gốc `sub_6722_global_config.json`, tiến trình bot kiểm tra file `sub6722_global_config.json` không thấy tồn tại nên đã tự động khởi tạo file mới và ghi đè giá trị mặc định `"POSITION_VOLUME_HIGH_CONFIDENCE": "100.00"`.
+    4. Web Frontend sau khi bấm Khởi Động Bot đã gọi API `GET /api/bot/config`, đọc trúng file có giá trị 100$ và cập nhật ô nhập ký quỹ thành `100 $`.
+  - **Giải pháp & Khắc phục:**
+    1. Triệt tiêu hoàn toàn mốc `100.00` trong toàn bộ mã nguồn của cả 3 bot (`sys_bot_sub1.py`, `sys_bot_sub2.py`, `gui_main.py`), chuyển chuẩn hóa về `0.40`.
+    2. Bổ sung cơ chế kế thừa cấu hình thông minh: Trước khi tạo cấu hình mặc định mới, `sys_bot_sub1.py` và `sys_bot_sub2.py` tự động quét tìm các file config alias đã được Web App lưu sẵn (`{target}_global_config.json` hoặc dạng không gạch dưới). Nếu đã có, bot sẽ nạp và kế thừa chính xác 100% mức vốn do người dùng cài đặt, bảo đảm không bao giờ tự ý tạo mới hay tăng khống khối lượng ký quỹ.
+    3. Cập nhật Frontend [App.jsx](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/App.jsx): Đồng bộ fallback TP/SL chuẩn `0.80%` và đồng bộ chính xác biến thể tên file.
+
+- **[28/10/2026]** - Sửa Lỗi `pm2: command not found` Khi Chạy SSH Từ Xa & Phân Tách Tuyệt Đối 2 File `zzPush_To_GitHub.py` và `zzzGit_Pull_bash_web.py`:
+  - **Hiện tượng lỗi:**
+    - Khi CEO chạy [zzzGit_Pull_bash_web.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.py) từ Windows, script kết nối SSH vào Mac Mini thành công nhưng khi gọi PM2 thì gặp lỗi: `start_web_server.sh: line 26: pm2: command not found`. Do đó backend không khởi động lại được.
+  - **Nguyên nhân kỹ thuật sâu:**
+    1. Trên macOS của Mac Mini M1, `pm2` được cài đặt toàn cục trong thư mục `$HOME/.npm-global/bin/pm2`.
+    2. Phiên đăng nhập SSH Non-interactive không tự động nạp file `~/.zshrc` (chỉ nạp PATH mặc định tối thiểu `/usr/bin:/bin:/usr/sbin:/sbin`). Do đó `start_web_server.sh` không thể tìm thấy lệnh `pm2`.
+    3. File `start_web_server.sh` khi sửa trên Windows bị dính ký tự xuống dòng CRLF `\r\n`, gây lỗi cú pháp bash trên macOS (`syntax error near unexpected token 'elif'`).
+  - **Giải pháp & Khắc phục:**
+    1. *Khắc phục start_web_server.sh:*
+       - Bổ sung nạp PATH toàn diện: `export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$HOME/.npm-global/bin:$PATH"`, source `.zprofile` và `.zshrc`.
+       - Thêm biến `PM2_CMD` tự động dò tìm đường dẫn thực thi của PM2 (`$HOME/.npm-global/bin/pm2` hoặc `/opt/homebrew/bin/pm2`), thay thế toàn bộ lệnh gọi `pm2` trực tiếp bằng `$PM2_CMD`.
+       - Chuyển đổi định dạng file sang chuẩn UNIX (LF `\n`) và đồng bộ trực tiếp lên Mac Mini qua SFTP.
+    2. *Khắc phục zzzGit_Pull_bash_web.py:*
+       - Cập nhật chuỗi lệnh thực thi SSH: Nạp đầy đủ PATH npm-global và profile trước khi cd và gọi `bash start_web_server.sh`.
+       - Đã kiểm thử thành công: PM2 nhận diện ứng dụng `tls1-bot-backend` (status `online`, memory `96.5mb`), Cloudflare Tunnel thông mạng, hệ thống chạy mượt mà 24/7.
+    3. *Phân tách độc lập 2 công cụ (Theo yêu cầu CEO):*
+       - [zzPush_To_GitHub.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzPush_To_GitHub.py): CHUYÊN BIỆT 100% cho việc đẩy mã nguồn lên GitHub. Tuyệt đối không can thiệp hay liên quan đến việc khởi động web server.
+       - [zzzGit_Pull_bash_web.py](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/zzzGit_Pull_bash_web.py): CHUYÊN BIỆT 100% cho việc kích hoạt Mac Mini kéo code (`git pull origin main`) và chạy cập nhật web server (`bash start_web_server.sh`).
+
 - **[28/10/2026]** - Chuẩn Hóa Bộ Cài Đặt Mặc Định Cho Tài Khoản Mới Lần Đầu Đăng Nhập App (Theo Ảnh Thực Tế CEO):
   - **Thông số chuẩn hóa:**
     1. **Sàn OKX (Cả 3 Bot):**

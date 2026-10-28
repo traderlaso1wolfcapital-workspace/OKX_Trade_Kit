@@ -233,7 +233,12 @@ def main():
 
     print("-------------------------------------------------------------------")
     print("🚀 BẮT ĐẦU CHẠY LỆNH TRÊN MAC MINI M1:")
-    full_cmd = f'export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$PATH" && cd {remote_path} && {command}'
+    full_cmd = (
+        'export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$HOME/.npm-global/bin:$PATH"; '
+        '[ -f "$HOME/.zprofile" ] && source "$HOME/.zprofile" 2>/dev/null; '
+        '[ -f "$HOME/.zshrc" ] && source "$HOME/.zshrc" 2>/dev/null; '
+        f'cd {remote_path} && {command}'
+    )
     print(f"👉 $ {full_cmd}\n")
 
     # 4. Thực thi lệnh với PTY để nhận toàn bộ màu sắc và output real-time

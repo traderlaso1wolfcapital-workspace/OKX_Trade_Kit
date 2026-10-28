@@ -115,24 +115,34 @@ function App() {
     return { ...(httpActiveAccounts || {}), ...(wsActiveAccountsState || {}) };
   }, [httpActiveAccounts, wsActiveAccountsState]);
 
-  const [selectedAccount, setSelectedAccount] = useState("");
+  const [selectedAccount, setSelectedAccount] = useState(() => {
+    try {
+      const curBot = localStorage.getItem("tls1_active_bot_tab") || "sub1";
+      const savedForBot = localStorage.getItem(`tls1_selected_account_${curBot}`);
+      if (savedForBot) return savedForBot;
+      const savedGlobal = localStorage.getItem("tls1_selected_account");
+      if (savedGlobal) return savedGlobal;
+    } catch {}
+    return "";
+  });
 
   const effectiveAccId = useMemo(() => {
-    // 1. Ưu tiên tài khoản người dùng đang chọn để xem vị thế & chart độc lập
-    if (selectedAccount && accounts.some(a => a.id === selectedAccount || a.name === selectedAccount)) {
-      const matched = accounts.find(a => a.id === selectedAccount || a.name === selectedAccount);
-      return matched ? matched.id : selectedAccount;
+    // 1. Ưu tiên tài khoản người dùng đang chọn (state hoặc localStorage) để xem vị thế & chart độc lập
+    const targetCandidate = selectedAccount || localStorage.getItem(`tls1_selected_account_${activeBotTab}`) || localStorage.getItem("tls1_selected_account");
+    if (targetCandidate && accounts.some(a => a.id === targetCandidate || a.name === targetCandidate)) {
+      const matched = accounts.find(a => a.id === targetCandidate || a.name === targetCandidate);
+      return matched ? matched.id : targetCandidate;
     }
-    // 2. Fallback: Tài khoản đang chạy thực tế trên server ở tab hiện tại
+    // 2. Fallback sang tài khoản đã gán trước đó trong botAccountMap
+    if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
+      return botAccountMap[activeBotTab];
+    }
+    // 3. Fallback: Tài khoản đang chạy thực tế trên server ở tab hiện tại
     const runningAcc = mergedActiveAccounts[activeBotTab];
     if (runningAcc) {
       const matched = accounts.find(a => a.id === runningAcc || a.name === runningAcc);
       if (matched) return matched.id;
       return runningAcc;
-    }
-    // 3. Fallback sang tài khoản đã gán trước đó trong botAccountMap
-    if (botAccountMap[activeBotTab] && accounts.some(a => a.id === botAccountMap[activeBotTab])) {
-      return botAccountMap[activeBotTab];
     }
     return accounts[0]?.id || "";
   }, [selectedAccount, mergedActiveAccounts, activeBotTab, accounts, botAccountMap]);
@@ -280,6 +290,29 @@ function App() {
 
   const handleAssignAccountToActiveBot = useCallback((accId) => {
     setSelectedAccount(accId);
+    try {
+      if (accId) {
+        localStorage.setItem("tls1_selected_account", accId);
+        localStorage.setItem(`tls1_selected_account_${activeBotTab}`, accId);
+      } else {
+        localStorage.removeItem("tls1_selected_account");
+        localStorage.removeItem(`tls1_selected_account_${activeBotTab}`);
+      }
+    } catch {}
+
+    // Tự động nạp cấu hình Ký quỹ / TP / SL riêng của tài khoản này từ localStorage
+    if (accId) {
+      try {
+        const savedAccRisk = localStorage.getItem(`tls1_risk_${activeBotTab}_${accId}`);
+        if (savedAccRisk) {
+          const parsed = JSON.parse(savedAccRisk);
+          if (parsed && typeof parsed === "object") {
+            setRisk(parsed);
+            prevRiskRef.current = parsed;
+          }
+        }
+      } catch {}
+    }
 
     // Tự động khôi phục chiến thuật bot mà tài khoản này đã chọn trước đó
     if (accId) {
@@ -338,11 +371,17 @@ function App() {
     const isTabSwitch = prevBotTabRef.current !== activeBotTab;
     prevBotTabRef.current = activeBotTab;
 
+    // Kiểm tra tài khoản đã chọn hiện tại (state hoặc localStorage) có hợp lệ không
+    const savedForThisBot = localStorage.getItem(`tls1_selected_account_${activeBotTab}`);
+    const savedGlobal = localStorage.getItem("tls1_selected_account");
+    const currentCandidate = selectedAccount || savedForThisBot || savedGlobal;
+    const isCandidateValid = currentCandidate && accounts.some(a => a.id === currentCandidate || a.name === currentCandidate);
+
     // Chỉ tự động điều chỉnh selectedAccount khi:
-    // 1. Chuyển đổi giữa các tab bot (sub1, sub2, sub3)
-    // 2. Hoặc ban đầu chưa có tài khoản nào được chọn (!selectedAccount)
-    // Tuyệt đối KHÔNG ghi đè khi người dùng đang chủ động chọn xem một tài khoản phụ khác!
-    if (isTabSwitch || !selectedAccount) {
+    // 1. Chuyển đổi tab bot VÀ tab mới chưa có tài khoản đã lưu hợp lệ
+    // 2. Hoặc ban đầu chưa có tài khoản nào được chọn hợp lệ (!isCandidateValid)
+    // Tuyệt đối KHÔNG ghi đè khi người dùng đang xem một tài khoản cụ thể (F5 giữ nguyên 100%)!
+    if (!isCandidateValid || (isTabSwitch && !savedForThisBot)) {
       const runningAcc = mergedActiveAccounts[activeBotTab];
       let target = "";
       if (runningAcc) {
@@ -356,6 +395,10 @@ function App() {
 
       if (target) {
         setSelectedAccount(target);
+        try {
+          localStorage.setItem("tls1_selected_account", target);
+          localStorage.setItem(`tls1_selected_account_${activeBotTab}`, target);
+        } catch {}
         if (runningAcc && botAccountMap[activeBotTab] !== target) {
           setBotAccountMap(prev => {
             const next = { ...prev, [activeBotTab]: target };
@@ -368,8 +411,10 @@ function App() {
         setPositions([]);
         setClosedPositions([]);
       }
+    } else if (currentCandidate && selectedAccount !== currentCandidate) {
+      setSelectedAccount(currentCandidate);
     }
-  }, [activeBotTab, mergedActiveAccounts, accounts]);
+  }, [activeBotTab, mergedActiveAccounts, accounts, selectedAccount]);
 
   const [adminClosedPositions, setAdminClosedPositions] = useState([]);
   const [isStartingBot, setIsStartingBot] = useState(false);
@@ -891,11 +936,17 @@ function App() {
     }
   };
 
-  // 9. Risk & Strategy Settings State (Ưu tiên nạp từ localStorage để không bị giật về 0.4$)
+  // 9. Risk & Strategy Settings State (Ưu tiên nạp từ localStorage theo từng tài khoản)
   const [risk, setRisk] = useState(() => {
     try {
       const active = localStorage.getItem("tls1_active_bot_tab") || "sub1";
-      const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}`));
+      const selAcc = localStorage.getItem(`tls1_selected_account_${active}`) || localStorage.getItem("tls1_selected_account") || "";
+      const savedAccRisk = selAcc ? localStorage.getItem(`tls1_risk_${active}_${selAcc}`) : null;
+      if (savedAccRisk) {
+        const parsed = JSON.parse(savedAccRisk);
+        if (parsed && typeof parsed === "object") return parsed;
+      }
+      const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}_${selAcc}`) || localStorage.getItem(`tls1_risk_posVol_${active}`));
       const initVol = (savedVol && savedVol > 0) ? savedVol : 0.4;
       if (active === "sub2") {
         return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false };
@@ -977,15 +1028,25 @@ function App() {
     const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${activeBotTab}`));
 
     if (activeBotTab === "sub1") {
+      const savedAccRisk = effectiveAccId ? localStorage.getItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`) : null;
+      if (savedAccRisk) {
+        try {
+          const parsed = JSON.parse(savedAccRisk);
+          if (parsed && typeof parsed === "object") {
+            setRisk(parsed);
+            prevRiskRef.current = parsed;
+            return;
+          }
+        } catch {}
+      }
       setRisk((r) => {
-        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
-        const isFromSub2 = r.tpPct === 5.0 && r.slPct === 1.0;
+        const curVol = (savedVol > 0) ? savedVol : (r.posVol > 0 ? r.posVol : 0.4);
         return {
           ...r,
           posVol: curVol,
           volUsdt: curVol,
-          tpPct: isFromSub2 ? 0.60 : (r.tpPct || 0.60),
-          slPct: isFromSub2 ? 0.60 : (r.slPct || 0.60),
+          tpPct: r.tpPct || 0.80,
+          slPct: r.slPct || 0.80,
           volUnit: r.volUnit || "USDT",
         };
       });
@@ -996,15 +1057,25 @@ function App() {
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
       });
     } else if (activeBotTab === "sub2") {
+      const savedAccRisk = effectiveAccId ? localStorage.getItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`) : null;
+      if (savedAccRisk) {
+        try {
+          const parsed = JSON.parse(savedAccRisk);
+          if (parsed && typeof parsed === "object") {
+            setRisk(parsed);
+            prevRiskRef.current = parsed;
+            return;
+          }
+        } catch {}
+      }
       setRisk((r) => {
-        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
-        const isFromSub1 = (r.tpPct === 0.60 && r.slPct === 0.60) || !r.tpPct;
+        const curVol = (savedVol > 0) ? savedVol : (r.posVol > 0 ? r.posVol : 0.4);
         return {
           ...r,
           posVol: curVol,
           volUsdt: curVol,
-          tpPct: isFromSub1 ? 5.0 : r.tpPct,
-          slPct: isFromSub1 ? 1.0 : r.slPct,
+          tpPct: 5.0,
+          slPct: 1.0,
           volUnit: r.volUnit || "USDT",
         };
       });
@@ -1017,7 +1088,7 @@ function App() {
       });
     } else {
       setRisk((r) => {
-        const curVol = (r.posVol && r.posVol > 0) ? r.posVol : (savedVol > 0 ? savedVol : 1);
+        const curVol = (savedVol > 0) ? savedVol : (r.posVol > 0 ? r.posVol : 0.4);
         return {
           ...r,
           posVol: curVol,
@@ -1029,13 +1100,19 @@ function App() {
       });
       setStrat({ main: true, timeframeBase: "1H" });
     }
-  }, [activeBotTab]);
+  }, [activeBotTab, effectiveAccId]);
 
-  // Sync Risk settings to backend (chỉ sync khi đã nạp xong từ backend và bot KHÔNG chạy)
+  // Sync Risk settings to backend & localStorage per account (đồng bộ ngay cả khi bot đang chạy cho TP/SL linh hoạt)
   useEffect(() => {
-    if (!hasLoadedConfigFromBackendRef.current || isRunning || !effectiveAccId) return;
+    if (!hasLoadedConfigFromBackendRef.current || !effectiveAccId) return;
     if (prevRiskRef.current && JSON.stringify(prevRiskRef.current) === JSON.stringify(risk)) return;
     prevRiskRef.current = risk;
+
+    // Lưu ngay lập tức vào localStorage cho tài khoản cụ thể này
+    try {
+      localStorage.setItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`, JSON.stringify(risk));
+      localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`, String(risk.posVol));
+    } catch {}
 
     const timer = setTimeout(() => {
       try {
@@ -1063,9 +1140,9 @@ function App() {
           }
         });
       } catch {}
-    }, 600);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [risk, isRunning, activeBotTab, currentUid, effectiveAccId, accounts]);
+  }, [risk, activeBotTab, currentUid, effectiveAccId, accounts]);
 
   // Bootstrap accounts & credentials unconditionally on mount
   useEffect(() => {
@@ -1267,6 +1344,10 @@ function App() {
           };
           prevRiskRef.current = nextRisk;
           setRisk(nextRisk);
+          try {
+            localStorage.setItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`, JSON.stringify(nextRisk));
+            localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`, String(nextRisk.posVol));
+          } catch {}
         }
         hasLoadedConfigFromBackendRef.current = true;
         if (d.ENABLE_STRATEGY_MAIN !== undefined || d.ENABLE_PYRAMID_DCA !== undefined || d.ENABLE_MULTITF_GRID !== undefined) {
@@ -2967,8 +3048,8 @@ function App() {
             } catch {}
           }
           const isSub2 = activeBotTab === "sub2";
-          let parsedTp = isSub2 ? 5.0 : 0.60;
-          let parsedSl = isSub2 ? 1.0 : 0.60;
+          let parsedTp = isSub2 ? 5.0 : 0.80;
+          let parsedSl = isSub2 ? 1.0 : 0.80;
           if (isSub2) {
             if (d.OB_RR_RATIO_TREND !== undefined) {
               parsedTp = Number(d.OB_RR_RATIO_TREND);
@@ -2983,8 +3064,8 @@ function App() {
               parsedSl = (slVal === 0.60 || slVal === 1.5) ? 1.0 : slVal;
             }
           } else {
-            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : 0.60;
-            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : 0.60;
+            parsedTp = d.SCALPING_TP_PCT ? Number((d.SCALPING_TP_PCT * 100).toFixed(2)) : 0.80;
+            parsedSl = d.SCALPING_SL_PCT ? Number((d.SCALPING_SL_PCT * 100).toFixed(2)) : 0.80;
           }
           setRisk((r) => {
             const nextRisk = {
@@ -2996,6 +3077,9 @@ function App() {
               multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : (r.multiplyVolumeByTf ?? false),
             };
             prevRiskRef.current = nextRisk;
+            try {
+              localStorage.setItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`, JSON.stringify(nextRisk));
+            } catch {}
             return nextRisk;
           });
           hasLoadedConfigFromBackendRef.current = true;

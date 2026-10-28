@@ -268,25 +268,45 @@ def main():
     }
 
     if not os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
-        try:
-            default_sub2_cfg = {
-                "ENABLED_COINS": ["XAU", "BTC", "ETH"],
-                "ENABLE_STRATEGY_SMC": True,
-                "TIMEFRAME_BASE": "1H",
-                "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
-                "OB_RR_RATIO_TREND": "5.00",
-                "OB_RR_RATIO_COUNTER": "1.00",
-                "USE_DYNAMIC_RISK": False,
-                "RISK_PER_TRADE_PCT": "0.0050",
-                "SMC_MODE": "All Setups",
-                "SMC_STYLE": "Normal",
-                "OB_SOURCE": "ALL",
-                "OB_DIRECTION": "BOTH",
-                "OB_TP_MODE": "RR"
-            }
-            with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
-                json.dump(default_sub2_cfg, f, indent=4)
-        except Exception: pass
+        found_existing = False
+        raw_env_name = os.path.basename(env_file).replace(".api", "").lstrip("_")
+        candidates = [
+            os.path.join(JSON_DATA_DIR, f"{raw_env_name}_global_config.json"),
+            os.path.join(JSON_DATA_DIR, f"{raw_env_name.replace('_', '')}_global_config.json"),
+            os.path.join(JSON_DATA_DIR, "sub2_global_config.json")
+        ]
+        for cp in candidates:
+            if os.path.exists(cp) and cp != env_paths["FILE_GLOBAL_CONFIG"]:
+                try:
+                    with open(cp, "r", encoding="utf-8") as rf:
+                        existing_data = json.load(rf)
+                    with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as wf:
+                        json.dump(existing_data, wf, indent=4, ensure_ascii=False)
+                    found_existing = True
+                    break
+                except Exception:
+                    pass
+
+        if not found_existing:
+            try:
+                default_sub2_cfg = {
+                    "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                    "ENABLE_STRATEGY_SMC": True,
+                    "TIMEFRAME_BASE": "1H",
+                    "POSITION_VOLUME_HIGH_CONFIDENCE": "0.40",
+                    "OB_RR_RATIO_TREND": "5.00",
+                    "OB_RR_RATIO_COUNTER": "1.00",
+                    "USE_DYNAMIC_RISK": False,
+                    "RISK_PER_TRADE_PCT": "0.0050",
+                    "SMC_MODE": "All Setups",
+                    "SMC_STYLE": "Normal",
+                    "OB_SOURCE": "ALL",
+                    "OB_DIRECTION": "BOTH",
+                    "OB_TP_MODE": "RR"
+                }
+                with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
+                    json.dump(default_sub2_cfg, f, indent=4)
+            except Exception: pass
 
     # Dọn sạch các file flag cũ của tài khoản này
     for flag_name in ["stop", "reset_wallet", "reset_nen"]:

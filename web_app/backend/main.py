@@ -2400,8 +2400,11 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
                     except Exception:
                         pass
 
-        # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh để bắt đầu chu trình chạy bot mới (bảo lưu 100% TP/SL)
-        canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")
+        # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh nếu bot KHÔNG chạy (bảo lưu 100% TP/SL)
+        is_running = (get_running_pid(uid, strategy) > 0) or (get_nested(bot_processes, uid, strategy) and get_nested(bot_processes, uid, strategy).poll() is None)
+        canceled_orders = 0
+        if not is_running:
+            canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")
 
         return {"message": "Config updated successfully.", "config": cfg, "canceled_count": canceled_orders}
     except Exception as e:

@@ -263,33 +263,54 @@ def main():
     }
 
     if not os.path.exists(env_paths["FILE_GLOBAL_CONFIG"]):
-        try:
-            default_sub1_cfg = {
-                "ENABLED_COINS": ["XAU", "BTC", "ETH"],
-                "ENABLE_STRATEGY_MAIN": True,
-                "ENABLE_PYRAMID_DCA": True,
-                "ENABLE_STRATEGY_HEDGE": True,
-                "ENABLE_STRATEGY_XOLE": True,
-                "ENABLE_DYNAMIC_EMA200_TP": False,
-                "ENABLE_DYNAMIC_PINGPONG_TP": False,
-                "ALTCOIN_FOLLOW_BTC_EMA": False,
-                "ENABLE_SIDEWAY_SAFE_EXIT": False,
-                "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
-                "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
-                "ENABLE_TRAILING_SL": False,
-                "ENABLE_MAX_ROI_EXIT": False,
-                "ENABLE_SIDEWAY_VAP_EXIT": False,
-                "ENABLE_H4_FLIP_CLOSE": False,
-                "POSITION_VOLUME_HIGH_CONFIDENCE": "100.00",
-                "TP_TARGET_OPTIMAL": "0.01200",
-                "SL_TARGET_OPTIMAL": "0.01200",
-                "EVOLUTION_CYCLE_SECONDS": 3600,
-                "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
-                "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
-            }
-            with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
-                json.dump(default_sub1_cfg, f, indent=4)
-        except Exception: pass
+        # Kiểm tra xem có file config biến thể do Web App tạo (ví dụ sub_6722 vs sub6722)
+        found_existing = False
+        raw_env_name = os.path.basename(env_file).replace(".api", "").lstrip("_")
+        candidates = [
+            os.path.join(JSON_DATA_DIR, f"{raw_env_name}_global_config.json"),
+            os.path.join(JSON_DATA_DIR, f"{raw_env_name.replace('_', '')}_global_config.json"),
+            os.path.join(JSON_DATA_DIR, "sub1_global_config.json")
+        ]
+        for cp in candidates:
+            if os.path.exists(cp) and cp != env_paths["FILE_GLOBAL_CONFIG"]:
+                try:
+                    with open(cp, "r", encoding="utf-8") as rf:
+                        existing_data = json.load(rf)
+                    with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as wf:
+                        json.dump(existing_data, wf, indent=4, ensure_ascii=False)
+                    found_existing = True
+                    break
+                except Exception:
+                    pass
+
+        if not found_existing:
+            try:
+                default_sub1_cfg = {
+                    "ENABLED_COINS": ["XAU", "BTC", "ETH"],
+                    "ENABLE_STRATEGY_MAIN": True,
+                    "ENABLE_PYRAMID_DCA": False,
+                    "ENABLE_STRATEGY_HEDGE": True,
+                    "ENABLE_STRATEGY_XOLE": True,
+                    "ENABLE_DYNAMIC_EMA200_TP": False,
+                    "ENABLE_DYNAMIC_PINGPONG_TP": False,
+                    "ALTCOIN_FOLLOW_BTC_EMA": False,
+                    "ENABLE_SIDEWAY_SAFE_EXIT": False,
+                    "ENABLE_SQUEEZE_ESCAPE_EXIT": False,
+                    "ENABLE_SAFEGUARD_ENTRY_EXIT": False,
+                    "ENABLE_TRAILING_SL": False,
+                    "ENABLE_MAX_ROI_EXIT": False,
+                    "ENABLE_SIDEWAY_VAP_EXIT": False,
+                    "ENABLE_H4_FLIP_CLOSE": False,
+                    "POSITION_VOLUME_HIGH_CONFIDENCE": "0.40",
+                    "TP_TARGET_OPTIMAL": "0.00800",
+                    "SL_TARGET_OPTIMAL": "0.00800",
+                    "EVOLUTION_CYCLE_SECONDS": 3600,
+                    "LEVERAGES": {"XAU": 50, "BTC": 100, "ETH": 100},
+                    "VOL_MULTIPLIERS": {"BTC": "1.00", "ETH": "1.30"}
+                }
+                with open(env_paths["FILE_GLOBAL_CONFIG"], "w", encoding="utf-8") as f:
+                    json.dump(default_sub1_cfg, f, indent=4)
+            except Exception: pass
 
     # Tự động dọn dẹp các file log rác nặng máy cũ (RSI macro log, nhật ký phiên)
     for path in [env_paths["FILE_RSI_BEHAVIOR"], env_paths["FILE_WAIT_LOG"], env_paths["FILE_TRADE_HISTORY"]]:
