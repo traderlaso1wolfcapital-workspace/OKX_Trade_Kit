@@ -1485,6 +1485,7 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
 def get_running_pid(uid: str, strategy: str, account_id: str = "") -> int:
     data_dir = get_user_data_dir(uid)
     acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
+    has_specific_acc = bool(acc_name)
     
     # Nếu không truyền account_id, lấy tài khoản đang chạy gần nhất của strategy
     if not acc_name:
@@ -1497,30 +1498,57 @@ def get_running_pid(uid: str, strategy: str, account_id: str = "") -> int:
                         acc_name = content
             except:
                 pass
-    if not acc_name:
-        acc_name = strategy
 
-    candidates = [
-        acc_name,
-        acc_name.replace("#", ""),
-        f"sub{acc_name.replace('#', '')}",
-        strategy
-    ]
+    candidates = []
+    if acc_name:
+        clean_name = acc_name.replace("#", "").strip()
+        clean_no_under = clean_name.replace("_", "").strip()
+        candidates.extend([acc_name, clean_name, clean_no_under, f"sub{clean_name}"])
+    
+    # Chỉ kiểm tra strategy.pid nếu không chỉ định account_id cụ thể
+    if not has_specific_acc:
+        candidates.append(strategy)
+
     for c in candidates:
+        if not c: continue
         pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{c}.pid")
         if os.path.exists(pid_file):
             try:
                 with open(pid_file, "r") as f:
-                    pid = int(f.read().strip())
+                    pid_str = f.read().strip()
+                if not pid_str.isdigit():
+                    try: os.remove(pid_file)
+                    except: pass
+                    continue
+                pid = int(pid_str)
                 try:
                     import psutil
                     if psutil.pid_exists(pid):
-                        _ = psutil.Process(pid)
-                        return pid
+                        p = psutil.Process(pid)
+                        # Kiểm tra trạng thái: nếu zombie / dead thì loại bỏ
+                        if p.status() in (getattr(psutil, "STATUS_ZOMBIE", "zombie"), getattr(psutil, "STATUS_DEAD", "dead")):
+                            try: os.remove(pid_file)
+                            except: pass
+                            continue
+                        
+                        # Bắt buộc kiểm tra cmdline hoặc process name xem có đúng là bot của strategy này không
+                        cmdline = " ".join(p.cmdline()).lower()
+                        pname = p.name().lower()
+                        is_bot = ("python" in pname or "python" in cmdline) and (f"sys_bot_{strategy}" in cmdline or f"--run-bot {strategy}" in cmdline or f"sys_bot_{strategy}" in pname)
+                        if is_bot:
+                            return pid
+                        else:
+                            # PID này không phải của bot (đã bị OS cấp lại cho ứng dụng khác)
+                            try: os.remove(pid_file)
+                            except: pass
+                    else:
+                        try: os.remove(pid_file)
+                        except: pass
                 except ImportError:
                     return pid
                 except (OSError, IOError, ValueError):
-                    pass
+                    try: os.remove(pid_file)
+                    except: pass
             except (OSError, IOError, ValueError):
                 pass
     return 0
@@ -1529,7 +1557,11 @@ def _get_flag_dir(uid: str, strategy: str) -> str:
     return os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
 
 def _is_shadow_mode(uid: str, strategy: str, account_id: str = "") -> bool:
-    """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng"""
+    """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng hoàn toàn"""
+    pid = get_running_pid(uid, strategy, account_id)
+    if pid <= 0:
+        return True
+
     data_dir = get_user_data_dir(uid)
     acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
     
@@ -1763,26 +1795,51 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     for other_strat in ["sub1", "sub2", "sub3"]:
         if other_strat == strategy:
             continue
-        o_pid = get_running_pid(uid, other_strat)
-        o_proc = get_nested(bot_processes, uid, other_strat)
+        o_pid = get_running_pid(uid, other_strat, target_acc)
+        o_proc = get_nested(bot_processes, uid, f"{other_strat}_{target_acc}") or get_nested(bot_processes, uid, other_strat)
         o_alive = (o_pid > 0) or (o_proc and o_proc.poll() is None)
-        if o_alive and not _is_shadow_mode(uid, other_strat):
-            o_acc_file = os.path.join(data_dir, f"bots/{other_strat}", f".running_account_{other_strat}")
-            if os.path.exists(o_acc_file):
+        
+        # Kiểm tra xem có file running_account nào trỏ vào tài khoản này không
+        o_acc_file_spec = os.path.join(data_dir, f"bots/{other_strat}", f".running_account_{other_strat}_{target_acc}")
+        o_acc_file = os.path.join(data_dir, f"bots/{other_strat}", f".running_account_{other_strat}")
+        o_acc = ""
+        for af in [o_acc_file_spec, o_acc_file]:
+            if os.path.exists(af):
                 try:
-                    with open(o_acc_file, "r", encoding="utf-8") as f:
+                    with open(af, "r", encoding="utf-8") as f:
                         o_acc = f.read().strip()
-                    if o_acc and (o_acc == target_acc or o_acc.replace("#", "") == target_acc.replace("#", "")):
-                        other_bot_name = strat_labels.get(other_strat, other_strat)
-                        this_bot_name = strat_labels.get(strategy, strategy)
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"⚠️ Tài khoản OKX '{target_acc}' đang chạy độc quyền bởi {other_bot_name}!\n\nTheo nguyên tắc an toàn vốn, mỗi tài khoản chỉ được chạy duy nhất 1 phương pháp Bot. Vui lòng chọn tài khoản phụ khác cho {this_bot_name} hoặc bấm DỪNG BOT bên {other_bot_name} trước!"
-                        )
-                except HTTPException:
-                    raise
-                except Exception as e:
-                    print(f"[EXCLUSIVE_LOCK_OKX] Lỗi kiểm tra: {e}", flush=True)
+                    if o_acc: break
+                except: pass
+
+        is_same_acc = False
+        if o_acc:
+            clean_o = o_acc.replace("#", "").strip()
+            clean_t = target_acc.replace("#", "").strip()
+            if clean_o == clean_t or o_acc == target_acc:
+                is_same_acc = True
+
+        # CHỈ CHẶN KHI VÀ CHỈ KHI: Bot đó THỰC SỰ ĐANG CHẠY TRÊN OS (o_alive == True) VÀ không ở chế độ shadow/dừng
+        if is_same_acc:
+            if o_alive and not _is_shadow_mode(uid, other_strat, target_acc):
+                other_bot_name = strat_labels.get(other_strat, other_strat)
+                this_bot_name = strat_labels.get(strategy, strategy)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"⚠️ Tài khoản OKX '{target_acc}' đang chạy độc quyền bởi {other_bot_name}!\n\nTheo nguyên tắc an toàn vốn, mỗi tài khoản chỉ được chạy duy nhất 1 phương pháp Bot. Vui lòng chọn tài khoản phụ khác cho {this_bot_name} hoặc bấm DỪNG BOT bên {other_bot_name} trước khi khởi động!"
+                )
+            else:
+                # Nếu tiến trình đó đã chết hoặc chỉ là cờ rác cũ còn sót lại -> Tự động dọn sạch rác, không chặn oan người dùng!
+                for af in [o_acc_file_spec, o_acc_file]:
+                    if os.path.exists(af):
+                        try: os.remove(af)
+                        except: pass
+                # Dọn các cờ rác cũ của other_strat
+                for nm in [target_acc, target_acc.replace("#", "")]:
+                    for fn in [f"activate_{nm}.flag", f"dry_run_{nm}.flag"]:
+                        fp = os.path.join(data_dir, f"bots/{other_strat}", "json_data", fn)
+                        if os.path.exists(fp):
+                            try: os.remove(fp)
+                            except: pass
 
     # ── HỖ TRỢ CHẾ ĐỘ QUỸ PROP FIRM (TRADELOCKER / E8) ──
     tradelocker_cfg = TradeLockerManager.load_user_config(uid, get_user_base_dir, fernet)
@@ -1913,25 +1970,33 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
     running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}_{target_acc}")
 
     if process_alive:
-        # Process đang chạy cho chính tài khoản này -> chỉ cần kích hoạt bằng flag
-        acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
-        for nm in acc_flag_names:
-            stop_flag = os.path.join(flag_dir, f"stop_{nm}.flag")
-            if os.path.exists(stop_flag):
-                try: os.remove(stop_flag)
-                except: pass
+        # Nếu có tiến trình cũ đang chạy dở, kill sạch để khởi động lại mới tinh khôi
+        print(f"🔄 [START BOT] Phát hiện tiến trình cũ (PID: {pid}) cho {target_acc}. Tự động dọn dẹp để khởi động lại sạch sẽ 100%...", flush=True)
+        if proc:
             try:
-                with open(os.path.join(flag_dir, f"activate_{nm}.flag"), "w") as f:
-                    f.write("1")
-                with open(os.path.join(flag_dir, f"dry_run_{nm}.flag"), "w") as f:
-                    f.write("0")
+                import psutil
+                p = psutil.Process(proc.pid)
+                for child in p.children(recursive=True):
+                    try: child.kill()
+                    except: pass
+                p.kill()
+            except:
+                try: proc.kill()
+                except: pass
+        if pid > 0:
+            try:
+                import psutil
+                p = psutil.Process(pid)
+                for child in p.children(recursive=True):
+                    try: child.kill()
+                    except: pass
+                p.kill()
             except: pass
-        set_nested(bot_start_times, uid, bot_key, time.time())
-        set_nested(bot_start_times, uid, strategy, time.time())
-        clean_info = f" (Đã dọn {canceled_orders} lệnh Limit cũ)" if canceled_orders > 0 else ""
-        return {"status": "success", "message": f"⚡ Bot đã được KÍCH HOẠT!{clean_info} Lệnh thật sẽ được đặt lên OKX theo nến hiện tại.", "canceled_count": canceled_orders}
+        del_nested(bot_processes, uid, bot_key)
+        del_nested(bot_processes, uid, strategy)
+        time.sleep(0.4)
 
-    # Process chưa chạy cho tài khoản này — spawn mới (hỗ trợ nhiều tài khoản cùng chạy 1 chiến thuật)
+    # Spawn tiến trình mới sạch sẽ (hỗ trợ nhiều tài khoản cùng chạy 1 chiến thuật)
     try:
         with open(running_acc_file, "w") as f:
             f.write(target_acc)
@@ -2179,7 +2244,15 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
         if get_nested(bot_processes, uid, strategy) == proc:
             del_nested(bot_processes, uid, strategy)
 
-    # 5. Dọn sạch queue logs của riêng tài khoản này trong RAM
+    # 5. Xóa sạch các file .pid của tài khoản này
+    for c in [acc_name, acc_name.replace("#", ""), f"sub{acc_name.replace('#', '')}", target_acc, target_acc.replace("#", "")]:
+        if not c: continue
+        pid_file = os.path.join(flag_dir, f"{c}.pid")
+        if os.path.exists(pid_file):
+            try: os.remove(pid_file)
+            except: pass
+
+    # 6. Dọn sạch queue logs của riêng tài khoản này trong RAM
     if uid in bot_log_queues:
         if bot_key in bot_log_queues[uid]:
             bot_log_queues[uid][bot_key].clear()
@@ -2188,6 +2261,114 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
 
     msg = f"Bot {strategy} cho tài khoản {target_acc} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
     return {"message": msg, "status": "STOPPED", "canceled_count": canceled_orders}
+
+@app.get("/api/bot/inspect")
+def inspect_system_bots(uid: str = "default"):
+    """Quét và trả về danh sách toàn bộ tiến trình bot đang chạy thực tế trên OS."""
+    bots = []
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'memory_info', 'status']):
+            try:
+                cmdline_list = proc.info.get('cmdline') or []
+                cmdline = " ".join(cmdline_list).lower()
+                pname = (proc.info.get('name') or "").lower()
+
+                is_bot = False
+                strat = "unknown"
+                target_env = ""
+
+                if "sys_bot_sub1" in cmdline:
+                    is_bot, strat = True, "sub1"
+                elif "sys_bot_sub2" in cmdline:
+                    is_bot, strat = True, "sub2"
+                elif "sys_bot_sub3" in cmdline:
+                    is_bot, strat = True, "sub3"
+                elif "--run-bot" in cmdline:
+                    is_bot = True
+                    for i, arg in enumerate(cmdline_list):
+                        if arg == "--run-bot" and i + 1 < len(cmdline_list):
+                            strat = cmdline_list[i+1]
+                            if i + 2 < len(cmdline_list):
+                                target_env = cmdline_list[i+2]
+                            break
+
+                if is_bot:
+                    mem_mb = round(proc.info['memory_info'].rss / (1024 * 1024), 1) if proc.info.get('memory_info') else 0
+                    uptime_sec = int(time.time() - proc.info.get('create_time', time.time()))
+                    bots.append({
+                        "pid": proc.info['pid'],
+                        "strategy": strat,
+                        "target": target_env or "default",
+                        "status": proc.info.get('status', 'running'),
+                        "uptime_sec": uptime_sec,
+                        "uptime": f"{uptime_sec // 60}m {uptime_sec % 60}s",
+                        "memory_mb": mem_mb,
+                    })
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+    except Exception as e:
+        return {"status": "error", "message": str(e), "bots": []}
+    return {"status": "success", "count": len(bots), "bots": bots}
+
+@app.post("/api/bot/force_kill_all")
+def force_kill_all_bots(uid: str = "default", cancel_limits: bool = True):
+    """Cưỡng chế tiêu diệt toàn bộ tiến trình bot chạy ngầm, dọn sạch cờ flags và file PID rác."""
+    killed = 0
+    current_pid = os.getpid()
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if proc.info['pid'] == current_pid:
+                    continue
+                cmdline = " ".join(proc.info.get('cmdline') or []).lower()
+                pname = (proc.info.get('name') or "").lower()
+                is_bot = any(k in cmdline for k in ["sys_bot_sub1", "sys_bot_sub2", "sys_bot_sub3", "--run-bot"])
+                if not is_bot and "python" in pname and any(k in cmdline for k in ["sub1", "sub2", "sub3", "xgui_main"]):
+                    is_bot = True
+                if is_bot:
+                    for child in proc.children(recursive=True):
+                        try: child.kill()
+                        except: pass
+                    proc.kill()
+                    killed += 1
+            except:
+                pass
+    except Exception as e:
+        print(f"[FORCE_KILL_ERR]: {e}")
+
+    # Dọn dẹp RAM process maps
+    if uid in bot_processes: bot_processes[uid].clear()
+    if uid in bot_start_times: bot_start_times[uid].clear()
+
+    # Dọn sạch các file .pid và .running_account và cờ flags
+    data_dir = get_user_data_dir(uid)
+    deleted_files = 0
+    if os.path.exists(data_dir):
+        for root, dirs, files in os.walk(data_dir):
+            for f in files:
+                if f.endswith(".pid") or f.startswith(".running_account") or (f.endswith(".flag") and any(f.startswith(p) for p in ["stop_", "activate_", "dry_run_", "kill_"])):
+                    try:
+                        os.remove(os.path.join(root, f))
+                        deleted_files += 1
+                    except: pass
+
+    # Hủy toàn bộ lệnh limit trên sàn nếu yêu cầu
+    canceled_limit_count = 0
+    if cancel_limits:
+        for strat in ["sub1", "sub2", "sub3"]:
+            try:
+                canceled_limit_count += _cancel_unfilled_limit_orders(uid, strat, action_name="FORCE KILL ALL")
+            except: pass
+
+    return {
+        "status": "success",
+        "killed_processes": killed,
+        "cleaned_files": deleted_files,
+        "canceled_limits": canceled_limit_count,
+        "message": f"✅ Đã tiêu diệt {killed} tiến trình bot, dọn {deleted_files} file rác và hủy {canceled_limit_count} lệnh Limit trên sàn!"
+    }
 
 @app.post("/api/bot/shadow/start")
 async def start_shadow_bot(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -5518,3 +5699,4 @@ if __name__ == "__main__":
 # z7736 | Triệt tiêu 100% rác HTML Cloudflare: mở rộng bộ lọc regex và token Cloudflare trong log_reader_task ngăn không cho bất kỳ fragment nào lọt vào OKX log stream
 # z7737 | Khắc phục triệt để lỗi hiển thị chấm đỏ trạng thái bot: dọn sạch activeAccounts khi bot dừng/chuyển trạng thái, loại bỏ cờ is_running cứng, cô lập chấm đỏ theo tài khoản thực tế đang chạy cho cả OKX và Quỹ FX.
 # z7738 | Khắc phục triệt để 3 lỗi: 1) Ký quỹ lệnh Limit 0.4$ thay vì mức cài đặt (đồng bộ POSITION_VOLUME_HIGH_CONFIDENCE, POSITION_VOLUME_USDT và tất cả alias config); 2) Hiển thị Timeframe cho lệnh Limit ("Chờ khớp (Limit M5)", v.v.) bằng cách trích xuất clOrdId; 3) Tự động hủy sạch toàn bộ lệnh Limit chưa khớp trên OKX khi Dừng bot và Bật bot (bảo lưu 100% TP/SL), dọn cache tức thì.
+# z7741 | Khắc phục triệt để lỗi bot chạy ngầm đẻ lại lệnh Limit và lỗi cảnh báo sai Liquidation Bot / không đăng xuất được: 1) Trích xuất chiến thuật getRunningStrategyForAccount chuẩn xác 100%, xóa bỏ lỗi nhận nhầm key 'sub1_{acc}' thành Liquidation Bot; 2) Cho phép Buộc Dừng Bot & Hủy Sạch Limit khi Đăng Xuất / Xóa tài khoản; 3) get_running_pid kiểm tra cmdline và process status, loại bỏ triệt để PID rác của OS; 4) Khởi động sạch (Clean Restart) kill sạch bot cũ trước khi spawn mới; 5) Bổ sung bộ công cụ CLI zInspect_Bots, zClean_Zombie_Bots và REST API /api/bot/inspect, /api/bot/force_kill_all.

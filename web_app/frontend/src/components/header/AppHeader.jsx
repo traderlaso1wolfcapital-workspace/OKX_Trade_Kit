@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "../../i18n";
 import { OkxLogo, E8Logo, FtmoLogo, formatOkxAccountTag } from "../sidebar/SidebarLeft";
+import { getRunningStrategyForAccount } from "../../utils/accountUtils";
 
 export default function AppHeader({
   accounts = [],
@@ -331,32 +332,15 @@ export default function AppHeader({
               const tag = formatOkxAccountTag(acc);
               const accBal = getOkxBalance(acc);
               const isAccMain = Boolean(acc.is_main || acc.name === "Tài khoản chính" || (acc.name && acc.name.toLowerCase().startsWith("tài khoản chính")));
-              const isThisAccRunning = !isAccMain && Boolean(
-                Object.entries(activeAccounts || {}).some(([k, runningVal]) => {
-                  if (!runningVal) return false;
-                  const cAccId = String(acc.id || "").trim().replace(/^#/, "");
-                  const cAccName = String(acc.name || "").trim().replace(/^#/, "");
-                  const cleanK = String(k).trim().replace(/^#/, "");
-
-                  // Nếu key là chiến thuật activeBotTab đang mở mà tài khoản này đang xem nhưng botStatus không phải RUNNING, bỏ qua
-                  if (k === activeBotTab && acc.id === effectiveAccId && botStatus && botStatus !== "RUNNING") return false;
-
-                  // 1. Key là acc_id (ví dụ { "#7768": "sub1" })
-                  if (cleanK === cAccId || (cAccName && cleanK === cAccName)) return true;
-
-                  // 2. runningVal là acc_id (ví dụ { "sub1_#7768": "#7768" })
-                  if (typeof runningVal === "string") {
-                    const cVal = runningVal.trim().replace(/^#/, "");
-                    if (cVal === cAccId || (cAccName && cVal === cAccName)) return true;
-                  } else if (Array.isArray(runningVal)) {
-                    if (runningVal.some(r => {
-                      const cVal = String(r).trim().replace(/^#/, "");
-                      return cVal === cAccId || (cAccName && cVal === cAccName);
-                    })) return true;
-                  }
-                  return false;
-                })
-              );
+              const runningStrat = getRunningStrategyForAccount(activeAccounts, acc.id, accounts);
+              let isThisAccRunning = false;
+              if (!isAccMain && runningStrat) {
+                if (runningStrat === activeBotTab && (acc.id === effectiveAccId || acc.name === effectiveAccId)) {
+                  isThisAccRunning = botStatus === "RUNNING";
+                } else {
+                  isThisAccRunning = true;
+                }
+              }
               const theme = getAccountTheme("okx");
 
               return (

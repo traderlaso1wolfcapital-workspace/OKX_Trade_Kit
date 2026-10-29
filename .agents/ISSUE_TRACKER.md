@@ -33,6 +33,38 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để 4 Vấn Đề: Lỗi Bot Chạy Ngầm Đẻ Lệnh Liên Tục, Cảnh Báo Sai "Đang Chạy Độc Quyền Bởi Liquidation Bot", Không Cho Đăng Xuất Tài Khoản và Bổ Sung Công Cụ Kiểm Tra / Diệt Bot Ngầm:
+  - **Hiện tượng & Báo cáo từ CEO:**
+    1. Khi bấm CHẠY BOT lần đầu, nút nháy "DỪNG BOT" rồi văng về "CHẠY BOT" kèm popup cảnh báo sai: `⚠️ Tài khoản OKX '#7768' đang chạy độc quyền bởi Liquidation Bot! ...`. Trong khi tài khoản này chưa từng chạy Liquidation Bot.
+    2. Trên sàn OKX xuất hiện một đống lệnh Limit liên tục; người dùng bấm xóa lệnh trên sàn thì một lúc sau bot chạy ngầm lại tự động đẻ lại lệnh Limit mới.
+    3. Không thể Đăng xuất / Ngắt kết nối tài khoản trên Web App: Bấm Đăng xuất bị popup chặn cứng: `⚠️ Không thể ngắt kết nối tài khoản này vì Liquidation Bot đang chạy giao dịch thực tế trên tài khoản này. Vui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`.
+    4. Yêu cầu lệnh CLI và công cụ kiểm tra xem hệ thống có bot nào đang chạy ngầm hay không để CEO chủ động kiểm soát và dọn dẹp.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi cảnh báo sai Liquidation Bot & Không đăng xuất được:*
+       - Backend trả về map `active_accounts` chứa các entry dạng `"sub1_#7768": "#7768"`.
+       - Tại Frontend (`App.jsx` các dòng 2260, 2473, 2544, 3277, 3810), code duyệt `Object.entries(mergedActiveAccounts)` và lấy phần tử đầu tiên làm tên chiến thuật `otherStrat = runningBotStrat[0]`. Khi duyệt trúng `"sub1_#7768"`, do chuỗi này khác `"sub1"` và `"sub2"`, toán tử ternary `otherStrat === "sub1" ? ... : otherStrat === "sub2" ? ... : "Liquidation Bot"` tự động rơi vào fallback mặc định là `"Liquidation Bot"`.
+       - Đồng thời, khi so sánh `strat !== activeBotTab`, chuỗi `"sub1_#7768" !== "sub1"` trả về `true`! Do đó hệ thống nhận nhầm tài khoản đang chạy Liquidation Bot và chặn cứng cả thao tác Chạy Bot lẫn Đăng Xuất.
+    2. *Lỗi bot chạy ngầm đẻ lại lệnh Limit:*
+       - Khi bấm CHẠY BOT, backend ghi flag `activate_*.flag` kích hoạt `DRY_RUN = False` cho bot process cũ trước khi bị lỗi HTTP 400. Do đó process python `sys_bot_sub1.py` cũ ở OS vẫn tiếp tục chạy live trong RAM và thực hiện vòng lặp đặt lệnh Limit.
+       - Khi người dùng xóa lệnh trên sàn, bot chạy ngầm quét thấy thiếu lệnh nên tự động đặt lại (re-place).
+       - Logic khởi động cũ không kill sạch tiến trình cũ mà chỉ ghi đè cờ, dẫn tới tình trạng zombie process chạy song song.
+       - Hàm `get_running_pid` trước đây chỉ dùng `psutil.pid_exists(pid)` mà không kiểm tra tên/cmdline của process, dẫn tới việc nhận nhầm PID của các tiến trình hệ thống khác đã được OS tái cấp phát.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Chuẩn hóa nhận diện chiến thuật tại Frontend (`accountUtils.js`):*
+       - Tạo hàm `getRunningStrategyForAccount(activeAccountsMap, targetAccId, accountsList)` kiểm tra chặt chẽ tiền tố `sub1`, `sub2`, `sub3`, loại bỏ 100% tình trạng nhận nhầm key `sub1_#7768` thành `Liquidation Bot`.
+       - Cập nhật đồng bộ tại `App.jsx`, `AppHeader.jsx`, `ConnectModal.jsx`, `SidebarLeft.jsx`.
+    2. *Giải phóng cơ chế Đăng Xuất & Xóa Tài Khoản:*
+       - Trong `handleDisconnectSpecificAccount` và `confirmDeleteAccount`: Thay vì chặn cứng bằng alert, hệ thống đưa ra hộp thoại xác nhận cho phép người dùng **"HỆ THỐNG TỰ ĐỘNG DỪNG BOT, HỦY HẾT LỆNH LIMIT VÀ NGẮT KẾT NỐI NGAY"**. Gọi API dừng bot và giải phóng tài khoản ngay lập tức, không bao giờ bị kẹt lại.
+    3. *Khởi động sạch (Clean Restart) & Quản lý PID nghiêm ngặt tại Backend (`main.py`):*
+       - Nâng cấp `get_running_pid`: Bắt buộc kiểm tra `p.cmdline()` và `p.name()` có chứa `sys_bot_{strategy}` hoặc `--run-bot {strategy}` và kiểm tra trạng thái không phải zombie/dead. Nếu PID đã chết hoặc thuộc process khác, tự động xóa file `.pid` rác và trả về 0.
+       - Trong `start_bot`: Nếu phát hiện process cũ còn sống của tài khoản đó, tự động kill sạch toàn bộ process cây con (`parent.children().kill()`) và process cha trước khi spawn process mới.
+    4. *Bộ công cụ kiểm tra & tiêu diệt bot ngầm phục vụ CEO:*
+       - `zInspect_Bots.py`: Quét toàn diện OS, hiển thị rõ ràng PID, Tên chiến thuật, Tài khoản, Uptime, RAM của mọi bot đang chạy ngầm; kiểm tra các file PID sống/chết và file `.running_account`.
+       - `zClean_Zombie_Bots.py`: Tiêu diệt -9 toàn bộ tiến trình bot ngầm trên OS, xóa sạch toàn bộ file `.pid`, file flags và file `.running_account` rác của tất cả tài khoản, tự động hủy sạch lệnh Limit trên OKX (bảo toàn 100% TP/SL).
+       - Bổ sung 2 endpoint backend: `GET /api/bot/inspect` và `POST /api/bot/force_kill_all`.
+
+
+
 - **[29/10/2026]** - Khắc Phục Triệt Để 3 Lỗi Về Ký Quỹ Lệnh Limit Bị Sai 0.4$, Hiển Thị Timeframe Cho Lệnh Chờ Khớp Limit và Tự Động Hủy Sạch Lệnh Limit Khi Dừng / Bật Bot:
   - **Hiện tượng & Yêu cầu từ CEO:**
     1. **Tính toán ký quỹ chờ Limit bị sai (toàn 0.4$ - 0.5$ dù người dùng nhập 4$ hoặc 1$):** Web hiển thị ký quỹ 4$ hoặc 1$, nhưng bot đặt lệnh Limit trên sàn OKX toàn với ký quỹ mặc định 0.4$ (notional ~40 USDT / 100x -> ký quỹ hiển thị ~0.48$ - 0.50$). Cần sửa triệt để để ký quỹ người dùng cài đặt trên web được bot nhận và đặt đúng số vốn.
@@ -5125,6 +5157,38 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Khắc Phục Triệt Để 4 Vấn Đề: Lỗi Bot Chạy Ngầm Đẻ Lệnh Liên Tục, Cảnh Báo Sai "Đang Chạy Độc Quyền Bởi Liquidation Bot", Không Cho Đăng Xuất Tài Khoản và Bổ Sung Công Cụ Kiểm Tra / Diệt Bot Ngầm:
+  - **Hiện tượng & Báo cáo từ CEO:**
+    1. Khi bấm CHẠY BOT lần đầu, nút nháy "DỪNG BOT" rồi văng về "CHẠY BOT" kèm popup cảnh báo sai: `⚠️ Tài khoản OKX '#7768' đang chạy độc quyền bởi Liquidation Bot! ...`. Trong khi tài khoản này chưa từng chạy Liquidation Bot.
+    2. Trên sàn OKX xuất hiện một đống lệnh Limit liên tục; người dùng bấm xóa lệnh trên sàn thì một lúc sau bot chạy ngầm lại tự động đẻ lại lệnh Limit mới.
+    3. Không thể Đăng xuất / Ngắt kết nối tài khoản trên Web App: Bấm Đăng xuất bị popup chặn cứng: `⚠️ Không thể ngắt kết nối tài khoản này vì Liquidation Bot đang chạy giao dịch thực tế trên tài khoản này. Vui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`.
+    4. Yêu cầu lệnh CLI và công cụ kiểm tra xem hệ thống có bot nào đang chạy ngầm hay không để CEO chủ động kiểm soát và dọn dẹp.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi cảnh báo sai Liquidation Bot & Không đăng xuất được:*
+       - Backend trả về map `active_accounts` chứa các entry dạng `"sub1_#7768": "#7768"`.
+       - Tại Frontend (`App.jsx` các dòng 2260, 2473, 2544, 3277, 3810), code duyệt `Object.entries(mergedActiveAccounts)` và lấy phần tử đầu tiên làm tên chiến thuật `otherStrat = runningBotStrat[0]`. Khi duyệt trúng `"sub1_#7768"`, do chuỗi này khác `"sub1"` và `"sub2"`, toán tử ternary `otherStrat === "sub1" ? ... : otherStrat === "sub2" ? ... : "Liquidation Bot"` tự động rơi vào fallback mặc định là `"Liquidation Bot"`.
+       - Đồng thời, khi so sánh `strat !== activeBotTab`, chuỗi `"sub1_#7768" !== "sub1"` trả về `true`! Do đó hệ thống nhận nhầm tài khoản đang chạy Liquidation Bot và chặn cứng cả thao tác Chạy Bot lẫn Đăng Xuất.
+    2. *Lỗi bot chạy ngầm đẻ lại lệnh Limit:*
+       - Khi bấm CHẠY BOT, backend ghi flag `activate_*.flag` kích hoạt `DRY_RUN = False` cho bot process cũ trước khi bị lỗi HTTP 400. Do đó process python `sys_bot_sub1.py` cũ ở OS vẫn tiếp tục chạy live trong RAM và thực hiện vòng lặp đặt lệnh Limit.
+       - Khi người dùng xóa lệnh trên sàn, bot chạy ngầm quét thấy thiếu lệnh nên tự động đặt lại (re-place).
+       - Logic khởi động cũ không kill sạch tiến trình cũ mà chỉ ghi đè cờ, dẫn tới tình trạng zombie process chạy song song.
+       - Hàm `get_running_pid` trước đây chỉ dùng `psutil.pid_exists(pid)` mà không kiểm tra tên/cmdline của process, dẫn tới việc nhận nhầm PID của các tiến trình hệ thống khác đã được OS tái cấp phát.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Chuẩn hóa nhận diện chiến thuật tại Frontend (`accountUtils.js`):*
+       - Tạo hàm `getRunningStrategyForAccount(activeAccountsMap, targetAccId, accountsList)` kiểm tra chặt chẽ tiền tố `sub1`, `sub2`, `sub3`, loại bỏ 100% tình trạng nhận nhầm key `sub1_#7768` thành `Liquidation Bot`.
+       - Cập nhật đồng bộ tại `App.jsx`, `AppHeader.jsx`, `ConnectModal.jsx`, `SidebarLeft.jsx`.
+    2. *Giải phóng cơ chế Đăng Xuất & Xóa Tài Khoản:*
+       - Trong `handleDisconnectSpecificAccount` và `confirmDeleteAccount`: Thay vì chặn cứng bằng alert, hệ thống đưa ra hộp thoại xác nhận cho phép người dùng **"HỆ THỐNG TỰ ĐỘNG DỪNG BOT, HỦY HẾT LỆNH LIMIT VÀ NGẮT KẾT NỐI NGAY"**. Gọi API dừng bot và giải phóng tài khoản ngay lập tức, không bao giờ bị kẹt lại.
+    3. *Khởi động sạch (Clean Restart) & Quản lý PID nghiêm ngặt tại Backend (`main.py`):*
+       - Nâng cấp `get_running_pid`: Bắt buộc kiểm tra `p.cmdline()` và `p.name()` có chứa `sys_bot_{strategy}` hoặc `--run-bot {strategy}` và kiểm tra trạng thái không phải zombie/dead. Nếu PID đã chết hoặc thuộc process khác, tự động xóa file `.pid` rác và trả về 0.
+       - Trong `start_bot`: Nếu phát hiện process cũ còn sống của tài khoản đó, tự động kill sạch toàn bộ process cây con (`parent.children().kill()`) và process cha trước khi spawn process mới.
+    4. *Bộ công cụ kiểm tra & tiêu diệt bot ngầm phục vụ CEO:*
+       - `zInspect_Bots.py`: Quét toàn diện OS, hiển thị rõ ràng PID, Tên chiến thuật, Tài khoản, Uptime, RAM của mọi bot đang chạy ngầm; kiểm tra các file PID sống/chết và file `.running_account`.
+       - `zClean_Zombie_Bots.py`: Tiêu diệt -9 toàn bộ tiến trình bot ngầm trên OS, xóa sạch toàn bộ file `.pid`, file flags và file `.running_account` rác của tất cả tài khoản, tự động hủy sạch lệnh Limit trên OKX (bảo toàn 100% TP/SL).
+       - Bổ sung 2 endpoint backend: `GET /api/bot/inspect` và `POST /api/bot/force_kill_all`.
+
+
 
 - **[29/10/2026]** - Khắc Phục Triệt Để 3 Lỗi Về Ký Quỹ Lệnh Limit Bị Sai 0.4$, Hiển Thị Timeframe Cho Lệnh Chờ Khớp Limit và Tự Động Hủy Sạch Lệnh Limit Khi Dừng / Bật Bot:
   - **Hiện tượng & Yêu cầu từ CEO:**

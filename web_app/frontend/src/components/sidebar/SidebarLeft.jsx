@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import NumberSpinBox from "../common/NumberSpinBox";
 import { useTranslation } from "../../i18n";
+import { getRunningStrategyForAccount } from "../../utils/accountUtils";
 
 const getTextWidth = (text, font = "600 12px 'Segoe UI', sans-serif") => {
   if (!text) return 60;
@@ -334,43 +335,11 @@ export default function SidebarLeft({
 
   const getOkxRunningBot = (acc) => {
     if (!acc) return null;
+    const strat = getRunningStrategyForAccount(activeAccounts, acc.id, [acc]);
+    if (strat) return strat;
+
     const accId = String(acc.id || "").trim();
     const accName = String(acc.name || "").trim();
-    const cleanAccName = accName.replace(/^#/, "").toLowerCase();
-
-    // 1. Kiểm tra trực tiếp activeAccounts[accId]
-    if (activeAccounts) {
-      if (activeAccounts[accId]) return activeAccounts[accId];
-      if (activeAccounts[accName]) return activeAccounts[accName];
-    }
-
-    for (const st of ["sub1", "sub2", "sub3"]) {
-      if (activeAccounts?.[`${st}_${accId}`] || activeAccounts?.[`${st}_${accName}`]) {
-        return st;
-      }
-      const runningTarget = activeAccounts ? activeAccounts[st] : null;
-      if (runningTarget) {
-        if (Array.isArray(runningTarget)) {
-          if (runningTarget.some(r => {
-            const tr = String(r).trim();
-            const cr = tr.replace(/^#/, "").toLowerCase();
-            return tr === accId || tr === accName || (cr && (cr === cleanAccName || cr === accId.toLowerCase()));
-          })) {
-            return st;
-          }
-        } else {
-          const targetStr = String(runningTarget).trim();
-          const cleanTarget = targetStr.replace(/^#/, "").toLowerCase();
-          if (
-            targetStr === accId ||
-            targetStr === accName ||
-            (cleanTarget && (cleanTarget === cleanAccName || cleanTarget === accId.toLowerCase()))
-          ) {
-            return st;
-          }
-        }
-      }
-    }
     if (isOkxRunning && (!activeAccounts || !activeAccounts[activeBotTab]) && (accId === effectiveAccId || accName === effectiveAccId)) {
       return activeBotTab;
     }

@@ -15,6 +15,7 @@ import { useTranslation } from "./i18n";
 import { getTourSteps } from "./i18n/tourData";
 import { AddAccountModal, DeleteAccountModal, ConfirmStopBotModal, ApiPermissionErrorModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
+import { getRunningStrategyForAccount, getBotDisplayName } from "./utils/accountUtils";
 import "./App.css";
 
 const dedupeAccounts = (accList) => {
@@ -112,8 +113,12 @@ function App() {
   const [wsActiveAccountsState, setWsActiveAccountsState] = useState({});
 
   const mergedActiveAccounts = useMemo(() => {
+    // Nếu WebSocket đã kết nối và có dữ liệu (kể cả rỗng {} khi bot dừng), WebSocket là nguồn chân lý trực tiếp
+    if (wsActiveAccountsState !== null && wsActiveAccountsState !== undefined && Object.keys(wsActiveAccountsState).length >= 0 && wsActiveAccounts !== undefined) {
+      return wsActiveAccountsState;
+    }
     return { ...(httpActiveAccounts || {}), ...(wsActiveAccountsState || {}) };
-  }, [httpActiveAccounts, wsActiveAccountsState]);
+  }, [httpActiveAccounts, wsActiveAccountsState, wsActiveAccounts]);
 
   const [selectedAccount, setSelectedAccount] = useState(() => {
     try {
@@ -295,7 +300,10 @@ function App() {
   }, [availBal, effectiveAccId]);
 
   useEffect(() => {
-    setWsActiveAccountsState(wsActiveAccounts || {});
+    if (wsActiveAccounts !== undefined && wsActiveAccounts !== null) {
+      setWsActiveAccountsState(wsActiveAccounts);
+      setHttpActiveAccounts(wsActiveAccounts);
+    }
   }, [wsActiveAccounts]);
 
   const prevBotTabRef = useRef(activeBotTab);
@@ -438,6 +446,11 @@ function App() {
   const isTargetOkxRunning = useMemo(() => {
     if (overrideBotRunning !== null) return overrideBotRunning;
     if (botStatus !== "RUNNING") return false;
+    const runningStrat = getRunningStrategyForAccount(mergedActiveAccounts, effectiveAccId, accounts);
+    if (runningStrat) {
+      return runningStrat === activeBotTab;
+    }
+
     const curClean = String(effectiveAccId || "").trim().replace(/^#/, "");
     const curObj = accounts.find(a => a.id === effectiveAccId || a.name === effectiveAccId);
     const curName = String(curObj?.name || "").trim().replace(/^#/, "");
@@ -2257,13 +2270,10 @@ function App() {
     }
 
     // 🛡️ KHÓA ĐỘC QUYỀN SÀN OKX: 1 Tài khoản chỉ được chạy 1 phương pháp Bot duy nhất
-    const runningBotStrat = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => {
-      return strat !== activeBotTab && (id === currentAcc || String(id).replace(/^#/, "") === String(currentAcc).replace(/^#/, ""));
-    });
-    if (runningBotStrat) {
-      const otherStrat = runningBotStrat[0];
-      const otherBotName = otherStrat === "sub1" ? "EMA200 Bot" : otherStrat === "sub2" ? "SMC Bot" : "Liquidation Bot";
-      const thisBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
+    const runningOtherStrat = getRunningStrategyForAccount(mergedActiveAccounts, currentAcc, accounts);
+    if (runningOtherStrat && runningOtherStrat !== activeBotTab) {
+      const otherBotName = getBotDisplayName(runningOtherStrat);
+      const thisBotName = getBotDisplayName(activeBotTab);
       const accName = accounts.find(a => a.id === currentAcc)?.name || currentAcc;
       alert(`⚠️ Tài khoản OKX '${accName}' đang chạy độc quyền bởi ${otherBotName}!\n\nTheo nguyên tắc an toàn vốn, mỗi tài khoản chỉ được chạy duy nhất 1 phương pháp Bot.\n\nVui lòng chọn tài khoản phụ khác cho ${thisBotName} hoặc bấm DỪNG BOT bên ${otherBotName} trước khi khởi động!`);
       return;
@@ -2470,7 +2480,7 @@ function App() {
       setShowDeleteAccountModal(false);
       return;
     }
-    const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, targetAccountId, accounts);
     let isRunningOnTarget = false;
     if (runningBot) {
       if (runningBot === activeBotTab) {
@@ -2480,11 +2490,21 @@ function App() {
       }
     }
     if (isRunningOnTarget) {
-      const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
-      alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản!`);
-      setShowDeleteAccountModal(false);
-      setAccountToDelete("");
-      return;
+      const botName = getBotDisplayName(runningBot);
+      if (!window.confirm(
+        `⚠️ Tài khoản này đang ghi nhận có hoạt động của ${botName}.\n\n` +
+        `Bạn có muốn HỆ THỐNG TỰ ĐỘNG DỪNG BOT, HỦY HẾT LỆNH LIMIT và xoá tài khoản này ngay không?`
+      )) {
+        setShowDeleteAccountModal(false);
+        setAccountToDelete("");
+        return;
+      }
+      try {
+        const curUid = localStorage.getItem("tls1_uid") || loginUid || "default";
+        await fetch(`/api/bot/stop?uid=${encodeURIComponent(curUid)}&strategy=${runningBot}&account_id=${encodeURIComponent(targetAccountId)}`, { credentials: "include" });
+      } catch (e) {
+        console.error("Lỗi dừng bot trước khi xoá tài khoản:", e);
+      }
     }
     setIsDeletingAccount(true);
 
@@ -2541,7 +2561,7 @@ function App() {
 
   const handleDisconnectSpecificAccount = async (targetAccountId) => {
     if (!targetAccountId) return;
-    const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === targetAccountId)?.[0];
+    const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, targetAccountId, accounts);
     let isRunningOnTarget = false;
     if (runningBot) {
       if (runningBot === activeBotTab) {
@@ -2551,9 +2571,19 @@ function App() {
       }
     }
     if (isRunningOnTarget) {
-      const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
-      alert(`⚠️ Không thể ngắt kết nối tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi ngắt kết nối!`);
-      return;
+      const botName = getBotDisplayName(runningBot);
+      if (!window.confirm(
+        `⚠️ Tài khoản này đang ghi nhận có hoạt động của ${botName}.\n\n` +
+        `Bạn có muốn HỆ THỐNG TỰ ĐỘNG DỪNG BOT, HỦY HẾT LỆNH LIMIT và ngắt kết nối tài khoản này ngay không?`
+      )) {
+        return;
+      }
+      try {
+        const curUid = localStorage.getItem("tls1_uid") || loginUid || "default";
+        await fetch(`/api/bot/stop?uid=${encodeURIComponent(curUid)}&strategy=${runningBot}&account_id=${encodeURIComponent(targetAccountId)}`, { credentials: "include" });
+      } catch (e) {
+        console.error("Lỗi dừng bot trước khi ngắt kết nối:", e);
+      }
     }
     const currentAcc = accounts.find(a => a.id === targetAccountId);
     const accName = currentAcc?.name || targetAccountId;
@@ -3274,7 +3304,7 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, id]) => id === targetId)?.[0];
+          const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, targetId, accounts);
           let isRunningOnTarget = false;
           if (runningBot) {
             if (runningBot === activeBotTab) {
@@ -3284,7 +3314,7 @@ function App() {
             }
           }
           if (isRunningOnTarget) {
-            const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+            const botName = getBotDisplayName(runningBot);
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
           }
@@ -3807,7 +3837,7 @@ function App() {
             alert("⚠️ Vui lòng chọn tài khoản cần xoá!");
             return;
           }
-          const runningBot = Object.entries(mergedActiveAccounts || {}).find(([strat, accId]) => accId === selectedAccount)?.[0];
+          const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, selectedAccount, accounts);
           let isRunningOnTarget = false;
           if (runningBot) {
             if (runningBot === activeBotTab) {
@@ -3817,7 +3847,7 @@ function App() {
             }
           }
           if (isRunningOnTarget) {
-            const botName = runningBot === "sub1" ? "EMA200 Bot" : runningBot === "sub2" ? "SMC Bot" : "Liquidation Bot";
+            const botName = getBotDisplayName(runningBot);
             alert(`⚠️ Không thể xoá tài khoản này vì ${botName} đang chạy giao dịch thực tế trên tài khoản này.\n\nVui lòng BẤM DỪNG BOT trước khi xoá tài khoản để bảo vệ an toàn vốn!`);
             return;
           }

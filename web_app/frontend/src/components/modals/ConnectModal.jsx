@@ -3,6 +3,7 @@ import { useTranslation } from "../../i18n";
 import { ConfirmLogoutModal } from "./AccountPromptModals";
 import TradeLockerTab from "./TradeLockerTab";
 import { formatOkxAccountTag } from "../sidebar/SidebarLeft";
+import { getRunningStrategyForAccount } from "../../utils/accountUtils";
 
 // 🔴 Biểu tượng chính thức sàn Vantage Markets
 const VantageLogo = ({ size = 22 }) => (
@@ -1605,27 +1606,7 @@ export default function ConnectModal({
                         {accounts.map(acc => {
                           const cleanAccId = String(acc.id || "").trim().replace(/^#/, "");
                           const cleanAccName = String(acc.name || "").trim().replace(/^#/, "");
-                          let runningBotKey = null;
-                          if (activeAccounts) {
-                            const directStrat = activeAccounts[acc.id] || activeAccounts[cleanAccId] || (cleanAccName && activeAccounts[cleanAccName]);
-                            if (directStrat && typeof directStrat === "string" && ["sub1", "sub2", "sub3"].includes(directStrat)) {
-                              runningBotKey = directStrat;
-                            } else {
-                              for (const [key, val] of Object.entries(activeAccounts)) {
-                                const stratMatch = key.startsWith("sub1") ? "sub1" : key.startsWith("sub2") ? "sub2" : key.startsWith("sub3") ? "sub3" : null;
-                                if (stratMatch) {
-                                  if (val === acc.id || val === cleanAccId || (cleanAccName && val === cleanAccName)) {
-                                    runningBotKey = stratMatch;
-                                    break;
-                                  }
-                                  if (Array.isArray(val) && val.some(v => v === acc.id || v === cleanAccId || (cleanAccName && v === cleanAccName))) {
-                                    runningBotKey = stratMatch;
-                                    break;
-                                  }
-                                }
-                              }
-                            }
-                          }
+                          const runningBotKey = getRunningStrategyForAccount(activeAccounts, acc.id, accounts);
                           const isThisBotAccount = (acc.id === modalAccountId || acc.id === botAccountMap?.[activeBotTab]);
                           const assignedOtherBot = !isThisBotAccount && Object.entries(botAccountMap || {}).find(([bot, accId]) => bot !== activeBotTab && accId === acc.id)?.[0];
 

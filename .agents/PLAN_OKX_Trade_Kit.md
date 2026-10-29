@@ -960,3 +960,18 @@ Mọi Box Long/Short vẽ trên biểu đồ bắt buộc phải ánh xạ trự
     - Loại bỏ hoàn toàn nút `[Đăng Xuất]` lớn thừa thãi ở đáy modal (tàn dư từ thời Single-Account). Đáy modal giờ đây thông thoáng, sạch sẽ 100%.
     - Ẩn hoàn toàn dòng trạng thái đơn lẻ `UID: Đã ngắt kết nối...` và chấm đỏ/xanh ở footer.
 
+### 5. Quản Lý Tiến Trình Bot Đa Tài Khoản & Cơ Chế Khởi Động Sạch (Clean Restart) & Công Cụ CLI
+- **Xác thực tiến trình nghiêm ngặt qua PID & Process Cmdline (`get_running_pid`):**
+  - Tránh triệt để việc tái sử dụng PID của hệ điều hành dẫn đến báo bot đang chạy giả mạo.
+  - Kiểm tra `p.cmdline()` và `p.name()` khớp `sys_bot_{strategy}` hoặc `--run-bot {strategy}` và kiểm tra trạng thái không phải zombie/dead. Tự động xóa file `.pid` rác nếu tiến trình đã chết.
+- **Khởi động sạch (Clean Restart):**
+  - Khi người dùng bấm **Chạy Bot**, nếu phát hiện tiến trình cũ của tài khoản đó đang chạy ngầm, hệ thống tự động kill sạch toàn bộ tiến trình con và cha trước khi spawn tiến trình mới.
+- **Chuẩn hóa nhận diện chiến thuật tại Frontend (`accountUtils.js`):**
+  - Trích xuất chiến thuật `getRunningStrategyForAccount` hỗ trợ chuẩn xác các key map `sub1_{acc}`, `{acc}: sub1`, tránh nhận nhầm key thành `Liquidation Bot`.
+  - Cơ chế Đăng xuất / Xóa tài khoản hỗ trợ xác nhận tự động dừng bot và hủy sạch lệnh limit, không bao giờ chặn cứng người dùng.
+- **Bộ công cụ CLI & API kiểm soát bot ngầm:**
+  - `python3 zInspect_Bots.py`: Quét toàn diện bot đang chạy ngầm, PID, RAM, Uptime và trạng thái cờ kẹt.
+  - `python3 zClean_Zombie_Bots.py` (hoặc `bash kill_all_bots.sh`): Tiêu diệt toàn bộ bot zombie, dọn sạch 100% file PID, cờ kẹt và hủy lệnh limit pending trên OKX.
+  - Endpoints backend: `GET /api/bot/inspect` và `POST /api/bot/force_kill_all`.
+
+
