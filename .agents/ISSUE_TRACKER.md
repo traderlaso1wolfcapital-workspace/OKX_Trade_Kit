@@ -33,6 +33,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Sửa Lỗi Crash Màn Hình Trắng "React App Crashed! ReferenceError: Cannot access 'J' before initialization":
+  - **Hiện tượng:** Mở web app xuất hiện màn hình đen/đỏ báo `💥 React App Crashed! Error Message: ReferenceError: Cannot access 'J' before initialization` tại `So (index-CqirWoyU.js:661:4867)`.
+  - **Nguyên nhân:** Trong `App.jsx`, hook `useMemo` tính `mergedActiveAccounts` (ở dòng 115) đã đưa biến `wsActiveAccounts` vào danh sách dependencies và thân hàm trước khi biến này được khai báo bởi destructuring từ `useBotWebSocket` (ở dòng 152). Khi React khởi tạo component, cơ chế TDZ (Temporal Dead Zone) của JavaScript ném `ReferenceError` khiến toàn bộ ứng dụng bị crash.
+  - **Khắc phục:** Loại bỏ tham chiếu sớm tới `wsActiveAccounts` trong `mergedActiveAccounts`. `mergedActiveAccounts` chỉ phụ thuộc vào `httpActiveAccounts` và `wsActiveAccountsState`. Biến `wsActiveAccountsState` đã được đồng bộ chuẩn xác từ `useEffect` khi có dữ liệu từ WebSocket. Đã build lại production bundle thành công.
+
+
 - **[29/10/2026]** - Khắc Phục Triệt Để 4 Vấn Đề: Lỗi Bot Chạy Ngầm Đẻ Lệnh Liên Tục, Cảnh Báo Sai "Đang Chạy Độc Quyền Bởi Liquidation Bot", Không Cho Đăng Xuất Tài Khoản và Bổ Sung Công Cụ Kiểm Tra / Diệt Bot Ngầm:
   - **Hiện tượng & Báo cáo từ CEO:**
     1. Khi bấm CHẠY BOT lần đầu, nút nháy "DỪNG BOT" rồi văng về "CHẠY BOT" kèm popup cảnh báo sai: `⚠️ Tài khoản OKX '#7768' đang chạy độc quyền bởi Liquidation Bot! ...`. Trong khi tài khoản này chưa từng chạy Liquidation Bot.
@@ -5157,6 +5163,12 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Sửa Lỗi Crash Màn Hình Trắng "React App Crashed! ReferenceError: Cannot access 'J' before initialization":
+  - **Hiện tượng:** Mở web app xuất hiện màn hình đen/đỏ báo `💥 React App Crashed! Error Message: ReferenceError: Cannot access 'J' before initialization` tại `So (index-CqirWoyU.js:661:4867)`.
+  - **Nguyên nhân:** Trong `App.jsx`, hook `useMemo` tính `mergedActiveAccounts` (ở dòng 115) đã đưa biến `wsActiveAccounts` vào danh sách dependencies và thân hàm trước khi biến này được khai báo bởi destructuring từ `useBotWebSocket` (ở dòng 152). Khi React khởi tạo component, cơ chế TDZ (Temporal Dead Zone) của JavaScript ném `ReferenceError` khiến toàn bộ ứng dụng bị crash.
+  - **Khắc phục:** Loại bỏ tham chiếu sớm tới `wsActiveAccounts` trong `mergedActiveAccounts`. `mergedActiveAccounts` chỉ phụ thuộc vào `httpActiveAccounts` và `wsActiveAccountsState`. Biến `wsActiveAccountsState` đã được đồng bộ chuẩn xác từ `useEffect` khi có dữ liệu từ WebSocket. Đã build lại production bundle thành công.
+
 
 - **[29/10/2026]** - Khắc Phục Triệt Để 4 Vấn Đề: Lỗi Bot Chạy Ngầm Đẻ Lệnh Liên Tục, Cảnh Báo Sai "Đang Chạy Độc Quyền Bởi Liquidation Bot", Không Cho Đăng Xuất Tài Khoản và Bổ Sung Công Cụ Kiểm Tra / Diệt Bot Ngầm:
   - **Hiện tượng & Báo cáo từ CEO:**

@@ -113,12 +113,8 @@ function App() {
   const [wsActiveAccountsState, setWsActiveAccountsState] = useState({});
 
   const mergedActiveAccounts = useMemo(() => {
-    // Nếu WebSocket đã kết nối và có dữ liệu (kể cả rỗng {} khi bot dừng), WebSocket là nguồn chân lý trực tiếp
-    if (wsActiveAccountsState !== null && wsActiveAccountsState !== undefined && Object.keys(wsActiveAccountsState).length >= 0 && wsActiveAccounts !== undefined) {
-      return wsActiveAccountsState;
-    }
     return { ...(httpActiveAccounts || {}), ...(wsActiveAccountsState || {}) };
-  }, [httpActiveAccounts, wsActiveAccountsState, wsActiveAccounts]);
+  }, [httpActiveAccounts, wsActiveAccountsState]);
 
   const [selectedAccount, setSelectedAccount] = useState(() => {
     try {
