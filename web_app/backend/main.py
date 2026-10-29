@@ -1482,6 +1482,25 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
 
     return accounts
 
+def get_user_accounts(uid: str) -> list:
+    """
+    Trả về danh sách tài khoản đã kết nối của user từ accounts.json.
+    Tìm kiếm an toàn cả ở get_user_data_dir(uid) và get_user_base_dir(uid).
+    """
+    if not uid or str(uid).strip() in ["default", "guest", "undefined", "null", ""]:
+        return []
+    data_dir = get_user_data_dir(uid)
+    for p in [os.path.join(data_dir, "accounts.json"), os.path.join(get_user_base_dir(uid), "accounts.json")]:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    accs = json.load(f)
+                    if isinstance(accs, list):
+                        return accs
+            except Exception:
+                pass
+    return []
+
 def _resolve_all_account_aliases(uid: str, strategy: str, account_id: str = "") -> List[str]:
     """
     Trả về toàn bộ danh sách các biến thể tên, ID, tag của tài khoản:
@@ -1536,47 +1555,44 @@ def _resolve_all_account_aliases(uid: str, strategy: str, account_id: str = "") 
         add_alias(raw_acc)
 
     # Đọc accounts.json để map 2 chiều ID <-> Tên hiển thị <-> OKX UID <-> Tag 4 số
-    acc_file = os.path.join(data_dir, "accounts.json")
-    if os.path.exists(acc_file):
-        try:
-            with open(acc_file, "r", encoding="utf-8") as f:
-                acc_list = json.load(f)
-                if isinstance(acc_list, list):
-                    for a in acc_list:
-                        a_id = str(a.get("id") or "").strip()
-                        a_name = str(a.get("name") or "").strip()
-                        a_okx = str(a.get("okx_uid") or "").strip()
-                        extracted_tag = ""
-                        if "(" in a_name and ")" in a_name:
-                            try:
-                                extracted_tag = a_name.split("(")[-1].split(")")[0].strip()
-                            except Exception:
-                                pass
+    try:
+        acc_list = get_user_accounts(uid)
+        if isinstance(acc_list, list):
+            for a in acc_list:
+                a_id = str(a.get("id") or "").strip()
+                a_name = str(a.get("name") or "").strip()
+                a_okx = str(a.get("okx_uid") or "").strip()
+                extracted_tag = ""
+                if "(" in a_name and ")" in a_name:
+                    try:
+                        extracted_tag = a_name.split("(")[-1].split(")")[0].strip()
+                    except Exception:
+                        pass
 
-                        is_match = False
-                        check_set = set(aliases) if aliases else set()
-                        if not raw_acc:
-                            pass
-                        elif raw_acc in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}"):
-                            is_match = True
-                        elif any(alias in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}") for alias in check_set):
-                            is_match = True
-                        elif extracted_tag and any(extracted_tag in alias for alias in check_set):
-                            is_match = True
-                        elif len(raw_acc.replace("#", "").replace("_", "")) >= 4:
-                            clean_test = raw_acc.replace("#", "").replace("_", "")
-                            if clean_test in a_name or clean_test in a_id:
-                                is_match = True
+                is_match = False
+                check_set = set(aliases) if aliases else set()
+                if not raw_acc:
+                    pass
+                elif raw_acc in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}"):
+                    is_match = True
+                elif any(alias in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}") for alias in check_set):
+                    is_match = True
+                elif extracted_tag and any(extracted_tag in alias for alias in check_set):
+                    is_match = True
+                elif len(raw_acc.replace("#", "").replace("_", "")) >= 4:
+                    clean_test = raw_acc.replace("#", "").replace("_", "")
+                    if clean_test in a_name or clean_test in a_id:
+                        is_match = True
 
-                        if is_match:
-                            add_alias(a_id)
-                            add_alias(a_name)
-                            if extracted_tag:
-                                add_alias(extracted_tag)
-                            if a_okx:
-                                add_alias(a_okx)
-        except Exception:
-            pass
+                if is_match:
+                    add_alias(a_id)
+                    add_alias(a_name)
+                    if extracted_tag:
+                        add_alias(extracted_tag)
+                    if a_okx:
+                        add_alias(a_okx)
+    except Exception:
+        pass
 
     return aliases
 
@@ -1742,6 +1758,17 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
                             if strat not in active_accounts:
                                 active_accounts[strat] = acc
                 except (OSError, IOError, ValueError): pass
+
+    # 3. Đồng bộ is_running nếu active_accounts phát hiện tài khoản/chiến thuật đang chạy:
+    if not is_running:
+        if target_acc:
+            aliases = _resolve_all_account_aliases(uid, strategy, target_acc)
+            if any(f"{strategy}_{al}" in active_accounts or al in active_accounts for al in aliases):
+                is_running = True
+        elif strategy in active_accounts:
+            is_running = True
+            running_val = active_accounts[strategy]
+            target_acc = running_val[0] if isinstance(running_val, list) and len(running_val) > 0 else str(running_val)
 
     if is_running:
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
@@ -4272,7 +4299,7 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
         try:
             status_data = await asyncio.to_thread(get_bot_status, uid, strategy)
         except Exception:
-            status_data = {"status": "STOPPED", "uptime": 0}
+            status_data = {"status": "STOPPED", "uptime": 0, "active_accounts": {}}
         return {
             "type": "bot_data",
             "strategy": strategy,
@@ -4285,7 +4312,7 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
     try:
         status_data = await asyncio.to_thread(get_bot_status, uid, strategy, acc)
     except Exception:
-        status_data = {"status": "STOPPED", "uptime": 0}
+        status_data = {"status": "STOPPED", "uptime": 0, "active_accounts": {}}
     try:
         pos_data = await asyncio.to_thread(get_bot_positions, uid, strategy, acc)
     except Exception:
@@ -5783,3 +5810,4 @@ if __name__ == "__main__":
 # z7741 | Khắc phục triệt để lỗi bot chạy ngầm đẻ lại lệnh Limit và lỗi cảnh báo sai Liquidation Bot / không đăng xuất được: 1) Trích xuất chiến thuật getRunningStrategyForAccount chuẩn xác 100%, xóa bỏ lỗi nhận nhầm key 'sub1_{acc}' thành Liquidation Bot; 2) Cho phép Buộc Dừng Bot & Hủy Sạch Limit khi Đăng Xuất / Xóa tài khoản; 3) get_running_pid kiểm tra cmdline và process status, loại bỏ triệt để PID rác của OS; 4) Khởi động sạch (Clean Restart) kill sạch bot cũ trước khi spawn mới; 5) Bổ sung bộ công cụ CLI zInspect_Bots, zClean_Zombie_Bots và REST API /api/bot/inspect, /api/bot/force_kill_all.
 # z7742 | Sửa lỗi ReferenceError Cannot access 'J' before initialization trong bundle Frontend: loại bỏ tham chiếu sớm tới biến wsActiveAccounts trong useMemo mergedActiveAccounts trước khi được khởi tạo bởi useBotWebSocket, đảm bảo React App không bị crash.
 # z7743 | Khắc phục triệt để lỗi ấn Chạy Bot nháy Đang khởi động rồi tự động lùi về Chạy Bot (Dừng bot): 1) Chuẩn hóa _resolve_all_account_aliases ánh xạ 2 chiều ID, name, tag 4 số (#6881, sub_179..., sub179...); 2) Nâng cấp get_running_pid và _is_shadow_mode dò đúng 100% PID và flag files, mặc định trả về Live khi PID sống và không có cờ stop; 3) active_accounts bổ sung toàn diện mọi alias keys để UI nhận diện trạng thái Live tức thì; 4) Đồng bộ start_bot/stop_bot quản lý cờ và tiến trình triệt để theo mọi biến thể tên.
+# z7744 | Định nghĩa get_user_accounts, sửa triệt để lỗi F5 giật về CHẠY BOT, đồng bộ active_accounts đa chiều và dự phòng is_running từ active_accounts.

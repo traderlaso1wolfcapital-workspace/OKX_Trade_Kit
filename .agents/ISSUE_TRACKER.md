@@ -33,6 +33,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi F5 Trang Web Giật Trạng Thái Về "CHẠY BOT" Mặc Dù Bot Vẫn Đang Chạy và Lệnh Limit Vẫn Đang Treo:
+  - **Hiện tượng & Báo cáo từ CEO:** Người dùng đang chạy bot bình thường (lệnh Limit trên sàn OKX và Bảng Vị Thế vẫn hiển thị đầy đủ), nhưng khi ấn F5 làm mới trang web thì nút điều khiển lại hiện về trạng thái ban đầu "CHẠY BOT" (màu xanh lá) như chưa từng khởi động.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi `NameError: name 'get_user_accounts' is not defined` trên Backend:* Trong `web_app/backend/main.py` tại hàm `get_bot_status`, hệ thống gọi `user_accs = get_user_accounts(uid)` để quét danh sách tài khoản đang chạy của user. Tuy nhiên hàm `get_user_accounts` chưa từng được định nghĩa trong file.
+    2. *WebSocket và HTTP API trả về STOPPED:* Khi trang web load (F5), WebSocket gửi bản tin ban đầu qua `get_state_payload`. Khối `try ... except Exception:` bên trong đã nuốt lỗi `NameError` và trả về fallback rỗng `{"status": "STOPPED", "uptime": 0}` mà không có `active_accounts`. Tương tự, endpoint HTTP `/api/bot/status` bị crash 500 Internal Server Error.
+    3. *Frontend mất state trong RAM:* Khi F5, React khởi tạo lại toàn bộ state (`botStatus = "STOPPED"`, `httpActiveAccounts = {}`, `wsActiveAccountsState = {}`). Do gói tin từ WebSocket và HTTP đều trả về STOPPED hoặc lỗi, `isTargetOkxRunning` tính ra `false`, khiến nút điều khiển hiển thị thành "CHẠY BOT". Đồng thời, hàm `bootstrap()` trong `App.jsx` khi phát hiện tài khoản hiện tại hợp lệ (`isCurrentValid = true`) đã bỏ qua bước fetch `/api/bot/status`.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Backend (`main.py`):*
+       - Định nghĩa hàm `get_user_accounts(uid: str) -> list`: Đọc an toàn file `accounts.json` từ cả `get_user_data_dir(uid)` và `get_user_base_dir(uid)`.
+       - Trong `get_bot_status`: Thêm cơ chế dự phòng hai chiều nếu `is_running` ban đầu là false nhưng `active_accounts` đã xác nhận tài khoản/chiến thuật đang chạy thì tự động gán `is_running = True` và xác định đúng chế độ Live.
+       - Trong `get_state_payload`: Khối fallback ngoại lệ luôn cung cấp `"active_accounts": {}` để ngăn chặn lỗi runtime.
+    2. *Frontend (`useBotWebSocket.js` & `App.jsx`):*
+       - Trong `useBotWebSocket.js`: Khởi tạo state ban đầu cho `botStatus` và `activeAccounts` trực tiếp từ `localStorage.getItem("tls1_active_accounts")` giúp giao diện nhận diện trạng thái Live tức thì trong 0ms từ frame render đầu tiên khi F5.
+       - Trong `App.jsx`: Khởi tạo `httpActiveAccounts` và `wsActiveAccountsState` từ `localStorage`. Đồng bộ lưu và dọn sạch `tls1_active_accounts` trong cả `handleStartBot`, `handleStopBot` và `useEffect` lắng nghe `wsActiveAccounts`.
+       - Trong `bootstrap()`: Luôn gọi fetch `/api/bot/status` với `account_id` của tài khoản đang chọn để đồng bộ ngay `active_accounts` và `botStatus` từ server kể cả khi tài khoản đã hợp lệ.
+
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Bấm "CHẠY BOT" Nháy "ĐANG KHỞI ĐỘNG..." Rồi Lùi Về Ban Đầu "CHẠY BOT":
   - **Hiện tượng & Báo cáo từ CEO:** Người dùng bấm nút "CHẠY BOT", nút chuyển sang màu xanh "ĐANG KHỞI ĐỘNG BOT..." khoảng 1-2 giây rồi tự động lùi về lại "CHẠY BOT" (Dừng bot). Trong khi bot python bên dưới thực tế vẫn đang khởi động và chạy bình thường. Terminal Logs hiện thông báo: `ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản...`.
   - **Nguyên nhân cốt lõi:**
@@ -5184,6 +5200,22 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi F5 Trang Web Giật Trạng Thái Về "CHẠY BOT" Mặc Dù Bot Vẫn Đang Chạy và Lệnh Limit Vẫn Đang Treo:
+  - **Hiện tượng & Báo cáo từ CEO:** Người dùng đang chạy bot bình thường (lệnh Limit trên sàn OKX và Bảng Vị Thế vẫn hiển thị đầy đủ), nhưng khi ấn F5 làm mới trang web thì nút điều khiển lại hiện về trạng thái ban đầu "CHẠY BOT" (màu xanh lá) như chưa từng khởi động.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi `NameError: name 'get_user_accounts' is not defined` trên Backend:* Trong `web_app/backend/main.py` tại hàm `get_bot_status`, hệ thống gọi `user_accs = get_user_accounts(uid)` để quét danh sách tài khoản đang chạy của user. Tuy nhiên hàm `get_user_accounts` chưa từng được định nghĩa trong file.
+    2. *WebSocket và HTTP API trả về STOPPED:* Khi trang web load (F5), WebSocket gửi bản tin ban đầu qua `get_state_payload`. Khối `try ... except Exception:` bên trong đã nuốt lỗi `NameError` và trả về fallback rỗng `{"status": "STOPPED", "uptime": 0}` mà không có `active_accounts`. Tương tự, endpoint HTTP `/api/bot/status` bị crash 500 Internal Server Error.
+    3. *Frontend mất state trong RAM:* Khi F5, React khởi tạo lại toàn bộ state (`botStatus = "STOPPED"`, `httpActiveAccounts = {}`, `wsActiveAccountsState = {}`). Do gói tin từ WebSocket và HTTP đều trả về STOPPED hoặc lỗi, `isTargetOkxRunning` tính ra `false`, khiến nút điều khiển hiển thị thành "CHẠY BOT". Đồng thời, hàm `bootstrap()` trong `App.jsx` khi phát hiện tài khoản hiện tại hợp lệ (`isCurrentValid = true`) đã bỏ qua bước fetch `/api/bot/status`.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Backend (`main.py`):*
+       - Định nghĩa hàm `get_user_accounts(uid: str) -> list`: Đọc an toàn file `accounts.json` từ cả `get_user_data_dir(uid)` và `get_user_base_dir(uid)`.
+       - Trong `get_bot_status`: Thêm cơ chế dự phòng hai chiều nếu `is_running` ban đầu là false nhưng `active_accounts` đã xác nhận tài khoản/chiến thuật đang chạy thì tự động gán `is_running = True` và xác định đúng chế độ Live.
+       - Trong `get_state_payload`: Khối fallback ngoại lệ luôn cung cấp `"active_accounts": {}` để ngăn chặn lỗi runtime.
+    2. *Frontend (`useBotWebSocket.js` & `App.jsx`):*
+       - Trong `useBotWebSocket.js`: Khởi tạo state ban đầu cho `botStatus` và `activeAccounts` trực tiếp từ `localStorage.getItem("tls1_active_accounts")` giúp giao diện nhận diện trạng thái Live tức thì trong 0ms từ frame render đầu tiên khi F5.
+       - Trong `App.jsx`: Khởi tạo `httpActiveAccounts` và `wsActiveAccountsState` từ `localStorage`. Đồng bộ lưu và dọn sạch `tls1_active_accounts` trong cả `handleStartBot`, `handleStopBot` và `useEffect` lắng nghe `wsActiveAccounts`.
+       - Trong `bootstrap()`: Luôn gọi fetch `/api/bot/status` với `account_id` của tài khoản đang chọn để đồng bộ ngay `active_accounts` và `botStatus` từ server kể cả khi tài khoản đã hợp lệ.
 
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Bấm "CHẠY BOT" Nháy "ĐANG KHỞI ĐỘNG..." Rồi Lùi Về Ban Đầu "CHẠY BOT":
   - **Hiện tượng & Báo cáo từ CEO:** Người dùng bấm nút "CHẠY BOT", nút chuyển sang màu xanh "ĐANG KHỞI ĐỘNG BOT..." khoảng 1-2 giây rồi tự động lùi về lại "CHẠY BOT" (Dừng bot). Trong khi bot python bên dưới thực tế vẫn đang khởi động và chạy bình thường. Terminal Logs hiện thông báo: `ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản...`.

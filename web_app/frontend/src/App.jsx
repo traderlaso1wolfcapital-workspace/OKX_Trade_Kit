@@ -109,8 +109,22 @@ function App() {
     return {};
   });
 
-  const [httpActiveAccounts, setHttpActiveAccounts] = useState({});
-  const [wsActiveAccountsState, setWsActiveAccountsState] = useState({});
+  const [httpActiveAccounts, setHttpActiveAccounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tls1_active_accounts");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [wsActiveAccountsState, setWsActiveAccountsState] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tls1_active_accounts");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const mergedActiveAccounts = useMemo(() => {
     return { ...(httpActiveAccounts || {}), ...(wsActiveAccountsState || {}) };
@@ -299,6 +313,15 @@ function App() {
     if (wsActiveAccounts !== undefined && wsActiveAccounts !== null) {
       setWsActiveAccountsState(wsActiveAccounts);
       setHttpActiveAccounts(wsActiveAccounts);
+      if (typeof wsActiveAccounts === "object") {
+        try {
+          if (Object.keys(wsActiveAccounts).length > 0) {
+            localStorage.setItem("tls1_active_accounts", JSON.stringify(wsActiveAccounts));
+          } else {
+            localStorage.removeItem("tls1_active_accounts");
+          }
+        } catch {}
+      }
     }
   }, [wsActiveAccounts]);
 
@@ -1292,6 +1315,23 @@ function App() {
             localStorage.setItem("tls1_bot_accounts", JSON.stringify(next));
             return next;
           });
+
+          // Luôn fetch /api/bot/status để đồng bộ active_accounts và botStatus ngay khi load trang
+          try {
+            const resStat = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${uidToUse}&account_id=${encodeURIComponent(targetAcc)}`);
+            if (resStat.ok && isMounted) {
+              const statData = await resStat.json();
+              if (statData?.active_accounts) {
+                setHttpActiveAccounts(statData.active_accounts);
+                if (Object.keys(statData.active_accounts).length > 0) {
+                  try { localStorage.setItem("tls1_active_accounts", JSON.stringify(statData.active_accounts)); } catch {}
+                }
+              }
+              if (statData?.status && setBotStatus) {
+                setBotStatus(statData.status);
+              }
+            }
+          } catch {}
         } else if (isMounted) {
           setSelectedAccount("");
         }
@@ -2324,18 +2364,26 @@ function App() {
         } catch { }
         setOverrideBotRunning(true);
         if (setBotStatus) setBotStatus("RUNNING");
-        setHttpActiveAccounts(prev => ({
-          ...prev,
-          [`${activeBotTab}_${currentAcc}`]: currentAcc,
-          [currentAcc]: activeBotTab,
-          [activeBotTab]: currentAcc,
-        }));
-        setWsActiveAccountsState(prev => ({
-          ...prev,
-          [`${activeBotTab}_${currentAcc}`]: currentAcc,
-          [currentAcc]: activeBotTab,
-          [activeBotTab]: currentAcc,
-        }));
+        setHttpActiveAccounts(prev => {
+          const next = {
+            ...prev,
+            [`${activeBotTab}_${currentAcc}`]: currentAcc,
+            [currentAcc]: activeBotTab,
+            [activeBotTab]: currentAcc,
+          };
+          try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
+          return next;
+        });
+        setWsActiveAccountsState(prev => {
+          const next = {
+            ...prev,
+            [`${activeBotTab}_${currentAcc}`]: currentAcc,
+            [currentAcc]: activeBotTab,
+            [activeBotTab]: currentAcc,
+          };
+          try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
+          return next;
+        });
         const accLabel = accounts.find(a => a.id === currentAcc)?.name || currentAcc;
         addSystemLog(`🚀 [BOT] Đã khởi động ${activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot"} với tài khoản ${accLabel}${cleanMsg}`);
         refreshBotData();
@@ -2394,6 +2442,7 @@ function App() {
           delete next[`${targetStrat}_${targetAcc}`];
           delete next[targetAcc];
           if (next[targetStrat] === targetAcc) delete next[targetStrat];
+          try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
           return next;
         });
         setWsActiveAccountsState(prev => {
@@ -2401,6 +2450,7 @@ function App() {
           delete next[`${targetStrat}_${targetAcc}`];
           delete next[targetAcc];
           if (next[targetStrat] === targetAcc) delete next[targetStrat];
+          try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
           return next;
         });
         const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";

@@ -974,4 +974,17 @@ Mọi Box Long/Short vẽ trên biểu đồ bắt buộc phải ánh xạ trự
   - `python3 zClean_Zombie_Bots.py` (hoặc `bash kill_all_bots.sh`): Tiêu diệt toàn bộ bot zombie, dọn sạch 100% file PID, cờ kẹt và hủy lệnh limit pending trên OKX.
   - Endpoints backend: `GET /api/bot/inspect` và `POST /api/bot/force_kill_all`.
 
+### 6. Đồng Bộ Trạng Thái Bot & Chống Lỗi F5 Giật Về "CHẠY BOT"
+- **Định nghĩa tập trung danh sách tài khoản `get_user_accounts(uid)`:**
+  - Quét an toàn file `accounts.json` của user từ cả `get_user_data_dir(uid)` và `get_user_base_dir(uid)`.
+  - Loại bỏ hoàn toàn lỗi `NameError: name 'get_user_accounts' is not defined` trong `get_bot_status` dẫn tới sập WebSocket payload về `STOPPED`.
+- **Cơ chế suy diễn trạng thái Live hai chiều:**
+  - Nếu `target_acc` không có PID trực tiếp nhưng `active_accounts` chứa tài khoản hoặc chiến thuật đó đang chạy Live, hệ thống tự động gán `is_running = True` và xác định đúng `status: "RUNNING"`.
+- **Đồng bộ State tức thì từ `localStorage` (0ms F5 Recovery):**
+  - `useBotWebSocket.js` và `App.jsx` khởi tạo `botStatus`, `httpActiveAccounts` và `wsActiveAccountsState` trực tiếp từ `localStorage.getItem("tls1_active_accounts")`.
+  - Loại bỏ hoàn toàn hiện tượng nhấp nháy chuyển về "CHẠY BOT" khi F5 tải lại trang.
+- **Đồng bộ qua HTTP Bootstrap:**
+  - Hàm `bootstrap()` luôn gọi fetch `/api/bot/status` với `account_id` để cập nhật đồng thời trạng thái và map tài khoản chạy của server.
+
+
 

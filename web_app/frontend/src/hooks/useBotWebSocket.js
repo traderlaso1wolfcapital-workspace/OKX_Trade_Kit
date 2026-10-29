@@ -1,9 +1,24 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 export function useBotWebSocket(uid, strategy, accountId) {
-  const [botStatus, setBotStatus] = useState("STOPPED");
+  const [botStatus, setBotStatus] = useState(() => {
+    try {
+      const savedAccounts = JSON.parse(localStorage.getItem("tls1_active_accounts") || "{}");
+      if (savedAccounts[strategy] || Object.keys(savedAccounts).some(k => k.startsWith(`${strategy}_`))) {
+        return "RUNNING";
+      }
+    } catch {}
+    return "STOPPED";
+  });
   const [uptime, setUptime] = useState(0);
-  const [activeAccounts, setActiveAccounts] = useState({});
+  const [activeAccounts, setActiveAccounts] = useState(() => {
+    try {
+      const savedAccounts = JSON.parse(localStorage.getItem("tls1_active_accounts") || "{}");
+      return savedAccounts && typeof savedAccounts === "object" ? savedAccounts : {};
+    } catch {
+      return {};
+    }
+  });
   const [positions, setPositions] = useState([]);
   const [availBal, setAvailBal] = useState(null);
   const [closedPositions, setClosedPositions] = useState([]);

@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../i18n";
 
-export default function LogsTerminal({ 
-  logs: externalLogs, 
+export default function LogsTerminal({
+  logs: externalLogs,
   okxLogs,
   propLogs,
   currentPlatform = "okx",
   onSwitchPlatform,
   isOkxRunning = false,
   isPropRunning = false,
-  activeBotTab, 
-  loginUid, 
+  activeBotTab,
+  loginUid,
   isAuthenticated,
   selectedAccount,
   hasActiveAccount = false,
@@ -183,19 +183,19 @@ export default function LogsTerminal({
 
         const isHeader = line.includes("bot_sub1.py") || line.includes("bot_sub2.py") || line.includes("bot_sub3.py") || line.includes("sys_bot_");
 
-        const isEventLog = 
-          line.startsWith("⏳") || line.startsWith("🔒") || line.startsWith("🚨") || 
-          line.startsWith("🧹") || line.startsWith("✅") || line.startsWith("🚀") || 
-          line.startsWith("💡") || line.startsWith("⚠️") || line.startsWith("🌑") || 
-          line.startsWith("⚙️") || line.startsWith("🔑") || line.startsWith("🛑") || 
-          line.startsWith("➕") || line.startsWith("🗑️") || line.startsWith("♻️") || 
+        const isEventLog =
+          line.startsWith("⏳") || line.startsWith("🔒") || line.startsWith("🚨") ||
+          line.startsWith("🧹") || line.startsWith("✅") || line.startsWith("🚀") ||
+          line.startsWith("💡") || line.startsWith("⚠️") || line.startsWith("🌑") ||
+          line.startsWith("⚙️") || line.startsWith("🔑") || line.startsWith("🛑") ||
+          line.startsWith("➕") || line.startsWith("🗑️") || line.startsWith("♻️") ||
           line.startsWith("🔄") || line.startsWith("✧") ||
-          line.startsWith("[TP/SL") || line.startsWith("[LIMIT") || line.startsWith("[CANCEL") || 
-          line.startsWith("[ORDER") || line.startsWith("[CLOSE") || line.startsWith("[ERROR") || 
+          line.startsWith("[TP/SL") || line.startsWith("[LIMIT") || line.startsWith("[CANCEL") ||
+          line.startsWith("[ORDER") || line.startsWith("[CLOSE") || line.startsWith("[ERROR") ||
           line.startsWith("[INFO") || line.startsWith("[SYSTEM") || line.startsWith("[OKX");
 
-        const isDashboardLine = 
-          line.startsWith("===") || 
+        const isDashboardLine =
+          line.startsWith("===") ||
           line.startsWith("---") ||
           line.includes("Thợ săn EMA200") ||
           line.includes("Quỹ E8") ||
@@ -260,7 +260,7 @@ export default function LogsTerminal({
       ws.onerror = () => {
         try {
           ws.close();
-        } catch {}
+        } catch { }
       };
     };
 
@@ -294,8 +294,8 @@ export default function LogsTerminal({
 
       coins.forEach(c => {
         // 1. Kiểm tra vị thế thật đang mở trên TradeLocker
-        const activePos = Array.isArray(positions) 
-          ? positions.find(p => !p.is_limit && (p.instId || p.coin || "").toUpperCase().includes(c)) 
+        const activePos = Array.isArray(positions)
+          ? positions.find(p => !p.is_limit && (p.instId || p.coin || "").toUpperCase().includes(c))
           : null;
 
         // 2. Kiểm tra lệnh chờ Limit đang cắm trên TradeLocker
@@ -375,10 +375,10 @@ export default function LogsTerminal({
     // tự động tái tạo bảng Dashboard và lọc triệt để 100% Event Logs của tài khoản đang chọn:
     const isCurrentAccountRunning = Boolean(
       isOkxRunning || (
-        runningAccId && 
-        selectedAccount && 
+        runningAccId &&
+        selectedAccount &&
         (
-          selectedAccount === runningAccId || 
+          selectedAccount === runningAccId ||
           (typeof runningAccId === "string" && selectedAccount.replace("#", "") === runningAccId.replace("#", "")) ||
           (Array.isArray(runningAccId) && runningAccId.some(r => r === selectedAccount || String(r).replace("#", "") === String(selectedAccount).replace("#", "")))
         )
@@ -396,7 +396,7 @@ export default function LogsTerminal({
       const pnlSign = totalPnl >= 0 ? "+" : "";
       const pnlStr = `${pnlSign}${totalPnl.toFixed(2)}`;
       const nowStr = new Date().toLocaleTimeString("vi-VN", { hour12: false });
-      
+
       const dbar = "=".repeat(78);
       const bar = "-".repeat(78);
       const r0 = " ⚡ Thợ săn EMA200  |   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  ";
@@ -414,7 +414,7 @@ export default function LogsTerminal({
       const r2 = `${r2_c1.padEnd(21)}|${r2_c2.padEnd(19)}|${r2_c3.padEnd(19)}|${r2_c4.padEnd(16)}`;
 
       const tailoredHeader = [dbar, r0, bar, r1, r2, dbar, "✜ Tình trạng vị thế:"];
-      
+
       const coins = ["XAU", "BTC", "ETH"];
       coins.forEach(c => {
         const matchPos = Array.isArray(positions)
@@ -490,10 +490,10 @@ export default function LogsTerminal({
     if (currentPlatform === "okx" && (!hasActiveAccount || !selectedAccount || accountsCount === 0)) {
       return [];
     }
-    return dashboardLines.filter(l => 
-      !l.includes("bot_sub1.py") && 
-      !l.includes("bot_sub2.py") && 
-      !l.includes("bot_sub3.py") && 
+    return dashboardLines.filter(l =>
+      !l.includes("bot_sub1.py") &&
+      !l.includes("bot_sub2.py") &&
+      !l.includes("bot_sub3.py") &&
       !l.includes("sys_bot_")
     );
   }, [dashboardLines, currentPlatform, hasActiveAccount, selectedAccount, accountsCount]);
@@ -603,7 +603,7 @@ export default function LogsTerminal({
         >
           {/* Icon vòng xoay màu xanh tinh gọn */}
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19"/>
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19" />
           </svg>
         </button>
       )}
@@ -725,18 +725,18 @@ export default function LogsTerminal({
                       color: (l.includes("⏳") || l.includes("TP/SL") || l.includes("🏆"))
                         ? "#fbbf24"
                         : (l.includes("🚨") || l.includes("Lỗi") || l.includes("ERROR") || l.includes("REJECT") || l.includes("THẤT BẠI"))
-                        ? "#f87171"
-                        : (l.includes("⚠️"))
-                        ? "#fb923c"
-                        : (l.includes("✅") || l.includes("SUCCESS") || l.includes("thành công") || l.includes("🔑"))
-                        ? "#34d399"
-                        : (l.includes("🚀") || l.includes("LIMIT") || l.includes("MARKET"))
-                        ? "#38bdf8"
-                        : (l.includes("🧹"))
-                        ? "#c084fc"
-                        : (l.includes("🌑"))
-                        ? "#94a3b8"
-                        : "#94a3b8",
+                          ? "#f87171"
+                          : (l.includes("⚠️"))
+                            ? "#fb923c"
+                            : (l.includes("✅") || l.includes("SUCCESS") || l.includes("thành công") || l.includes("🔑"))
+                              ? "#34d399"
+                              : (l.includes("🚀") || l.includes("LIMIT") || l.includes("MARKET"))
+                                ? "#38bdf8"
+                                : (l.includes("🧹"))
+                                  ? "#c084fc"
+                                  : (l.includes("🌑"))
+                                    ? "#94a3b8"
+                                    : "#94a3b8",
                       lineHeight: "1.45",
                     }}
                   >
