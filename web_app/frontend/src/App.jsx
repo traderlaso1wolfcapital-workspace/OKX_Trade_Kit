@@ -1423,7 +1423,11 @@ function App() {
       .then(d => {
         if (!d) return;
         if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
-        if (d.ENABLED_COINS) setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
+        if (d.ENABLED_COINS && Array.isArray(d.ENABLED_COINS) && d.ENABLED_COINS.length > 0) {
+          const coinPairs = d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`);
+          setActivePairs(coinPairs);
+          setWatchlistCoins(prev => Array.from(new Set([...(prev || []), ...coinPairs])));
+        }
         if (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) {
           const bVol = Number(d.POSITION_VOLUME_HIGH_CONFIDENCE);
           if (bVol > 0) {
@@ -2698,7 +2702,6 @@ function App() {
         accumCandles: 60,
         altcoinFollowBtc: true,
       }));
-      setWatchlistCoins(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
     } else if (activeBotTab === "sub2") {
       // Defaults for Bot SMC
       setRisk({ posVol: 1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT" });
@@ -2709,7 +2712,6 @@ function App() {
         trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
         timeframeBase: "1H",
       });
-      setWatchlistCoins(["XAU-USDT-SWAP", "BTC-USDT-SWAP", "ETH-USDT-SWAP"]);
     }
   }, [activeBotTab]);
 
@@ -2861,6 +2863,7 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          enabled_coins: (activePairs || []).map(p => p.split("-")[0]),
           position_volume: risk.posVol,
           scalping_tp_pct: (risk.tpPct || 0.6) / 100,
           scalping_sl_pct: (risk.slPct || 0.6) / 100,
@@ -3224,7 +3227,9 @@ function App() {
           const d = await r.json();
           if (d.ENABLED_TFS) setEnabledTfs(d.ENABLED_TFS);
           if (d.ENABLED_COINS && Array.isArray(d.ENABLED_COINS) && d.ENABLED_COINS.length > 0) {
-            setActivePairs(d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`));
+            const coinPairs = d.ENABLED_COINS.map(c => `${c}-USDT-SWAP`);
+            setActivePairs(coinPairs);
+            setWatchlistCoins(prev => Array.from(new Set([...(prev || []), ...coinPairs])));
           }
           const bVol = (d.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && d.POSITION_VOLUME_HIGH_CONFIDENCE !== null) ? Number(d.POSITION_VOLUME_HIGH_CONFIDENCE) : null;
           if (bVol !== null && bVol > 0) {
@@ -3916,6 +3921,7 @@ function App() {
         isSavingConfig={isSavingConfig}
         onSaveApiKey={handleSaveApiKey}
         watchlistCoins={watchlistCoins}
+        activePairs={activePairs}
         onToggleWatchlistCoin={handleToggleWatchlistCoin}
         safePos={safePos}
         risk={risk}

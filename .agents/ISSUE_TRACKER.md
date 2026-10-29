@@ -33,6 +33,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Sửa Lỗi Lệch State Coin Giữa Cài Đặt (Modal) Và Bảng Vị Thế Ngoại Vi:
+  - **Nguyên nhân:**
+    1. `PositionsTable` ngoài bảng gộp chung cả `watchlistCoins` và `activePairs`, nhưng `SystemSettingsModal` chỉ đọc một mình `watchlistCoins`.
+    2. `watchlistCoins` bị dính lệnh hardcode reset về 3 coin `["XAU", "BTC", "ETH"]` trong `useEffect` của `App.jsx`, đồng thời khi API backend trả về `ENABLED_COINS` thì frontend chỉ gán vào `activePairs` mà quên gán vào `watchlistCoins`.
+    3. Nút "Lưu Chiến Thuật" trong modal không đóng gói `enabled_coins` gửi lên backend.
+  - **Giải pháp:**
+    1. Gỡ bỏ 2 đoạn code hardcode reset `watchlistCoins` trong `App.jsx`.
+    2. Đồng bộ `ENABLED_COINS` từ API backend vào cả `activePairs` và `watchlistCoins`.
+    3. Truyền `activePairs` vào `SystemSettingsModal` và kiểm tra `isSelected` trên cả 2 nguồn.
+    4. Bổ sung `enabled_coins` vào payload của hàm `handleSaveStratConfig` khi lưu cấu hình.
+  - **Kết quả:** Ô SOL và mọi coin khác được tích chọn sẽ luôn đồng bộ 100% giữa Bảng Vị Thế và Modal Cài Đặt.
+
+- **[30/10/2026]** - Sửa Lỗi Nhận Diện TF Lệnh Limit (M15 Bị Nhầm Sang M5):
+  - **Nguyên nhân:** Hàm `getLimitTfKey` kiểm tra điều kiện `raw.endsWith("5")` cho khung M5 và đặt trước M15. Khi lệnh là Limit `M15`, chuỗi kết thúc bằng ký tự `5` dẫn đến việc hàm trả về nhầm `M5` thay vì `M15`, làm sáng ô [5].
+  - **Giải pháp:** Viết lại bộ bóc tách TF chuẩn xác:
+    1. Ưu tiên đối chiếu trực tiếp `pos.tf` đã được chuẩn hóa (`tfUpper === "M15"`, `tfUpper === "M5"`...).
+    2. Dự phòng dùng Regex khớp ranh giới từ `\bM15\b`, `LIMIT M?15` và ưu tiên kiểm tra `M15`/`M30` trước `M5`.
+  - **Kết quả:** Đã test thực tế bằng Node.js và build frontend thành công, lệnh Limit M15 sáng chính xác ô [15].
+
 - **[30/10/2026]** - Triển Khai Phương Án B Cho Cột TF Lớp 2 (Lệnh Chờ Khớp):
   - **Yêu cầu từ CEO:** Duyệt triển khai Phương án B: Cột TF ở Lớp 2 (lệnh limit) vẫn giữ đủ 6 ô thẳng hàng, nhưng chỉ sáng duy nhất 1 ô TF của chính lệnh limit đó (ví dụ lệnh M15 thì ô [15] sáng teal, 5 ô còn lại tối mờ), và toàn bộ 6 ô được LOCK LẠI (`pointerEvents: none`, `cursor: default`) để chống thao tác nhầm, vì quyền điều khiển TF đã tập trung tại Lớp 1.
   - **Kết quả:** Đã triển khai hoàn tất trong `PositionsTable.jsx`, 6 ô TF canh đều chuẩn xác, lệnh limit hiển thị trực quan khung giờ tương ứng, khóa click tuyệt đối. Build frontend thành công.
@@ -5252,6 +5271,25 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[30/10/2026]** - Sửa Lỗi Lệch State Coin Giữa Cài Đặt (Modal) Và Bảng Vị Thế Ngoại Vi:
+  - **Nguyên nhân:**
+    1. `PositionsTable` ngoài bảng gộp chung cả `watchlistCoins` và `activePairs`, nhưng `SystemSettingsModal` chỉ đọc một mình `watchlistCoins`.
+    2. `watchlistCoins` bị dính lệnh hardcode reset về 3 coin `["XAU", "BTC", "ETH"]` trong `useEffect` của `App.jsx`, đồng thời khi API backend trả về `ENABLED_COINS` thì frontend chỉ gán vào `activePairs` mà quên gán vào `watchlistCoins`.
+    3. Nút "Lưu Chiến Thuật" trong modal không đóng gói `enabled_coins` gửi lên backend.
+  - **Giải pháp:**
+    1. Gỡ bỏ 2 đoạn code hardcode reset `watchlistCoins` trong `App.jsx`.
+    2. Đồng bộ `ENABLED_COINS` từ API backend vào cả `activePairs` và `watchlistCoins`.
+    3. Truyền `activePairs` vào `SystemSettingsModal` và kiểm tra `isSelected` trên cả 2 nguồn.
+    4. Bổ sung `enabled_coins` vào payload của hàm `handleSaveStratConfig` khi lưu cấu hình.
+  - **Kết quả:** Ô SOL và mọi coin khác được tích chọn sẽ luôn đồng bộ 100% giữa Bảng Vị Thế và Modal Cài Đặt.
+
+- **[30/10/2026]** - Sửa Lỗi Nhận Diện TF Lệnh Limit (M15 Bị Nhầm Sang M5):
+  - **Nguyên nhân:** Hàm `getLimitTfKey` kiểm tra điều kiện `raw.endsWith("5")` cho khung M5 và đặt trước M15. Khi lệnh là Limit `M15`, chuỗi kết thúc bằng ký tự `5` dẫn đến việc hàm trả về nhầm `M5` thay vì `M15`, làm sáng ô [5].
+  - **Giải pháp:** Viết lại bộ bóc tách TF chuẩn xác:
+    1. Ưu tiên đối chiếu trực tiếp `pos.tf` đã được chuẩn hóa (`tfUpper === "M15"`, `tfUpper === "M5"`...).
+    2. Dự phòng dùng Regex khớp ranh giới từ `\bM15\b`, `LIMIT M?15` và ưu tiên kiểm tra `M15`/`M30` trước `M5`.
+  - **Kết quả:** Đã test thực tế bằng Node.js và build frontend thành công, lệnh Limit M15 sáng chính xác ô [15].
 
 - **[30/10/2026]** - Triển Khai Phương Án B Cho Cột TF Lớp 2 (Lệnh Chờ Khớp):
   - **Yêu cầu từ CEO:** Duyệt triển khai Phương án B: Cột TF ở Lớp 2 (lệnh limit) vẫn giữ đủ 6 ô thẳng hàng, nhưng chỉ sáng duy nhất 1 ô TF của chính lệnh limit đó (ví dụ lệnh M15 thì ô [15] sáng teal, 5 ô còn lại tối mờ), và toàn bộ 6 ô được LOCK LẠI (`pointerEvents: none`, `cursor: default`) để chống thao tác nhầm, vì quyền điều khiển TF đã tập trung tại Lớp 1.

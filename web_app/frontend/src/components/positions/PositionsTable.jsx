@@ -54,13 +54,26 @@ export default function PositionsTable({
     String(p.status || "").toLowerCase().includes("pending");
 
   const getLimitTfKey = (pos) => {
-    const raw = String(pos?.tf || pos?.status || "").toUpperCase();
-    if (raw.includes("M5") || raw.includes(" 5M") || raw.includes("LIMIT 5") || raw.includes("M5)") || raw.endsWith("M5") || raw.endsWith("5")) return "M5";
-    if (raw.includes("M15") || raw.includes(" 15M") || raw.includes("LIMIT 15") || raw.includes("M15)") || raw.endsWith("M15") || raw.endsWith("15")) return "M15";
-    if (raw.includes("M30") || raw.includes(" 30M") || raw.includes("LIMIT 30") || raw.includes("M30)") || raw.endsWith("M30") || raw.endsWith("30")) return "M30";
-    if (raw.includes("H1") || raw.includes(" 1H") || raw.includes("LIMIT H1") || raw.includes("H1)") || raw.endsWith("H1") || raw.endsWith("1H")) return "H1";
-    if (raw.includes("H2") || raw.includes(" 2H") || raw.includes("LIMIT H2") || raw.includes("H2)") || raw.endsWith("H2") || raw.endsWith("2H")) return "H2";
-    if (raw.includes("H4") || raw.includes(" 4H") || raw.includes("LIMIT H4") || raw.includes("H4)") || raw.endsWith("H4") || raw.endsWith("4H")) return "H4";
+    // 1. Ưu tiên lấy trực tiếp từ pos.tf
+    if (pos?.tf) {
+      const tfUpper = String(pos.tf).toUpperCase().trim();
+      if (tfUpper === "M5" || tfUpper === "5M" || tfUpper === "5") return "M5";
+      if (tfUpper === "M15" || tfUpper === "15M" || tfUpper === "15") return "M15";
+      if (tfUpper === "M30" || tfUpper === "30M" || tfUpper === "30") return "M30";
+      if (tfUpper === "H1" || tfUpper === "1H") return "H1";
+      if (tfUpper === "H2" || tfUpper === "2H") return "H2";
+      if (tfUpper === "H4" || tfUpper === "4H") return "H4";
+    }
+
+    // 2. Dự phòng trích xuất từ pos.status hoặc pos.ticket_id
+    const text = String(pos?.status || pos?.ticket_id || "").toUpperCase();
+    if (/\bM15\b|\b15M\b|LIMIT M?15/i.test(text)) return "M15";
+    if (/\bM30\b|\b30M\b|LIMIT M?30/i.test(text)) return "M30";
+    if (/\bM5\b|\b5M\b|LIMIT M?5/i.test(text)) return "M5";
+    if (/\bH1\b|\b1H\b|LIMIT H?1/i.test(text)) return "H1";
+    if (/\bH2\b|\b2H\b|LIMIT H?2/i.test(text)) return "H2";
+    if (/\bH4\b|\b4H\b|LIMIT H?4/i.test(text)) return "H4";
+
     return "";
   };
 

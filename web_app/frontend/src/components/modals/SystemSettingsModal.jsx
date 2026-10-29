@@ -34,6 +34,7 @@ export default function SystemSettingsModal({
   isSavingConfig,
   onSaveApiKey,
   watchlistCoins,
+  activePairs = [],
   onToggleWatchlistCoin,
   safePos = [],
   risk,
@@ -208,7 +209,7 @@ export default function SystemSettingsModal({
                   {/* Nhóm FX / Kim loại / Hàng hóa (XAU, XAG, CL...) */}
                   <div className="coin-select-grid" style={{ marginTop: "8px" }}>
                     {COIN_LIST.filter(c => c.value !== "USDT.D" && (c.assetClass === "forex" || ["XAU", "XAG", "CL"].includes(c.label.replace("-USDT", "").replace("-SWAP", "")))).map(coin => {
-                      const isSelected = watchlistCoins.includes(coin.value);
+                      const isSelected = (watchlistCoins && watchlistCoins.includes(coin.value)) || (activePairs && activePairs.includes(coin.value));
                       const hasPos = safePos.some(p => p.instId === coin.value);
                       const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
                       return (
@@ -230,7 +231,7 @@ export default function SystemSettingsModal({
                   {/* Nhóm Crypto Coins (BTC, ETH, SOL, XRP...) */}
                   <div className="coin-select-grid" style={{ marginTop: 0 }}>
                     {COIN_LIST.filter(c => c.value !== "USDT.D" && !(c.assetClass === "forex" || ["XAU", "XAG", "CL"].includes(c.label.replace("-USDT", "").replace("-SWAP", "")))).map(coin => {
-                      const isSelected = watchlistCoins.includes(coin.value);
+                      const isSelected = (watchlistCoins && watchlistCoins.includes(coin.value)) || (activePairs && activePairs.includes(coin.value));
                       const hasPos = safePos.some(p => p.instId === coin.value);
                       const coinSymbol = coin.label.replace("-USDT", "").replace("-SWAP", "");
                       return (
