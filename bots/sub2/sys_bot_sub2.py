@@ -293,7 +293,8 @@ def main():
                     "ENABLED_COINS": ["XAU", "BTC", "ETH"],
                     "ENABLE_STRATEGY_SMC": True,
                     "TIMEFRAME_BASE": "1H",
-                    "POSITION_VOLUME_HIGH_CONFIDENCE": "0.40",
+                    "POSITION_VOLUME_HIGH_CONFIDENCE": "1.00",
+                    "POSITION_VOLUME_USDT": 1.0,
                     "OB_RR_RATIO_TREND": "5.00",
                     "OB_RR_RATIO_COUNTER": "1.00",
                     "USE_DYNAMIC_RISK": False,
@@ -555,3 +556,4 @@ if __name__ == "__main__":
 # z1951 | Flush I/O queue and wait for worker thread to finish before process exit to prevent data loss
 # z1952 | Tích hợp TradeLocker dispatcher bất đồng bộ khi khớp lệnh và đặt lệnh limit SMC
 # z1953 | Tách biệt hoàn toàn luồng xử lý và trạng thái hoạt động giữa Sàn OKX và Quỹ FX
+# z1954 | Cập nhật cấu hình mặc định POSITION_VOLUME_HIGH_CONFIDENCE và POSITION_VOLUME_USDT thành 1.0; đồng bộ đa alias config file.

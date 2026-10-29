@@ -333,7 +333,7 @@ export default function PositionsTable({
         <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
           {isLimit ? (
             <span style={{ color: "#f59e0b", fontSize: "12px", fontWeight: "bold" }}>
-              Chờ khớp (Limit)
+              {pos.tf ? `Chờ khớp (Limit ${pos.tf.toUpperCase()})` : (pos.status || "Chờ khớp (Limit)")}
             </span>
           ) : (
             (() => {

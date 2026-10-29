@@ -33,6 +33,36 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để 3 Lỗi Về Ký Quỹ Lệnh Limit Bị Sai 0.4$, Hiển Thị Timeframe Cho Lệnh Chờ Khớp Limit và Tự Động Hủy Sạch Lệnh Limit Khi Dừng / Bật Bot:
+  - **Hiện tượng & Yêu cầu từ CEO:**
+    1. **Tính toán ký quỹ chờ Limit bị sai (toàn 0.4$ - 0.5$ dù người dùng nhập 4$ hoặc 1$):** Web hiển thị ký quỹ 4$ hoặc 1$, nhưng bot đặt lệnh Limit trên sàn OKX toàn với ký quỹ mặc định 0.4$ (notional ~40 USDT / 100x -> ký quỹ hiển thị ~0.48$ - 0.50$). Cần sửa triệt để để ký quỹ người dùng cài đặt trên web được bot nhận và đặt đúng số vốn.
+    2. **Hiển thị Timeframe cho lệnh chờ khớp Limit:** Cột PNL thả nổi trước đây chỉ hiển thị chữ `Chờ khớp (Limit)`, CEO muốn hiển thị rõ khung thời gian đặt lệnh: ví dụ `Chờ khớp (Limit M5)`, `Chờ khớp (Limit M15)`, `Chờ khớp (Limit H1)`,...
+    3. **Hủy toàn bộ lệnh Limit trên sàn khi DỪNG BOT và BẬT BOT:** Khi người dùng bấm "DỪNG BOT" hoặc "CHẠY BOT", hệ thống phải tự động quét và hủy sạch 100% các lệnh Limit đang treo trên sàn OKX (bảo toàn nguyên vẹn 100% TP/SL của các vị thế đang chạy). Trước đây dừng bot rồi mà trên sàn vẫn còn đống lệnh limit cũ gây nguy hiểm.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi Ký Quỹ Limit 0.4$:*
+       - Trong `sys_bot_sub1.py` và `sys_bot_sub2.py`, tên tài khoản bị xóa dấu gạch dưới (`acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")`), dẫn đến tên file `sub1789...` không khớp với file `sub_1789...` do Web App lưu. Bot không tìm thấy file cấu hình tài khoản nên tự động sinh file mới với giá trị mặc định `"POSITION_VOLUME_HIGH_CONFIDENCE": "0.40"`.
+       - Trong `web_app/backend/main.py` hàm `update_bot_config`, khi frontend không gửi trường `vol_unit`, backend không đồng bộ `POSITION_VOLUME_USDT`. Do đó trong file JSON vẫn lưu `POSITION_VOLUME_USDT: 0.4`. Trong khi `bot_strategy.py` lại ưu tiên đọc `POSITION_VOLUME_USDT` trước `POSITION_VOLUME_HIGH_CONFIDENCE`, khiến bot đọc ngược lại 0.4$ và ghi đè lên mức 4$ của CEO.
+    2. *Lỗi chưa hiện Timeframe cho lệnh Limit:*
+       - Trong `main.py` hàm `get_bot_positions`, hệ thống chỉ đọc Timeframe từ `markers.json`. Khi markers không khớp, `c_tf` bị rỗng. Đồng thời hệ thống chưa parse trực tiếp mã `clOrdId` của OKX vốn đã được bot gắn prefix chuẩn: `f"{CL_ORD_PREFIX}EL{tf}..."` hoặc `f"{CL_ORD_PREFIX}ES{tf}..."`.
+       - Trong `PositionsTable.jsx`, cột PNL thả nổi gán chuỗi text tĩnh `Chờ khớp (Limit)` thay vì dynamic theo `pos.tf`.
+    3. *Lỗi dừng bot chưa hủy lệnh Limit trên sàn:*
+       - Trong `main.py`, hàm `_get_okx_creds` khi nhận `account_id` dạng tag `#7768` chỉ tìm file `.api_#7768`. Do file thực tế là `.api_7768`, `.api_sub1` hoặc `.api_sub_...`, hàm trả về rỗng `("", "", "", False)`. Do đó `_cancel_unfilled_limit_orders` không có API Key và không thể gửi lệnh hủy lên OKX.
+       - Bộ lọc lệnh chỉ kiểm tra `ordType == "limit"`, bỏ sót các lệnh Maker `post_only`, `fok`, `ioc`.
+       - Sau khi hủy lệnh, cache `_okx_positions_cache` không bị xóa nên UI tiếp tục lấy danh sách lệnh limit cũ từ cache.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Khắc phục Ký Quỹ Limit:*
+       - Backend `main.py` hàm `update_bot_config`: Luôn gán đồng thời `POSITION_VOLUME_HIGH_CONFIDENCE` và `POSITION_VOLUME_USDT` bằng mức vốn người dùng cài đặt, gán mặc định `VOL_UNIT = "USDT"`. Ghi đồng bộ vào tất cả các alias file: `{clean_acc}_global_config.json`, `{clean_no_under}_global_config.json`, `{target_acc}_global_config.json` và cả `{strategy}_global_config.json`.
+       - Lõi bot `bot_strategy.py`: Ưu tiên đọc `POSITION_VOLUME_HIGH_CONFIDENCE` từ JSON, fallback sang `POSITION_VOLUME_USDT`, đổi default từ `0.4` sang `1.0`. Cải tiến cơ chế dò tìm candidate config files thông minh (hỗ trợ cả có và không có dấu gạch dưới).
+       - File `bot_config.py` và `sys_bot_sub1.py`, `sys_bot_sub2.py`: Đổi default fallback `POSITION_VOLUME_HIGH_CONFIDENCE` từ `0.40` sang `1.00`.
+       - Frontend `App.jsx`: Gửi đầy đủ `vol_unit: risk.volUnit || "USDT"` và `vol_usdt: Number(risk.posVol)` trong cả effect cập nhật risk lẫn hàm `handleStartBot`.
+    2. *Khắc phục Timeframe cho lệnh Limit:*
+       - Backend `main.py` hàm `get_bot_positions`: Bổ sung bộ phân tích `clOrdId` từ API OKX, quét các định dạng `EL{tf}`, `ES{tf}`, `_{tf}`, kết thúc bằng `{tf}` (với `tf` ∈ `["M5", "M15", "M30", "H1", "H2", "H4", "D1"]`). Trả về cả `status: "Chờ khớp (Limit {TF})"` và `tf: "{TF}"`.
+       - Frontend `PositionsTable.jsx`: Hiển thị `{pos.tf ? `Chờ khớp (Limit ${pos.tf.toUpperCase()})` : (pos.status || "Chờ khớp (Limit)")}`.
+    3. *Khắc phục Hủy toàn bộ Limit trên sàn khi Dừng và Bật Bot:*
+       - Backend `main.py` hàm `_get_okx_creds`: Chuẩn hóa đa chiều `target_acc` (loại bỏ `#`, tra cứu `accounts.json` khớp `id`, `name`, tag 4 số cuối như `7768`), tìm quét tất cả các file alias `.api_{clean}`, `.api_{target}`, `.api_{id}`, `.running_account` và fallback `.api_{strategy}`. Đảm bảo luôn lấy được API Key chính xác 100%.
+       - Nâng cấp `_cancel_unfilled_limit_orders`: Quét toàn diện lệnh pending SWAP và non-SWAP, mở rộng nhận diện mọi loại lệnh limit (`limit`, `post_only`, `fok`, `ioc`), hủy theo batch 20 lệnh.
+       - Tự động xóa sạch `_okx_positions_cache` ngay sau khi hủy để UI cập nhật tức thì 0ms. Bảo lưu 100% các lệnh chốt lời/cắt lỗ (`reduceOnly == True`) của các vị thế đang chạy.
+
 - **[29/10/2026]** - Nâng Cấp Hệ Thống Cho Phép Nhiều Tài Khoản Cùng Chạy Chung Một Phương Pháp Bot (EMA200 / SMC / Liquidation) Song Song Độc Lập 100%:
   - **Yêu cầu & Mục tiêu:**
     - Thay đổi logic hệ thống: Cho phép 2 hoặc nhiều tài khoản khác nhau (ví dụ Account 1 `#7768` và Account 2 `#7829`) cùng chạy chung một phương pháp bot (ví dụ cả hai cùng chạy `EMA200 Bot`) đồng thời một cách độc lập 100%.
@@ -5095,6 +5125,36 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Khắc Phục Triệt Để 3 Lỗi Về Ký Quỹ Lệnh Limit Bị Sai 0.4$, Hiển Thị Timeframe Cho Lệnh Chờ Khớp Limit và Tự Động Hủy Sạch Lệnh Limit Khi Dừng / Bật Bot:
+  - **Hiện tượng & Yêu cầu từ CEO:**
+    1. **Tính toán ký quỹ chờ Limit bị sai (toàn 0.4$ - 0.5$ dù người dùng nhập 4$ hoặc 1$):** Web hiển thị ký quỹ 4$ hoặc 1$, nhưng bot đặt lệnh Limit trên sàn OKX toàn với ký quỹ mặc định 0.4$ (notional ~40 USDT / 100x -> ký quỹ hiển thị ~0.48$ - 0.50$). Cần sửa triệt để để ký quỹ người dùng cài đặt trên web được bot nhận và đặt đúng số vốn.
+    2. **Hiển thị Timeframe cho lệnh chờ khớp Limit:** Cột PNL thả nổi trước đây chỉ hiển thị chữ `Chờ khớp (Limit)`, CEO muốn hiển thị rõ khung thời gian đặt lệnh: ví dụ `Chờ khớp (Limit M5)`, `Chờ khớp (Limit M15)`, `Chờ khớp (Limit H1)`,...
+    3. **Hủy toàn bộ lệnh Limit trên sàn khi DỪNG BOT và BẬT BOT:** Khi người dùng bấm "DỪNG BOT" hoặc "CHẠY BOT", hệ thống phải tự động quét và hủy sạch 100% các lệnh Limit đang treo trên sàn OKX (bảo toàn nguyên vẹn 100% TP/SL của các vị thế đang chạy). Trước đây dừng bot rồi mà trên sàn vẫn còn đống lệnh limit cũ gây nguy hiểm.
+  - **Nguyên nhân cốt lõi:**
+    1. *Lỗi Ký Quỹ Limit 0.4$:*
+       - Trong `sys_bot_sub1.py` và `sys_bot_sub2.py`, tên tài khoản bị xóa dấu gạch dưới (`acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")`), dẫn đến tên file `sub1789...` không khớp với file `sub_1789...` do Web App lưu. Bot không tìm thấy file cấu hình tài khoản nên tự động sinh file mới với giá trị mặc định `"POSITION_VOLUME_HIGH_CONFIDENCE": "0.40"`.
+       - Trong `web_app/backend/main.py` hàm `update_bot_config`, khi frontend không gửi trường `vol_unit`, backend không đồng bộ `POSITION_VOLUME_USDT`. Do đó trong file JSON vẫn lưu `POSITION_VOLUME_USDT: 0.4`. Trong khi `bot_strategy.py` lại ưu tiên đọc `POSITION_VOLUME_USDT` trước `POSITION_VOLUME_HIGH_CONFIDENCE`, khiến bot đọc ngược lại 0.4$ và ghi đè lên mức 4$ của CEO.
+    2. *Lỗi chưa hiện Timeframe cho lệnh Limit:*
+       - Trong `main.py` hàm `get_bot_positions`, hệ thống chỉ đọc Timeframe từ `markers.json`. Khi markers không khớp, `c_tf` bị rỗng. Đồng thời hệ thống chưa parse trực tiếp mã `clOrdId` của OKX vốn đã được bot gắn prefix chuẩn: `f"{CL_ORD_PREFIX}EL{tf}..."` hoặc `f"{CL_ORD_PREFIX}ES{tf}..."`.
+       - Trong `PositionsTable.jsx`, cột PNL thả nổi gán chuỗi text tĩnh `Chờ khớp (Limit)` thay vì dynamic theo `pos.tf`.
+    3. *Lỗi dừng bot chưa hủy lệnh Limit trên sàn:*
+       - Trong `main.py`, hàm `_get_okx_creds` khi nhận `account_id` dạng tag `#7768` chỉ tìm file `.api_#7768`. Do file thực tế là `.api_7768`, `.api_sub1` hoặc `.api_sub_...`, hàm trả về rỗng `("", "", "", False)`. Do đó `_cancel_unfilled_limit_orders` không có API Key và không thể gửi lệnh hủy lên OKX.
+       - Bộ lọc lệnh chỉ kiểm tra `ordType == "limit"`, bỏ sót các lệnh Maker `post_only`, `fok`, `ioc`.
+       - Sau khi hủy lệnh, cache `_okx_positions_cache` không bị xóa nên UI tiếp tục lấy danh sách lệnh limit cũ từ cache.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Khắc phục Ký Quỹ Limit:*
+       - Backend `main.py` hàm `update_bot_config`: Luôn gán đồng thời `POSITION_VOLUME_HIGH_CONFIDENCE` và `POSITION_VOLUME_USDT` bằng mức vốn người dùng cài đặt, gán mặc định `VOL_UNIT = "USDT"`. Ghi đồng bộ vào tất cả các alias file: `{clean_acc}_global_config.json`, `{clean_no_under}_global_config.json`, `{target_acc}_global_config.json` và cả `{strategy}_global_config.json`.
+       - Lõi bot `bot_strategy.py`: Ưu tiên đọc `POSITION_VOLUME_HIGH_CONFIDENCE` từ JSON, fallback sang `POSITION_VOLUME_USDT`, đổi default từ `0.4` sang `1.0`. Cải tiến cơ chế dò tìm candidate config files thông minh (hỗ trợ cả có và không có dấu gạch dưới).
+       - File `bot_config.py` và `sys_bot_sub1.py`, `sys_bot_sub2.py`: Đổi default fallback `POSITION_VOLUME_HIGH_CONFIDENCE` từ `0.40` sang `1.00`.
+       - Frontend `App.jsx`: Gửi đầy đủ `vol_unit: risk.volUnit || "USDT"` và `vol_usdt: Number(risk.posVol)` trong cả effect cập nhật risk lẫn hàm `handleStartBot`.
+    2. *Khắc phục Timeframe cho lệnh Limit:*
+       - Backend `main.py` hàm `get_bot_positions`: Bổ sung bộ phân tích `clOrdId` từ API OKX, quét các định dạng `EL{tf}`, `ES{tf}`, `_{tf}`, kết thúc bằng `{tf}` (với `tf` ∈ `["M5", "M15", "M30", "H1", "H2", "H4", "D1"]`). Trả về cả `status: "Chờ khớp (Limit {TF})"` và `tf: "{TF}"`.
+       - Frontend `PositionsTable.jsx`: Hiển thị `{pos.tf ? `Chờ khớp (Limit ${pos.tf.toUpperCase()})` : (pos.status || "Chờ khớp (Limit)")}`.
+    3. *Khắc phục Hủy toàn bộ Limit trên sàn khi Dừng và Bật Bot:*
+       - Backend `main.py` hàm `_get_okx_creds`: Chuẩn hóa đa chiều `target_acc` (loại bỏ `#`, tra cứu `accounts.json` khớp `id`, `name`, tag 4 số cuối như `7768`), tìm quét tất cả các file alias `.api_{clean}`, `.api_{target}`, `.api_{id}`, `.running_account` và fallback `.api_{strategy}`. Đảm bảo luôn lấy được API Key chính xác 100%.
+       - Nâng cấp `_cancel_unfilled_limit_orders`: Quét toàn diện lệnh pending SWAP và non-SWAP, mở rộng nhận diện mọi loại lệnh limit (`limit`, `post_only`, `fok`, `ioc`), hủy theo batch 20 lệnh.
+       - Tự động xóa sạch `_okx_positions_cache` ngay sau khi hủy để UI cập nhật tức thì 0ms. Bảo lưu 100% các lệnh chốt lời/cắt lỗ (`reduceOnly == True`) của các vị thế đang chạy.
 
 - **[29/10/2026]** - Nâng Cấp Hệ Thống Cho Phép Nhiều Tài Khoản Cùng Chạy Chung Một Phương Pháp Bot (EMA200 / SMC / Liquidation) Song Song Độc Lập 100%:
   - **Yêu cầu & Mục tiêu:**

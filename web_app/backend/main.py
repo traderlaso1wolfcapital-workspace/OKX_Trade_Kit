@@ -1157,54 +1157,90 @@ def _get_okx_creds(uid: str, strategy: str = "sub1", account_id: str = None):
         return "", "", "", False
     primary_dir = get_user_data_dir(uid)
 
-    # Khi chỉ định rõ account_id:
-    if account_id and account_id.strip():
-        target_acc = account_id.strip()
+    target_acc = (account_id or "").strip()
+    clean_target = target_acc.replace("#", "").strip()
+    clean_no_under = clean_target.replace("_", "").strip()
 
-        # Tìm thêm tên gợi nhớ (label) của account_id trong accounts.json nếu có
-        acc_names = []
-        acc_file = os.path.join(primary_dir, "accounts.json")
-        if os.path.exists(acc_file):
+    # Tìm thêm tên gợi nhớ (label) và ID tương ứng trong accounts.json nếu có
+    acc_names = []
+    acc_ids = []
+    acc_file = os.path.join(primary_dir, "accounts.json")
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                acc_list = json.load(f)
+                if isinstance(acc_list, list):
+                    for a in acc_list:
+                        a_id = str(a.get("id") or "").strip()
+                        a_name = str(a.get("name") or "").strip()
+                        # Kiểm tra xem tài khoản này có khớp với target_acc không (id, name, tag #...)
+                        is_match = False
+                        if target_acc and (target_acc in (a_id, a_name, f"#{a_name}", f"#{a_id}")):
+                            is_match = True
+                        elif clean_target and (clean_target in (a_id, a_name, a_id.replace("_", ""), a_name.replace("#", ""))):
+                            is_match = True
+                        elif clean_target and len(clean_target) >= 4 and (a_id.endswith(clean_target) or a_name.endswith(clean_target)):
+                            is_match = True
+                        
+                        if is_match:
+                            if a_name: acc_names.append(a_name)
+                            if a_id: acc_ids.append(a_id)
+        except Exception:
+            pass
+
+    # Xây dựng danh sách các ứng viên file API Key theo thứ tự ưu tiên
+    candidate_paths = []
+    direct_keys = [target_acc, clean_target, clean_no_under] + acc_ids + acc_names
+    for dk in direct_keys:
+        if not dk: continue
+        candidate_paths.extend([
+            os.path.join(primary_dir, f".api_{dk}"),
+            os.path.join(primary_dir, f"bots/{strategy}", f".api_{dk}"),
+            os.path.join(primary_dir, f"bots/{dk}", f".api_{dk}"),
+            os.path.join(primary_dir, f"accounts/{dk}", f".api_{dk}"),
+        ])
+
+    # Kiểm tra file .running_account
+    for run_file in [
+        os.path.join(primary_dir, f"bots/{strategy}", f".running_account_{strategy}_{target_acc}"),
+        os.path.join(primary_dir, f"bots/{strategy}", f".running_account_{strategy}_{clean_target}"),
+        os.path.join(primary_dir, f"bots/{strategy}", f".running_account_{strategy}")
+    ]:
+        if os.path.exists(run_file):
             try:
-                with open(acc_file, "r", encoding="utf-8") as f:
-                    acc_list = json.load(f)
-                    if isinstance(acc_list, list):
-                        for a in acc_list:
-                            if a.get("id") == target_acc and a.get("name"):
-                                acc_names.append(a.get("name").strip())
+                with open(run_file, "r", encoding="utf-8") as rf:
+                    r_acc = rf.read().strip()
+                if r_acc:
+                    r_clean = r_acc.replace("#", "").strip()
+                    candidate_paths.extend([
+                        os.path.join(primary_dir, f".api_{r_clean}"),
+                        os.path.join(primary_dir, f"bots/{strategy}", f".api_{r_clean}"),
+                        os.path.join(primary_dir, f".api_{r_acc}"),
+                        os.path.join(primary_dir, f"bots/{strategy}", f".api_{r_acc}"),
+                    ])
             except Exception:
                 pass
 
-        candidate_paths = [
-            os.path.join(primary_dir, f"bots/{target_acc}", f".api_{target_acc}"),
-            os.path.join(primary_dir, f"accounts/{target_acc}", f".api_{target_acc}"),
-            os.path.join(primary_dir, f"bots/{strategy}", f".api_{target_acc}"),
-            os.path.join(primary_dir, f".api_{target_acc}"),
-        ]
-        for aname in acc_names:
-            if aname != target_acc:
-                candidate_paths.extend([
-                    os.path.join(primary_dir, f"bots/{aname}", f".api_{aname}"),
-                    os.path.join(primary_dir, f"accounts/{aname}", f".api_{aname}"),
-                    os.path.join(primary_dir, f"bots/{strategy}", f".api_{aname}"),
-                    os.path.join(primary_dir, f".api_{aname}"),
-                ])
-        if target_acc in ["botEMA200", ".api_botEMA200"] or any(n in ["botEMA200"] for n in acc_names):
-            candidate_paths.extend([
-                os.path.join(primary_dir, ".api_botEMA200"),
-                os.path.join(primary_dir, "bots/sub1", ".api_botEMA200"),
-                os.path.join(primary_dir, ".api_sub1"),
-                os.path.join(primary_dir, "bots/sub1", ".api_sub1")
-            ])
+    # Fallback cho botEMA200 hoặc các file mặc định
+    candidate_paths.extend([
+        os.path.join(primary_dir, f".api_{strategy}"),
+        os.path.join(primary_dir, f"bots/{strategy}", f".api_{strategy}"),
+        os.path.join(primary_dir, ".api_botEMA200"),
+        os.path.join(primary_dir, "bots/sub1", ".api_botEMA200"),
+        os.path.join(primary_dir, ".api_sub1"),
+        os.path.join(primary_dir, "bots/sub1", ".api_sub1"),
+    ])
 
-        for p in candidate_paths:
-            if os.path.exists(p):
-                c = _parse_env_file(p)
-                if c.get("api_key") and c.get("secret_key") and c.get("passphrase"):
-                    return c["api_key"], c["secret_key"], c["passphrase"], c.get("is_demo", False)
-        return "", "", "", False
+    # Duyệt kiểm tra file tồn tại và có đủ 3 thông số API
+    seen_paths = set()
+    for p in candidate_paths:
+        if not p or p in seen_paths: continue
+        seen_paths.add(p)
+        if os.path.exists(p):
+            c = _parse_env_file(p)
+            if c.get("api_key") and c.get("secret_key") and c.get("passphrase"):
+                return c["api_key"], c["secret_key"], c["passphrase"], c.get("is_demo", False)
 
-    # Khi không truyền account_id: Tuyệt đối không tự động nạp key của tài khoản khác
     return "", "", "", False
 
 def _okx_signed_request(method: str, path: str, body_str: str, api_key: str, secret_key: str, passphrase: str, is_demo: bool = False, timeout: int = 10):
@@ -1668,25 +1704,47 @@ def _cancel_unfilled_limit_orders(uid: str, strategy: str, account_id: str = Non
     canceled_orders = 0
     if api_key and secret_key and passphrase:
         try:
-            resp = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo)
+            # Quét các lệnh chờ khớp trên OKX (SWAP)
+            raw_orders = []
+            resp = _okx_signed_request("GET", "/api/v5/trade/orders-pending?instType=SWAP", "", api_key, secret_key, passphrase, is_demo, timeout=6)
             if resp.status_code == 200:
-                data = resp.json().get("data", [])
-                # Chỉ hủy các lệnh Limit mở vị thế chưa khớp, TUYỆT ĐỐI không hủy lệnh đóng vị thế (reduceOnly)
-                to_cancel = [
-                    {"instId": o["instId"], "ordId": o["ordId"]}
-                    for o in data
-                    if o.get("ordType") == "limit" and str(o.get("reduceOnly", "")).lower() != "true"
-                ]
-                if to_cancel:
-                    for i in range(0, len(to_cancel), 20):
-                        batch = to_cancel[i:i+20]
-                        _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", json.dumps(batch), api_key, secret_key, passphrase, is_demo)
-                    canceled_orders = len(to_cancel)
-                    print(f"🧹 [{action_name}] Đã hủy thành công {canceled_orders} lệnh Limit chưa khớp trên OKX cho {target_acc}. Bảo lưu 100% TP/SL!", flush=True)
-                else:
-                    print(f"ℹ️ [{action_name}] Không có lệnh Limit chờ nào cần hủy trên OKX cho {target_acc}.", flush=True)
+                raw_orders.extend(resp.json().get("data", []))
+            
+            # Quét bổ sung nếu cần để không sót lệnh
+            if not raw_orders:
+                resp_all = _okx_signed_request("GET", "/api/v5/trade/orders-pending", "", api_key, secret_key, passphrase, is_demo, timeout=6)
+                if resp_all.status_code == 200:
+                    raw_orders.extend(resp_all.json().get("data", []))
+
+            # Chỉ hủy các lệnh Limit/Post-only mở vị thế chưa khớp, TUYỆT ĐỐI không hủy lệnh đóng vị thế (reduceOnly)
+            seen_ord_ids = set()
+            to_cancel = []
+            for o in raw_orders:
+                o_id = o.get("ordId")
+                if not o_id or o_id in seen_ord_ids: continue
+                ord_type = str(o.get("ordType", "")).lower()
+                is_reduce = str(o.get("reduceOnly", "")).lower() in ("true", "1")
+                if ord_type in ("limit", "post_only", "fok", "ioc") and not is_reduce:
+                    seen_ord_ids.add(o_id)
+                    to_cancel.append({"instId": o["instId"], "ordId": o_id})
+
+            if to_cancel:
+                for i in range(0, len(to_cancel), 20):
+                    batch = to_cancel[i:i+20]
+                    _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", json.dumps(batch), api_key, secret_key, passphrase, is_demo, timeout=8)
+                canceled_orders = len(to_cancel)
+                print(f"🧹 [{action_name}] Đã hủy thành công {canceled_orders} lệnh Limit chưa khớp trên OKX cho {target_acc}. Bảo lưu 100% TP/SL!", flush=True)
+            else:
+                print(f"ℹ️ [{action_name}] Không có lệnh Limit chờ nào cần hủy trên OKX cho {target_acc}.", flush=True)
+
+            # Xóa sạch positions cache để UI cập nhật ngay tức thì
+            for ck in list(_okx_positions_cache.keys()):
+                if ck.startswith(f"{uid}:"):
+                    del _okx_positions_cache[ck]
         except Exception as e:
             print(f"⚠️ [{action_name}] Lỗi dọn dẹp lệnh Limit trên OKX: {e}", flush=True)
+    else:
+        print(f"⚠️ [{action_name}] Không tìm thấy API Key hợp lệ cho {target_acc} để hủy lệnh Limit trên OKX.", flush=True)
     return canceled_orders
 
 @app.post("/api/bot/start")
@@ -2384,8 +2442,12 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         cfg["ENABLED_COINS"] = update_data.enabled_coins
     if update_data.vol_unit is not None:
         cfg["VOL_UNIT"] = update_data.vol_unit
+    elif "VOL_UNIT" not in cfg:
+        cfg["VOL_UNIT"] = "USDT"
+
     if update_data.vol_usdt is not None:
         cfg["POSITION_VOLUME_USDT"] = update_data.vol_usdt
+        cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = update_data.vol_usdt
     if update_data.vol_pct is not None:
         cfg["POSITION_VOLUME_PCT"] = update_data.vol_pct
     if update_data.use_dynamic_risk is not None:
@@ -2394,10 +2456,10 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         cfg["DYNAMIC_RISK_PCT"] = update_data.dynamic_risk_pct
     if update_data.position_volume is not None:
         cfg["POSITION_VOLUME_HIGH_CONFIDENCE"] = update_data.position_volume
-        if update_data.vol_unit == "USDT" or cfg.get("VOL_UNIT") == "USDT":
-            cfg["POSITION_VOLUME_USDT"] = update_data.position_volume
-        elif update_data.vol_unit in ("LOT", "PERCENT") or cfg.get("VOL_UNIT") in ("LOT", "PERCENT"):
+        if update_data.vol_unit in ("LOT", "PERCENT") or cfg.get("VOL_UNIT") in ("LOT", "PERCENT"):
             cfg["POSITION_VOLUME_PCT"] = update_data.position_volume
+        else:
+            cfg["POSITION_VOLUME_USDT"] = update_data.position_volume
     if update_data.scalping_tp_pct is not None:
         cfg["SCALPING_TP_PCT"] = update_data.scalping_tp_pct
         cfg["TP_TARGET_OPTIMAL"] = str(update_data.scalping_tp_pct)
@@ -2438,18 +2500,24 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
 
-        # Nếu là tài khoản cụ thể, lưu đồng bộ vào các định dạng tên biến thể (kèm & không kèm #)
+        # Nếu là tài khoản cụ thể, lưu đồng bộ vào các định dạng tên biến thể (kèm & không kèm #, kèm & không kèm _)
+        alias_names = [f"{strategy}_global_config.json"]
         if is_specific_acc:
             clean_acc = target_acc.replace("#", "").strip()
             clean_no_under = clean_acc.replace("_", "").strip()
-            for alias_name in [f"{clean_acc}_global_config.json", f"{clean_no_under}_global_config.json", f"{target_acc}_global_config.json"]:
-                alias_path = os.path.join(config_dir, alias_name)
-                if alias_path != config_path:
-                    try:
-                        with open(alias_path, "w", encoding="utf-8") as af:
-                            json.dump(cfg, af, indent=4, ensure_ascii=False)
-                    except Exception:
-                        pass
+            alias_names.extend([
+                f"{clean_acc}_global_config.json",
+                f"{clean_no_under}_global_config.json",
+                f"{target_acc}_global_config.json"
+            ])
+        for alias_name in alias_names:
+            alias_path = os.path.join(config_dir, alias_name)
+            if alias_path != config_path:
+                try:
+                    with open(alias_path, "w", encoding="utf-8") as af:
+                        json.dump(cfg, af, indent=4, ensure_ascii=False)
+                except Exception:
+                    pass
 
         # Quét trên sàn và huỷ toàn bộ limit chờ vào lệnh nếu bot KHÔNG chạy (bảo lưu 100% TP/SL)
         is_running = (get_running_pid(uid, strategy) > 0) or (get_nested(bot_processes, uid, strategy) and get_nested(bot_processes, uid, strategy).poll() is None)
@@ -3439,10 +3507,19 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                 margin_str = "0.00"
 
             c_tf = ""
-            for item in markers.get(coin, []):
-                if item.get("order_id") == ord_id or (item.get("status") == "pending" and item.get("side", "").lower() == pos_side):
-                    c_tf = item.get("tf", "").upper()
-                    break
+            cl_id = o.get("clOrdId", "")
+            if cl_id:
+                for cand_tf in ["M5", "M15", "M30", "H1", "H2", "H4", "D1"]:
+                    if f"EL{cand_tf}" in cl_id or f"ES{cand_tf}" in cl_id or f"_{cand_tf}" in cl_id or cl_id.endswith(cand_tf):
+                        c_tf = cand_tf
+                        break
+            if not c_tf:
+                for item in markers.get(coin, []):
+                    if item.get("order_id") == ord_id or (item.get("status") == "pending" and item.get("side", "").lower() == pos_side):
+                        c_tf = item.get("tf", "").upper()
+                        break
+
+            status_text = f"Chờ khớp (Limit {c_tf.upper()})" if c_tf else "Chờ khớp (Limit)"
 
             formatted_limit_orders.append({
                 "ticket_id": f"ord_{ord_id}",
@@ -3450,7 +3527,7 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                 "is_limit": True,
                 "is_aggregate": False,
                 "is_child": False,
-                "status": "Chờ khớp (Limit)",
+                "status": status_text,
                 "instId": inst_id,
                 "posSide": pos_side,
                 "side": side,
@@ -3463,7 +3540,7 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                 "tp": "---",
                 "sl": "---",
                 "lever": str(int(f_lev)),
-                "tf": c_tf,
+                "tf": c_tf.upper() if c_tf else "",
                 "cTime": int(o.get("cTime") or 0)
             })
 
@@ -5440,3 +5517,4 @@ if __name__ == "__main__":
 # z7735 | Khắc phục triệt để lỗi TradeLocker không hiển thị vị thế trên web (chuẩn hóa ma trận list sang dict), lọc rác HTML 502/504 Cloudflare trong log OKX, và truyền BOT_USER_UID đồng bộ vào shadow bot
 # z7736 | Triệt tiêu 100% rác HTML Cloudflare: mở rộng bộ lọc regex và token Cloudflare trong log_reader_task ngăn không cho bất kỳ fragment nào lọt vào OKX log stream
 # z7737 | Khắc phục triệt để lỗi hiển thị chấm đỏ trạng thái bot: dọn sạch activeAccounts khi bot dừng/chuyển trạng thái, loại bỏ cờ is_running cứng, cô lập chấm đỏ theo tài khoản thực tế đang chạy cho cả OKX và Quỹ FX.
+# z7738 | Khắc phục triệt để 3 lỗi: 1) Ký quỹ lệnh Limit 0.4$ thay vì mức cài đặt (đồng bộ POSITION_VOLUME_HIGH_CONFIDENCE, POSITION_VOLUME_USDT và tất cả alias config); 2) Hiển thị Timeframe cho lệnh Limit ("Chờ khớp (Limit M5)", v.v.) bằng cách trích xuất clOrdId; 3) Tự động hủy sạch toàn bộ lệnh Limit chưa khớp trên OKX khi Dừng bot và Bật bot (bảo lưu 100% TP/SL), dọn cache tức thì.

@@ -166,8 +166,11 @@ def run_ai_self_evolution(env_paths: dict, globals_ref: Any):
                 set_val("SCALPING_TP_PCT", Decimal(str(_tp_val)))
                 set_val("SCALPING_SL_PCT", Decimal(str(_sl_val)))
                 
-                if "POSITION_VOLUME_HIGH_CONFIDENCE" in cfg:
-                    set_val("POSITION_VOLUME_HIGH_CONFIDENCE", Decimal(str(cfg["POSITION_VOLUME_HIGH_CONFIDENCE"])))
+                _vol_val = cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE")
+                if _vol_val is None or float(_vol_val) <= 0:
+                    _vol_val = cfg.get("POSITION_VOLUME_USDT")
+                if _vol_val is not None and float(_vol_val) > 0:
+                    set_val("POSITION_VOLUME_HIGH_CONFIDENCE", Decimal(str(_vol_val)))
                     
                 # Các cờ chiến thuật
                 if "ENABLE_STRATEGY_MAIN" in cfg: set_val("ENABLE_STRATEGY_MAIN", bool(cfg["ENABLE_STRATEGY_MAIN"]))
@@ -2374,9 +2377,17 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
             try:
                 cfg_file = env_paths.get("FILE_GLOBAL_CONFIG", "")
                 if not cfg_file or not os.path.exists(cfg_file):
-                    _possible = os.path.join(os.path.dirname(cfg_file) if cfg_file else "", "sub1_global_config.json")
-                    if os.path.exists(_possible):
-                        cfg_file = _possible
+                    _p_dir = os.path.dirname(cfg_file) if cfg_file else ""
+                    _env_base = os.path.basename(env_paths.get("ENV_NAME", "")).replace(".api", "").lstrip("_")
+                    _cand_files = [
+                        os.path.join(_p_dir, f"{_env_base}_global_config.json") if _p_dir and _env_base else "",
+                        os.path.join(_p_dir, f"{_env_base.replace('_', '')}_global_config.json") if _p_dir and _env_base else "",
+                        os.path.join(_p_dir, "sub1_global_config.json") if _p_dir else ""
+                    ]
+                    for _cf in _cand_files:
+                        if _cf and os.path.exists(_cf):
+                            cfg_file = _cf
+                            break
                 if cfg_file and os.path.exists(cfg_file):
                     with open(cfg_file, "r", encoding="utf-8") as _f:
                         _cfg = json.load(_f)
@@ -2395,18 +2406,19 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
                             except: pass
                             target_usdt = max(Decimal("0.1"), _cur_eq * (_pct / Decimal("100")))
                             globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = target_usdt
-                        elif "POSITION_VOLUME_USDT" in _cfg:
-                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_USDT"]))
+                        else:
+                            _vol_cfg = _cfg.get("POSITION_VOLUME_HIGH_CONFIDENCE")
+                            if _vol_cfg is None or float(_vol_cfg) <= 0:
+                                _vol_cfg = _cfg.get("POSITION_VOLUME_USDT", 1.0)
+                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_vol_cfg))
                             target_usdt = globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE
-                        elif "POSITION_VOLUME_HIGH_CONFIDENCE" in _cfg:
-                            globals_ref.POSITION_VOLUME_HIGH_CONFIDENCE = Decimal(str(_cfg["POSITION_VOLUME_HIGH_CONFIDENCE"]))
                         if "ENABLE_TF_VOLUME_MULTIPLIER" in _cfg:
                             globals_ref.ENABLE_TF_VOLUME_MULTIPLIER = bool(_cfg["ENABLE_TF_VOLUME_MULTIPLIER"])
                 if getattr(tracker, "_last_seen_mult_flag", None) != getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False):
                     tracker._last_seen_mult_flag = getattr(globals_ref, "ENABLE_TF_VOLUME_MULTIPLIER", False)
                     print(f"⚙️ [CONFIG SYNC] Ký quỹ đa khung (ENABLE_TF_VOLUME_MULTIPLIER): {globals_ref.ENABLE_TF_VOLUME_MULTIPLIER}")
-            except: pass
-            target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("0.4"))
+            except Exception: pass
+            target_usdt = getattr(globals_ref, "POSITION_VOLUME_HIGH_CONFIDENCE", Decimal("1.0"))
 
             if not is_enabled:
                 # Coin bị tắt (unticked) -> Chỉ huỷ lưới lệnh Limit để không nhồi thêm lệnh mới, 
@@ -3572,3 +3584,4 @@ def _run_strategy_cycle_impl(client, cfg: dict, pMode: str, state_matrix: dict, 
 # z309 | Update default margin to 1$ and logic volume fallbacks to 1
 # z310 | Upgraded Grid Mode (OFF both DCAs) with native OKX attachAlgoOrds: each TF limit has independent TP/SL sub-position matching OKX Split Position tab
 # z311 | Refactored strategy to dynamically reference STRATEGY_NAME for flag checks instead of hardcoding "sub1"
+# z312 | Sửa lỗi bắt ký quỹ lệnh limit: đồng bộ POSITION_VOLUME_HIGH_CONFIDENCE & POSITION_VOLUME_USDT, hỗ trợ đa alias config file cho tài khoản phụ OKX.

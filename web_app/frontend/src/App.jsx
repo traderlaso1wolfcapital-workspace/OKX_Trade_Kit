@@ -1161,6 +1161,8 @@ function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             position_volume: Number(risk.posVol),
+            vol_unit: risk.volUnit || "USDT",
+            vol_usdt: Number(risk.posVol),
             scalping_tp_pct: Number(risk.tpPct) / 100,
             scalping_sl_pct: Number(risk.slPct) / 100,
             ob_rr_ratio_trend: isSub2 ? Number(risk.tpPct) : undefined,
@@ -2294,6 +2296,8 @@ function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             position_volume: Number(risk.posVol),
+            vol_unit: risk.volUnit || "USDT",
+            vol_usdt: Number(risk.posVol),
             strategy_config: {
               ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf),
             },
