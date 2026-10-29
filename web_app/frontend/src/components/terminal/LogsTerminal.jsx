@@ -374,10 +374,15 @@ export default function LogsTerminal({
     // Nếu tài khoản đang xem KHÔNG PHẢI là tài khoản đang chạy live bot,
     // tự động tái tạo bảng Dashboard và lọc triệt để 100% Event Logs của tài khoản đang chọn:
     const isCurrentAccountRunning = Boolean(
-      isOkxRunning && 
-      runningAccId && 
-      selectedAccount && 
-      (selectedAccount === runningAccId || selectedAccount.replace("#", "") === runningAccId.replace("#", ""))
+      isOkxRunning || (
+        runningAccId && 
+        selectedAccount && 
+        (
+          selectedAccount === runningAccId || 
+          (typeof runningAccId === "string" && selectedAccount.replace("#", "") === runningAccId.replace("#", "")) ||
+          (Array.isArray(runningAccId) && runningAccId.some(r => r === selectedAccount || String(r).replace("#", "") === String(selectedAccount).replace("#", "")))
+        )
+      )
     );
 
     if (!isCurrentAccountRunning && selectedAccount) {

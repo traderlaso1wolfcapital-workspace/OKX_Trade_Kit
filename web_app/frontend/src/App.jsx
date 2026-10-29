@@ -441,11 +441,11 @@ function App() {
   const isPropRunning = overridePropBotRunning !== null ? overridePropBotRunning : (propBotStatus === "RUNNING");
   const isTargetOkxRunning = useMemo(() => {
     if (overrideBotRunning !== null) return overrideBotRunning;
-    if (botStatus !== "RUNNING") return false;
     const runningStrat = getRunningStrategyForAccount(mergedActiveAccounts, effectiveAccId, accounts);
     if (runningStrat) {
       return runningStrat === activeBotTab;
     }
+    if (botStatus !== "RUNNING") return false;
 
     const curClean = String(effectiveAccId || "").trim().replace(/^#/, "");
     const curObj = accounts.find(a => a.id === effectiveAccId || a.name === effectiveAccId);
@@ -3156,7 +3156,8 @@ function App() {
     if (!isAuthenticated && !isE8) return;
     const fetchStatus = async () => {
       try {
-        const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}`);
+        const accParam = effectiveAccId ? `&account_id=${encodeURIComponent(effectiveAccId)}` : "";
+        const r = await fetch(`/api/bot/status?strategy=${activeBotTab}&uid=${localStorage.getItem('tls1_uid') || loginUid}${accParam}`);
         if (r.ok) {
           const d = await r.json();
           if (d?.status && setBotStatus) setBotStatus(d.status);

@@ -1482,35 +1482,121 @@ def sync_account_name_in_storage(uid: str, target_acc: str, detected_name: str, 
 
     return accounts
 
+def _resolve_all_account_aliases(uid: str, strategy: str, account_id: str = "") -> List[str]:
+    """
+    Trả về toàn bộ danh sách các biến thể tên, ID, tag của tài khoản:
+    - ID gốc (vd: sub_1790389385645)
+    - Không gạch dưới (vd: sub1790389385645)
+    - Có / không dấu # (vd: 6881, #6881)
+    - Tiền tố sub (vd: sub6881, sub_6881)
+    - Tên hiển thị (vd: Tài khoản phụ (6881))
+    - Ánh xạ 2 chiều từ accounts.json
+    - Fallback từ .running_account_{strategy}
+    """
+    data_dir = get_user_data_dir(uid)
+    raw_acc = (account_id or "").strip()
+
+    if not raw_acc:
+        for rf in [
+            os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}"),
+            os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}_{strategy}")
+        ]:
+            if os.path.exists(rf):
+                try:
+                    with open(rf, "r", encoding="utf-8") as f:
+                        c = f.read().strip()
+                        if c:
+                            raw_acc = c
+                            break
+                except Exception:
+                    pass
+
+    aliases: List[str] = []
+    def add_alias(val):
+        if not val: return
+        s = str(val).strip()
+        if not s: return
+        clean_no_hash = s.replace("#", "").strip()
+        clean_no_under = clean_no_hash.replace("_", "").strip()
+        for item in [s, clean_no_hash, clean_no_under, s.replace("_", "").strip()]:
+            if item and item not in aliases:
+                aliases.append(item)
+            if item:
+                with_hash = f"#{item}"
+                if with_hash not in aliases:
+                    aliases.append(with_hash)
+                sub_var = f"sub{item}"
+                if sub_var not in aliases:
+                    aliases.append(sub_var)
+                sub_under = f"sub_{item}"
+                if sub_under not in aliases:
+                    aliases.append(sub_under)
+
+    if raw_acc:
+        add_alias(raw_acc)
+
+    # Đọc accounts.json để map 2 chiều ID <-> Tên hiển thị <-> OKX UID <-> Tag 4 số
+    acc_file = os.path.join(data_dir, "accounts.json")
+    if os.path.exists(acc_file):
+        try:
+            with open(acc_file, "r", encoding="utf-8") as f:
+                acc_list = json.load(f)
+                if isinstance(acc_list, list):
+                    for a in acc_list:
+                        a_id = str(a.get("id") or "").strip()
+                        a_name = str(a.get("name") or "").strip()
+                        a_okx = str(a.get("okx_uid") or "").strip()
+                        extracted_tag = ""
+                        if "(" in a_name and ")" in a_name:
+                            try:
+                                extracted_tag = a_name.split("(")[-1].split(")")[0].strip()
+                            except Exception:
+                                pass
+
+                        is_match = False
+                        check_set = set(aliases) if aliases else set()
+                        if not raw_acc:
+                            pass
+                        elif raw_acc in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}"):
+                            is_match = True
+                        elif any(alias in (a_id, a_name, a_okx, extracted_tag, f"#{extracted_tag}") for alias in check_set):
+                            is_match = True
+                        elif extracted_tag and any(extracted_tag in alias for alias in check_set):
+                            is_match = True
+                        elif len(raw_acc.replace("#", "").replace("_", "")) >= 4:
+                            clean_test = raw_acc.replace("#", "").replace("_", "")
+                            if clean_test in a_name or clean_test in a_id:
+                                is_match = True
+
+                        if is_match:
+                            add_alias(a_id)
+                            add_alias(a_name)
+                            if extracted_tag:
+                                add_alias(extracted_tag)
+                            if a_okx:
+                                add_alias(a_okx)
+        except Exception:
+            pass
+
+    return aliases
+
 def get_running_pid(uid: str, strategy: str, account_id: str = "") -> int:
     data_dir = get_user_data_dir(uid)
-    acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
-    has_specific_acc = bool(acc_name)
-    
-    # Nếu không truyền account_id, lấy tài khoản đang chạy gần nhất của strategy
-    if not acc_name:
-        running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-        if os.path.exists(running_acc_file):
-            try:
-                with open(running_acc_file, "r") as f:
-                    content = f.read().strip()
-                    if content:
-                        acc_name = content
-            except:
-                pass
-
-    candidates = []
-    if acc_name:
-        clean_name = acc_name.replace("#", "").strip()
-        clean_no_under = clean_name.replace("_", "").strip()
-        candidates.extend([acc_name, clean_name, clean_no_under, f"sub{clean_name}"])
-    
-    # Chỉ kiểm tra strategy.pid nếu không chỉ định account_id cụ thể
+    has_specific_acc = bool(account_id and account_id.strip())
+    candidates = _resolve_all_account_aliases(uid, strategy, account_id)
     if not has_specific_acc:
-        candidates.append(strategy)
+        if strategy not in candidates:
+            candidates.append(strategy)
 
     for c in candidates:
         if not c: continue
+        # 1. Kiểm tra bot_processes trong bộ nhớ trước
+        bot_key = f"{strategy}_{c}"
+        proc = get_nested(bot_processes, uid, bot_key) or (get_nested(bot_processes, uid, strategy) if not has_specific_acc else None)
+        if proc and proc.poll() is None:
+            return proc.pid
+
+        # 2. Kiểm tra file .pid trên ổ đĩa
         pid_file = os.path.join(data_dir, f"bots/{strategy}", "json_data", f"{c}.pid")
         if os.path.exists(pid_file):
             try:
@@ -1557,51 +1643,43 @@ def _get_flag_dir(uid: str, strategy: str) -> str:
     return os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
 
 def _is_shadow_mode(uid: str, strategy: str, account_id: str = "") -> bool:
-    """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng hoàn toàn"""
+    """Trả về True nếu bot đang chạy ngầm (dry_run=True) hoặc đã dừng hoàn toàn. Trả về False nếu đang chạy Live."""
     pid = get_running_pid(uid, strategy, account_id)
     if pid <= 0:
         return True
 
-    data_dir = get_user_data_dir(uid)
-    acc_name = account_id.strip() if (account_id and account_id.strip()) else ""
-    
-    if not acc_name:
-        running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-        if os.path.exists(running_acc_file):
-            try:
-                with open(running_acc_file, "r") as f:
-                    content = f.read().strip()
-                    if content:
-                        acc_name = content
-            except (OSError, IOError, ValueError):
-                pass
-    if not acc_name:
-        acc_name = strategy
-
     flag_dir = _get_flag_dir(uid, strategy)
-    check_names = {acc_name, acc_name.replace("#", ""), strategy}
+    candidates = _resolve_all_account_aliases(uid, strategy, account_id)
+    if strategy not in candidates:
+        candidates.append(strategy)
 
     # 1. Kiểm tra cờ dừng trước tiên (nếu có stop flag thì chắc chắn là shadow/dừng)
-    for name in check_names:
+    for name in candidates:
         if os.path.exists(os.path.join(flag_dir, f"stop_{name}.flag")):
             return True
 
     # 2. Kiểm tra cờ kích hoạt trực tiếp (Live mode)
-    for name in check_names:
+    for name in candidates:
         if os.path.exists(os.path.join(flag_dir, f"activate_{name}.flag")):
             return False
 
     # 3. Kiểm tra cờ dry_run do bot engine ghi ra
-    for name in check_names:
+    for name in candidates:
         flag_path = os.path.join(flag_dir, f"dry_run_{name}.flag")
         if os.path.exists(flag_path):
             try:
                 with open(flag_path, "r") as f:
-                    return f.read().strip() == "1"
+                    content = f.read().strip()
+                    if content == "1":
+                        return True
+                    elif content == "0":
+                        return False
             except (OSError, IOError, ValueError):
                 pass
 
-    return True
+    # 4. Khi tiến trình python PID > 0 đang sống thực tế trên OS và KHÔNG HỀ CÓ cờ stop:
+    # MẶC ĐỊNH LÀ BOT ĐANG CHẠY LIVE (return False), TUYỆT ĐỐI KHÔNG COI LÀ DỪNG!
+    return False
 
 @app.get("/api/bot/status")
 def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
@@ -1609,17 +1687,11 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
         return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True, "active_accounts": {}}
     
     target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
-    bot_key = f"{strategy}_{target_acc}" if target_acc else strategy
-    proc = get_nested(bot_processes, uid, bot_key) or get_nested(bot_processes, uid, strategy)
-    is_running = False
-    uptime = 0
-    
     pid = get_running_pid(uid, strategy, target_acc)
-    if pid > 0:
-        is_running = True
-        uptime = int(time.time() - get_nested(bot_start_times, uid, bot_key, get_nested(bot_start_times, uid, strategy, time.time())))
-    elif proc and proc.poll() is None:
-        is_running = True
+    is_running = (pid > 0)
+    uptime = 0
+    bot_key = f"{strategy}_{target_acc}" if target_acc else strategy
+    if is_running:
         uptime = int(time.time() - get_nested(bot_start_times, uid, bot_key, get_nested(bot_start_times, uid, strategy, time.time())))
     else:
         if target_acc:
@@ -1638,32 +1710,37 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
             a_id = acc.get("id") or acc.get("name")
             if not a_id: continue
             a_pid = get_running_pid(uid, strat, a_id)
-            a_proc = get_nested(bot_processes, uid, f"{strat}_{a_id}")
-            if (a_pid > 0 or (a_proc and a_proc.poll() is None)) and not _is_shadow_mode(uid, strat, a_id):
-                active_accounts[f"{strat}_{a_id}"] = a_id
-                active_accounts[a_id] = strat
+            if a_pid > 0 and not _is_shadow_mode(uid, strat, a_id):
+                # Bổ sung toàn bộ các biến thể định danh của tài khoản này vào map active_accounts
+                aliases = _resolve_all_account_aliases(uid, strat, a_id)
+                for al in aliases:
+                    active_accounts[f"{strat}_{al}"] = a_id
+                    active_accounts[al] = strat
                 if strat not in active_accounts:
                     active_accounts[strat] = a_id
                 elif isinstance(active_accounts[strat], list):
                     if a_id not in active_accounts[strat]:
                         active_accounts[strat].append(a_id)
                 else:
-                    active_accounts[strat] = [active_accounts[strat], a_id]
+                    if active_accounts[strat] != a_id:
+                        active_accounts[strat] = [active_accounts[strat], a_id]
 
     # 2. Quét thêm fallback từ file .running_account_{strat} cũ
     for strat in ["sub1", "sub2", "sub3"]:
-        s_proc = get_nested(bot_processes, uid, strat)
         s_pid = get_running_pid(uid, strat)
-        if (s_pid > 0 or (s_proc and s_proc.poll() is None)) and not _is_shadow_mode(uid, strat):
+        if s_pid > 0 and not _is_shadow_mode(uid, strat):
             running_acc_file = os.path.join(data_dir, f"bots/{strat}", f".running_account_{strat}")
             if os.path.exists(running_acc_file):
                 try:
                     with open(running_acc_file, "r") as f:
                         acc = f.read().strip()
-                        if acc and acc not in active_accounts:
-                            active_accounts[strat] = acc
-                            active_accounts[acc] = strat
-                            active_accounts[f"{strat}_{acc}"] = acc
+                        if acc:
+                            aliases = _resolve_all_account_aliases(uid, strat, acc)
+                            for al in aliases:
+                                active_accounts[f"{strat}_{al}"] = acc
+                                active_accounts[al] = strat
+                            if strat not in active_accounts:
+                                active_accounts[strat] = acc
                 except (OSError, IOError, ValueError): pass
 
     if is_running:
@@ -2007,7 +2084,9 @@ async def start_bot(uid: str, strategy: str = "sub1", env_file: str = None, acco
 
     cmd = [sys.executable, XGUI_MAIN_PATH, "--run-bot", strategy, strat_env_file]
     try:
-        acc_flag_names = {strategy, acc_name, target_acc, target_acc.replace("#", ""), target_acc.replace("#", "").replace("_", "")}
+        acc_flag_names = set(_resolve_all_account_aliases(uid, strategy, target_acc))
+        acc_flag_names.add(strategy)
+        if acc_name: acc_flag_names.add(acc_name)
         # Xoá stop/kill flag cũ
         for nm in acc_flag_names:
             for fname in [f"stop_{nm}.flag", f"kill_{nm}.flag"]:
@@ -2202,7 +2281,9 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
             except: pass
 
     # 3. Dọn dẹp cờ flag cho riêng tài khoản này
-    acc_flag_names = {acc_name, acc_name.replace("#", ""), target_acc, target_acc.replace("#", "")}
+    acc_flag_names = set(_resolve_all_account_aliases(uid, strategy, target_acc))
+    acc_flag_names.add(strategy)
+    if acc_name: acc_flag_names.add(acc_name)
     for nm in acc_flag_names:
         for fname in [f"activate_{nm}.flag", f"dry_run_{nm}.flag"]:
             fp = os.path.join(flag_dir, fname)
@@ -2245,7 +2326,7 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
             del_nested(bot_processes, uid, strategy)
 
     # 5. Xóa sạch các file .pid của tài khoản này
-    for c in [acc_name, acc_name.replace("#", ""), f"sub{acc_name.replace('#', '')}", target_acc, target_acc.replace("#", "")]:
+    for c in acc_flag_names:
         if not c: continue
         pid_file = os.path.join(flag_dir, f"{c}.pid")
         if os.path.exists(pid_file):
@@ -5701,3 +5782,4 @@ if __name__ == "__main__":
 # z7738 | Khắc phục triệt để 3 lỗi: 1) Ký quỹ lệnh Limit 0.4$ thay vì mức cài đặt (đồng bộ POSITION_VOLUME_HIGH_CONFIDENCE, POSITION_VOLUME_USDT và tất cả alias config); 2) Hiển thị Timeframe cho lệnh Limit ("Chờ khớp (Limit M5)", v.v.) bằng cách trích xuất clOrdId; 3) Tự động hủy sạch toàn bộ lệnh Limit chưa khớp trên OKX khi Dừng bot và Bật bot (bảo lưu 100% TP/SL), dọn cache tức thì.
 # z7741 | Khắc phục triệt để lỗi bot chạy ngầm đẻ lại lệnh Limit và lỗi cảnh báo sai Liquidation Bot / không đăng xuất được: 1) Trích xuất chiến thuật getRunningStrategyForAccount chuẩn xác 100%, xóa bỏ lỗi nhận nhầm key 'sub1_{acc}' thành Liquidation Bot; 2) Cho phép Buộc Dừng Bot & Hủy Sạch Limit khi Đăng Xuất / Xóa tài khoản; 3) get_running_pid kiểm tra cmdline và process status, loại bỏ triệt để PID rác của OS; 4) Khởi động sạch (Clean Restart) kill sạch bot cũ trước khi spawn mới; 5) Bổ sung bộ công cụ CLI zInspect_Bots, zClean_Zombie_Bots và REST API /api/bot/inspect, /api/bot/force_kill_all.
 # z7742 | Sửa lỗi ReferenceError Cannot access 'J' before initialization trong bundle Frontend: loại bỏ tham chiếu sớm tới biến wsActiveAccounts trong useMemo mergedActiveAccounts trước khi được khởi tạo bởi useBotWebSocket, đảm bảo React App không bị crash.
+# z7743 | Khắc phục triệt để lỗi ấn Chạy Bot nháy Đang khởi động rồi tự động lùi về Chạy Bot (Dừng bot): 1) Chuẩn hóa _resolve_all_account_aliases ánh xạ 2 chiều ID, name, tag 4 số (#6881, sub_179..., sub179...); 2) Nâng cấp get_running_pid và _is_shadow_mode dò đúng 100% PID và flag files, mặc định trả về Live khi PID sống và không có cờ stop; 3) active_accounts bổ sung toàn diện mọi alias keys để UI nhận diện trạng thái Live tức thì; 4) Đồng bộ start_bot/stop_bot quản lý cờ và tiến trình triệt để theo mọi biến thể tên.

@@ -33,6 +33,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Bấm "CHẠY BOT" Nháy "ĐANG KHỞI ĐỘNG..." Rồi Lùi Về Ban Đầu "CHẠY BOT":
+  - **Hiện tượng & Báo cáo từ CEO:** Người dùng bấm nút "CHẠY BOT", nút chuyển sang màu xanh "ĐANG KHỞI ĐỘNG BOT..." khoảng 1-2 giây rồi tự động lùi về lại "CHẠY BOT" (Dừng bot). Trong khi bot python bên dưới thực tế vẫn đang khởi động và chạy bình thường. Terminal Logs hiện thông báo: `ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản...`.
+  - **Nguyên nhân cốt lõi:**
+    1. *Mâu thuẫn định danh (Alias Mismatch):* Bot engine (`sys_bot_sub1.py`) khi đọc file `.api_sub_1790389385645` đã loại bỏ dấu gạch dưới `_`, biến tên tài khoản thành `sub1790389385645`. Do đó bot tạo file PID `sub1790389385645.pid` và cờ `dry_run_sub1790389385645.flag` (nội dung `"0"`).
+    2. *Hàm `_is_shadow_mode` và `get_running_pid` trong backend `main.py`:* Khi nhận `account_id` dạng `sub_1790389385645` (có `_`) hoặc `#6881` (tag name), backend không tìm thấy cờ `dry_run` tương ứng nên rơi vào fallback mặc định `return True` (chế độ SHADOW / DỪNG).
+    3. *Hiệu ứng dây chuyền về Frontend:* WebSocket định kỳ 2s gửi về trạng thái `status: "SHADOW"` và `active_accounts: {}`. State `botStatus` biến thành `"SHADOW"`, khiến `isTargetOkxRunning` trả về `false`, lập tức giật nút từ "Đang khởi động..." về lại "CHẠY BOT".
+    4. *`LogsTerminal.jsx`:* Kiểm tra `selectedAccount === runningAccId` bị lỗi khi `runningAccId` là mảng đa tài khoản, dẫn tới dòng chữ `Bot đang DỪNG...` bị unshift vào đầu bảng logs.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Backend (`main.py`):*
+       - Xây dựng hàm `_resolve_all_account_aliases(uid, strategy, account_id)`: Ánh xạ 2 chiều thông minh toàn bộ các định danh (`id` có/không `_`, `name`, tag 4 số `#6881`, `6881`, `sub6881`, v.v.) qua `accounts.json` và running account.
+       - Nâng cấp `get_running_pid` và `_is_shadow_mode`: Quét toàn diện tất cả các biến thể alias. Nếu tiến trình Python có `pid > 0` còn sống trên OS và không có cờ `stop_*.flag`, mặc định trả về `False` (Bot đang LIVE thực tế), xóa bỏ hoàn toàn việc fallback sai về `True`.
+       - Trong `get_bot_status`: Đưa toàn bộ các key alias của tài khoản đang chạy vào map `active_accounts` (`sub1_sub_...`, `sub1_#6881`, `sub1_6881`...) giúp tất cả các component frontend nhận diện trạng thái Live tức thì 0ms.
+       - Đồng bộ `start_bot` và `stop_bot`: Dọn cờ, đặt cờ kích hoạt và kill tiến trình theo mọi alias.
+    2. *Bot Engine (`sys_bot_sub1.py`, `sys_bot_sub2.py`):*
+       - Ghi đồng thời cả 2 file PID (`{acc_name}.pid` và `{raw_acc_name}.pid`) và 2 file cờ `dry_run` để đảm bảo tương thích 100% với cả 2 định dạng (có và không có dấu gạch dưới).
+       - Vòng lặp IPC lắng nghe cờ kiểm tra toàn bộ các biến thể tên.
+    3. *Frontend (`accountUtils.js`, `App.jsx`, `LogsTerminal.jsx`):*
+       - Nâng cấp `getRunningStrategyForAccount`: Quét đa chiều cả `id`, `noUnderId`, `cleanName` và trích xuất tag `(xxxx)` từ tên tài khoản; hỗ trợ cả mảng trong `activeAccountsMap`.
+       - Trong `App.jsx`: `isTargetOkxRunning` ưu tiên nhận diện từ `getRunningStrategyForAccount`; lời gọi polling `fetchStatus` truyền thêm `account_id` để lấy đúng trạng thái của tài khoản đang xem.
+       - Trong `LogsTerminal.jsx`: Chuẩn hóa `isCurrentAccountRunning` theo `isOkxRunning`, chống văng thông báo "Bot đang dừng" khi bot đang chạy.
+
 - **[29/10/2026]** - Sửa Lỗi Crash Màn Hình Trắng "React App Crashed! ReferenceError: Cannot access 'J' before initialization":
   - **Hiện tượng:** Mở web app xuất hiện màn hình đen/đỏ báo `💥 React App Crashed! Error Message: ReferenceError: Cannot access 'J' before initialization` tại `So (index-CqirWoyU.js:661:4867)`.
   - **Nguyên nhân:** Trong `App.jsx`, hook `useMemo` tính `mergedActiveAccounts` (ở dòng 115) đã đưa biến `wsActiveAccounts` vào danh sách dependencies và thân hàm trước khi biến này được khai báo bởi destructuring từ `useBotWebSocket` (ở dòng 152). Khi React khởi tạo component, cơ chế TDZ (Temporal Dead Zone) của JavaScript ném `ReferenceError` khiến toàn bộ ứng dụng bị crash.
@@ -5163,6 +5184,27 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[29/10/2026]** - Khắc Phục Triệt Để Lỗi Bấm "CHẠY BOT" Nháy "ĐANG KHỞI ĐỘNG..." Rồi Lùi Về Ban Đầu "CHẠY BOT":
+  - **Hiện tượng & Báo cáo từ CEO:** Người dùng bấm nút "CHẠY BOT", nút chuyển sang màu xanh "ĐANG KHỞI ĐỘNG BOT..." khoảng 1-2 giây rồi tự động lùi về lại "CHẠY BOT" (Dừng bot). Trong khi bot python bên dưới thực tế vẫn đang khởi động và chạy bình thường. Terminal Logs hiện thông báo: `ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản...`.
+  - **Nguyên nhân cốt lõi:**
+    1. *Mâu thuẫn định danh (Alias Mismatch):* Bot engine (`sys_bot_sub1.py`) khi đọc file `.api_sub_1790389385645` đã loại bỏ dấu gạch dưới `_`, biến tên tài khoản thành `sub1790389385645`. Do đó bot tạo file PID `sub1790389385645.pid` và cờ `dry_run_sub1790389385645.flag` (nội dung `"0"`).
+    2. *Hàm `_is_shadow_mode` và `get_running_pid` trong backend `main.py`:* Khi nhận `account_id` dạng `sub_1790389385645` (có `_`) hoặc `#6881` (tag name), backend không tìm thấy cờ `dry_run` tương ứng nên rơi vào fallback mặc định `return True` (chế độ SHADOW / DỪNG).
+    3. *Hiệu ứng dây chuyền về Frontend:* WebSocket định kỳ 2s gửi về trạng thái `status: "SHADOW"` và `active_accounts: {}`. State `botStatus` biến thành `"SHADOW"`, khiến `isTargetOkxRunning` trả về `false`, lập tức giật nút từ "Đang khởi động..." về lại "CHẠY BOT".
+    4. *`LogsTerminal.jsx`:* Kiểm tra `selectedAccount === runningAccId` bị lỗi khi `runningAccId` là mảng đa tài khoản, dẫn tới dòng chữ `Bot đang DỪNG...` bị unshift vào đầu bảng logs.
+  - **Khắc phục hoàn chỉnh:**
+    1. *Backend (`main.py`):*
+       - Xây dựng hàm `_resolve_all_account_aliases(uid, strategy, account_id)`: Ánh xạ 2 chiều thông minh toàn bộ các định danh (`id` có/không `_`, `name`, tag 4 số `#6881`, `6881`, `sub6881`, v.v.) qua `accounts.json` và running account.
+       - Nâng cấp `get_running_pid` và `_is_shadow_mode`: Quét toàn diện tất cả các biến thể alias. Nếu tiến trình Python có `pid > 0` còn sống trên OS và không có cờ `stop_*.flag`, mặc định trả về `False` (Bot đang LIVE thực tế), xóa bỏ hoàn toàn việc fallback sai về `True`.
+       - Trong `get_bot_status`: Đưa toàn bộ các key alias của tài khoản đang chạy vào map `active_accounts` (`sub1_sub_...`, `sub1_#6881`, `sub1_6881`...) giúp tất cả các component frontend nhận diện trạng thái Live tức thì 0ms.
+       - Đồng bộ `start_bot` và `stop_bot`: Dọn cờ, đặt cờ kích hoạt và kill tiến trình theo mọi alias.
+    2. *Bot Engine (`sys_bot_sub1.py`, `sys_bot_sub2.py`):*
+       - Ghi đồng thời cả 2 file PID (`{acc_name}.pid` và `{raw_acc_name}.pid`) và 2 file cờ `dry_run` để đảm bảo tương thích 100% với cả 2 định dạng (có và không có dấu gạch dưới).
+       - Vòng lặp IPC lắng nghe cờ kiểm tra toàn bộ các biến thể tên.
+    3. *Frontend (`accountUtils.js`, `App.jsx`, `LogsTerminal.jsx`):*
+       - Nâng cấp `getRunningStrategyForAccount`: Quét đa chiều cả `id`, `noUnderId`, `cleanName` và trích xuất tag `(xxxx)` từ tên tài khoản; hỗ trợ cả mảng trong `activeAccountsMap`.
+       - Trong `App.jsx`: `isTargetOkxRunning` ưu tiên nhận diện từ `getRunningStrategyForAccount`; lời gọi polling `fetchStatus` truyền thêm `account_id` để lấy đúng trạng thái của tài khoản đang xem.
+       - Trong `LogsTerminal.jsx`: Chuẩn hóa `isCurrentAccountRunning` theo `isOkxRunning`, chống văng thông báo "Bot đang dừng" khi bot đang chạy.
 
 - **[29/10/2026]** - Sửa Lỗi Crash Màn Hình Trắng "React App Crashed! ReferenceError: Cannot access 'J' before initialization":
   - **Hiện tượng:** Mở web app xuất hiện màn hình đen/đỏ báo `💥 React App Crashed! Error Message: ReferenceError: Cannot access 'J' before initialization` tại `So (index-CqirWoyU.js:661:4867)`.

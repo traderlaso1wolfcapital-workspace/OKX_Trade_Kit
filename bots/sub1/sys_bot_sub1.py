@@ -154,7 +154,8 @@ def main():
         time.sleep(5)
         sys.exit(1)
         
-    acc_name = os.path.basename(env_file).replace(".api", "").replace("_", "")
+    raw_acc_name = os.path.basename(env_file).replace(".api", "").lstrip("_")
+    acc_name = raw_acc_name.replace("_", "")
     if acc_name == "": acc_name = "sub1"
 
     # Tải API keys
@@ -205,47 +206,57 @@ def main():
     JSON_DATA_DIR = os.path.join(sub1_dir, "json_data")
     os.makedirs(JSON_DATA_DIR, exist_ok=True)
     lock_file = os.path.join(JSON_DATA_DIR, f"{acc_name}.pid")
+    lock_file_raw = os.path.join(JSON_DATA_DIR, f"{raw_acc_name}.pid") if raw_acc_name and raw_acc_name != acc_name else None
     
     if HAS_PSUTIL:
-        if os.path.exists(lock_file):
-            try:
-                with open(lock_file, "r") as f:
-                    old_pid = int(f.read().strip())
-                if psutil.pid_exists(old_pid) and old_pid != os.getpid():
-                    try:
-                        old_proc = psutil.Process(old_pid)
-                        if old_proc.status() == psutil.STATUS_ZOMBIE:
+        for lf in [lock_file, lock_file_raw]:
+            if not lf: continue
+            if os.path.exists(lf):
+                try:
+                    with open(lf, "r") as f:
+                        old_pid = int(f.read().strip())
+                    if psutil.pid_exists(old_pid) and old_pid != os.getpid():
+                        try:
+                            old_proc = psutil.Process(old_pid)
+                            if old_proc.status() == psutil.STATUS_ZOMBIE:
+                                pass
+                            else:
+                                print(f"\n{'='*80}")
+                                print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
+                                print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
+                                print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
+                                print(f"   File lock: {lf}")
+                                print(f"{'='*80}\n")
+                                sys.exit(1)
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
                             pass
-                        else:
-                            print(f"\n{'='*80}")
-                            print(f"🚫 CẢNH BÁO: Bot tài khoản [{acc_name}] đang chạy ở tiến trình khác!")
-                            print(f"   PID: {old_pid} | Tên: {old_proc.name()}")
-                            print("   Vui lòng tắt tiến trình đó trước khi bắt đầu phiên mới.")
-                            print(f"   File lock: {lock_file}")
-                            print(f"{'='*80}\n")
-                            sys.exit(1)
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
-                if os.path.exists(lock_file):
-                    os.remove(lock_file)
-            except (ValueError, psutil.NoSuchProcess, Exception):
-                if os.path.exists(lock_file):
-                    try: os.remove(lock_file)
-                    except Exception: pass
+                    if os.path.exists(lf):
+                        os.remove(lf)
+                except (ValueError, psutil.NoSuchProcess, Exception):
+                    if os.path.exists(lf):
+                        try: os.remove(lf)
+                        except Exception: pass
         
         current_pid = os.getpid()
         with open(lock_file, "w") as f:
             f.write(str(current_pid))
+        if lock_file_raw:
+            try:
+                with open(lock_file_raw, "w") as f:
+                    f.write(str(current_pid))
+            except: pass
         
         import atexit
         def _cleanup_lock():
-            try:
-                if os.path.exists(lock_file):
-                    lock_pid = int(open(lock_file).read().strip())
-                    if lock_pid == current_pid:
-                        os.remove(lock_file)
-            except:
-                pass
+            for lf in [lock_file, lock_file_raw]:
+                if not lf: continue
+                try:
+                    if os.path.exists(lf):
+                        lock_pid = int(open(lf).read().strip())
+                        if lock_pid == current_pid:
+                            os.remove(lf)
+                except:
+                    pass
         atexit.register(_cleanup_lock)
         print(f"🔒 [LOCK] Đã khóa phiên duy nhất cho tài khoản [{acc_name}] (PID: {current_pid})")
     else:
@@ -431,65 +442,67 @@ def main():
                 
             # --- THE START OF GUI IPC FLAGS ---
             try:
-                stop_flag_path = os.path.join(JSON_DATA_DIR, f"stop_{acc_name}.flag")
-                if os.path.exists(stop_flag_path):
-                    # Đây giờ chỉ đưa về DRY_RUN (chạy ngầm), không thoát process
-                    system_config["DRY_RUN"] = True
-                    print(f"\n🌑 [SHADOW MODE]: Bot {acc_name} đã chuyển về chế độ ngầm (DRY-RUN). Tiếp tục đếm nến, không đặt lệnh.")
-                    try: os.remove(stop_flag_path)
-                    except: pass
+                flag_targets = list(set(filter(None, [acc_name, raw_acc_name])))
+                for _acc in flag_targets:
+                    stop_flag_path = os.path.join(JSON_DATA_DIR, f"stop_{_acc}.flag")
+                    if os.path.exists(stop_flag_path):
+                        # Đây giờ chỉ đưa về DRY_RUN (chạy ngầm), không thoát process
+                        system_config["DRY_RUN"] = True
+                        print(f"\n🌑 [SHADOW MODE]: Bot {_acc} đã chuyển về chế độ ngầm (DRY-RUN). Tiếp tục đếm nến, không đặt lệnh.")
+                        try: os.remove(stop_flag_path)
+                        except: pass
 
-                    # 🧹 Dọn sạch toàn bộ Limit chưa khớp trên sàn OKX (Secondary Guarantee, bảo lưu 100% TP/SL)
+                        # 🧹 Dọn sạch toàn bộ Limit chưa khớp trên sàn OKX (Secondary Guarantee, bảo lưu 100% TP/SL)
+                        try:
+                            bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
+                        except Exception as _ce:
+                            print(f"⚠️ Lỗi dọn dẹp limit khi vào Shadow Mode: {_ce}")
+
+                        # 🔄 Reset cache lệnh limit trong RAM của bot để tránh re-place nhầm
+                        for coin_tracker in state_matrix.values():
+                            coin_tracker.placed_entry_px_long = "---"
+                            coin_tracker.placed_entry_px_short = "---"
+                            coin_tracker.placed_entry_px_long_by_tf = {}
+                            coin_tracker.placed_entry_px_short_by_tf = {}
+                            if hasattr(coin_tracker, "missing_count"):
+                                coin_tracker.missing_count = {"long": {}, "short": {}}
+
+                    # Kích hoạt bot thật (chuyển từ shadow → live)
+                    activate_flag_path = os.path.join(JSON_DATA_DIR, f"activate_{_acc}.flag")
+                    if os.path.exists(activate_flag_path):
+                        if not system_config["STARTUP_CLEANUP_DONE"]:
+                            bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
+                            system_config["STARTUP_CLEANUP_DONE"] = True
+                        system_config["DRY_RUN"] = False
+                        print(f"\n⚡ [ACTIVATED]: Bot {_acc} đã được KÍCH HOẠT! Bắt đầu đặt lệnh thật lên OKX.")
+                        try: os.remove(activate_flag_path)
+                        except: pass
+
+                    # Tắt toàn bộ process (chuyển từ shadow → exit)
+                    kill_flag_path = os.path.join(JSON_DATA_DIR, f"kill_{_acc}.flag")
+                    if os.path.exists(kill_flag_path):
+                        system_config["KILL_PROCESS"] = True
+                        try: os.remove(kill_flag_path)
+                        except: pass
+
+                    # Ghi trạng thái DRY_RUN ra file để backend Web đọc
+                    status_file = os.path.join(JSON_DATA_DIR, f"dry_run_{_acc}.flag")
                     try:
-                        bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
-                    except Exception as _ce:
-                        print(f"⚠️ Lỗi dọn dẹp limit khi vào Shadow Mode: {_ce}")
-
-                    # 🔄 Reset cache lệnh limit trong RAM của bot để tránh re-place nhầm
-                    for coin_tracker in state_matrix.values():
-                        coin_tracker.placed_entry_px_long = "---"
-                        coin_tracker.placed_entry_px_short = "---"
-                        coin_tracker.placed_entry_px_long_by_tf = {}
-                        coin_tracker.placed_entry_px_short_by_tf = {}
-                        if hasattr(coin_tracker, "missing_count"):
-                            coin_tracker.missing_count = {"long": {}, "short": {}}
-
-                # Kích hoạt bot thật (chuyển từ shadow → live)
-                activate_flag_path = os.path.join(JSON_DATA_DIR, f"activate_{acc_name}.flag")
-                if os.path.exists(activate_flag_path):
-                    if not system_config["STARTUP_CLEANUP_DONE"]:
-                        bot_sub1.cleanup_all_orders_on_startup(client, bot_sub1.COIN_PORTFOLIO, dry_run=False)
-                        system_config["STARTUP_CLEANUP_DONE"] = True
-                    system_config["DRY_RUN"] = False
-                    print(f"\n⚡ [ACTIVATED]: Bot {acc_name} đã được KÍCH HOẠT! Bắt đầu đặt lệnh thật lên OKX.")
-                    try: os.remove(activate_flag_path)
+                        with open(status_file, "w") as _sf:
+                            _sf.write("1" if system_config.get("DRY_RUN", True) else "0")
                     except: pass
 
-                # Tắt toàn bộ process (chuyển từ shadow → exit)
-                kill_flag_path = os.path.join(JSON_DATA_DIR, f"kill_{acc_name}.flag")
-                if os.path.exists(kill_flag_path):
-                    system_config["KILL_PROCESS"] = True
-                    try: os.remove(kill_flag_path)
-                    except: pass
+                    reset_wallet_flag_path = os.path.join(JSON_DATA_DIR, f"reset_wallet_{_acc}.flag")
+                    if os.path.exists(reset_wallet_flag_path):
+                        system_config["SHOULD_RESET_WALLET"] = True
+                        try: os.remove(reset_wallet_flag_path)
+                        except: pass
 
-                # Ghi trạng thái DRY_RUN ra file để backend Web đọc
-                status_file = os.path.join(JSON_DATA_DIR, f"dry_run_{acc_name}.flag")
-                try:
-                    with open(status_file, "w") as _sf:
-                        _sf.write("1" if system_config.get("DRY_RUN", True) else "0")
-                except: pass
-
-                reset_wallet_flag_path = os.path.join(JSON_DATA_DIR, f"reset_wallet_{acc_name}.flag")
-                if os.path.exists(reset_wallet_flag_path):
-                    system_config["SHOULD_RESET_WALLET"] = True
-                    try: os.remove(reset_wallet_flag_path)
-                    except: pass
-
-                reset_nen_flag_path = os.path.join(JSON_DATA_DIR, f"reset_nen_{acc_name}.flag")
-                if os.path.exists(reset_nen_flag_path):
-                    system_config["SHOULD_RESET_NEN"] = True
-                    try: os.remove(reset_nen_flag_path)
-                    except: pass
+                    reset_nen_flag_path = os.path.join(JSON_DATA_DIR, f"reset_nen_{_acc}.flag")
+                    if os.path.exists(reset_nen_flag_path):
+                        system_config["SHOULD_RESET_NEN"] = True
+                        try: os.remove(reset_nen_flag_path)
+                        except: pass
             except: pass
             # --- THE END OF GUI IPC FLAGS ---
 
@@ -634,3 +647,4 @@ if __name__ == "__main__":
 # z1952 | Tích hợp TradeLocker dispatcher bất đồng bộ khi khớp lệnh và đặt lệnh limit
 # z1953 | Tách biệt hoàn toàn luồng xử lý và trạng thái hoạt động giữa Sàn OKX và Quỹ FX
 # z1954 | Cập nhật cấu hình mặc định POSITION_VOLUME_HIGH_CONFIDENCE và POSITION_VOLUME_USDT thành 1.0; đồng bộ đa alias config file.
+# z1955 | Đồng bộ PID và cờ trạng thái (dry_run, activate, stop) cho cả acc_name và raw_acc_name (có/không gạch dưới), chống lỗi UI nhận nhầm trạng thái dừng.
