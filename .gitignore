@@ -105,3 +105,6 @@ web_frontend/
 # Sandbox Test (Local experimental environment)
 web_app1/
 xRun_Web1.py
+
+demo_*.html
+web_app/demo_*.html

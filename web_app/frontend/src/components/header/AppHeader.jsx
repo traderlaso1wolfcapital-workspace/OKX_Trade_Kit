@@ -28,6 +28,12 @@ export default function AppHeader({
   const dropdownRef = useRef(null);
 
   useEffect(() => {
+    document.documentElement.removeAttribute("data-theme");
+    if (document.body) document.body.removeAttribute("data-theme");
+    localStorage.removeItem("tls1_app_theme");
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsOpen(false);
@@ -307,6 +313,7 @@ export default function AppHeader({
         {/* Custom Popover Dropdown Menu - GIỮ NGUYÊN 100% STYLE MENU HEADER */}
         {isOpen && (
           <div
+            className="header-account-popover"
             style={{
               position: "absolute",
               top: "calc(100% + 5px)",

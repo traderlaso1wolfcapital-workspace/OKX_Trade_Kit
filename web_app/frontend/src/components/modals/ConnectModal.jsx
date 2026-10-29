@@ -493,6 +493,7 @@ export default function ConnectModal({
       onClick={onClose}
     >
       <div
+        className="connect-modal-box"
         style={{
           width: "100%",
           maxWidth: "460px",

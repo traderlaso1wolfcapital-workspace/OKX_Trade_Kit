@@ -923,10 +923,10 @@ body.is-resizing iframe {
 .tab-btn {
   background: #1a1a1a;
   border: none;
-  border-right: 1px solid #333333;
-  color: #a0a0a0;
+  border-right: none;
+  color: #787f8f;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
   font-family: "Segoe UI", sans-serif;
   padding: 0 16px;
   cursor: pointer;
@@ -941,13 +941,13 @@ body.is-resizing iframe {
 
 .tab-btn:hover {
   background-color: #222;
-  color: #fff;
+  color: #d1d5db;
 }
 
 .tab-btn.active {
   background-color: #222;
-  color: #F90;
-  border-bottom: 2px solid #F90;
+  color: #d1d5db;
+  border-bottom: 2px solid #6b7280;
 }
 
 .btn-tab-split {
@@ -1057,12 +1057,12 @@ body.is-resizing iframe {
 
 .positions-table th {
   background-color: #252526;
-  color: #fff;
-  font-weight: bold;
+  color: #9ca3af;
+  font-weight: 500;
   padding: 6px 10px;
-  border-bottom: 1px solid #333333;
-  border-right: 1px solid #333333;
-  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -1073,8 +1073,8 @@ body.is-resizing iframe {
 
 .positions-table td {
   padding: 6px 10px;
-  border-bottom: 1px solid #333333;
-  border-right: 1px solid #333333;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   color: #fff;
   background-color: #1a1a1a;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
@@ -4834,6 +4834,14 @@ div[class*="tradingview-widget-copyright"],
 @keyframes chartSpinner {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* ============= ACCORDION LIMIT HEADER BAR (SÁT 100% 2 BIÊN TRÁI PHẢI) ============= */
+.positions-table td.accordion-limit-td {
+  padding: 0 !important;
+  margin: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
 }
 
 

@@ -21,6 +21,7 @@ export default function PositionsTable({
 }) {
   const { t } = useTranslation();
   const [closingTickets, setClosingTickets] = useState({});
+  const [isLimitCollapsed, setIsLimitCollapsed] = useState(false);
 
   const handleCoinClick = (coinValue, tf = "1H") => {
     const rawCoin = coinValue || "BTC-USDT-SWAP";
@@ -51,6 +52,17 @@ export default function PositionsTable({
     String(p.ticket_id || "").startsWith("ord_") ||
     String(p.order_id || "").length > 0 ||
     String(p.status || "").toLowerCase().includes("pending");
+
+  const getLimitTfKey = (pos) => {
+    const raw = String(pos?.tf || pos?.status || "").toUpperCase();
+    if (raw.includes("M5") || raw.includes(" 5M") || raw.includes("LIMIT 5") || raw.includes("M5)") || raw.endsWith("M5") || raw.endsWith("5")) return "M5";
+    if (raw.includes("M15") || raw.includes(" 15M") || raw.includes("LIMIT 15") || raw.includes("M15)") || raw.endsWith("M15") || raw.endsWith("15")) return "M15";
+    if (raw.includes("M30") || raw.includes(" 30M") || raw.includes("LIMIT 30") || raw.includes("M30)") || raw.endsWith("M30") || raw.endsWith("30")) return "M30";
+    if (raw.includes("H1") || raw.includes(" 1H") || raw.includes("LIMIT H1") || raw.includes("H1)") || raw.endsWith("H1") || raw.endsWith("1H")) return "H1";
+    if (raw.includes("H2") || raw.includes(" 2H") || raw.includes("LIMIT H2") || raw.includes("H2)") || raw.endsWith("H2") || raw.endsWith("2H")) return "H2";
+    if (raw.includes("H4") || raw.includes(" 4H") || raw.includes("LIMIT H4") || raw.includes("H4)") || raw.endsWith("H4") || raw.endsWith("4H")) return "H4";
+    return "";
+  };
 
   // 🔼 TẦNG 1: 100% các lệnh ĐÃ KHỚP (Active Positions) đang chạy, có số PNL xanh/đỏ và nút đỏ [Đóng], sắp xếp theo % PNL từ cao xuống thấp
   // Lọc trùng lặp tuyệt đối (chống sinh lệnh ảo trên giao diện)
@@ -100,10 +112,11 @@ export default function PositionsTable({
       });
   }, [safePos]);
 
-  // ⚪ TẦNG 3: Các cặp coin đang đứng ngoài (chờ tín hiệu)
-  const activeInstIds = new Set(safePos.map((p) => p.instId));
+  // ⚪ LỚP 1: Các cặp coin được chọn trong Cài Đặt nhưng CHƯA CÓ VỊ THẾ KHỚP ở Lớp 1
+  // Luôn luôn hiển thị 1 dòng ở Lớp 1 (kể cả đang có rải Limit ở Lớp 2) để CEO chủ động chọn TF
+  const filledInstIds = new Set(filledParents.map((p) => p.instId));
   const emptyCoins = displayCoins
-    .filter((c) => !activeInstIds.has(c.value))
+    .filter((c) => !filledInstIds.has(c.value))
     .sort((a, b) => {
       const idxA = COIN_LIST.findIndex((c) => c.value === a.value);
       const idxB = COIN_LIST.findIndex((c) => c.value === b.value);
@@ -211,11 +224,25 @@ export default function PositionsTable({
         key={rowKey}
         style={{
           borderBottom: isLast
-            ? "1px solid #262626"
+            ? "1px solid rgba(255, 255, 255, 0.05)"
             : isChild
               ? "1px solid transparent"
               : "1px solid rgba(255, 255, 255, 0.03)",
           backgroundColor: isChild ? "rgba(255, 255, 255, 0.01)" : "transparent",
+          opacity: isLimit ? 0.65 : 1,
+          transition: "opacity 0.2s ease, background 0.2s",
+        }}
+        onMouseEnter={(e) => {
+          if (isLimit) {
+            e.currentTarget.style.opacity = "1";
+            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.03)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (isLimit) {
+            e.currentTarget.style.opacity = "0.65";
+            e.currentTarget.style.backgroundColor = isChild ? "rgba(255, 255, 255, 0.01)" : "transparent";
+          }
         }}
       >
         <td style={{ textAlign: "left", padding: "4px 6px", whiteSpace: "nowrap" }}>
@@ -254,7 +281,7 @@ export default function PositionsTable({
                   color: isChild ? "rgba(255,255,255,0.4)" : "#fff",
                   cursor: "pointer",
                   fontSize: "13px",
-                  fontWeight: "400",
+                  fontWeight: !isLimit ? "700" : "400",
                 }}
                 onClick={() => {
                   const rawTf = pos.tf ? pos.tf.split(" ")[0].toUpperCase() : "1H";
@@ -291,7 +318,7 @@ export default function PositionsTable({
             </div>
 
             {isLimit ? (
-              <div style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 400, marginLeft: isChild ? "26px" : "22px" }}>
+              <div style={{ color: "#a8a29e", fontSize: "11px", fontWeight: 400, marginLeft: isChild ? "26px" : "22px" }}>
                 {isLong ? "Limit Long" : "Limit Short"} {pos.avgPx ? parseFloat(pos.avgPx).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "0.0"}
               </div>
             ) : (
@@ -323,16 +350,16 @@ export default function PositionsTable({
             textAlign: "center",
             padding: "4px 6px",
             fontSize: "13px",
-            color: isChild ? "rgba(255,255,255,0.4)" : "#fff",
+            color: isLimit ? "#9ca3af" : (isChild ? "rgba(255,255,255,0.4)" : "#fff"),
             whiteSpace: "nowrap",
-            fontWeight: "400",
+            fontWeight: !isLimit ? "700" : "400",
           }}
         >
           {isFxOrProp ? `${lotVal.toFixed(2)} L` : `${margin.toFixed(2)} $`}
         </td>
         <td style={{ padding: "4px 6px", textAlign: "center", fontSize: "13px", whiteSpace: "nowrap" }}>
           {isLimit ? (
-            <span style={{ color: "#f59e0b", fontSize: "12px", fontWeight: "bold" }}>
+            <span style={{ color: "#a8a29e", fontSize: "12px", fontWeight: "normal" }}>
               {pos.tf ? `Chờ khớp (Limit ${pos.tf.toUpperCase()})` : (pos.status || "Chờ khớp (Limit)")}
             </span>
           ) : (
@@ -349,11 +376,11 @@ export default function PositionsTable({
                     gap: "6px",
                   }}
                 >
-                  <span style={{ fontWeight: "400", fontSize: "14.2px" }}>
+                  <span style={{ fontWeight: "700", fontSize: "14.2px" }}>
                     {upl >= 0 ? "+" : ""}
                     {upl.toFixed(2)} {isFxOrProp ? "USD" : "USDT"}
                   </span>
-                  <span style={{ fontSize: "11.5px" }}>
+                  <span style={{ fontSize: "11.5px", fontWeight: "600" }}>
                     ({roi > 0 ? "+" : ""}
                     {roi.toFixed(2)}%)
                   </span>
@@ -366,9 +393,42 @@ export default function PositionsTable({
           {!isChild && (
             <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
               {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
+                const label = tf.replace("M", "");
+                if (isLimit) {
+                  const limitTf = getLimitTfKey(pos);
+                  const isThisLimitTf = tf === limitTf;
+                  return (
+                    <span
+                      key={tf}
+                      className={`tf-badge limit-locked ${isThisLimitTf ? "on" : "off"}`}
+                      title={isThisLimitTf ? `Lệnh Limit đặt từ khung ${tf} (Khóa - điều chỉnh TF tại Lớp 1)` : ""}
+                      style={{
+                        cursor: "default",
+                        pointerEvents: "none",
+                        userSelect: "none",
+                        padding: "0px",
+                        borderRadius: "5px",
+                        fontSize: "12.5px",
+                        fontWeight: isThisLimitTf ? "bold" : "normal",
+                        background: isThisLimitTf ? "#1d766b" : "#181818",
+                        color: isThisLimitTf ? "#f0f0f0" : "#3e424b",
+                        border: isThisLimitTf ? "1px solid #1d766b" : "1px solid #262830",
+                        opacity: isThisLimitTf ? 1 : 0.35,
+                        width: "29px",
+                        height: "24px",
+                        textAlign: "center",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  );
+                }
+
                 const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
                 const isOn = coinTfs.includes(tf);
-                const label = tf.replace("M", "");
                 return (
                   <span
                     key={tf}
@@ -403,12 +463,21 @@ export default function PositionsTable({
           {(() => {
             const tId = pos?.ticket_id || pos?.position_id || pos?.order_id || `${pos?.instId}-${pos?.posSide}`;
             const isClosing = Boolean(closingTickets[tId]);
-            return (
-              <button
-                disabled={isClosing}
-                onClick={() => handleClosePosition(coin, pos)}
-                style={{
-                  background: isClosing ? "#6b7280" : (isLimit ? "#d97706" : "#b32626"),
+            const btnStyle = isLimit
+              ? {
+                  background: "transparent",
+                  color: "#d4d4d8",
+                  border: "1px solid #52525b",
+                  borderRadius: "4px",
+                  padding: "3px 12px",
+                  cursor: isClosing ? "not-allowed" : "pointer",
+                  fontSize: "11.5px",
+                  fontWeight: "normal",
+                  opacity: isClosing ? 0.6 : 1,
+                  transition: "all 0.2s ease",
+                }
+              : {
+                  background: isClosing ? "#6b7280" : "#b32626",
                   color: "white",
                   border: "none",
                   borderRadius: "4px",
@@ -418,6 +487,26 @@ export default function PositionsTable({
                   fontWeight: "bold",
                   opacity: isClosing ? 0.6 : 1,
                   transition: "all 0.2s ease",
+                };
+
+            return (
+              <button
+                disabled={isClosing}
+                onClick={() => handleClosePosition(coin, pos)}
+                style={btnStyle}
+                onMouseEnter={(e) => {
+                  if (isLimit && !isClosing) {
+                    e.currentTarget.style.background = "#d97706";
+                    e.currentTarget.style.borderColor = "#d97706";
+                    e.currentTarget.style.color = "#ffffff";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (isLimit && !isClosing) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.borderColor = "#52525b";
+                    e.currentTarget.style.color = "#d4d4d8";
+                  }
                 }}
               >
                 {isClosing ? "..." : (isLimit ? "Hủy" : t("close_btn"))}
@@ -532,15 +621,15 @@ export default function PositionsTable({
       <table className="positions-table">
         <thead>
           <tr style={{ background: "#252526" }}>
-            <th style={{ textAlign: "left", whiteSpace: "nowrap" }}>{t("th_pair")}</th>
-            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>{t("th_margin")}</th>
-            <th style={{ textAlign: "center", minWidth: "130px" }}>{t("th_pnl")}</th>
-            <th style={{ textAlign: "center" }}>{t("th_tf_trade")}</th>
-            <th style={{ textAlign: "center", whiteSpace: "nowrap" }}>{t("th_close")}</th>
+            <th style={{ textAlign: "left", whiteSpace: "nowrap", fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{t("th_pair")}</th>
+            <th style={{ textAlign: "center", whiteSpace: "nowrap", fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{t("th_margin")}</th>
+            <th style={{ textAlign: "center", minWidth: "130px", fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{t("th_pnl")}</th>
+            <th style={{ textAlign: "center", fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{t("th_tf_trade")}</th>
+            <th style={{ textAlign: "center", whiteSpace: "nowrap", fontSize: "12px", color: "#9ca3af", fontWeight: "normal" }}>{t("th_close")}</th>
           </tr>
         </thead>
         <tbody>
-          {/* 🔼 TẦNG 1: 100% CÁC LỆNH ĐÃ KHỚP (ACTIVE POSITIONS) */}
+          {/* 🔼 LỚP 1: CÁC VỊ THẾ ĐÃ KHỚP + CÁC CẶP COIN CHỜ TÍN HIỆU (XẾP CUỐI LỚP 1) */}
           {filledParents.map((parent, pIdx) => {
             const children = (positions || []).filter((p) => p.is_child && p.parent_id === parent.ticket_id);
             const hasChildren = children.length > 0;
@@ -555,13 +644,62 @@ export default function PositionsTable({
             );
           })}
 
-          {/* 🔽 TẦNG 2: 100% CÁC LỆNH CHỜ KHỚP (LIMIT ORDERS) */}
-          {limitOrders.map((limitPos, lIdx) =>
-            renderPosRow(limitPos, `limit-${limitPos.instId || "coin"}-${limitPos.order_id || limitPos.ticket_id || lIdx}`, false, true)
-          )}
-
-          {/* ⚪ TẦNG 3: CÁC CẶP COIN ĐỨNG NGOÀI (CHỜ TÍN HIỆU) */}
+          {/* ⚪ CÁC CẶP COIN CHỜ TÍN HIỆU (XẾP Ở CUỐI LỚP 1, GIỮ NGUYÊN FONT THƯỜNG KHÔNG IN ĐẬM) */}
           {emptyCoins.map((coin) => renderEmptyCoinRow(coin))}
+
+          {/* 🔽 LỚP 2: 100% CÁC LỆNH CHỜ KHỚP (LIMIT ORDERS) - CHUẨN PA 3: ACCORDION */}
+          {limitOrders.length > 0 && (
+            <tr key="accordion-limit-header">
+              <td colSpan={5} className="accordion-limit-td" style={{ padding: 0, border: "none" }}>
+                <div
+                  className="accordion-limit-header-bar"
+                  onClick={() => setIsLimitCollapsed(!isLimitCollapsed)}
+                  style={{
+                    background: "#252526",
+                    padding: "6px 12px",
+                    fontSize: "11.5px",
+                    color: "#808796",
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                    userSelect: "none",
+                    whiteSpace: "nowrap",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    transition: "background 0.2s ease, color 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#2d2d30";
+                    e.currentTarget.style.color = "#b0b8c6";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#252526";
+                    e.currentTarget.style.color = "#808796";
+                  }}
+                >
+                  <span style={{ fontWeight: "normal" }}>
+                    <span style={{ marginRight: "6px", fontSize: "10px" }}>{isLimitCollapsed ? "▶" : "▼"}</span>
+                    Lệnh chờ khớp ({limitOrders.length} lệnh limit đang rải)
+                  </span>
+                  <span style={{ fontSize: "11px", color: isLimitCollapsed ? "#b0b8c6" : "#5c6370" }}>
+                    Click để {isLimitCollapsed ? "mở rộng" : "thu gọn"}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          )}
+          {!isLimitCollapsed &&
+            limitOrders.map((limitPos, lIdx) =>
+              renderPosRow(
+                limitPos,
+                `limit-${limitPos.instId || "coin"}-${limitPos.order_id || limitPos.ticket_id || lIdx}`,
+                false,
+                true
+              )
+            )}
         </tbody>
       </table>
     </div>

@@ -33,6 +33,58 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Triển Khai Phương Án B Cho Cột TF Lớp 2 (Lệnh Chờ Khớp):
+  - **Yêu cầu từ CEO:** Duyệt triển khai Phương án B: Cột TF ở Lớp 2 (lệnh limit) vẫn giữ đủ 6 ô thẳng hàng, nhưng chỉ sáng duy nhất 1 ô TF của chính lệnh limit đó (ví dụ lệnh M15 thì ô [15] sáng teal, 5 ô còn lại tối mờ), và toàn bộ 6 ô được LOCK LẠI (`pointerEvents: none`, `cursor: default`) để chống thao tác nhầm, vì quyền điều khiển TF đã tập trung tại Lớp 1.
+  - **Kết quả:** Đã triển khai hoàn tất trong `PositionsTable.jsx`, 6 ô TF canh đều chuẩn xác, lệnh limit hiển thị trực quan khung giờ tương ứng, khóa click tuyệt đối. Build frontend thành công.
+
+- **[30/10/2026]** - Tối Giản Về 1 Bản Duy Nhất Hoàn Chỉnh & Cấu Trúc Lại Vị Trí Coin Chờ Tín Hiệu:
+  - **Yêu cầu từ CEO:**
+    1. Xóa bỏ theme bản mới song song (xóa nút chuyển theme, xóa CSS modern không cần thiết), thống nhất dùng 1 bản duy nhất hiện tại đã được tinh chỉnh đẹp mắt.
+    2. Chuyển chữ `LỆNH CHỜ KHỚP` sang chữ thường `Lệnh chờ khớp` để không chiếm spotlight.
+    3. Chuyển các cặp coin đang chờ tín hiệu (`emptyCoins`, ví dụ `ETH-USDT`) lên xếp ở cuối Lớp 1 (ngay dưới các lệnh đã khớp, nằm trên thanh Lệnh chờ khớp), giữ nguyên font chữ thường không in đậm. Toàn bộ thanh Accordion Lệnh chờ khớp được đưa xuống đáy bảng.
+  - **Kết quả:** Đã gỡ bỏ sạch sẽ theme song song, đóng gói giao diện thống nhất, cấu trúc lại thứ tự bảng vị thế cực kỳ logic và thẩm mỹ. Build thành công và kích hoạt trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Làm Mờ Đường Kẻ Chỉ Bảng Vị Thế & Xóa Bỏ Đường Phân Cách Cụm Tab:
+  - **Yêu cầu từ CEO:**
+    1. Làm các đường kẻ chỉ ngang/dọc ở các ô trong Bảng Vị Thế mờ nhẹ, dịu mắt hơn.
+    2. Cụm tab `Bảng vị thế`, `Logs`, `Biểu đồ` không cần đường kẻ chỉ phân cách nữa.
+  - **Kết quả:**
+    - Đã xóa bỏ đường kẻ chỉ dọc giữa các tab (`border-right: none`), giúp cụm tab liền mạch, thoáng đãng.
+    - Đã hạ độ đậm các đường kẻ ô ngang/dọc trong Bảng Vị Thế từ `#333333` xuống `rgba(255, 255, 255, 0.05 - 0.06)` mờ nhẹ tinh tế. Build và kiểm thử thành công.
+
+- **[30/10/2026]** - Tối Giản Độ Sáng Tab Bảng Vị Thế / Logs / Biểu Đồ Khi Active:
+  - **Yêu cầu từ CEO:** Màu tab khi được chọn không cần sáng quá, tránh chiếm spotlight của tên coin `BTC-USDT`.
+  - **Kết quả:** Hạ màu tab active từ `#ffffff` chói sáng xuống tone xám sáng nhẹ nhàng `#d1d5db`, gạch chân tinh tế `#6b7280`. Tab inactive giữ màu `#787f8f`. Nhờ đó tên coin `BTC-USDT` ở bên dưới giữ trọn vẹn điểm nhấn thị giác số 1.
+
+- **[30/10/2026]** - Cân Đối Lại Độ Tương Phản Cho Thanh Accordion Lệnh Chờ Khớp:
+  - **Yêu cầu từ CEO:** Chữ `LỆNH CHỜ KHỚP (10 Lệnh Limit Đang Rải)` là thông tin phụ nên cần làm bớt nổi bật hơn tiêu đề cột `Cặp vị thế`, nhưng vẫn nổi bật hơn chữ `Click để thu gọn`.
+  - **Kết quả:** Đã hạ tone màu chữ `LỆNH CHỜ KHỚP` xuống `#808796` (cỡ 11.5px), thấp hơn mức `#9ca3af` của tiêu đề `Cặp vị thế`, đồng thời giữ chữ `Click để thu gọn` ở mức mờ `#5c6370`. Khi di chuột vào (hover) chỉ sáng dịu lên `#b0b8c6`, tạo chiều sâu thị giác chuẩn xác và tinh tế.
+
+- **[30/10/2026]** - Chỉnh Sửa Trạng Thái Active Cho Cụm Tab (Bảng Vị Thế, Logs, Biểu Đồ):
+  - **Yêu cầu từ CEO:** Giữ nguyên hiệu ứng hover khi di chuột vào, nhưng khi tab được chọn (active) không bôi màu cam nữa mà chỉ cần sáng trắng lên (`#ffffff`) và gạch chân trắng như lúc di chuột vào.
+  - **Kết quả:** Đã cập nhật cả trong `index.css` và `theme_modern_slate.css` đưa `.tab-btn.active` về `color: #fff; border-bottom: 2px solid #fff;`, loại bỏ hoàn toàn màu cam `#F90`/`#f97316`. Build thành công và mở trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Tinh Chỉnh Bảng Vị Thế Bản Cũ Theo Phong Cách Tinh Tế Của Bản Mới:
+  - **Yêu cầu từ CEO:**
+    1. Thanh `Lệnh chờ khớp (10 lệnh limit đang rải)` ở bản cũ đưa về font chữ thường (không in đậm), di chuột vào chỉ sáng trắng nhẹ `#ffffff`, không chuyển sang màu cam.
+    2. Dòng tiêu đề cột (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`) ở bản cũ học bản mới: đổi sang font chữ nhỏ `12px`, màu xám `#9ca3af` dịu mắt, hơi chìm đi.
+    3. Các vị thế đã khớp tầng 1 ở bản cũ học bản mới: tên cặp coin (`ETH-USDT`), ký quỹ (`0.37 $`), và PNL (`+0.27 USDT (+71.05%)`) được in đậm (`fontWeight: 700`), giữ nguyên đơn vị gốc `USDT`.
+  - **Kết quả:** Đã áp dụng hoàn tất trên `PositionsTable.jsx` và `index.css`, build thành công và kích hoạt trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Hoàn Thiện Đồng Bộ Bảng Vị Thế Chuẩn "PA 3: Accordion (Thu Gọn Nhóm)" và Căn Chỉnh Kích Thước Bot Action Bar:
+  - **Hiện tượng & Yêu cầu từ CEO:**
+    1. Vùng Dừng bot / Connect ở bản mới bị phình to hơn bản cũ. Yêu cầu giữ nguyên kích thước khoảng hở giống bản cũ.
+    2. Thanh Lệnh chờ khớp chưa sát 2 đường biên trái phải của bảng vị thế (bị thụt vào).
+    3. Phần Lệnh chờ khớp ở bản cũ bị hiển thị lại màu vàng và nút cam, trong khi CEO đã chốt toàn bộ hệ thống chuyển sang chuẩn **PA 3: Accordion (Thu Gọn Nhóm)** (làm chìm mờ dịu, ghost button).
+    4. Thanh accordion ở bản cũ bị ám màu xanh của theme mới thay vì tông màu xám đen gốc.
+  - **Khắc phục triệt để:**
+    1. *Bot Action Bar (`theme_modern_slate.css`):* Chỉnh `padding: 0 10px !important` cho `.bot-action-bar` ở theme mới, đồng bộ 100% kích thước và khoảng cách với bản cũ.
+    2. *Sát 2 biên trái phải (`index.css` & `theme_modern_slate.css`):* Bổ sung `.positions-table td.accordion-limit-td { padding: 0 !important; margin: 0 !important; border-left: none !important; border-right: none !important; }`, giúp thanh Accordion Header trải rộng 100% sát khít 2 mép biên bảng vị thế.
+    3. *Chuẩn hóa PA 3 Accordion cho Cả 2 Theme (`PositionsTable.jsx`):* Toàn bộ các dòng Lệnh chờ khớp (Limit rows) đều có màu xám mờ dịu `#a8a29e`, ký quỹ `#9ca3af`, chữ `Chờ khớp (Limit ...)` màu `#a8a29e`, nút Hủy dạng Ghost button viền `#52525b` hover cam `#d97706`, độ mờ `opacity: 0.65` (hover: 1). Tuyệt đối không còn màu vàng chóe hay nút cam cố định.
+    4. *Bảo toàn Bản Cũ & Phân Tách Rõ Ràng:*
+       - Khi ở theme [🏛️ CŨ]: Thanh Accordion mang tông màu xám đen thuần khiết `#252526`, viền `#333`, chữ `#ccc` (không bị ám màu xanh slate). Cột PNL của các vị thế đã khớp giữ nguyên 100% định dạng gốc: đơn vị **`USDT`** và font thường 400.
+       - Khi ở theme [💎 MỚI]: Thanh Accordion mang tông xanh slate `#1c2028`, viền `#374151`. Cột PNL hiển thị đơn vị **`$`** và font in đậm 700.
+
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi F5 Trang Web Giật Trạng Thái Về "CHẠY BOT" Mặc Dù Bot Vẫn Đang Chạy và Lệnh Limit Vẫn Đang Treo:
   - **Hiện tượng & Báo cáo từ CEO:** Người dùng đang chạy bot bình thường (lệnh Limit trên sàn OKX và Bảng Vị Thế vẫn hiển thị đầy đủ), nhưng khi ấn F5 làm mới trang web thì nút điều khiển lại hiện về trạng thái ban đầu "CHẠY BOT" (màu xanh lá) như chưa từng khởi động.
   - **Nguyên nhân cốt lõi:**
@@ -5201,6 +5253,58 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Triển Khai Phương Án B Cho Cột TF Lớp 2 (Lệnh Chờ Khớp):
+  - **Yêu cầu từ CEO:** Duyệt triển khai Phương án B: Cột TF ở Lớp 2 (lệnh limit) vẫn giữ đủ 6 ô thẳng hàng, nhưng chỉ sáng duy nhất 1 ô TF của chính lệnh limit đó (ví dụ lệnh M15 thì ô [15] sáng teal, 5 ô còn lại tối mờ), và toàn bộ 6 ô được LOCK LẠI (`pointerEvents: none`, `cursor: default`) để chống thao tác nhầm, vì quyền điều khiển TF đã tập trung tại Lớp 1.
+  - **Kết quả:** Đã triển khai hoàn tất trong `PositionsTable.jsx`, 6 ô TF canh đều chuẩn xác, lệnh limit hiển thị trực quan khung giờ tương ứng, khóa click tuyệt đối. Build frontend thành công.
+
+- **[30/10/2026]** - Tối Giản Về 1 Bản Duy Nhất Hoàn Chỉnh & Cấu Trúc Lại Vị Trí Coin Chờ Tín Hiệu:
+  - **Yêu cầu từ CEO:**
+    1. Xóa bỏ theme bản mới song song (xóa nút chuyển theme, xóa CSS modern không cần thiết), thống nhất dùng 1 bản duy nhất hiện tại đã được tinh chỉnh đẹp mắt.
+    2. Chuyển chữ `LỆNH CHỜ KHỚP` sang chữ thường `Lệnh chờ khớp` để không chiếm spotlight.
+    3. Chuyển các cặp coin đang chờ tín hiệu (`emptyCoins`, ví dụ `ETH-USDT`) lên xếp ở cuối Lớp 1 (ngay dưới các lệnh đã khớp, nằm trên thanh Lệnh chờ khớp), giữ nguyên font chữ thường không in đậm. Toàn bộ thanh Accordion Lệnh chờ khớp được đưa xuống đáy bảng.
+  - **Kết quả:** Đã gỡ bỏ sạch sẽ theme song song, đóng gói giao diện thống nhất, cấu trúc lại thứ tự bảng vị thế cực kỳ logic và thẩm mỹ. Build thành công và kích hoạt trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Làm Mờ Đường Kẻ Chỉ Bảng Vị Thế & Xóa Bỏ Đường Phân Cách Cụm Tab:
+  - **Yêu cầu từ CEO:**
+    1. Làm các đường kẻ chỉ ngang/dọc ở các ô trong Bảng Vị Thế mờ nhẹ, dịu mắt hơn.
+    2. Cụm tab `Bảng vị thế`, `Logs`, `Biểu đồ` không cần đường kẻ chỉ phân cách nữa.
+  - **Kết quả:**
+    - Đã xóa bỏ đường kẻ chỉ dọc giữa các tab (`border-right: none`), giúp cụm tab liền mạch, thoáng đãng.
+    - Đã hạ độ đậm các đường kẻ ô ngang/dọc trong Bảng Vị Thế từ `#333333` xuống `rgba(255, 255, 255, 0.05 - 0.06)` mờ nhẹ tinh tế. Build và kiểm thử thành công.
+
+- **[30/10/2026]** - Tối Giản Độ Sáng Tab Bảng Vị Thế / Logs / Biểu Đồ Khi Active:
+  - **Yêu cầu từ CEO:** Màu tab khi được chọn không cần sáng quá, tránh chiếm spotlight của tên coin `BTC-USDT`.
+  - **Kết quả:** Hạ màu tab active từ `#ffffff` chói sáng xuống tone xám sáng nhẹ nhàng `#d1d5db`, gạch chân tinh tế `#6b7280`. Tab inactive giữ màu `#787f8f`. Nhờ đó tên coin `BTC-USDT` ở bên dưới giữ trọn vẹn điểm nhấn thị giác số 1.
+
+- **[30/10/2026]** - Cân Đối Lại Độ Tương Phản Cho Thanh Accordion Lệnh Chờ Khớp:
+  - **Yêu cầu từ CEO:** Chữ `LỆNH CHỜ KHỚP (10 Lệnh Limit Đang Rải)` là thông tin phụ nên cần làm bớt nổi bật hơn tiêu đề cột `Cặp vị thế`, nhưng vẫn nổi bật hơn chữ `Click để thu gọn`.
+  - **Kết quả:** Đã hạ tone màu chữ `LỆNH CHỜ KHỚP` xuống `#808796` (cỡ 11.5px), thấp hơn mức `#9ca3af` của tiêu đề `Cặp vị thế`, đồng thời giữ chữ `Click để thu gọn` ở mức mờ `#5c6370`. Khi di chuột vào (hover) chỉ sáng dịu lên `#b0b8c6`, tạo chiều sâu thị giác chuẩn xác và tinh tế.
+
+- **[30/10/2026]** - Chỉnh Sửa Trạng Thái Active Cho Cụm Tab (Bảng Vị Thế, Logs, Biểu Đồ):
+  - **Yêu cầu từ CEO:** Giữ nguyên hiệu ứng hover khi di chuột vào, nhưng khi tab được chọn (active) không bôi màu cam nữa mà chỉ cần sáng trắng lên (`#ffffff`) và gạch chân trắng như lúc di chuột vào.
+  - **Kết quả:** Đã cập nhật cả trong `index.css` và `theme_modern_slate.css` đưa `.tab-btn.active` về `color: #fff; border-bottom: 2px solid #fff;`, loại bỏ hoàn toàn màu cam `#F90`/`#f97316`. Build thành công và mở trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Tinh Chỉnh Bảng Vị Thế Bản Cũ Theo Phong Cách Tinh Tế Của Bản Mới:
+  - **Yêu cầu từ CEO:**
+    1. Thanh `Lệnh chờ khớp (10 lệnh limit đang rải)` ở bản cũ đưa về font chữ thường (không in đậm), di chuột vào chỉ sáng trắng nhẹ `#ffffff`, không chuyển sang màu cam.
+    2. Dòng tiêu đề cột (`Cặp vị thế`, `Ký quỹ`, `PNL thả nổi`, `TF trade`, `Cắt lệnh`) ở bản cũ học bản mới: đổi sang font chữ nhỏ `12px`, màu xám `#9ca3af` dịu mắt, hơi chìm đi.
+    3. Các vị thế đã khớp tầng 1 ở bản cũ học bản mới: tên cặp coin (`ETH-USDT`), ký quỹ (`0.37 $`), và PNL (`+0.27 USDT (+71.05%)`) được in đậm (`fontWeight: 700`), giữ nguyên đơn vị gốc `USDT`.
+  - **Kết quả:** Đã áp dụng hoàn tất trên `PositionsTable.jsx` và `index.css`, build thành công và kích hoạt trình duyệt kiểm thử.
+
+- **[30/10/2026]** - Hoàn Thiện Đồng Bộ Bảng Vị Thế Chuẩn "PA 3: Accordion (Thu Gọn Nhóm)" và Căn Chỉnh Kích Thước Bot Action Bar:
+  - **Hiện tượng & Yêu cầu từ CEO:**
+    1. Vùng Dừng bot / Connect ở bản mới bị phình to hơn bản cũ. Yêu cầu giữ nguyên kích thước khoảng hở giống bản cũ.
+    2. Thanh Lệnh chờ khớp chưa sát 2 đường biên trái phải của bảng vị thế (bị thụt vào).
+    3. Phần Lệnh chờ khớp ở bản cũ bị hiển thị lại màu vàng và nút cam, trong khi CEO đã chốt toàn bộ hệ thống chuyển sang chuẩn **PA 3: Accordion (Thu Gọn Nhóm)** (làm chìm mờ dịu, ghost button).
+    4. Thanh accordion ở bản cũ bị ám màu xanh của theme mới thay vì tông màu xám đen gốc.
+  - **Khắc phục triệt để:**
+    1. *Bot Action Bar (`theme_modern_slate.css`):* Chỉnh `padding: 0 10px !important` cho `.bot-action-bar` ở theme mới, đồng bộ 100% kích thước và khoảng cách với bản cũ.
+    2. *Sát 2 biên trái phải (`index.css` & `theme_modern_slate.css`):* Bổ sung `.positions-table td.accordion-limit-td { padding: 0 !important; margin: 0 !important; border-left: none !important; border-right: none !important; }`, giúp thanh Accordion Header trải rộng 100% sát khít 2 mép biên bảng vị thế.
+    3. *Chuẩn hóa PA 3 Accordion cho Cả 2 Theme (`PositionsTable.jsx`):* Toàn bộ các dòng Lệnh chờ khớp (Limit rows) đều có màu xám mờ dịu `#a8a29e`, ký quỹ `#9ca3af`, chữ `Chờ khớp (Limit ...)` màu `#a8a29e`, nút Hủy dạng Ghost button viền `#52525b` hover cam `#d97706`, độ mờ `opacity: 0.65` (hover: 1). Tuyệt đối không còn màu vàng chóe hay nút cam cố định.
+    4. *Bảo toàn Bản Cũ & Phân Tách Rõ Ràng:*
+       - Khi ở theme [🏛️ CŨ]: Thanh Accordion mang tông màu xám đen thuần khiết `#252526`, viền `#333`, chữ `#ccc` (không bị ám màu xanh slate). Cột PNL của các vị thế đã khớp giữ nguyên 100% định dạng gốc: đơn vị **`USDT`** và font thường 400.
+       - Khi ở theme [💎 MỚI]: Thanh Accordion mang tông xanh slate `#1c2028`, viền `#374151`. Cột PNL hiển thị đơn vị **`$`** và font in đậm 700.
+
 - **[29/10/2026]** - Khắc Phục Triệt Để Lỗi F5 Trang Web Giật Trạng Thái Về "CHẠY BOT" Mặc Dù Bot Vẫn Đang Chạy và Lệnh Limit Vẫn Đang Treo:
   - **Hiện tượng & Báo cáo từ CEO:** Người dùng đang chạy bot bình thường (lệnh Limit trên sàn OKX và Bảng Vị Thế vẫn hiển thị đầy đủ), nhưng khi ấn F5 làm mới trang web thì nút điều khiển lại hiện về trạng thái ban đầu "CHẠY BOT" (màu xanh lá) như chưa từng khởi động.
   - **Nguyên nhân cốt lõi:**
@@ -5862,3 +5966,54 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
   - Chạy `npm run build` thành công 100%.
 - **Engine:**
   - `bot_strategy.py`: Thêm Cooldown Timer tối thiểu 5s/lần cho mỗi cặp coin/TF khi dời lệnh Limit theo EMA200 (amend-order), triệt tiêu hoàn toàn nguy cơ dính mã lỗi `50011` (Rate Limit).
+
+
+### [TASK-2026-10-30-01] Áp dụng Phương án 3 (Accordion Thu Gọn & Làm Chìm Lớp Lệnh Limit)
+- **Tập tin:** `web_app/frontend/src/components/positions/PositionsTable.jsx`
+- **Yêu cầu:** 
+  1. Giữ nguyên 100% định dạng, màu sắc, font chữ và nút của Lớp 1 (Vị thế đã khớp thật).
+  2. Áp dụng thanh Accordion Header phía trên danh sách lệnh chờ khớp (Lớp 2): cho phép click để thu gọn/mở rộng.
+  3. Khi mở rộng: các hàng lệnh Limit được làm chìm dịu mắt (opacity 0.68, hover 1.0, nhãn xám khói `#a8a29e`, nút Hủy ghost viền mỏng `#52525b`).
+- **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công.
+
+
+### [TASK-2026-10-30-02] Tích hợp Cơ chế Đổi Theme Song Song (Classic 100% vs Modern Slate Obsidian)
+- **Tập tin:**
+  - `web_app/frontend/src/theme_modern_slate.css`: Định nghĩa hệ thống màu Slate Obsidian chuẩn 100% từ phòng thử nghiệm.
+  - `web_app/frontend/src/components/header/AppHeader.jsx`: Thêm nút đổi theme `[💎 MỚI / 🏛️ CŨ]` cạnh icon Discord góc trên cùng bên phải.
+  - `web_app/frontend/src/main.jsx`: Nạp stylesheet theme.
+  - `web_app/frontend/src/components/positions/PositionsTable.jsx`: Hỗ trợ biến CSS fallback.
+- **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công. CEO có thể click nút chuyển đổi trực tiếp trên web live.
+
+
+### [TASK-2026-10-30-03] Đồng bộ 100% Giao Diện Mới Chuẩn Phòng Thử Nghiệm UI (Xóa đường kẻ chỉ, Giữ nguyên logic co dãn)
+- **Tập tin:**
+  - `web_app/frontend/src/theme_modern_slate.css`:
+    - Xóa bỏ triệt để đường kẻ chỉ dọc (`border-right: none`, `border-left: none`).
+    - Nền toàn bảng, tabs, chart, sidebar đồng bộ 100% mã màu `#0f1115`, `#181a20`, `#20242c`, `#222630`.
+    - Thiết lập `white-space: nowrap !important` toàn bộ bảng vị thế để chống rớt dòng chữ khi co kéo cửa sổ.
+    - Bảo toàn 100% logic co dãn cửa sổ và ẩn các cột khi màn hình thu hẹp như ảnh CEO chụp.
+- **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công.
+
+
+### [TASK-2026-10-30-04] Hoàn thiện Áo Mới Toàn Diện (In đậm Lớp 1, Đổi USDT sang $, Thay áo Modals Cài Đặt & Connect, Phân tầng Layer Sáng Tối)
+- **Tập tin:**
+  - `web_app/frontend/src/components/positions/PositionsTable.jsx`:
+    - Lớp 1 (Vị thế đã khớp): In đậm tên coin (`fontWeight: 700`), in đậm Ký quỹ (`fontWeight: 700`), in đậm PNL thả nổi (`fontWeight: 700`).
+    - Cột PNL thả nổi: Đổi `USDT` thành ký tự `$` (ví dụ: `+0.27 $ (+71.05%)`) đồng bộ 100% với cột Ký quỹ.
+  - `web_app/frontend/src/components/modals/ConnectModal.jsx`: Gắn class định danh `connect-modal-box`.
+  - `web_app/frontend/src/components/header/AppHeader.jsx`: Gắn class định danh `header-account-popover`.
+  - `web_app/frontend/src/theme_modern_slate.css`:
+    - Thay áo mới 100% cho `Cài Đặt` (`SystemSettingsModal`), `Connect` (`ConnectModal`), và menu popover chọn tài khoản.
+    - Xóa bỏ triệt để vùng xám cũ tại khu vực `DỪNG BOT` & `Connect` (`.bot-panel-card` và `.bot-action-bar`).
+    - Phân tầng layer sáng tối đậm nhạt (Tầng 0: Nền sâu `#0c0e14`, Tầng 1: Khối ngoài `#141720`, Tầng 2: Thanh Header `#1c202a`, Tầng 3: Bảng Vị Thế `#181a20`, Tầng 4: Cụm EMA200 Bot `#1a1e28` có bóng đổ tách biệt).
+- **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công.
+
+
+### [TASK-2026-10-30-05] Khôi phục 100% Giao Diện & Font Chữ Monospace Gốc cho Tab Logs Terminal
+- **Tập tin:**
+  - `web_app/frontend/src/theme_modern_slate.css`:
+    - Loại trừ hoàn toàn `logs-terminal` khỏi quy tắc font sans-serif toàn cục.
+    - Khôi phục font monospace chuẩn (`ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`), nền đen sâu `#0d0d0d`, màu chữ `#c8c8c8` và khoảng cách dòng gốc.
+    - Giữ các nhánh cây ASCII (`├──`, `└──`) và bảng thống kê dòng thẳng hàng tắp chuẩn 100% như bản cũ.
+- **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công.
