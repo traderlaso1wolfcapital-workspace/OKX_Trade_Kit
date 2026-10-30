@@ -64,8 +64,22 @@ function App() {
   });
   const [slotCount] = useState(() => [56, 57, 58][Math.floor(Math.random() * 3)]);
 
-  // 3. Bot Tab (sub1: Bot EMA200, sub2: Bot SMC, sub3: Bot Liquidation)
+  // 3. Bot Tab (sub1: Bot EMA200, sub2: Bot SMC, sub3: Bot Liquidation) - Auto-sync running bot
+  // 🔒 Tự động chọn bot tab đang chạy (có lock) của tài khoản đang chọn khi F5 / mở lại trang
   const [activeBotTab, setActiveBotTab] = useState(() => {
+    try {
+      const savedAcc = localStorage.getItem("tls1_selected_account");
+      const savedActiveAccounts = localStorage.getItem("tls1_active_accounts");
+      const savedAccountsList = localStorage.getItem("tls1_accounts");
+      if (savedAcc && savedActiveAccounts) {
+        const activeMap = JSON.parse(savedActiveAccounts);
+        const accList = savedAccountsList ? JSON.parse(savedAccountsList) : [];
+        const running = getRunningStrategyForAccount(activeMap, savedAcc, accList);
+        if (running && ["sub1", "sub2", "sub3"].includes(running)) {
+          return running;
+        }
+      }
+    } catch {}
     return localStorage.getItem("tls1_active_bot_tab") || "sub1";
   });
   const [fadeClass, setFadeClass] = useState("tab-fade");
@@ -254,6 +268,12 @@ function App() {
   }, []);
 
   const handleSelectBotTab = useCallback((strat) => {
+    // 🔒 Nếu tài khoản hiện tại đang có bot chạy, giữ nguyên và cảnh báo không được đổi tab sang bot chưa chạy
+    const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, effectiveAccId, accounts);
+    if (runningBot && runningBot !== strat) {
+      alert(`⚠️ Tài khoản này đang chạy ${getBotDisplayName(runningBot)}!\n\nVui lòng DỪNG BOT trước khi chuyển sang chiến thuật khác.`);
+      return;
+    }
     setActiveBotTab(strat);
     try {
       localStorage.setItem("tls1_active_bot_tab", strat);
@@ -263,7 +283,7 @@ function App() {
         localStorage.setItem("tls1_selected_account", effectiveAccId);
       }
     } catch {}
-  }, [effectiveAccId]);
+  }, [effectiveAccId, mergedActiveAccounts, accounts]);
 
   // Bảng vị thế: Tách riêng tuyệt đối giữa Sàn OKX và Quỹ FX, chống hoàn toàn giật/flicker
   const positions = useMemo(() => {
@@ -345,26 +365,40 @@ function App() {
       }
     } catch {}
 
-    // Tự động nạp cấu hình Ký quỹ / TP / SL riêng của tài khoản này từ localStorage
+    // 🔒 Tự động chuyển sang tab bot đang chạy (có lock) nếu tài khoản này đang có bot hoạt động
+    let effectiveStrat = activeBotTab;
+    if (accId) {
+      const runningBot = getRunningStrategyForAccount(mergedActiveAccounts, accId, accounts);
+      if (runningBot && ["sub1", "sub2", "sub3"].includes(runningBot)) {
+        effectiveStrat = runningBot;
+        setActiveBotTab(runningBot);
+        try {
+          localStorage.setItem("tls1_active_bot_tab", runningBot);
+          localStorage.setItem(`tls1_bot_strat_${accId}`, runningBot);
+        } catch {}
+      } else {
+        // Tự động khôi phục chiến thuật bot mà tài khoản này đã chọn trước đó (nếu không có bot chạy)
+        try {
+          const savedStrat = localStorage.getItem(`tls1_bot_strat_${accId}`);
+          if (savedStrat && ["sub1", "sub2", "sub3"].includes(savedStrat)) {
+            effectiveStrat = savedStrat;
+            setActiveBotTab(savedStrat);
+            localStorage.setItem("tls1_active_bot_tab", savedStrat);
+          }
+        } catch {}
+      }
+    }
+
+    // Tự động nạp cấu hình Ký quỹ / TP / SL riêng của tài khoản này từ localStorage theo effectiveStrat
     if (accId) {
       try {
-        const savedAccRisk = localStorage.getItem(`tls1_risk_${activeBotTab}_${accId}`);
+        const savedAccRisk = localStorage.getItem(`tls1_risk_${effectiveStrat}_${accId}`);
         if (savedAccRisk) {
           const parsed = JSON.parse(savedAccRisk);
           if (parsed && typeof parsed === "object") {
             setRisk(parsed);
             prevRiskRef.current = parsed;
           }
-        }
-      } catch {}
-    }
-
-    // Tự động khôi phục chiến thuật bot mà tài khoản này đã chọn trước đó
-    if (accId) {
-      try {
-        const savedStrat = localStorage.getItem(`tls1_bot_strat_${accId}`);
-        if (savedStrat && ["sub1", "sub2", "sub3"].includes(savedStrat)) {
-          setActiveBotTab(savedStrat);
         }
       } catch {}
     }
@@ -409,7 +443,37 @@ function App() {
       setPositions([]);
       setClosedPositions([]);
     }
-  }, [activeBotTab, loginUid, mergedActiveAccounts, setPositions, setClosedPositions]);
+  }, [activeBotTab, loginUid, mergedActiveAccounts, accounts, setPositions, setClosedPositions]);
+
+  // 🔒 Tự động đồng bộ tab bot khi tài khoản hiện tại đang có bot chạy (F5, WebSocket push, v.v.)
+
+  useEffect(() => {
+
+    if (!effectiveAccId || Object.keys(mergedActiveAccounts || {}).length === 0) return;
+
+    const runningStrat = getRunningStrategyForAccount(mergedActiveAccounts, effectiveAccId, accounts);
+
+    if (runningStrat && ["sub1", "sub2", "sub3"].includes(runningStrat)) {
+
+      if (runningStrat !== activeBotTab) {
+
+        setActiveBotTab(runningStrat);
+
+        try {
+
+          localStorage.setItem("tls1_active_bot_tab", runningStrat);
+
+          localStorage.setItem(`tls1_bot_strat_${effectiveAccId}`, runningStrat);
+
+        } catch {}
+
+      }
+
+    }
+
+  }, [effectiveAccId, mergedActiveAccounts, accounts, activeBotTab]);
+
+
 
   const prevEffectiveAccRef = useRef(effectiveAccId);
   useEffect(() => {
@@ -1094,6 +1158,45 @@ function App() {
     }
   };
 
+  // 🧹 CHỦ ĐỘNG QUÉT & XÓA LỆNH LIMIT KHI WEB HIỂN THỊ "CHẠY BOT" (BOT ĐANG DỪNG)
+  const isCleaningLimitsRef = useRef(false);
+  const lastAutoCleanTimeRef = useRef(0);
+
+  useEffect(() => {
+    // Chỉ kích hoạt khi bot ở trạng thái DỪNG (giao diện hiển thị nút "CHẠY BOT")
+    if (isOkxRunning || isStartingBot || isStoppingBot) return;
+    if (!effectiveAccId) return;
+
+    // Kiểm tra các lệnh limit chờ khớp đang hiển thị trong positions
+    const limitOrdersList = (positions || []).filter(
+      p => p.is_limit || String(p.ticket_id || "").startsWith("ord_") || p.order_id
+    );
+
+    if (limitOrdersList.length > 0 && !isCleaningLimitsRef.current) {
+      const now = Date.now();
+      if (now - lastAutoCleanTimeRef.current < 3000) return; // Tránh gọi dồn dập trong 3s
+      lastAutoCleanTimeRef.current = now;
+      isCleaningLimitsRef.current = true;
+
+      const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
+      fetch(`/api/bot/clean_limits?uid=${encodeURIComponent(curUid)}&strategy=${activeBotTab}&account_id=${encodeURIComponent(effectiveAccId)}`, {
+        method: "POST"
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.canceled_count > 0) {
+            addSystemLog(`🧹 [TỰ ĐỘNG DỌN DẸP] Đã xóa sạch ${data.canceled_count} lệnh Limit trên sàn OKX vì bot đang ở trạng thái Dừng (Bảo lưu 100% TP/SL).`);
+            setPositions(prev => (prev || []).filter(p => !p.is_limit && !String(p.ticket_id || "").startsWith("ord_") && !p.order_id));
+            refreshBotData();
+          }
+        })
+        .catch(err => console.warn("Lỗi auto clean limit:", err))
+        .finally(() => {
+          setTimeout(() => { isCleaningLimitsRef.current = false; }, 2000);
+        });
+    }
+  }, [isOkxRunning, isStartingBot, isStoppingBot, effectiveAccId, positions, activeBotTab, currentUid, addSystemLog, setPositions, refreshBotData]);
+
   // Switch bot defaults
   useEffect(() => {
     setFadeClass("");
@@ -1331,6 +1434,15 @@ function App() {
                 setHttpActiveAccounts(statData.active_accounts);
                 if (Object.keys(statData.active_accounts).length > 0) {
                   try { localStorage.setItem("tls1_active_accounts", JSON.stringify(statData.active_accounts)); } catch {}
+                }
+                // 🔒 TỰ ĐỘNG CHỌN TAB BOT ĐANG CHẠY CỦA TÀI KHOẢN (CÓ LOCK) KHI BOOTSTRAP F5
+                const runningStrat = getRunningStrategyForAccount(statData.active_accounts, targetAcc, accList);
+                if (runningStrat && ["sub1", "sub2", "sub3"].includes(runningStrat)) {
+                  setActiveBotTab(runningStrat);
+                  try {
+                    localStorage.setItem("tls1_active_bot_tab", runningStrat);
+                    localStorage.setItem(`tls1_bot_strat_${targetAcc}`, runningStrat);
+                  } catch {}
                 }
               }
               if (statData?.status && setBotStatus) {
@@ -2075,6 +2187,26 @@ function App() {
                 acc = matchedAcc.id;
               }
             }
+            // 🔒 ĐỒNG BỘ ĐA THIẾT BỊ (MÁY A & MÁY B): Nhận diện bot đang chạy ngay khi Fast Connect
+
+            if (data.is_running && data.running_strategy) {
+
+              setActiveBotTab(data.running_strategy);
+
+              try {
+
+                localStorage.setItem("tls1_active_bot_tab", data.running_strategy);
+
+                localStorage.setItem(`tls1_bot_strat_${acc}`, data.running_strategy);
+
+              } catch {}
+
+              setOverrideBotRunning(true);
+
+            }
+
+
+
             const accDisplayName = data.detected_name || (accounts.find(a => a.id === acc)?.name) || "Tài khoản";
 
             const successMsg = (!isStandalone && callbackPwa)
@@ -2836,6 +2968,20 @@ function App() {
       setIsAuthenticated(true);
       localStorage.setItem("tls1_auth", "true");
 
+      if (data.account_id) {
+        targetAcc = data.account_id;
+      }
+
+      // 🔒 ĐỒNG BỘ ĐA THIẾT BỊ (MÁY A & MÁY B): Nhận diện bot đang chạy ngay khi lưu API Key
+      if (data.is_running && data.running_strategy) {
+        setActiveBotTab(data.running_strategy);
+        try {
+          localStorage.setItem("tls1_active_bot_tab", data.running_strategy);
+          localStorage.setItem(`tls1_bot_strat_${targetAcc}`, data.running_strategy);
+        } catch {}
+        setOverrideBotRunning(true);
+      }
+
       if (!isCustom) {
         setSelectedAccount(targetAcc);
         handleAssignAccountToActiveBot(targetAcc);
@@ -3136,7 +3282,7 @@ function App() {
           setLockMessage(data.message || "⛔ Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Admin.");
         } else if (data.status === "pending") {
           setLockMessage(data.message || "⏳ Tài khoản đang chờ duyệt.");
-        } else if (data.status === "error" && data.message && (data.message.includes("kích hoạt") || data.message.includes("Admin"))) {
+        } else if (data.status === "error" && data.message) {
           setLockMessage("⚠️ " + data.message);
         } else {
           setLockMessage("");

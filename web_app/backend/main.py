@@ -116,11 +116,12 @@ def decrypt_value(val: str) -> str:
     return val
 
 ADMIN_UID = "admtls12021"
+MASTER_AFFILIATE_UID = "523019992975987626"
 
 def is_admin_uid(uid: str) -> bool:
     if not uid: return False
     clean = str(uid).strip().lower()
-    return clean == ADMIN_UID
+    return clean == ADMIN_UID or clean == MASTER_AFFILIATE_UID
 
 def kill_pid(pid: int):
     if not pid or pid <= 0:
@@ -150,24 +151,20 @@ def verify_jwt(credentials: Optional[HTTPAuthorizationCredentials] = Depends(sec
 
 uid_cache = {}
 
-def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
-    clean = str(uid_str).strip().lower() if uid_str else ""
-    if not clean:
-        return False, "UID rỗng"
-    if is_admin_uid(clean):
-        return True, "Admin"
+def _check_google_sheet_fallback(clean: str) -> tuple[bool, str]:
+    """Fallback kiểm tra qua Google Sheets dự phòng để bảo đảm Zero Downtime"""
     now = time.time()
-    if clean in uid_cache and now - uid_cache[clean]["time"] < 300: # 5 minutes
+    if clean in uid_cache and now - uid_cache[clean]["time"] < 300:
         res = uid_cache[clean]["result"]
         if res.get("status") == "success":
             return True, "ACTIVE"
     try:
         url = "https://docs.google.com/spreadsheets/d/1lPyXwv1sa0Oa3kvwOeTkZsegcFQeapsXK-hCDLHazGU/export?format=csv&gid=0"
-        resp = requests.get(url, timeout=10)
+        resp = requests.get(url, timeout=8)
         resp.raise_for_status()
         content = resp.text
         reader = csv.reader(content.splitlines())
-        next(reader, None) # skip header
+        next(reader, None)
         for row in reader:
             if row and len(row) >= 1 and row[0].strip().isdigit():
                 if row[0].strip() == clean:
@@ -177,12 +174,53 @@ def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
                         uid_cache[clean] = {"time": now, "result": result}
                         return True, "ACTIVE"
                     else:
-                        # Đã có UID trong bảng (đã đăng ký ref) nhưng chưa được bật ON
                         return False, "Vui lòng liên hệ Admin để kích hoạt."
         return False, "UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!"
     except Exception as e:
-        print(f"[REF CHECK ERROR] {e}", flush=True)
+        print(f"[REF CHECK SHEET FALLBACK ERROR] {e}", flush=True)
         return True, "Bypass on network error"
+
+def check_uid_active_ref(uid_str: str) -> tuple[bool, str]:
+    """
+    Xác thực UID chính xác qua OKX Affiliate API v5:
+    1. Kiểm tra Admin / Master UID.
+    2. Kiểm tra trực tiếp qua OKX Affiliate API: Link Ref + Volume 14 ngày đạt tối thiểu 20,000 USDT.
+    3. Bảo toàn Zero Downtime: Fallback kiểm tra Google Sheets nếu Affiliate API không phản hồi.
+    """
+    clean = str(uid_str).strip().lower() if uid_str else ""
+    if not clean:
+        return False, "UID rỗng"
+    if is_admin_uid(clean):
+        return True, "Admin"
+    
+    # 1. Ưu tiên kiểm tra OKX Affiliate API v5
+    try:
+        from affiliate_service import check_uid_affiliate_and_volume
+        aff_res = check_uid_affiliate_and_volume(clean, min_volume=20000.0)
+        
+        # Nếu OKX Affiliate API xác nhận hợp lệ (đủ 20k volume 14 ngày và đúng ref)
+        if aff_res.get("allowed"):
+            return True, "ACTIVE"
+        
+        # Nếu OKX xác nhận rõ ràng: không thuộc ref hoặc không đủ volume
+        status = aff_res.get("status")
+        if status in ["NOT_INVITEE", "INSUFFICIENT_VOLUME"]:
+            # Kiểm tra Google Sheets dự phòng (dành cho tài khoản chuyển đổi)
+            is_sheet_ok, _ = _check_google_sheet_fallback(clean)
+            if is_sheet_ok:
+                return True, "ACTIVE"
+            return False, aff_res.get("message", "Chưa đủ điều kiện tham gia!")
+    except Exception as e:
+        print(f"[AFFILIATE CHECK ERR] {e}", flush=True)
+
+    # 2. Fallback sang Google Sheets nếu Affiliate API gặp lỗi
+    return _check_google_sheet_fallback(clean)
+
+@app.get("/api/affiliate/check")
+def api_affiliate_check(uid: str):
+    clean = str(uid).strip()
+    from affiliate_service import check_uid_affiliate_and_volume
+    return check_uid_affiliate_and_volume(clean, min_volume=20000.0)
 
 @app.get("/api/auth/verify")
 def verify_uid(uid: str, jwt_data: Optional[dict] = Depends(verify_jwt)):
@@ -236,6 +274,24 @@ bot_processes = {}
 bot_start_times = {}
 bot_log_queues = {}
 active_connections = {}
+
+# 🌐 Runtime map đồng bộ trạng thái bot chạy từ xa / thiết bị khác qua sàn OKX
+_okx_remote_active_accounts = {}
+
+def _detect_remote_bot_strategy(raw_pending_orders: list) -> str:
+    """Nhận diện chiến thuật bot đang chạy từ xa qua tiền tố clOrdId của lệnh chờ trên sàn OKX."""
+    if not raw_pending_orders:
+        return ""
+    for o in raw_pending_orders:
+        cl_id = str(o.get("clOrdId", "")).upper()
+        if not cl_id: continue
+        if any(tag in cl_id for tag in ["SCVLMT", "SCV25", "EM15", "TLS1_EM", "TPSL"]):
+            return "sub1"
+        if any(tag in cl_id for tag in ["TLS1_OB", "OB_", "ELM", "ESM", "ELH", "ESH", "ELD", "ESD"]):
+            return "sub2"
+        if any(tag in cl_id for tag in ["TLS1_LIQ", "LIQ_"]):
+            return "sub3"
+    return ""
 
 def get_nested(d: dict, k1: str, k2: str, default=None):
     return d.get(k1, {}).get(k2, default)
@@ -663,7 +719,21 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                 # Cập nhật hoặc lưu vào accounts.json của chính UID này
                 fast_api_label = acc_info.get("label", "") if acc_info else ""
                 updated_accounts = sync_account_name_in_storage(uid, acc, detected_name, api_label=fast_api_label, is_main=is_main, okx_uid=api_uid)
-                
+
+                # 🔒 KIỂM TRA ĐỒNG BỘ BOT ĐANG CHẠY (MULTI-DEVICE SYNC)
+                is_running_strat = None
+                running_pid_val = 0
+                for st in ["sub1", "sub2", "sub3"]:
+                    s_pid = get_running_pid(uid, st, acc)
+                    s_proc = get_nested(bot_processes, uid, f"{st}_{acc}") or get_nested(bot_processes, uid, st)
+                    if s_pid > 0 or (s_proc and s_proc.poll() is None):
+                        is_running_strat = st
+                        running_pid_val = s_pid or (s_proc.pid if s_proc else 0)
+                        break
+
+                if is_running_strat:
+                    print(f"🔒 [FAST CONNECT MULTI-DEVICE] Tài khoản [{acc}] đang chạy {is_running_strat} (PID={running_pid_val}). Bảo lưu 100% bot, đồng bộ sang thiết bị mới!", flush=True)
+
                 return {
                     "status": "success",
                     "message": f"Kết nối OKX Fast Connect thành công: {detected_name}!",
@@ -671,7 +741,10 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
                     "detected_uid": uid,
                     "account_id": acc,
                     "is_main": is_main,
-                    "accounts": updated_accounts
+                    "accounts": updated_accounts,
+                    "is_running": bool(is_running_strat),
+                    "running_strategy": is_running_strat or "",
+                    "running_account": acc if is_running_strat else "",
                 }
         
         return {"status": "error", "message": f"Tạo API Key thất bại: {create_data.get('msg', create_data)}", "raw": create_data}
@@ -1720,6 +1793,13 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
     data_dir = get_user_data_dir(uid)
     active_accounts = {}
     
+    # 🌐 Đồng bộ các tài khoản đang chạy bot từ xa (phát hiện qua sàn OKX)
+    if _okx_remote_active_accounts:
+        for r_k, r_v in _okx_remote_active_accounts.items():
+            active_accounts[r_k] = r_v
+        if target_acc and _okx_remote_active_accounts.get(target_acc) == strategy:
+            is_running = True
+    
     # 1. Quét theo danh sách tài khoản đã kết nối của user
     user_accs = get_user_accounts(uid)
     for strat in ["sub1", "sub2", "sub3"]:
@@ -1773,7 +1853,8 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
 
     if is_running:
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
-        shadow = _is_shadow_mode(uid, strategy, target_acc)
+        is_remote = bool(_okx_remote_active_accounts and (_okx_remote_active_accounts.get(target_acc) == strategy or _okx_remote_active_accounts.get(f"{strategy}_{target_acc}")))
+        shadow = False if is_remote else _is_shadow_mode(uid, strategy, target_acc)
         return {
             "status": "SHADOW" if shadow else "RUNNING",
             "uptime": uptime,
@@ -1847,11 +1928,15 @@ def _cancel_unfilled_limit_orders(uid: str, strategy: str, account_id: str = Non
             if resp.status_code == 200:
                 raw_orders.extend(resp.json().get("data", []))
             
-            # Quét bổ sung nếu cần để không sót lệnh
-            if not raw_orders:
+            # Quét bổ sung để không sót bất kỳ lệnh nào (kể cả SPOT hay SWAP còn sót)
+            try:
                 resp_all = _okx_signed_request("GET", "/api/v5/trade/orders-pending", "", api_key, secret_key, passphrase, is_demo, timeout=6)
                 if resp_all.status_code == 200:
-                    raw_orders.extend(resp_all.json().get("data", []))
+                    for o_extra in resp_all.json().get("data", []):
+                        if not any(o.get("ordId") == o_extra.get("ordId") for o in raw_orders):
+                            raw_orders.append(o_extra)
+            except Exception:
+                pass
 
             # Chỉ hủy các lệnh Limit/Post-only mở vị thế chưa khớp, TUYỆT ĐỐI không hủy lệnh đóng vị thế (reduceOnly)
             seen_ord_ids = set()
@@ -1868,7 +1953,18 @@ def _cancel_unfilled_limit_orders(uid: str, strategy: str, account_id: str = Non
             if to_cancel:
                 for i in range(0, len(to_cancel), 20):
                     batch = to_cancel[i:i+20]
-                    _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", json.dumps(batch), api_key, secret_key, passphrase, is_demo, timeout=8)
+                    res_c = _okx_signed_request("POST", "/api/v5/trade/cancel-batch-orders", json.dumps(batch), api_key, secret_key, passphrase, is_demo, timeout=8)
+                    try:
+                        res_json = res_c.json() if res_c.status_code == 200 else {}
+                        if res_json.get("code") != "0":
+                            print(f"⚠️ [CANCEL BATCH] Mã lỗi {res_json.get('code')}: {res_json.get('msg')}. Thử hủy đơn lẻ...", flush=True)
+                            for item in batch:
+                                try:
+                                    _okx_signed_request("POST", "/api/v5/trade/cancel-order", json.dumps(item), api_key, secret_key, passphrase, is_demo, timeout=4)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
                 canceled_orders = len(to_cancel)
                 print(f"🧹 [{action_name}] Đã hủy thành công {canceled_orders} lệnh Limit chưa khớp trên OKX cho {target_acc}. Bảo lưu 100% TP/SL!", flush=True)
             else:
@@ -2370,6 +2466,15 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
 
     msg = f"Bot {strategy} cho tài khoản {target_acc} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
     return {"message": msg, "status": "STOPPED", "canceled_count": canceled_orders}
+
+@app.post("/api/bot/clean_limits")
+async def clean_limits(uid: str, strategy: str = "sub1", account_id: str = None):
+    """Chủ động quét và xóa sạch toàn bộ lệnh limit chưa khớp trên OKX khi bot ở trạng thái Dừng."""
+    if not uid or uid in ["default", "guest", "undefined", "null"]:
+        return {"status": "error", "message": "UID không hợp lệ", "canceled_count": 0}
+    target_acc = (account_id or "").strip() or strategy
+    canceled = await asyncio.to_thread(_cancel_unfilled_limit_orders, uid, strategy, target_acc, action_name="WEB CLEAN")
+    return {"status": "success", "canceled_count": canceled}
 
 @app.get("/api/bot/inspect")
 def inspect_system_bots(uid: str = "default"):
@@ -3347,31 +3452,20 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
     # Đồng bộ tên quét được từ sàn OKX vào accounts.json của riêng UID này
     updated_accounts = sync_account_name_in_storage(owner_uid, target_acc, detected_name, api_label=label, is_main=is_main, okx_uid=api_uid)
 
-    data_dir = get_user_data_dir(owner_uid)
-    running_acc_file = os.path.join(data_dir, f"bots/{strategy}", f".running_account_{strategy}")
-    if os.path.exists(running_acc_file):
-        with open(running_acc_file, "r") as f:
-            current_running = f.read().strip()
-        if current_running == target_acc:
-            # Người dùng đổi API key của chính tài khoản đang chạy -> KILL bot để nạp lại
-            proc = get_nested(bot_processes, owner_uid, strategy)
-            pid = get_running_pid(owner_uid, strategy)
-            if proc or pid > 0:
-                if proc:
-                    try:
-                        import psutil
-                        parent = psutil.Process(proc.pid)
-                        for child in parent.children(recursive=True): child.kill()
-                        parent.kill()
-                    except: proc.kill()
-                elif pid > 0:
-                    try:
-                        import psutil
-                        parent = psutil.Process(pid)
-                        for child in parent.children(recursive=True): child.kill()
-                        parent.kill()
-                    except: pass
-                del_nested(bot_processes, owner_uid, strategy)
+    # 🔒 KIỂM TRA ĐỒNG BỘ BOT ĐANG CHẠY (MULTI-DEVICE SYNC)
+    # TUYỆT ĐỐI KHÔNG KILL BOT KHI MÁY B KẾT NỐI API CỦA TÀI KHOẢN ĐANG CHẠY Ở MÁY A
+    is_running_strat = None
+    running_pid_val = 0
+    for st in ["sub1", "sub2", "sub3"]:
+        s_pid = get_running_pid(owner_uid, st, target_acc)
+        s_proc = get_nested(bot_processes, owner_uid, f"{st}_{target_acc}") or get_nested(bot_processes, owner_uid, st)
+        if s_pid > 0 or (s_proc and s_proc.poll() is None):
+            is_running_strat = st
+            running_pid_val = s_pid or (s_proc.pid if s_proc else 0)
+            break
+
+    if is_running_strat:
+        print(f"🔒 [MULTI-DEVICE SYNC] Tài khoản [{target_acc}] đang chạy {is_running_strat} (PID={running_pid_val}). BẢO VỆ TIẾN TRÌNH BOT, đồng bộ phiên cho thiết bị mới!", flush=True)
 
     # ── AUTO RESET VỐN GỐC KHI LẦN ĐẦU LƯU API KEY CHO TÀI KHOẢN MỚI ──
     primary_data_dir = get_user_data_dir(owner_uid)
@@ -3454,8 +3548,12 @@ def update_bot_credentials(req: CredentialsUpdate, uid: str, strategy: str = "su
         "detected_uid": owner_uid,
         "detected_name": detected_name,
         "is_main": is_main,
+        "account_id": target_acc,
         "accounts": updated_accounts,
         "auto_capital_init": auto_reset_equity,
+        "is_running": bool(is_running_strat),
+        "running_strategy": is_running_strat or "",
+        "running_account": target_acc if is_running_strat else "",
     }
 
 OKX_CT_VAL_CACHE = {}  # Runtime cache — fetch từ OKX API lần đầu
@@ -3568,6 +3666,33 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
                     pending_fetched = True
             except Exception:
                 pass
+
+        # 🔒 TỰ ĐỘNG QUÉT & HỦY TOÀN BỘ LỆNH LIMIT NẾU BOT ĐANG Ở TRẠNG THÁI DỪNG (GIAO DIỆN HIỆN "CHẠY BOT")
+        is_bot_running_on_acc = (
+            get_running_pid(uid, "sub1", target_acc) > 0 or
+            get_running_pid(uid, "sub2", target_acc) > 0 or
+            get_running_pid(uid, "sub3", target_acc) > 0 or
+            get_running_pid(uid, strategy, target_acc) > 0
+        )
+        # 🌐 KIỂM TRA ĐỒNG BỘ ĐA THIẾT BỊ: Nhận diện bot đang chạy từ Máy A qua dấu vân tay clOrdId
+        if not is_bot_running_on_acc and raw_pending_orders:
+            remote_strat = _detect_remote_bot_strategy(raw_pending_orders)
+            if remote_strat:
+                is_bot_running_on_acc = True
+                _okx_remote_active_accounts[f"{remote_strat}_{target_acc}"] = target_acc
+                _okx_remote_active_accounts[target_acc] = remote_strat
+                _okx_remote_active_accounts[remote_strat] = target_acc
+        if not is_bot_running_on_acc and raw_pending_orders:
+            # Lọc các lệnh Limit mở vị thế chưa khớp (TUYỆT ĐỐI không hủy lệnh reduceOnly đóng vị thế)
+            entry_limits = [
+                o for o in raw_pending_orders
+                if str(o.get("ordType", "")).lower() in ("limit", "post_only", "fok", "ioc")
+                and str(o.get("reduceOnly", "")).lower() not in ("true", "1")
+            ]
+            if entry_limits:
+                print(f"🧹 [AUTO CLEAN - BOT STOPPED] Phát hiện {len(entry_limits)} lệnh Limit tồn đọng trên OKX cho {target_acc} khi bot đang dừng. Tự động xóa sạch!", flush=True)
+                _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="AUTO CLEAN STOPPED")
+                raw_pending_orders = [o for o in raw_pending_orders if o not in entry_limits]
 
         # Chống giật lag: Nếu lỗi kết nối tạm thời / rate-limit 50011, tái sử dụng dữ liệu từ cache
         if not pending_fetched and cached_entry:

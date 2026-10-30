@@ -33,6 +33,36 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Đồng Bộ Hóa Đa Thiết Bị (Máy A & Máy B) Khi Đăng Nhập API Key / Fast API (No-Kill Policy & OKX Order Fingerprint):
+  - **Yêu cầu nghiệp vụ từ CEO:** Khi khởi động bot ở Máy A, sang Máy B đăng nhập bằng API Key hoặc Fast API (OAuth) thì Máy B phải nhận diện được tài khoản đang chạy bot ở Máy A, tự động chuyển đúng tab bot, khóa vàng 🔒 và hiển thị nút đỏ `[ ⏹ DỪNG BOT ]`.
+  - **Bản vá kiến trúc (`main.py` & `App.jsx`):**
+    1. **Chấm dứt lỗi Kill Bot nhầm khi Máy B kết nối (`update_bot_credentials`):** Xóa bỏ đoạn mã kill bot ở dòng 3380. Khi Máy B kết nối, hệ thống bảo lưu 100% tiến trình bot đang chạy của Máy A, kiểm tra trạng thái và trả về `is_running: True`, `running_strategy`, `running_account`.
+    2. **Đồng bộ hóa tức thì trên Fast Connect (`okx_oauth_callback`):** Khi Máy B cấp quyền OAuth, backend kiểm tra ngay xem tài khoản phụ đó có đang chạy bot nào không và trả cờ `is_running: True` về cho trình duyệt.
+    3. **Nhận diện qua Dấu vân tay lệnh OKX (`_detect_remote_bot_strategy`):** Nếu 2 máy chạy 2 backend riêng, hệ thống tự động quét các lệnh chờ (`orders-pending`) trên sàn OKX qua `clOrdId` (`SCVLMT`, `EM15` -> sub1; `OB_`, `TLS1_OB` -> sub2; `LIQ_` -> sub3) để nhận diện bot chạy từ xa và phản ánh trạng thái `RUNNING` lên giao diện Máy B.
+    4. **Frontend Reactive Takeover (`App.jsx`):** Khi nhận được phản hồi `is_running: True` lúc lưu API Key hoặc Fast Connect, web tự động chuyển sang tab bot đang chạy, kích hoạt `setOverrideBotRunning(true)` và hiển thị nút `[ ⏹ DỪNG BOT ]`.
+    5. **Kiểm thử Sandbox:** Đã vượt qua 100% 3 bộ kiểm thử Sandbox giả lập tiến trình ngầm và nhận diện lệnh OKX.
+
+- **[30/10/2026]** - Tự Động Quét & Xóa Toàn Bộ Lệnh Limit Trên Sàn OKX Khi Bot Ở Trạng Thái Dừng (Giao Diện Hiện Chữ "CHẠY BOT"):
+  - **Vấn đề phát sinh từ giao diện người dùng:** Khi bot đang ở trạng thái Dừng (giao diện hiện chữ "CHẠY BOT"), trên sàn OKX vẫn còn sót các lệnh limit chờ khớp từ phiên giao dịch cũ (ví dụ 10 lệnh limit XAU/BTC) gây tốn ký quỹ và xung đột khi bật bot mới.
+  - **Bản vá kiến trúc (`main.py` & `App.jsx`):**
+    1. **Tầng Backend (`get_bot_positions` & `_cancel_unfilled_limit_orders`):** Khi WebSocket stream vị thế mỗi 2s, nếu kiểm tra tài khoản không có bot nào chạy (`!is_bot_running_on_acc`) và còn lệnh limit mở vị thế (`ordType in ("limit", "post_only", "fok", "ioc") and not is_reduce`), hệ thống chủ động gọi `_cancel_unfilled_limit_orders` hủy sạch trên sàn OKX và loại bỏ khỏi kết quả trả về.
+    2. **Tầng REST API (`POST /api/bot/clean_limits`):** Cung cấp endpoint độc lập để dọn dẹp sạch sẽ limit unexecuted trên sàn OKX.
+    3. **Tầng Frontend Watcher (`App.jsx`):** Bổ sung useEffect tự động quét liên tục: nếu giao diện ở trạng thái Dừng (`!isOkxRunning`) và phát hiện có lệnh limit trong danh sách vị thế, web tự động gọi API `clean_limits`, xóa sạch limit hiển thị trên UI và ghi nhật ký hệ thống.
+    4. **Bảo toàn vị thế:** Chỉ xóa lệnh mở vị thế chưa khớp, bảo lưu 100% các vị thế đang mở và lệnh điều kiện TP/SL.
+
+
+- **[30/10/2026]** - Tự Động Khóa Và Chuyển Sang Tab Bot Đang Chạy Khi F5 Hoặc Đổi Tài Khoản (Bảo Vệ Khóa Cứng 1 Bot / 1 Tài Khoản):
+  - **Vấn đề phát sinh từ giao diện người dùng:**
+    - Khi F5 làm mới trang web hoặc chọn tài khoản, giao diện có thể rơi vào tab bot chưa chạy (ví dụ tài khoản #3787 đang chạy EMA200 Bot nhưng mở trang lại hiển thị tab SMC Bot chưa chạy với nút xanh "CHẠY BOT").
+    - Dẫn đến nhầm lẫn cho CEO tưởng bot chưa chạy nên bấm "CHẠY BOT", gây xung đột chạy 2 bot trên 1 tài khoản (sai logic tài khoản).
+  - **Bản vá kiến trúc (`App.jsx`):**
+    1. **Khởi tạo trực tiếp từ Cache (`useState activeBotTab`):** Khi load trang, hàm khởi tạo kiểm tra ngay `getRunningStrategyForAccount` từ `tls1_active_accounts` và `tls1_selected_account` trong localStorage. Nếu tài khoản đang chạy bot nào, tự động gán thẳng `activeBotTab` về bot đó (có khóa vàng 🔒 và nút đỏ "DỪNG BOT") ngay ở render đầu tiên.
+    2. **Đồng bộ hóa tức thời khi Bootstrap F5 (`bootstrap()`):** Sau khi truy vấn `/api/bot/status` trả về `active_accounts` từ server, tự động kích hoạt `setActiveBotTab(runningStrat)` và ghi nhớ vào localStorage.
+    3. **Tự động chuyển tab khi đổi tài khoản (`handleAssignAccountToActiveBot`):** Khi CEO chọn tài khoản khác từ dropdown Header, nếu tài khoản đó đang có bot chạy, web tự động chuyển sang tab bot đang chạy của tài khoản đó. Nếu không có bot chạy, giữ tab tự do hoặc phục hồi cấu hình đã lưu.
+    4. **Hiệu ứng Reactive bảo vệ 24/7 (`useEffect`):** Bắt sự kiện WebSocket cập nhật danh sách bot chạy (`mergedActiveAccounts`). Bất cứ khi nào tài khoản đang chọn có bot chạy trên server, tab bot luôn được cố định ở bot đó, ngăn chặn việc rơi vào tab chưa chạy.
+    5. **Chặn thao tác chuyển tab khi bot đang chạy (`handleSelectBotTab`):** Khi bot đang chạy, dropdown bị khóa cứng (`disabled`); nếu cố tình chuyển tab sẽ hiển thị cảnh báo yêu cầu dừng bot trước để bảo vệ an toàn vốn.
+
+
 - **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Hiện Tượng Chồng Đè Chỉ Báo Long/Short, Dãn Cách Xa Giá Hiện Tại & Cách Đều 3 Nến Tuyệt Đối:
   - **Vấn đề phát sinh từ giao diện người dùng:**
     - Trên các khung thời gian (5m, 15m, 1H...), các hộp chỉ báo vị thế Long/Short (Risk/Reward box) bị dính chặt vào nến hiện tại hoặc vẽ đè lên các cây nến lịch sử trong quá khứ.
@@ -6368,3 +6398,59 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
     - Khôi phục font monospace chuẩn (`ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`), nền đen sâu `#0d0d0d`, màu chữ `#c8c8c8` và khoảng cách dòng gốc.
     - Giữ các nhánh cây ASCII (`├──`, `└──`) và bảng thống kê dòng thẳng hàng tắp chuẩn 100% như bản cũ.
 - **Trạng thái:** ✅ Đã hoàn tất và build frontend thành công.
+
+
+### [TASK-2026-10-30-06] Tự Động Xóa Sạch Lệnh Limit Trên Sàn OKX Khi Bot Ở Trạng Thái Dừng (Hiển Thị [▶ CHẠY BOT])
+- **Yêu cầu CEO:** Khi bot đang ở trạng thái không chạy (giao diện hiện chữ CHẠY BOT) thì tuyệt đối không được có limit lệnh nào trên sàn OKX. Phải tự động xóa sạch toàn bộ limit đi để reset chuẩn bị cho lệnh mới; liên tục check xem giao diện đang ở chữ Chạy bot hay Dừng bot để chủ động xóa limit.
+- **Triển khai:**
+  - `web_app/backend/main.py`:
+    - Nâng cấp `_cancel_unfilled_limit_orders`: Hủy toàn bộ lệnh limit chờ mở vị thế trên tất cả các cặp coin, có cơ chế fallback hủy từng lệnh nếu batch-cancel bị lỗi.
+    - Trong `get_bot_positions`: Tự động kiểm tra nếu `not is_bot_running_on_acc`, chủ động gửi lệnh hủy sạch các limit orders trên OKX và loại bỏ khỏi bảng trả về.
+    - Thêm REST API `POST /api/bot/clean_limits` để hỗ trợ frontend dọn dẹp tức thì.
+  - `web_app/frontend/src/App.jsx`:
+    - Thêm watcher `useEffect` tự động giám sát trạng thái `!isOkxRunning`: Nếu phát hiện còn sót lệnh limit (`limitOrdersList.length > 0`), tự động gọi `POST /api/bot/clean_limits` và xóa khỏi state bảng vị thế, ghi log hệ thống.
+- **Trạng thái:** ✅ Đã hoàn tất và kiểm chứng thành công.
+
+
+### [TASK-2026-10-30-07] Đồng Bộ Trạng Thái Bot Đa Thiết Bị (Máy A & Máy B)
+- **Yêu cầu CEO:** Khi tài khoản đang chạy bot ở Máy A, sang Máy B đăng nhập bằng API Key hoặc Fast API thì web ở Máy B vẫn nhận diện được tài khoản đó đang chạy bot, tự động khóa tab (ổ khóa vàng 🔒) và hiển thị nút [⏹ DỪNG BOT] (bot đang chạy ở Máy B luôn để đồng bộ 2 máy).
+- **Triển khai:**
+  - `web_app/backend/main.py`:
+    - Loại bỏ lệnh ngắt tiến trình sai lầm ở `update_bot_credentials` (dòng 3380 cũ), bảo toàn 100% tiến trình bot đang chạy và trả về `is_running: True`, `running_strategy`, `running_account`.
+    - Bổ sung cơ chế quét đơn hàng trực tiếp trên OKX `_detect_remote_bot_strategy` dựa vào tag đơn `clOrdId` (`SCVLMT`, `EM15` -> sub1; `OB_`, `TLS1_OB` -> sub2; `LIQ_` -> sub3) để nhận diện bot chạy từ thiết bị khác.
+    - Cập nhật `get_bot_status` trả về trạng thái `RUNNING` với `dry_run: False` cho tài khoản điều khiển từ xa.
+  - `web_app/frontend/src/App.jsx`:
+    - Khi nhận `data.is_running === true` sau khi lưu API Key hoặc Fast Connect, tự động chuyển `activeBotTab` sang chiến thuật đang chạy, khóa tab và hiển thị nút đỏ `[⏹ DỪNG BOT]`.
+- **Trạng thái:** ✅ Đã hoàn tất 100% sandbox backtest.
+
+
+### [TASK-2026-10-30-08] Tích Hợp OKX Affiliate API v5: Xác Thực Link Ref & Volume 14 Ngày >= 20,000 USDT
+- **Yêu cầu CEO:** Thay thế cơ chế check ref Google Sheets thủ công bằng kiểm tra tự động trực tiếp qua OKX Affiliate API v5 với API Key quyền đọc (`AutoTrader_Check_Volume`). Kiểm tra tự động 2 điều kiện: (1) Đăng ký dưới link Ref của AutoTrader.fun, (2) Volume giao dịch trong 14 ngày gần nhất phải đạt tối thiểu 20,000 USDT trước khi cho phép kích hoạt bot. Giữ cơ chế fallback sang Google Sheets để đảm bảo Zero-Downtime trong giai đoạn thử nghiệm.
+- **Thông tin API Key Ref của CEO:**
+  - Tên API: `AutoTrader_Check_Volume` (hoặc `AutoTrader_Checker`)
+  - API Key: `f8356797-a6d7-470e-8002-f715f29a229e`
+  - Secret Key: `DEC67AB700D4E779662894D8530C611F`
+  - Passphrase: `Autotrader_check_volume2026`
+  - Master UID: `523019992975987626`
+- **Triển khai:**
+  - Tạo mới module `web_app/backend/affiliate_service.py`:
+    - Ký danh tính HMAC-SHA256 chuẩn OKX API v5 với quyền đọc Affiliate.
+    - Gọi endpoint `GET /api/v5/affiliate/invitee/detail?uid={uid}&periodType=last_30d` và `last_7d`.
+    - Nhận diện chính xác mã lỗi `51621` ("The user isn't your invitee") để từ chối các UID không thuộc Ref.
+    - Tính toán chính xác Volume 14 ngày gần nhất dựa trên `joinTime` và lịch sử snapshot (`affiliate_volume_snapshots.json`).
+    - Tính toán khối lượng còn thiếu (`missing_volume`) và xuất thông báo tiếng Việt trực quan cho khách hàng: `Tài khoản UID {uid} chưa đạt điều kiện Volume 14 ngày (Hiện tại: X USDT / Yêu cầu: 20,000 USDT). Vui lòng giao dịch thêm Y USDT để kích hoạt bot!`.
+    - Cấp quyền tuyệt đối không điều kiện cho Admin (`admtls12021`) và CEO Master UID (`523019992975987626`).
+    - Bộ nhớ đệm TTL 300s bảo vệ chống Rate Limit OKX (3 req/s).
+  - Cập nhật `web_app/backend/main.py`:
+    - Tích hợp `check_uid_affiliate_and_volume` vào hàm trung tâm `check_uid_active_ref`: Ưu tiên kiểm tra OKX Affiliate API trước, fallback sang Google Sheets nếu Affiliate API gặp sự cố mạng (Zero Downtime).
+    - Thêm REST API `GET /api/affiliate/check?uid={uid}` để tra cứu trạng thái và thống kê Volume chi tiết.
+    - Cập nhật `start_bot`: Chặn khởi động bot ngay lập tức với HTTP 403 nếu tài khoản không đủ điều kiện Ref hoặc thiếu Volume.
+  - Cập nhật `web_app/frontend/src/App.jsx`:
+    - Hiển thị thanh cảnh báo đỏ nổi bật trên đầu trang khi UID chưa đủ điều kiện Volume hoặc chưa thuộc Ref.
+- **Kiểm thử Sandbox Backtest:**
+  - Test 1 (UID `900679364449466256` có 28,542$ Volume): PASS -> Phê duyệt `ACTIVE` 🟢.
+  - Test 2 (UID `900647202782283517` có 0$ Volume): PASS -> Chặn khởi động và báo thiếu 20,000$ Volume 🔴.
+  - Test 3 (UID `12345678999999` không thuộc Ref): PASS -> Chặn khởi động và báo chưa đăng ký Ref 🔴.
+  - Test 4 (Admin & CEO Master UID `523019992975987626`): PASS -> Bypass cấp quyền đầy đủ 🟢.
+  - Test 5 (REST API `/api/affiliate/check`): PASS -> Phản hồi dữ liệu JSON chuẩn xác 🟢.
+- **Trạng thái:** ✅ Đã hoàn tất 100% và nghiệm thu sandbox.
