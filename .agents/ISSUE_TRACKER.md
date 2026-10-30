@@ -33,6 +33,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Hiện Tượng Chồng Đè Chỉ Báo Long/Short, Dãn Cách Xa Giá Hiện Tại & Cách Đều 3 Nến Tuyệt Đối:
+  - **Vấn đề phát sinh từ giao diện người dùng:**
+    - Trên các khung thời gian (5m, 15m, 1H...), các hộp chỉ báo vị thế Long/Short (Risk/Reward box) bị dính chặt vào nến hiện tại hoặc vẽ đè lên các cây nến lịch sử trong quá khứ.
+    - Khi có nhiều khối OB hợp lệ, các hộp nằm sát nhau hoặc đè lên nhau gây rối mắt, cản trở tầm nhìn biểu đồ nến và đường giá Live.
+  - **Bản vá kiến trúc (`SingleChartPane.jsx`):**
+    1. **Loại bỏ hộp lịch sử che nến:** Bỏ cơ chế vẽ hộp backtest cũ trong quá khứ (`hitEntryIdx`) vốn kéo dài dải màu đè lên hàng chục nến đang chạy.
+    2. **Dãn cách xa giá hiện tại (`INITIAL_GAP = 3`):** Hộp setup đầu tiên (gần giá Live nhất) luôn bắt đầu cách cây nến hiện tại đúng 3 cây nến về phía tương lai, giữ vùng nến Live và đường giá hiện tại hoàn toàn thông thoáng, sạch sẽ.
+    3. **Cách đều 3 nến giữa mọi chỉ báo (`BOX_GAP = 3`, `BOX_WIDTH = 8`):** Mỗi hộp setup rộng 8 nến, giữa 2 hộp liền kề luôn có khoảng đệm đúng 3 cây nến: `offsetBars = 3 + index * 11`.
+    4. **Không chồng đè dù có 5 - 10 chỉ báo:** Mọi khối OB hợp lệ (lên tới 10 setup) được sắp xếp tuần tự theo mức độ ưu tiên từ gần giá nhất đến xa dần, trải đều thành bậc thang tương lai cách nhau đúng 3 nến, triệt tiêu 100% hiện tượng chồng đè.
+    5. **Mở rộng vùng đệm biên phải (`rightOffset = 28`):** Chart tự động chừa 28 nến khoảng trống tương lai để hiển thị trọn vẹn và thoáng đãng các hộp chỉ báo.
+
 - **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Lỗi Spam 50+ Lệnh Chờ Khớp TP/SL & Chấm Dứt Vòng Lặp Xóa/Rải Limit Vô Tận:
   - **Nguyên nhân cốt lõi khiến lệnh chờ khớp trên sàn OKX tăng vọt lên 51 - 70 lệnh:**
     1. **Lỗi cú pháp `Decimal("")` trong kiểm tra TP/SL (`apply_ob_tpsl`):**
@@ -5473,6 +5484,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Hiện Tượng Chồng Đè Chỉ Báo Long/Short, Dãn Cách Xa Giá Hiện Tại & Cách Đều 3 Nến Tuyệt Đối:
+  - **Vấn đề phát sinh từ giao diện người dùng:**
+    - Trên các khung thời gian (5m, 15m, 1H...), các hộp chỉ báo vị thế Long/Short (Risk/Reward box) bị dính chặt vào nến hiện tại hoặc vẽ đè lên các cây nến lịch sử trong quá khứ.
+    - Khi có nhiều khối OB hợp lệ, các hộp nằm sát nhau hoặc đè lên nhau gây rối mắt, cản trở tầm nhìn biểu đồ nến và đường giá Live.
+  - **Bản vá kiến trúc (`SingleChartPane.jsx`):**
+    1. **Loại bỏ hộp lịch sử che nến:** Bỏ cơ chế vẽ hộp backtest cũ trong quá khứ (`hitEntryIdx`) vốn kéo dài dải màu đè lên hàng chục nến đang chạy.
+    2. **Dãn cách xa giá hiện tại (`INITIAL_GAP = 3`):** Hộp setup đầu tiên (gần giá Live nhất) luôn bắt đầu cách cây nến hiện tại đúng 3 cây nến về phía tương lai, giữ vùng nến Live và đường giá hiện tại hoàn toàn thông thoáng, sạch sẽ.
+    3. **Cách đều 3 nến giữa mọi chỉ báo (`BOX_GAP = 3`, `BOX_WIDTH = 8`):** Mỗi hộp setup rộng 8 nến, giữa 2 hộp liền kề luôn có khoảng đệm đúng 3 cây nến: `offsetBars = 3 + index * 11`.
+    4. **Không chồng đè dù có 5 - 10 chỉ báo:** Mọi khối OB hợp lệ (lên tới 10 setup) được sắp xếp tuần tự theo mức độ ưu tiên từ gần giá nhất đến xa dần, trải đều thành bậc thang tương lai cách nhau đúng 3 nến, triệt tiêu 100% hiện tượng chồng đè.
+    5. **Mở rộng vùng đệm biên phải (`rightOffset = 28`):** Chart tự động chừa 28 nến khoảng trống tương lai để hiển thị trọn vẹn và thoáng đãng các hộp chỉ báo.
 
 - **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Lỗi Spam 50+ Lệnh Chờ Khớp TP/SL & Chấm Dứt Vòng Lặp Xóa/Rải Limit Vô Tận:
   - **Nguyên nhân cốt lõi khiến lệnh chờ khớp trên sàn OKX tăng vọt lên 51 - 70 lệnh:**
