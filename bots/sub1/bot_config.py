@@ -36,7 +36,7 @@ LIMIT_CANDLES = "900"
 POSITION_VOLUME_HIGH_CONFIDENCE = Decimal("1.0")   # Vốn Base Volume cố định dùng cho toàn bộ lệnh Limit (Mặc định 1.0$)
 USE_DYNAMIC_RISK = False                           # (ĐÃ TẮT BỞI USER) Bật/tắt vào lệnh theo % vốn (Dynamic Risk)
 DYNAMIC_RISK_PCT = Decimal("0.001")                # Tỷ lệ % vốn vào lệnh (0.001 = 0.1%)
-ENABLE_TF_VOLUME_MULTIPLIER = False                # Bật: Nhân ký quỹ theo TF (Hệ số Ký Quỹ). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: TẮT)
+ENABLE_TF_VOLUME_MULTIPLIER = False                # Bật: Nhân ký quỹ theo TF (Hệ số nhân Ký Quỹ (Vốn)). Tắt: Cố định ký quỹ ban đầu cho mọi TF. (Mặc định: TẮT)
 
 
 # ==============================================================================
@@ -67,7 +67,7 @@ ENABLE_PARTIAL_LOCK_SL = True                      # Kéo SL tự động: 1/3 T
 # 4. HỆ SỐ NHÂN (MULTIPLIERS) CHO CÁC KHUNG THỜI GIAN
 # ==============================================================================
 def tf_weight(tf: str) -> int:
-    return {"M5": 1, "M15": 2, "M30": 3, "H1": 4, "H2": 5, "H4": 6}.get(tf, 0)
+    return {"M5": 1, "M15": 2, "M30": 3, "H1": 4, "H2": 5, "H4": 6, "D1": 7}.get(tf, 0)
 
 # --- CẤU TRÚC ĐA KHUNG TẬP TRUNG (UNIFIED TF PROFILES) ---
 TF_CONFIG = {
@@ -77,6 +77,7 @@ TF_CONFIG = {
     "H1":  {"offset": Decimal("3.333"),  "vol": Decimal("2.0")},
     "H2":  {"offset": Decimal("4.667"),  "vol": Decimal("3.0")},
     "H4":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
+    "D1":  {"offset": Decimal("10.0"),   "vol": Decimal("8.0")},
 }
 
 HEDGE_TF_CONFIG = {

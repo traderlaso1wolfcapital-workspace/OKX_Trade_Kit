@@ -20,7 +20,13 @@ export default function LogsTerminal({
   accountBalance = null,
   runningAccId = null,
   accounts = [],
+  propAccounts = [],
+  activePropId = "",
+  risk = null,
+  strat = null,
 }) {
+  const [copied, setCopied] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   // Dual-mode: nếu App.jsx truyền logs prop sẵn → render từ nó (App tự quản lý WS)
   // Nếu truyền activeBotTab + isAuthenticated → tự kết nối WS riêng
   const isSelfManaged = !externalLogs && !okxLogs && !propLogs && isAuthenticated && activeBotTab;
@@ -285,6 +291,56 @@ export default function LogsTerminal({
   // Phân rã dữ liệu: Bảng Dashboard cố định ở trên + Dải Event Logs ở dưới
   const { dashboardLines, eventLogs } = React.useMemo(() => {
     if (currentPlatform === "e8") {
+      if (!isPropRunning) {
+        let totalEq = 0;
+        let baseCap = 0;
+        if (propAccounts && propAccounts.length > 0) {
+          const currentPropAcc = propAccounts.find(a => String(a.id) === String(activePropId) || a.is_active) || propAccounts[0];
+          if (currentPropAcc) {
+            totalEq = Number(currentPropAcc.balance ?? currentPropAcc.equity ?? currentPropAcc.fund_size ?? 5000);
+            baseCap = Number(currentPropAcc.fund_size ?? currentPropAcc.initial_balance ?? totalEq);
+          }
+        }
+        if (totalEq <= 0) {
+          const currentAccObj = (accounts || []).find(a => a.id === selectedAccount || a.name === selectedAccount);
+          totalEq = Number(accountBalance?.totalEq ?? accountBalance?.availBal ?? accountBalance?.balance ?? currentAccObj?.balance ?? 5000);
+          baseCap = totalEq;
+        }
+        let totalPnl = 0;
+        if (Array.isArray(positions)) {
+          totalPnl = positions
+            .filter(p => !p.is_child && !Boolean(p.is_limit))
+            .reduce((sum, p) => sum + Number(p.upl || p.pnl || 0), 0);
+        }
+        const pnlSign = totalPnl >= 0 ? "+" : "";
+        const pnlStr = `${pnlSign}${totalPnl.toFixed(2)}`;
+        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour12: false });
+        const dbar = "=".repeat(78);
+        const bar = "-".repeat(78);
+        const botTitle = (activeBotTab === "sub2") ? "SMC Order Block" : (activeBotTab === "sub3" ? "Liquidation Bot" : "Quỹ FX TradeLocker");
+        const r0 = ` ⚡ ${botTitle.padEnd(18)}|   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  `;
+        if (baseCap <= 0) baseCap = (totalEq - totalPnl) > 0 ? (totalEq - totalPnl) : totalEq;
+        const gocStr = totalEq > 0 ? ` Gốc: ${baseCap.toFixed(2).padStart(8)} $ ` : ` Gốc:       -- $ `;
+        const tongStr = totalEq > 0 ? ` Tổng: ${totalEq.toFixed(2).padStart(8)} $ ` : ` Tổng:       -- $ `;
+        const r1_c1 = `   ${nowStr.padStart(11).padEnd(15)}   `;
+        const r1_c2 = gocStr;
+        const r1_c3 = tongStr;
+        const r1_c4 = " Win: 100.0% / 0";
+        const r1 = `${r1_c1.padEnd(21)}|${r1_c2.padEnd(19)}|${r1_c3.padEnd(19)}|${r1_c4.padEnd(16)}`;
+        const r2_c1 = "  Mode: Quỹ E8       ";
+        const r2_c2 = ` PNL: ${pnlStr.padStart(8)} $ `;
+        const savedLot = localStorage.getItem("tls1_e8_lot");
+        const curLot = (savedLot && !isNaN(Number(savedLot))) ? Number(savedLot) : 0.01;
+        const volStr = `${curLot.toFixed(2)} L`;
+        const r2_c3 = ` Vol : ${volStr.padStart(8)} `;
+        const r2_c4 = " M/M: -- / --   ";
+        const r2 = `${r2_c1.padEnd(21)}|${r2_c2.padEnd(19)}|${r2_c3.padEnd(19)}|${r2_c4.padEnd(16)}`;
+
+        return {
+          dashboardLines: [dbar, r0, bar, r1, r2, dbar],
+          eventLogs: []
+        };
+      }
       const propHeader = Array.isArray(propLogs?.dashboardLines) ? propLogs.dashboardLines : [];
       const okxDashboard = Array.isArray(okxLogs?.dashboardLines) ? okxLogs.dashboardLines : [];
 
@@ -385,8 +441,10 @@ export default function LogsTerminal({
       )
     );
 
-    if (!isCurrentAccountRunning && selectedAccount) {
-      const totalEq = Number(accountBalance?.totalEq ?? accountBalance?.availBal ?? accountBalance?.balance ?? 0);
+    if (!isCurrentAccountRunning) {
+      const currentAccObj = (accounts || []).find(a => a.id === selectedAccount || a.name === selectedAccount);
+      const accBalVal = accountBalance?.totalEq ?? accountBalance?.availBal ?? accountBalance?.balance ?? currentAccObj?.balance ?? currentAccObj?.totalEq ?? 0;
+      const totalEq = Number(accBalVal) || 0;
       let totalPnl = 0;
       if (Array.isArray(positions)) {
         totalPnl = positions
@@ -399,90 +457,57 @@ export default function LogsTerminal({
 
       const dbar = "=".repeat(78);
       const bar = "-".repeat(78);
-      const r0 = " ⚡ Thợ săn EMA200  |   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  ";
-      const r1_c1 = `   ${nowStr.padStart(9).padEnd(15)}   `;
+      const botTitle = (activeBotTab === "sub2")
+        ? "SMC Order Block"
+        : (activeBotTab === "sub3" ? "Sub3 Bot" : "Thợ săn EMA200");
+      const r0 = ` ⚡ ${botTitle.padEnd(18)}|   💰 Lợi nhuận    |   🏦 Tài khoản    |  🎯 Hiệu suất  `;
+
       const baseCap = (totalEq - totalPnl) > 0 ? (totalEq - totalPnl) : totalEq;
-      const r1_c2 = ` Gốc: ${baseCap.toFixed(2).padStart(8)} $ `;
-      const r1_c3 = ` Tổng: ${totalEq.toFixed(2).padStart(8)} $ `;
-      const r1_c4 = ` Win: 100.0% / 0  `;
+      const gocStr = totalEq > 0 ? ` Gốc: ${baseCap.toFixed(2).padStart(8)} $ ` : ` Gốc:       -- $ `;
+      const tongStr = totalEq > 0 ? ` Tổng: ${totalEq.toFixed(2).padStart(8)} $ ` : ` Tổng:       -- $ `;
+      const r1_c1 = `   ${nowStr.padStart(11).padEnd(15)}   `;
+      const r1_c2 = gocStr;
+      const r1_c3 = tongStr;
+      const r1_c4 = " Win: 100.0% / 0";
       const r1 = `${r1_c1.padEnd(21)}|${r1_c2.padEnd(19)}|${r1_c3.padEnd(19)}|${r1_c4.padEnd(16)}`;
 
-      const r2_c1 = " Mode: Độc Lập TF    ";
+      let modeText = "Mode: Độc Lập TF";
+      if (activeBotTab === "sub1") {
+        if (strat?.pyramidDca) modeText = "Mode: DCA Dương";
+        else if (strat?.negativeDca) modeText = "Mode: DCA Âm";
+      } else if (activeBotTab === "sub2") {
+        modeText = "Mode: Độc Lập TF";
+      }
+
+      const r2_c1 = `  ${modeText.padEnd(17)}  `;
       const r2_c2 = ` PNL: ${pnlStr.padStart(8)} $ `;
-      const r2_c3 = ` Vol :     4.0 U `;
+
+      const curVol = (risk && risk.posVol != null && !isNaN(Number(risk.posVol))) ? Number(risk.posVol) : 1.0;
+      const volUnit = (risk && risk.volUnit === "PERCENT") ? "% V" : "U";
+      const volFormatted = (curVol % 1 === 0 ? curVol.toFixed(1) : String(curVol));
+      const volStr = `${volFormatted} ${volUnit}`;
+      const r2_c3 = ` Vol : ${volStr.padStart(8)} `;
       const r2_c4 = " M/M: -- / --   ";
       const r2 = `${r2_c1.padEnd(21)}|${r2_c2.padEnd(19)}|${r2_c3.padEnd(19)}|${r2_c4.padEnd(16)}`;
 
-      const tailoredHeader = [dbar, r0, bar, r1, r2, dbar, "✜ Tình trạng vị thế:"];
-
-      const coins = ["XAU", "BTC", "ETH"];
-      coins.forEach(c => {
-        const matchPos = Array.isArray(positions)
-          ? positions.find(p => (p.instId || p.symbol || "").toUpperCase().includes(c) && !p.is_child && !Boolean(p.is_limit))
-          : null;
-        if (matchPos) {
-          const side = (matchPos.posSide || matchPos.side || "short").toUpperCase();
-          const margin = Number(matchPos.margin || matchPos.initialMargin || 0).toFixed(2);
-          const uplPct = Number(matchPos.uplRatio ? matchPos.uplRatio * 100 : (matchPos.roi || 0)).toFixed(1);
-          const uplPctSign = Number(uplPct) >= 0 ? "+" : "";
-          const entryPx = Number(matchPos.avgPx || matchPos.openPrice || 0).toLocaleString();
-          const markPx = Number(matchPos.markPx || matchPos.last || matchPos.lastPx || entryPx).toLocaleString();
-          const tfStr = matchPos.tf ? ` [${matchPos.tf.split(" ")[0].toLowerCase()}]` : "";
-          tailoredHeader.push(`    ${c} ╭─ Đã khớp ${side}${tfStr} - ký quỹ: ${margin} U (${uplPctSign}${uplPct}%)`);
-          tailoredHeader.push(`        ├─ Entry: ${entryPx} ⭢ Mark: ${markPx}`);
-          tailoredHeader.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
-        } else {
-          tailoredHeader.push(`    ${c} ╭─ Chưa có vị thế`);
-          tailoredHeader.push(`        ╰─ Chưa có lệnh đóng ⭢ Win Streak: 0`);
-        }
-      });
-
-      // Lấy bảng nến đa khung từ snapshot nếu có
-      let tableIndex = -1;
-      for (let i = 0; i < rawDashboard.length; i++) {
-        if (rawDashboard[i].includes("Coin |") || (rawDashboard[i].includes("Coin") && rawDashboard[i].includes("Price"))) {
-          tableIndex = i - 1;
-          break;
-        }
-      }
-      const finalDashboard = (tableIndex !== -1 && tableIndex >= 0)
-        ? [...tailoredHeader, ...rawDashboard.slice(tableIndex)]
-        : [...tailoredHeader, dbar];
-
-      // 🛡️ LỌC TUYỆT ĐỐI EVENT LOGS: Loại bỏ 100% nhật ký lệnh của tài khoản khác
-      const otherAccounts = (accounts || [])
-        .map(a => a?.id || a?.name)
-        .filter(id => id && id !== selectedAccount && id !== String(selectedAccount).replace("#", ""));
-
-      const filteredEvents = rawEvents.filter(line => {
-        if (typeof line !== "string") return false;
-        for (const oId of otherAccounts) {
-          const clean = String(oId).replace("#", "");
-          if (line.includes(`#${clean}`) || line.includes(`[${oId}]`) || line.includes(`ACC:${oId}`)) {
-            return false;
-          }
-        }
-        return true;
-      });
-
-      const currentAccObj = (accounts || []).find(a => a.id === selectedAccount || a.name === selectedAccount);
-      const currentAccLabel = currentAccObj?.name || (String(selectedAccount).startsWith("#") ? selectedAccount : `#${selectedAccount}`);
-
-      const cleanEvents = [...filteredEvents];
-      if (!isOkxRunning) {
-        cleanEvents.unshift(`ℹ️ [HỆ THỐNG] Bot đang DỪNG trên tài khoản ${currentAccLabel}. Bấm [CHẠY BOT] để bắt đầu giao dịch.`);
-      } else if (runningAccId && runningAccId !== selectedAccount) {
-        cleanEvents.unshift(`ℹ️ [HỆ THỐNG] Tài khoản ${currentAccLabel} đang ở trạng thái CHỜ (Bot đang kích hoạt trên tài khoản khác). Bấm [CHẠY BOT] để chuyển bot sang tài khoản này.`);
-      }
-
       return {
-        dashboardLines: finalDashboard,
-        eventLogs: cleanEvents
+        dashboardLines: [dbar, r0, bar, r1, r2, dbar],
+        eventLogs: []
       };
     }
 
     return { dashboardLines: rawDashboard, eventLogs: rawEvents };
-  }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs, selectedAccount, runningAccId, positions, accountBalance, isOkxRunning, accounts]);
+  }, [currentPlatform, propLogs, okxLogs, externalLogs, internalLogs, selectedAccount, runningAccId, positions, accountBalance, isOkxRunning, isPropRunning, accounts, propAccounts, activePropId, activeBotTab, risk, strat]);
+
+  // 🛡️ Lọc sạch đường dẫn AppData trên máy tính cục bộ, tuyệt đối không lộ lên bản Web
+  const cleanEventLogs = React.useMemo(() => {
+    return eventLogs.map(line => {
+      if (typeof line !== "string") return line;
+      return line
+        .replace(/\[[A-Za-z]:\\[^\]]*AppData[^\]]*\\([^\\\]]+)\]/g, "[$1]")
+        .replace(/[A-Za-z]:\\[^\s]+\\AppData[^\s]+\\/g, "");
+    });
+  }, [eventLogs]);
 
   // 🧹 Lọc bỏ dòng đường dẫn file hệ thống cục bộ bot_sub*.py (không cần thiết trên giao diện Web)
   const cleanDashboardLines = React.useMemo(() => {
@@ -510,10 +535,12 @@ export default function LogsTerminal({
   const handleCopy = () => {
     const parts = [];
     if (cleanDashboardLines.length > 0) parts.push(cleanDashboardLines.join("\n"));
-    if (eventLogs.length > 0) parts.push("--- " + t("log_events_title", "NHẬT KÝ SỰ KIỆN TỨC THỜI") + " ---\n" + eventLogs.join("\n"));
-    navigator.clipboard.writeText(parts.join("\n\n")).then(() => {
-      alert(t("log_copied", "Đã sao chép toàn bộ logs vào Clipboard!"));
-    });
+    if (cleanEventLogs.length > 0) parts.push("--- " + t("log_events_title", "NHẬT KÝ SỰ KIỆN TỨC THỜI") + " ---\n" + cleanEventLogs.join("\n"));
+    if (parts.length > 0) {
+      navigator.clipboard.writeText(parts.join("\n\n"));
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
   };
 
   const displayBotName = currentPlatform === "e8"
@@ -522,69 +549,35 @@ export default function LogsTerminal({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
-      {/* Nút Sao chép Logs nổi gọn gàng ở góc trên bên phải, chỉ để icon tinh gọn */}
-      <button
-        type="button"
-        onClick={handleCopy}
-        style={{
-          position: "absolute",
-          top: "8px",
-          right: "12px",
-          zIndex: 10,
-          width: "28px",
-          height: "28px",
-          padding: 0,
-          borderRadius: "5px",
-          background: "rgba(255, 255, 255, 0.08)",
-          backdropFilter: "blur(6px)",
-          border: "1px solid rgba(255, 255, 255, 0.15)",
-          color: "#cbd5e1",
-          fontSize: "13px",
-          cursor: "pointer",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.15s ease",
-          opacity: 0.85,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = "1";
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.16)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = "0.85";
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
-        }}
-        title={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
-        aria-label={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
-      >
-        📋
-      </button>
-
-      {/* Nút Reset Vốn Gốc riêng của từng tài khoản, đặt ngay dưới nút Sao chép */}
+      {/* 1. Nút Reset Vốn Gốc (ở TRÊN, top: 8px) - Kích hoạt ngay lập tức, không hiện popup confirm/alert */}
       {onResetCapital && (
         <button
           type="button"
-          onClick={() => onResetCapital && onResetCapital(selectedAccount)}
+          onClick={() => {
+            setIsResetting(true);
+            if (onResetCapital) onResetCapital(selectedAccount, true);
+            setTimeout(() => setIsResetting(false), 1200);
+          }}
           style={{
             position: "absolute",
-            top: "42px",
+            top: "8px",
             right: "12px",
             zIndex: 10,
             width: "28px",
             height: "28px",
             padding: 0,
             borderRadius: "5px",
-            background: "rgba(34, 197, 94, 0.12)",
+            background: isResetting ? "rgba(34, 197, 94, 0.35)" : "rgba(34, 197, 94, 0.12)",
             backdropFilter: "blur(6px)",
-            border: "1px solid rgba(34, 197, 94, 0.35)",
+            border: isResetting ? "1px solid rgba(34, 197, 94, 0.8)" : "1px solid rgba(34, 197, 94, 0.35)",
             color: "#22c55e",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            transition: "all 0.15s ease",
-            opacity: 0.9,
+            transition: "all 0.2s ease",
+            opacity: 0.35,
+            boxShadow: isResetting ? "0 0 10px rgba(34, 197, 94, 0.5)" : "none",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = "1";
@@ -593,20 +586,59 @@ export default function LogsTerminal({
             e.currentTarget.style.boxShadow = "0 0 10px rgba(34, 197, 94, 0.35)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = "0.9";
-            e.currentTarget.style.background = "rgba(34, 197, 94, 0.12)";
-            e.currentTarget.style.borderColor = "rgba(34, 197, 94, 0.35)";
-            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.opacity = "0.35";
+            e.currentTarget.style.background = isResetting ? "rgba(34, 197, 94, 0.35)" : "rgba(34, 197, 94, 0.12)";
+            e.currentTarget.style.borderColor = isResetting ? "rgba(34, 197, 94, 0.8)" : "rgba(34, 197, 94, 0.35)";
+            e.currentTarget.style.boxShadow = isResetting ? "0 0 10px rgba(34, 197, 94, 0.5)" : "none";
           }}
           title={t("reset_capital_tooltip", "Reset vốn gốc tài khoản này (lấy số dư thực tế làm vốn gốc mới)")}
           aria-label={t("reset_capital_tooltip", "Reset vốn gốc tài khoản này")}
         >
           {/* Icon vòng xoay màu xanh tinh gọn */}
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isResetting ? "rotate(180deg)" : "none", transition: "transform 0.5s ease" }}>
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-1.19" />
           </svg>
         </button>
       )}
+
+      {/* 2. Nút Sao chép Logs (ở DƯỚI, top: 42px) - Kích hoạt ngay lập tức, không hiện popup alert */}
+      <button
+        type="button"
+        onClick={handleCopy}
+        style={{
+          position: "absolute",
+          top: "42px",
+          right: "12px",
+          zIndex: 10,
+          width: "28px",
+          height: "28px",
+          padding: 0,
+          borderRadius: "5px",
+          background: copied ? "rgba(34, 197, 94, 0.25)" : "rgba(255, 255, 255, 0.08)",
+          backdropFilter: "blur(6px)",
+          border: copied ? "1px solid rgba(34, 197, 94, 0.6)" : "1px solid rgba(255, 255, 255, 0.15)",
+          color: copied ? "#22c55e" : "#cbd5e1",
+          fontSize: copied ? "14px" : "13px",
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease",
+          opacity: 0.35,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1";
+          e.currentTarget.style.background = copied ? "rgba(34, 197, 94, 0.3)" : "rgba(255, 255, 255, 0.16)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0.35";
+          e.currentTarget.style.background = copied ? "rgba(34, 197, 94, 0.25)" : "rgba(255, 255, 255, 0.08)";
+        }}
+        title={copied ? "Đã sao chép!" : t("log_copy_tooltip", "Sao chép toàn bộ logs")}
+        aria-label={t("log_copy_tooltip", "Sao chép toàn bộ logs")}
+      >
+        {copied ? "✓" : "📋"}
+      </button>
 
       {/* Vùng hiển thị Logs Terminal */}
       <div
@@ -644,7 +676,7 @@ export default function LogsTerminal({
               Vui lòng kết nối tài khoản (bấm nút <strong>Connect</strong>) và chọn tài khoản trong danh sách để xem bảng trạng thái vị thế và lệnh của Bot.
             </p>
           </div>
-        ) : cleanDashboardLines.length === 0 && eventLogs.length === 0 ? (
+        ) : cleanDashboardLines.length === 0 && cleanEventLogs.length === 0 ? (
           <div style={{ color: "#666", padding: "16px 0", fontStyle: "italic" }}>
             {t("log_waiting", "Đang đợi dữ liệu console từ bot {name}...").replace("{name}", displayBotName)}
           </div>
@@ -680,7 +712,7 @@ export default function LogsTerminal({
             )}
 
             {/* 2. KHU VỰC NHẬT KÝ SỰ KIỆN TỨC THỜI (Ở DƯỚI BẢNG, KHÔNG BAO GIỜ LÀM NHẢY BẢNG) */}
-            {eventLogs.length > 0 && (
+            {cleanEventLogs.length > 0 && (
               <div
                 className="log-events-block"
                 style={{
@@ -706,13 +738,13 @@ export default function LogsTerminal({
                       opacity: 0.9,
                     }}
                   >
-                    <span>{t("log_events_title", "⚡ NHẬT KÝ SỰ KIỆN TỨC THỜI")} ({eventLogs.length})</span>
+                    <span>{t("log_events_title", "⚡ NHẬT KÝ SỰ KIỆN TỨC THỜI")} ({cleanEventLogs.length})</span>
                     <span style={{ fontSize: "10px", color: "#888", fontWeight: "normal" }}>
                       {t("log_events_desc", "(Tin mới nhất ở trên cùng • Không làm nhảy bảng trên)")}
                     </span>
                   </div>
                 )}
-                {eventLogs.map((l, i) => (
+                {cleanEventLogs.map((l, i) => (
                   <div
                     key={i}
                     className="log-line event-log-line"

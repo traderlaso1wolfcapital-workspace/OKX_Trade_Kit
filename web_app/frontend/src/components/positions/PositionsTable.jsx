@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { COIN_LIST } from "../../constants/tradeConfig";
+import { COIN_LIST, BOT_TFS } from "../../constants/tradeConfig";
 import { useTranslation } from "../../i18n";
 
 export default function PositionsTable({
@@ -63,6 +63,7 @@ export default function PositionsTable({
       if (tfUpper === "H1" || tfUpper === "1H") return "H1";
       if (tfUpper === "H2" || tfUpper === "2H") return "H2";
       if (tfUpper === "H4" || tfUpper === "4H") return "H4";
+      if (tfUpper === "D1" || tfUpper === "1D" || tfUpper === "D") return "D1";
     }
 
     // 2. Dự phòng trích xuất từ pos.status hoặc pos.ticket_id
@@ -405,8 +406,8 @@ export default function PositionsTable({
         <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
           {!isChild && (
             <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-              {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
-                const label = tf.replace("M", "");
+              {BOT_TFS.map((tf) => {
+                const label = tf === "D1" ? "D" : tf.replace("M", "");
                 if (isLimit) {
                   const limitTf = getLimitTfKey(pos);
                   const isThisLimitTf = tf === limitTf;
@@ -572,10 +573,10 @@ export default function PositionsTable({
         </td>
         <td style={{ padding: "4px 6px", textAlign: "center", whiteSpace: "nowrap" }}>
           <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-            {["M5", "M15", "M30", "H1", "H2", "H4"].map((tf) => {
+            {BOT_TFS.map((tf) => {
               const coinTfs = (enabledTfs && typeof enabledTfs === "object" && !Array.isArray(enabledTfs)) ? (enabledTfs[coin.value] || []) : [];
               const isOn = coinTfs.includes(tf);
-              const label = tf.replace("M", "");
+              const label = tf === "D1" ? "D" : tf.replace("M", "");
               return (
                 <span
                   key={tf}

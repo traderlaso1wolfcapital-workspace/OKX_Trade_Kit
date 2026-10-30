@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-bot_sub2.py - SMC Order Block Engine
-Port 100% từ chỉ báo TLS1 - SMC OB Auto v2 (PineScript -> Python)
+bot_orders.py - SMC Order Execution Engine
+Hỗ trợ Multi-Timeframe độc lập, gắn tag TF vào clOrdId và đồng bộ TradeLocker
 """
 import os
 import time
@@ -10,55 +10,36 @@ from decimal import Decimal
 from typing import List, Optional, Tuple, Dict
 
 from bots.sub2.bot_models import AssetTracker, Pivot, OrderBlock, TradeSetup, FairValueGap, EqualLevel
+from bots.sub2 import bot_config
 from bots.sub2.bot_config import (
-    # Data & Timeframe
-    TIMEFRAME_BASE, TIMEFRAME_HEDGE, LIMIT_CANDLES, M30_LIMIT_CANDLES,
-    # Volume & Risk
     POSITION_VOLUME_HIGH_CONFIDENCE, LEVERAGE, POSITION_MODE,
     SWING_VOLUME_USDT, SWING_RISK_PCT,
     INTERNAL_VOLUME_USDT, INTERNAL_RISK_PCT, INTERNAL_LEVERAGE,
-    # SMC General
     ACCOUNT_NAME, CL_ORD_PREFIX,
-    # Structure
-    SWING_LENGTH, INTERNAL_LENGTH,
-    SMC_INT_BULL, SMC_INT_BEAR, SMC_SWING_BULL, SMC_SWING_BEAR,
-    SMC_INT_CONF,
-    # Order Blocks
-    SMC_INT_OB, SMC_INT_OB_CNT,
-    SMC_SWING_OB, SMC_SWING_OB_CNT,
-    SMC_OB_FILTER, SMC_OB_MITIG,
-    OB_VOLATILITY_MULT,
-    # EQH/EQL
-    SMC_EQH, SMC_EQH_BARS, SMC_EQH_THR,
-    # FVG
-    SMC_FVG, SMC_FVG_AUTO,
-    # Zones
-    SMC_ZONES,
-    # OB Trade Setup
-    SMC_TRADE, OB_RR_RATIO_TREND, OB_RR_RATIO_INTERNAL, OB_TP_MODE,
-    OB_SOURCE, OB_DIRECTION,
-    OB_MAX_ACTIVE_SETUPS,
+    SMC_INT_OB, SMC_SWING_OB,
+    OB_TP_MODE, OB_MAX_ACTIVE_SETUPS,
+    normalize_tf_to_std
 )
+from bots.sub2.bot_indicators import round_to_tick, BULLISH, BEARISH
 
-BULLISH = 1
-BEARISH = -1
-BULLISH_LEG = 1
-BEARISH_LEG = 0
-
-
-# =============================================================================
-# TECHNICAL INDICATORS
-# =============================================================================
-
-from bots.sub2.bot_indicators import *
+def _safe_dec(val, default=Decimal("0")) -> Decimal:
+    """Chuyển đổi an toàn sang Decimal, triệt tiêu lỗi InvalidOperation khi chuỗi rỗng"""
+    if not val or not str(val).strip():
+        return default
+    try:
+        return Decimal(str(val).strip())
+    except Exception:
+        return default
 
 def clean_ob_orders(client, inst_id: str, cl_prefix: str, side: str = None):
+    """Hủy các lệnh Limit pending của SMC Bot trên sàn OKX (Bảo lưu TP/SL)"""
     try:
         pending = client.request("GET", "/api/v5/trade/orders-pending",
                                  params={"instType": "SWAP", "instId": inst_id}).get("data", [])
         cancel_batch = []
         for o in pending:
-            if cl_prefix in o.get("clOrdId", ""):
+            # Hủy lệnh của bot hoặc lệnh tồn đọng ở chế độ isolated (cô lập) cũ
+            if cl_prefix in o.get("clOrdId", "") or o.get("tdMode") == "isolated":
                 if side is None or o.get("posSide") == side:
                     cancel_batch.append({"instId": inst_id, "ordId": o["ordId"]})
         if cancel_batch:
@@ -68,6 +49,45 @@ def clean_ob_orders(client, inst_id: str, cl_prefix: str, side: str = None):
     except Exception as e:
         print(f"⚠️ [clean_ob_orders]: Lỗi khi hủy lệnh rác {inst_id}: {e}")
 
+def clean_algo_orders(client, inst_id: str, pos_side: str = None, cl_prefix: str = CL_ORD_PREFIX):
+    """Hủy các lệnh algo conditional cũ/trùng lặp của bot trên sàn OKX (dọn dẹp TP/SL rác)"""
+    try:
+        pending_algo = client.request("GET", "/api/v5/trade/orders-algo-pending",
+                                      params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"}).get("data", [])
+        ours_algo = [
+            o for o in pending_algo
+            if cl_prefix in o.get("clOrdId", "") or not o.get("clOrdId")
+        ]
+        if pos_side and pos_side != "net":
+            ours_algo = [o for o in ours_algo if o.get("posSide") == pos_side or o.get("posSide") == "net"]
+        if ours_algo:
+            body_cancel = [{"algoId": o["algoId"], "instId": o["instId"]} for o in ours_algo]
+            for i in range(0, len(body_cancel), 10):
+                chunk = body_cancel[i:i+10]
+                client.request("POST", "/api/v5/trade/cancel-algos", body=chunk)
+                time.sleep(0.1)
+            print(f"🧹 [SMC ALGO CLEANUP] {inst_id}: Đã hủy {len(ours_algo)} lệnh algo TP/SL rác.")
+    except Exception as e:
+        print(f"⚠️ [clean_algo_orders]: Lỗi khi hủy algo orders {inst_id}: {e}")
+
+def clean_ob_orders_by_tf(client, inst_id: str, cl_prefix: str, tf: str):
+    """Hủy các lệnh Limit pending riêng cho 1 Timeframe cụ thể khi TF đó bị bỏ chọn"""
+    try:
+        std_tf = normalize_tf_to_std(tf)
+        pending = client.request("GET", "/api/v5/trade/orders-pending",
+                                 params={"instType": "SWAP", "instId": inst_id}).get("data", [])
+        cancel_batch = []
+        for o in pending:
+            cl_id = o.get("clOrdId", "")
+            if cl_prefix in cl_id and (f"EL{std_tf}" in cl_id or f"ES{std_tf}" in cl_id or f"LMT{std_tf}" in cl_id or f"_{std_tf}_" in cl_id):
+                cancel_batch.append({"instId": inst_id, "ordId": o["ordId"]})
+        if cancel_batch:
+            for i in range(0, len(cancel_batch), 20):
+                client.request("POST", "/api/v5/trade/cancel-batch-orders", body=cancel_batch[i:i+20])
+                time.sleep(0.1)
+            print(f"🧹 [SMC TF CLEANUP] {inst_id}: Đã hủy {len(cancel_batch)} lệnh Limit của TF {tf}")
+    except Exception as e:
+        print(f"⚠️ [clean_ob_orders_by_tf]: Lỗi khi hủy lệnh TF {tf} ({inst_id}): {e}")
 
 # Global counter để tránh trùng clOrdId trong cùng 1 giây
 _ORDER_COUNTER = 0
@@ -107,29 +127,30 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
     else:
         pos_side = "long" if setup.bias == BULLISH else "short"
 
+    # Định danh Timeframe
+    std_tf = normalize_tf_to_std(setup.tf) if setup.tf else "H1"
+
     # 🏆 Đồng bộ lệnh Limit sang Quỹ TradeLocker (E8) nếu có bật
     try:
         tl_sl = float(setup.stop_loss) if setup.stop_loss else None
         tl_tp = float(setup.take_profit) if setup.take_profit else None
         tl_px = float(setup.entry_price) if setup.entry_price else 0.0
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=tl_px, sl_price=tl_sl, tp_price=tl_tp, tf=setup.ob_source, dry_run=False, strategy="sub2")
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=tl_px, sl_price=tl_sl, tp_price=tl_tp, tf=std_tf, dry_run=False, strategy="sub2")
     except Exception:
         pass
         
-    cl_id = f"{cl_prefix}{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
+    tag = "EL" if setup.bias == BULLISH else "ES"
+    cl_id = f"{cl_prefix}{tag}{std_tf}{_ORDER_COUNTER:02d}{int(time.time())}"[:32]
+    setup.cl_ord_id = cl_id
     try:
-        # Phân biệt mode & đòn bẩy: Internal OB dùng isolated (50x), Swing OB dùng cross (100x)
-        if setup.ob_source == "INTERNAL":
-            td_mode = "isolated"
-            lever = str(INTERNAL_LEVERAGE)
-        else:
-            td_mode = POSITION_MODE
-            lever = str(LEVERAGE)
+        # ĐỒNG BỘ 100% CHẾ ĐỘ CHÉO (CROSS) & ĐÒN BẨY 100X THEO CHỈ ĐẠO CỦA CEO
+        td_mode = "cross"
+        lever = "100"
 
-        # Set leverage trước khi đặt lệnh
+        # Set leverage 100x Cross trước khi đặt lệnh
         try:
             client.request("POST", "/api/v5/account/set-leverage", body={
-                "instId": inst_id, "lever": lever, "mgnMode": td_mode
+                "instId": inst_id, "lever": "100", "mgnMode": "cross"
             })
         except:
             pass
@@ -141,9 +162,11 @@ def place_ob_limit_order(client, inst_id: str, setup: TradeSetup, sz_str: str, t
         if setup.take_profit and setup.stop_loss:
             tp_px = f"{round_to_tick(setup.take_profit, tick_sz):.5f}"
             sl_px = f"{round_to_tick(setup.stop_loss, tick_sz):.5f}"
+            coin_clean = inst_id.split("-")[0].replace("/", "")[:4]
+            algo_cl_id = f"{cl_prefix}TP{coin_clean}{std_tf}{_ORDER_COUNTER:02d}{int(time.time() * 1000) % 10000000}"[:32]
             body_limit["attachAlgoOrds"] = [
                 {
-                    "attachAlgoClOrdId": f"{cl_prefix}TPSL{int(time.time() * 1000)}"[:32],
+                    "attachAlgoClOrdId": algo_cl_id,
                     "tpTriggerPx": tp_px,
                     "tpOrdPx": "-1",
                     "tpTriggerPxType": "last",
@@ -207,26 +230,26 @@ def place_ob_market_order(client, inst_id: str, setup: TradeSetup, sz_str: str, 
     else:
         pos_side = "long" if setup.bias == BULLISH else "short"
         
+    std_tf = normalize_tf_to_std(setup.tf) if setup.tf else "H1"
+
     # 🏆 Đồng bộ lệnh Market sang Quỹ TradeLocker (E8) nếu có bật
     try:
         tl_sl = float(setup.stop_loss) if setup.stop_loss else None
         tl_tp = float(setup.take_profit) if setup.take_profit else None
-        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, sl_price=tl_sl, tp_price=tl_tp, tf=setup.ob_source, dry_run=False, strategy="sub2")
+        _dispatch_to_tradelocker(inst_id=inst_id, side=side, price=0.0, sl_price=tl_sl, tp_price=tl_tp, tf=std_tf, dry_run=False, strategy="sub2")
     except Exception:
         pass
 
-    cl_id = f"{cl_prefix}mkt{_ORDER_COUNTER:03d}{int(time.time())}"[:32]
+    tag = "ML" if setup.bias == BULLISH else "MS"
+    cl_id = f"{cl_prefix}{tag}{std_tf}{_ORDER_COUNTER:02d}{int(time.time())}"[:32]
+    setup.cl_ord_id = cl_id
     try:
-        if setup.ob_source == "INTERNAL":
-            td_mode = "isolated"
-            lever = str(INTERNAL_LEVERAGE)
-        else:
-            td_mode = POSITION_MODE
-            lever = str(LEVERAGE)
+        td_mode = "cross"
+        lever = "100"
 
         try:
             client.request("POST", "/api/v5/account/set-leverage", body={
-                "instId": inst_id, "lever": lever, "mgnMode": td_mode
+                "instId": inst_id, "lever": "100", "mgnMode": "cross"
             })
         except:
             pass
@@ -251,11 +274,23 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
     elif not pos_side:
         pos_side = "long" if setup.bias == BULLISH else "short"
         
+    std_tf = normalize_tf_to_std(setup.tf) if setup.tf else "H1"
+
+    def _safe_dec(val) -> Decimal:
+        if not val or not str(val).strip():
+            return Decimal("0")
+        try:
+            return Decimal(str(val).strip())
+        except Exception:
+            return Decimal("0")
+
     # ⚡ Kiểm tra nếu vị thế đã có TP và SL sẵn trên sàn (từ attachAlgoOrds khi khớp limit)
+    has_tp = False
+    has_sl = False
     try:
         pending_algos = client.request("GET", "/api/v5/trade/orders-algo-pending", params={"instType": "SWAP", "instId": inst_id, "ordType": "conditional"}).get("data", [])
-        has_tp = any(Decimal(o.get("tpTriggerPx", "0")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
-        has_sl = any(Decimal(o.get("slTriggerPx", "0")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
+        has_tp = any(_safe_dec(o.get("tpTriggerPx")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
+        has_sl = any(_safe_dec(o.get("slTriggerPx")) > 0 and (o.get("posSide") == pos_side or pos_side == "net") for o in pending_algos)
         if has_tp and has_sl:
             return True
     except Exception:
@@ -286,13 +321,21 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
         elif setup.bias == BEARISH and sl_dec < lp:
             sl_valid = False
 
+    # Nếu sàn đã có sẵn TP hoặc SL thì không đặt trùng lặp
+    if has_tp:
+        tp_valid = False
+        tp_ok = True
+    if has_sl:
+        sl_valid = False
+        sl_ok = True
+
     tp_ok = not tp_valid
     sl_ok = not sl_valid
 
     # Đặt lệnh TP
     if tp_valid:
         _ORDER_COUNTER += 1
-        tp_cl_id = f"{cl_prefix}TP{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
+        tp_cl_id = f"{cl_prefix}TP{std_tf}{_ORDER_COUNTER:02d}{int(time.time())}"[:32]
         try:
             resp = client.request("POST", "/api/v5/trade/order-algo", body={
                 "instId": inst_id, "tdMode": td_mode,
@@ -303,9 +346,8 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
             })
             if resp and resp.get("code") == "0":
                 tp_ok = True
-                print(f"🔒 [SMC] {inst_id}: TP set @ {tp_px} ({td_mode})")
+                print(f"🔒 [SMC] {inst_id} [{std_tf}]: TP set @ {tp_px} ({td_mode})")
             else:
-                # Nếu lỗi posSide, thử retry với posSide ngược lại (net vs long/short)
                 fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
                 resp_retry = client.request("POST", "/api/v5/trade/order-algo", body={
                     "instId": inst_id, "tdMode": td_mode,
@@ -317,17 +359,17 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
                 if resp_retry and resp_retry.get("code") == "0":
                     tp_ok = True
                     client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
-                    print(f"🔒 [SMC] {inst_id}: TP set @ {tp_px} ({td_mode}) [fallback]")
+                    print(f"🔒 [SMC] {inst_id} [{std_tf}]: TP set @ {tp_px} ({td_mode}) [fallback]")
                 else:
                     err = resp.get("msg","?") if resp else "NoResp"
-                    print(f"🚫 [SMC] {inst_id}: TP FAILED - {err}")
+                    print(f"🚫 [SMC] {inst_id} [{std_tf}]: TP FAILED - {err}")
         except Exception as e:
-            print(f"🚫 [SMC] {inst_id}: TP EXCEPTION - {e}")
+            print(f"🚫 [SMC] {inst_id} [{std_tf}]: TP EXCEPTION - {e}")
 
     # Đặt lệnh SL
     if sl_valid:
         _ORDER_COUNTER += 1
-        sl_cl_id = f"{cl_prefix}SL{_ORDER_COUNTER:04d}{int(time.time())}"[:32]
+        sl_cl_id = f"{cl_prefix}SL{std_tf}{_ORDER_COUNTER:02d}{int(time.time())}"[:32]
         try:
             resp = client.request("POST", "/api/v5/trade/order-algo", body={
                 "instId": inst_id, "tdMode": td_mode,
@@ -338,7 +380,7 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
             })
             if resp and resp.get("code") == "0":
                 sl_ok = True
-                print(f"🔒 [SMC] {inst_id}: SL set @ {sl_px} ({td_mode})")
+                print(f"🔒 [SMC] {inst_id} [{std_tf}]: SL set @ {sl_px} ({td_mode})")
             else:
                 fallback_pos_side = "net" if pos_side != "net" else ("long" if setup.bias == BULLISH else "short")
                 resp_retry = client.request("POST", "/api/v5/trade/order-algo", body={
@@ -351,19 +393,15 @@ def apply_ob_tpsl(client, inst_id: str, setup: TradeSetup, pos_sz: str, tick_sz:
                 if resp_retry and resp_retry.get("code") == "0":
                     sl_ok = True
                     client.pMode = "net_mode" if fallback_pos_side == "net" else "long_short_mode"
-                    print(f"🔒 [SMC] {inst_id}: SL set @ {sl_px} ({td_mode}) [fallback]")
+                    print(f"🔒 [SMC] {inst_id} [{std_tf}]: SL set @ {sl_px} ({td_mode}) [fallback]")
                 else:
                     err = resp.get("msg","?") if resp else "NoResp"
-                    print(f"🚫 [SMC] {inst_id}: SL FAILED - {err}")
+                    print(f"🚫 [SMC] {inst_id} [{std_tf}]: SL FAILED - {err}")
         except Exception as e:
-            print(f"🚫 [SMC] {inst_id}: SL EXCEPTION - {e}")
+            print(f"🚫 [SMC] {inst_id} [{std_tf}]: SL EXCEPTION - {e}")
 
     return tp_ok and sl_ok
 
-
-# =============================================================================
-# REPLAY HISTORY - Duyệt lại toàn bộ lịch sử để khởi tạo state
-# =============================================================================
 
 def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
     """
@@ -376,6 +414,7 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
         for item in portfolio:
             inst_id = item["swap"]
             try:
+                # 1. Hủy các lệnh Limit pending thông thường
                 pending_regular = client.request("GET", "/api/v5/trade/orders-pending", params={"instType": "SWAP", "instId": inst_id}).get("data", [])
                 if pending_regular:
                     body_cancel = [
@@ -387,13 +426,14 @@ def cleanup_all_orders_on_startup(client, portfolio: list[dict]):
                         for i in range(0, len(body_cancel), 20):
                             client.request("POST", "/api/v5/trade/cancel-batch-orders", body=body_cancel[i:i+20])
                             time.sleep(0.1)
+
+                # 2. Dọn dẹp orphan conditional TP/SL nếu coin KHÔNG có vị thế mở nào
+                positions = client.fetch_positions(inst_id)
+                has_open_pos = any(Decimal(p.get("pos", "0")) > 0 for p in positions)
+                if not has_open_pos:
+                    clean_algo_orders(client, inst_id, cl_prefix=CL_ORD_PREFIX)
             except Exception as e:
                 pass
-            
-            # TUYỆT ĐỐI KHÔNG HỦY TP/SL CỦA LỆNH ĐANG CHẠY
         print("✅ [SMC CLEANUP]: Hoàn tất dọn dẹp lệnh Limit. Bảo lưu 100% TP/SL của vị thế.")
     except Exception as e:
         print(f"⚠️ [SMC CLEANUP LỖI]: {e}")
-
-# z1953 | Tích hợp độc lập _dispatch_to_tradelocker cho SMC Market entry và Limit entry không phụ thuộc OKX
-# z1954 | Thêm trace exception chi tiết cho _dispatch_to_tradelocker trong SMC bot_orders

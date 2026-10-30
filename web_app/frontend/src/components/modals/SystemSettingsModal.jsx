@@ -314,27 +314,30 @@ export default function SystemSettingsModal({
                   <>
                     <div className="settings-group">
                       <div className="settings-group-title">{t("smc_strategy_title")}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                        <div className="toggle-row">
-                          <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
-                          <span className="toggle-name">{t("smc_order_block")}</span>
-                          <button className="btn-help" onClick={() => alert("Kích hoạt chiến lược Smart Money Concepts (SMC): Tự động quét vùng mất cân bằng cung cầu (Order Block / FVG) để đặt lệnh đón thanh khoản theo cấu trúc sóng thị trường.")} title="Kích hoạt chiến lược Smart Money Concepts (Order Block / FVG).">[?]</button>
+                      <div className="tactics-toggles-layout">
+                        <div className="tactics-left-col">
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
+                            <ToggleSwitch checked={strat.main ?? true} onChange={v => setStrat(s => ({ ...s, main: v }))} />
+                            <span className="toggle-name">{t("smc_order_block")}</span>
+                            <button className="btn-help" onClick={() => alert("Kích hoạt chiến lược Smart Money Concepts (SMC): Tự động quét vùng mất cân bằng cung cầu (Order Block / FVG) để đặt lệnh đón thanh khoản theo cấu trúc sóng thị trường.")} title="Kích hoạt chiến lược Smart Money Concepts (Order Block / FVG).">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={strat.multiTfGrid ?? true} onChange={v => setStrat(s => ({ ...s, multiTfGrid: v }))} />
+                            <span className="toggle-name">Lưới Đa Khung Độc Lập</span>
+                            <button className="btn-help" onClick={() => alert("BẬT (Lưới Đa Khung Độc Lập): Bot quét nến và tính toán Order Block độc lập trên từng khung thời gian được tích chọn ở cột TF trade (5m, 15m, 30m, 1H, 4H...). Mỗi TF tự đặt lệnh, chốt lời và cắt lỗ riêng biệt theo đúng cấu trúc sóng của khung giờ đó.")} title="BẬT: Chạy độc lập trên từng TF được tích ở cột TF trade.">[?]</button>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ color: "#e0e0e0", fontSize: "12px" }}>{t("base_tf")}</span>
-                          <select
-                            className="styled-select"
-                            value={strat.timeframeBase || "1H"}
-                            onChange={e => setStrat(s => ({ ...s, timeframeBase: e.target.value }))}
-                            style={{ width: "90px" }}
-                          >
-                            <option value="5m">5m</option>
-                            <option value="15m">15m</option>
-                            <option value="30m">30m</option>
-                            <option value="1H">1H</option>
-                            <option value="2H">2H</option>
-                            <option value="4H">4H</option>
-                          </select>
+                        <div className="tactics-right-col">
+                          <div className="toggle-row" style={{ marginBottom: '10px' }}>
+                            <ToggleSwitch checked={smcEntryCfg.autoMitigation ?? true} onChange={v => setSmcEntryCfg(s => ({ ...s, autoMitigation: v }))} />
+                            <span className="toggle-name">Tự Động Khử Cản (Mitigation)</span>
+                            <button className="btn-help" onClick={() => alert("BẬT (Khử cản): Khi giá đã đâm xuyên qua vùng Order Block (thủng râu cản), khối cản đó được coi là đã hấp thụ hết thanh khoản và tự động xóa bỏ, không gài lệnh trễ.")} title="BẬT: Tự động loại bỏ OB khi giá đâm xuyên qua.">[?]</button>
+                          </div>
+                          <div className="toggle-row">
+                            <ToggleSwitch checked={smcEntryCfg.mergeOverlapping ?? true} onChange={v => setSmcEntryCfg(s => ({ ...s, mergeOverlapping: v }))} />
+                            <span className="toggle-name">Gộp Cản Chồng Lấn</span>
+                            <button className="btn-help" onClick={() => alert("BẬT (Gộp cản): Khi có 2 khối OB cùng chiều nằm đè lên nhau hoặc giao cắt nhau, hệ thống tự động gộp thành 1 vùng cản Zone duy nhất để tối ưu hóa điểm vào lệnh và bảo vệ vốn.")} title="BẬT: Tự động gộp các OB đè nhau thành 1 vùng Zone lớn.">[?]</button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -454,76 +457,135 @@ export default function SystemSettingsModal({
                 )}
 
                 {/* 3. Điểm Vào Lệnh (Entry Setup) */}
-                <div className="settings-group" data-tour="settings-entry-filters">
-                  <div className="settings-group-title">{t("entry_setup_title")}</div>
-                  <div className="entry-setup-list">
-                    <div className="entry-setup-row">
-                      <div className="entry-label-wrap">
-                         <span>{t("base_offset")}</span>
-                        <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh Limit đón sớm hơn một khoảng % trước khi giá chạm đúng vào vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Ở các khung thời gian lớn hơn, độ lệch này sẽ tự động nhân với Hệ số Vào Lệnh (Entry) của khung đó (ví dụ H4 x6.8 -> đệm 0.34%).")} title="Độ lệch đệm đón trước cản EMA200 để lệnh dễ khớp trước khi giá bật nảy.">[?]</button>
-                      </div>
-                      <NumberSpinBox
-                        value={entryCfg.entryOffset}
-                        onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
-                        step={0.01}
-                        min={0}
-                        max={0.3}
-                        suffix="%"
-                        width="84px"
-                      />
-                    </div>
-
-                    <div className="entry-setup-row">
-                      <div className="entry-label-wrap">
-                        <span>{t("dca_gap")}</span>
-                        <button className="btn-help" onClick={() => alert("Khoảng cách an toàn tối thiểu (Base Gap %): Ngưỡng cách biệt giá tối thiểu giữa 2 đường EMA200 liền kề để được rải lệnh Limit (mặc định 0.20% ở M5). Nếu 2 đường EMA200 quá sát nhau (nhỏ hơn khoảng cách này nhân với Hệ số Vào Lệnh), bot sẽ tự động bỏ qua khung nhỏ để dồn vào cản khung lớn hơn, tránh rải lệnh quá dày đặc.")} title="Khoảng cách an toàn tối thiểu giữa 2 đường EMA200 để tránh rải lệnh quá dày.">[?]</button>
-                      </div>
-                      <NumberSpinBox
-                        value={entryCfg.dcaGapPct}
-                        onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
-                        step={0.05}
-                        min={0}
-                        max={0.5}
-                        suffix="%"
-                        width="84px"
-                      />
-                    </div>
-
-                    <div className="entry-setup-row">
-                      <div className="entry-label-wrap">
-                        <span>{t("accum_candles")}</span>
-                        <button className="btn-help" onClick={() => alert("Bộ lọc nến tích lũy (Accumulation Candles): Số lượng nến đóng cửa liên tục nằm hoàn toàn về một phía của EMA200 (mặc định 60 nến). Đảm bảo thị trường đã tích lũy và xác nhận một xu hướng vững chắc trước khi mở lệnh đón cản, loại bỏ tín hiệu nhiễu khi giá đang sideway cắt qua cắt lại EMA200.")} title="Số nến liên tục cùng phía EMA200 để xác nhận xu hướng vững chắc trước khi vào lệnh.">[?]</button>
-                      </div>
-                      <NumberSpinBox
-                        value={entryCfg.accumCandles}
-                        onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
-                        min={12}
-                        max={200}
-                        step={1}
-                        width="84px"
-                      />
-                    </div>
-
-                    {entryCfg.altcoinFollowBtc && (
+                {activeBotTab === "sub2" ? (
+                  <div className="settings-group" data-tour="settings-entry-filters">
+                    <div className="settings-group-title">Điểm Vào Lệnh (SMC Entry Setup)</div>
+                    <div className="entry-setup-list">
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
-                          <span>{t("eth_vol_mult")}</span>
-                          <button className="btn-help" onClick={() => alert("Hệ số nhạy ETH (Vol Mult): Trọng số điều chỉnh khối lượng riêng cho ETH khi bật chế độ Đồng pha BTC. Giúp tự động cân đối quy mô vào lệnh của ETH tương quan với biên độ biến động của thị trường so với BTC.")} title="Hệ số điều chỉnh khối lượng cho ETH khi bật chế độ Đồng pha BTC.">[?]</button>
+                          <span>Đón trước mép cản OB:</span>
+                          <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh đón sớm một khoảng % trước khi giá chạm đúng vào mép Order Block (mặc định 0.05%), giúp lệnh dễ khớp trước khi thị trường phản ứng bật nảy. Chỉ số này sẽ tự động nhân với Hệ số nhân Entry/TP/SL của từng khung thời gian.")} title="Độ lệch đệm đón trước mép OB để dễ khớp trước khi giá phản ứng.">[?]</button>
                         </div>
                         <NumberSpinBox
-                          value={entryCfg.ethVolMult}
-                          onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
-                          step={0.1}
+                          value={smcEntryCfg.entryOffset ?? "0.05"}
+                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, entryOffset: val }))}
+                          step={0.01}
                           min={0}
+                          max={0.5}
+                          suffix="%"
                           width="84px"
                         />
                       </div>
-                    )}
-                    <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
-                      {t("entry_formula_note")}
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Vị trí đón cản trong OB:</span>
+                          <button className="btn-help" onClick={() => alert("Vị trí đón cản:\n- Mép ngoài OB (Conservative): Đặt lệnh tại râu ngoài cùng của nến OB -> Khớp nhanh nhất, an toàn nhất.\n- 50% Khối OB (Equilibrium): Đặt lệnh tại điểm giữa thân OB -> Điểm vào lệnh sâu hơn, tỷ lệ R:R cao hơn.")} title="Chọn điểm đặt lệnh tại mép ngoài hoặc 50% vùng OB.">[?]</button>
+                        </div>
+                        <select
+                          className="styled-select"
+                          style={{ width: "170px" }}
+                          value={smcEntryCfg.entryLevel || "OUTER"}
+                          onChange={e => setSmcEntryCfg(s => ({ ...s, entryLevel: e.target.value }))}
+                        >
+                          <option value="OUTER">Mép ngoài OB (Khớp nhanh)</option>
+                          <option value="EQUILIBRIUM">50% Thân OB (Tối ưu R:R)</option>
+                        </select>
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Khoảng cách gộp cản tối thiểu:</span>
+                          <button className="btn-help" onClick={() => alert("Ngưỡng gộp cản (Merge Threshold %): Khoảng cách tối thiểu giữa các lệnh setup OB (mặc định 0.50%). Nếu 2 setup quá gần nhau, bot tự động gộp lại thành 1 lệnh duy nhất để tránh rải lệnh quá dày đặc.")} title="Khoảng cách tối thiểu giữa các setup để tránh rải lệnh vụn.">[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={smcEntryCfg.mergeThreshold ?? "0.50"}
+                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, mergeThreshold: val }))}
+                          step={0.05}
+                          min={0.1}
+                          max={2.0}
+                          suffix="%"
+                          width="84px"
+                        />
+                      </div>
+
+                      <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                        * Điểm đón trước cản sẽ tự động nhân với Hệ số nhân Entry/TP/SL của từng khung thời gian.
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="settings-group" data-tour="settings-entry-filters">
+                    <div className="settings-group-title">{t("entry_setup_title")}</div>
+                    <div className="entry-setup-list">
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                           <span>{t("base_offset")}</span>
+                          <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh Limit đón sớm hơn một khoảng % trước khi giá chạm đúng vào vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Ở các khung thời gian lớn hơn, độ lệch này sẽ tự động nhân với Hệ số nhân Entry/TP/SL của khung đó (ví dụ H4 x6.8 -> đệm 0.34%).")} title="Độ lệch đệm đón trước cản EMA200 để lệnh dễ khớp trước khi giá bật nảy.">[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.entryOffset}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, entryOffset: val }))}
+                          step={0.01}
+                          min={0}
+                          max={0.3}
+                          suffix="%"
+                          width="84px"
+                        />
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>{t("dca_gap")}</span>
+                          <button className="btn-help" onClick={() => alert("Khoảng cách an toàn tối thiểu (Base Gap %): Ngưỡng cách biệt giá tối thiểu giữa 2 đường EMA200 liền kề để được rải lệnh Limit (mặc định 0.20% ở M5). Nếu 2 đường EMA200 quá sát nhau (nhỏ hơn khoảng cách này nhân với Hệ số nhân Entry/TP/SL), bot sẽ tự động bỏ qua khung nhỏ để dồn vào cản khung lớn hơn, tránh rải lệnh quá dày đặc.")} title="Khoảng cách an toàn tối thiểu giữa 2 đường EMA200 để tránh rải lệnh quá dày.">[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.dcaGapPct}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, dcaGapPct: val }))}
+                          step={0.05}
+                          min={0}
+                          max={0.5}
+                          suffix="%"
+                          width="84px"
+                        />
+                      </div>
+
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>{t("accum_candles")}</span>
+                          <button className="btn-help" onClick={() => alert("Bộ lọc nến tích lũy (Accumulation Candles): Số lượng nến đóng cửa liên tục nằm hoàn toàn về một phía của EMA200 (mặc định 60 nến). Đảm bảo thị trường đã tích lũy và xác nhận một xu hướng vững chắc trước khi mở lệnh đón cản, loại bỏ tín hiệu nhiễu khi giá đang sideway cắt qua cắt lại EMA200.")} title="Số nến liên tục cùng phía EMA200 để xác nhận xu hướng vững chắc trước khi vào lệnh.">[?]</button>
+                        </div>
+                        <NumberSpinBox
+                          value={entryCfg.accumCandles}
+                          onChange={val => setEntryCfg(prev => ({ ...prev, accumCandles: val }))}
+                          min={12}
+                          max={200}
+                          step={1}
+                          width="84px"
+                        />
+                      </div>
+
+                      {entryCfg.altcoinFollowBtc && (
+                        <div className="entry-setup-row">
+                          <div className="entry-label-wrap">
+                            <span>{t("eth_vol_mult")}</span>
+                            <button className="btn-help" onClick={() => alert("Hệ số nhạy ETH (Vol Mult): Trọng số điều chỉnh khối lượng riêng cho ETH khi bật chế độ Đồng pha BTC. Giúp tự động cân đối quy mô vào lệnh của ETH tương quan với biên độ biến động của thị trường so với BTC.")} title="Hệ số điều chỉnh khối lượng cho ETH khi bật chế độ Đồng pha BTC.">[?]</button>
+                          </div>
+                          <NumberSpinBox
+                            value={entryCfg.ethVolMult}
+                            onChange={val => setEntryCfg(prev => ({ ...prev, ethVolMult: val }))}
+                            step={0.1}
+                            min={0}
+                            width="84px"
+                          />
+                        </div>
+                      )}
+                      <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
+                        {t("entry_formula_note")}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 4. Hệ Số Nhân Đa Khung (TF Multipliers) */}
                 <div className="settings-group" data-tour="settings-tf-multipliers">
@@ -564,6 +626,7 @@ export default function SystemSettingsModal({
                         ["H1",  "2.0x", "3.3x"],
                         ["H2",  "3.0x", "4.7x"],
                         ["H4",  "5.0x", "6.8x"],
+                        ["D1",  "8.0x", "10.0x"],
                       ].map(([tf, vol, offset]) => (
                         <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
                           <td style={{ padding: "6px 8px", textAlign: "left", color: "#e0e0e0" }}>{tf}</td>

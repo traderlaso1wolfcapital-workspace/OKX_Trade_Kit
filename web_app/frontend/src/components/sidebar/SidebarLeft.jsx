@@ -594,17 +594,18 @@ export default function SidebarLeft({
                           userSelect: "none",
                         }}
                       >
-                        {isBotMenuOpen ? "▼" : "▲"}
+                        {isBotMenuOpen ? "▲" : "▼"}
                       </span>
                     )}
                   </button>
 
-                  {/* Popup Menu Lựa Chọn Chiến Thuật Bot - CƠ CHẾ DROPUP LẬT LÊN TRÊN */}
+                  {/* Popup Menu Lựa Chọn Chiến Thuật Bot - CƠ CHẾ DROPDOWN THẢ XUỐNG DƯỚI */}
                   {isBotMenuOpen && !isCurrentBotRunning && (
                     <div
                       style={{
                         position: "absolute",
-                        bottom: "calc(100% + 6px)",
+                        top: "calc(100% + 6px)",
+                        bottom: "auto",
                         left: 0,
                         minWidth: "220px",
                         maxWidth: "290px",
@@ -617,7 +618,7 @@ export default function SidebarLeft({
                         backdropFilter: "blur(10px)",
                         border: "1px solid rgba(255, 255, 255, 0.15)",
                         borderRadius: "7px",
-                        boxShadow: "0 -10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
+                        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5)",
                         padding: "5px",
                         display: "flex",
                         flexDirection: "column",
@@ -841,7 +842,7 @@ export default function SidebarLeft({
                     )}
                   </div>
 
-                  {/* Nút xổ xuống: Cố định / nhân Hệ số Ký Quỹ (Vốn) - Chỉ hiển thị ở Sàn Coin OKX, Quỹ FX mặc định cố định theo Lot */}
+                  {/* Nút xổ xuống: Cố định / Hệ số nhân Ký Quỹ (Vốn) - Chỉ hiển thị ở Sàn Coin OKX, Quỹ FX mặc định cố định theo Lot */}
                   {tradingPlatform !== "e8" && (
                     <div
                       style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
@@ -1000,8 +1001,65 @@ export default function SidebarLeft({
                   </>
                 ) : (
                   <>
-                    <div className="risk-row">
-                      <label>Tỷ lệ chốt lời Thuận Trend:</label>
+                    <div className="risk-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+                        <label style={{ margin: 0, whiteSpace: "nowrap" }}>Tỷ lệ chốt lời:</label>
+                        <div
+                          className="risk-mult-wrapper"
+                          style={{ position: "relative", display: "inline-flex" }}
+                          title={
+                            risk.smcTpMode === "NEAREST_OB"
+                              ? "Chốt lời theo OB ngược chiều: Ưu tiên chạm mép Entry của OB đối diện là chốt lời (đồng thời khớp lệnh ngược chiều). Nếu số R nhập vào nhỏ hơn chưa tới cản thì vẫn chốt lời theo số R đó."
+                              : "Cố định: Luôn chốt lời theo đúng số R đã nhập."
+                          }
+                        >
+                          <div
+                            className={`risk-mult-badge ${risk.smcTpMode === "NEAREST_OB" ? "active" : ""}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "3px",
+                              padding: "1px 5px",
+                              fontSize: "10px",
+                              fontWeight: "bold",
+                              borderRadius: "4px",
+                              border: "1px solid #444",
+                              background: "#222",
+                              cursor: isRunning ? "not-allowed" : "pointer",
+                              userSelect: "none",
+                              whiteSpace: "nowrap",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <span className="risk-mult-text" style={{ color: risk.smcTpMode === "NEAREST_OB" ? "#26a69a" : "#dddddd" }}>
+                              {risk.smcTpMode === "NEAREST_OB" ? "Theo OB ngược chiều" : "Cố định"}
+                            </span>
+                            <span className="risk-mult-arrow" style={{ fontSize: "8px", opacity: 0.95, color: risk.smcTpMode === "NEAREST_OB" ? "#26a69a" : "#ffffff" }}>▼</span>
+                          </div>
+
+                          <select
+                            value={risk.smcTpMode || "RR"}
+                            disabled={isRunning}
+                            onChange={(e) => {
+                              if (isRunning) return;
+                              const nextVal = e.target.value;
+                              setRisk((r) => ({ ...r, smcTpMode: nextVal }));
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              width: "100%",
+                              height: "100%",
+                              opacity: 0,
+                              cursor: isRunning ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            <option value="RR" style={{ background: "#222", color: "#fff" }}>Cố định</option>
+                            <option value="NEAREST_OB" style={{ background: "#222", color: "#26a69a" }}>Chốt lời theo OB ngược chiều</option>
+                          </select>
+                        </div>
+                      </div>
                       <NumberSpinBox
                         value={risk.tpPct}
                         onChange={(val) => setRisk((r) => ({ ...r, tpPct: val }))}
@@ -1012,7 +1070,7 @@ export default function SidebarLeft({
                       />
                     </div>
                     <div className="risk-row">
-                      <label>Tỷ lệ chốt lời Ngược Trend:</label>
+                      <label title="Hệ số nhân cắt lỗ theo R (Mặc định 1 R = mép đối diện của khối OB; nếu đặt 2 R = mở rộng vùng cắt lỗ gấp 2 lần độ dày OB).">Tỷ lệ cắt lỗ:</label>
                       <NumberSpinBox
                         value={risk.slPct}
                         onChange={(val) => setRisk((r) => ({ ...r, slPct: val }))}

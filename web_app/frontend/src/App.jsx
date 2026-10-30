@@ -1018,7 +1018,7 @@ function App() {
       const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}_${selAcc}`) || localStorage.getItem(`tls1_risk_posVol_${active}`));
       const initVol = (savedVol && savedVol > 0) ? savedVol : 0.4;
       if (active === "sub2") {
-        return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false };
+        return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false, smcTpMode: "RR" };
       }
       return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false };
     } catch {
@@ -1051,6 +1051,11 @@ function App() {
     internalLength: 5,
     forceMarket: true,
     maxSlippage: 0.8,
+    entryOffset: "0.05",
+    entryLevel: "OUTER",
+    mergeThreshold: "0.50",
+    autoMitigation: true,
+    mergeOverlapping: true,
   });
 
   const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -1199,6 +1204,7 @@ function App() {
             scalping_sl_pct: Number(risk.slPct) / 100,
             ob_rr_ratio_trend: isSub2 ? Number(risk.tpPct) : undefined,
             ob_rr_ratio_counter: isSub2 ? Number(risk.slPct) : undefined,
+            ob_tp_mode: isSub2 ? (risk.smcTpMode || "RR") : undefined,
           }),
         }).then((res) => {
           if (res.ok) {
@@ -1463,6 +1469,7 @@ function App() {
             tpPct: parsedTp,
             slPct: parsedSl,
             multiplyVolumeByTf: d.ENABLE_TF_VOLUME_MULTIPLIER !== undefined ? Boolean(d.ENABLE_TF_VOLUME_MULTIPLIER) : false,
+            smcTpMode: d.OB_TP_MODE || "RR",
           };
           prevRiskRef.current = nextRisk;
           setRisk(nextRisk);
@@ -1500,6 +1507,23 @@ function App() {
             confluencePct: String(d.CONFLUENCE_PCT ?? e.confluencePct),
             accumCandles: Number(d.ACCUM_CANDLES ?? e.accumCandles),
             altcoinFollowBtc: d.ALTCOIN_FOLLOW_BTC_EMA !== undefined ? Boolean(d.ALTCOIN_FOLLOW_BTC_EMA) : true,
+          }));
+        }
+        if (d.OB_SOURCE !== undefined || d.OB_DIRECTION !== undefined || d.OB_VOLATILITY_MULT !== undefined || d.SWING_LENGTH !== undefined || d.ENTRY_OFFSET_PCT !== undefined) {
+          setSmcEntryCfg(s => ({
+            ...s,
+            source: d.OB_SOURCE || s.source || "ALL",
+            dir: d.OB_DIRECTION || s.dir || "BOTH",
+            obVol: d.OB_VOLATILITY_MULT !== undefined ? Number(d.OB_VOLATILITY_MULT) : s.obVol,
+            swingLength: d.SWING_LENGTH !== undefined ? Number(d.SWING_LENGTH) : s.swingLength,
+            internalLength: d.INTERNAL_LENGTH !== undefined ? Number(d.INTERNAL_LENGTH) : s.internalLength,
+            forceMarket: d.FORCE_MARKET_ENTRY_ON_CROSS !== undefined ? Boolean(d.FORCE_MARKET_ENTRY_ON_CROSS) : s.forceMarket,
+            maxSlippage: d.MAX_MARKET_SLIPPAGE_PCT !== undefined ? Number((d.MAX_MARKET_SLIPPAGE_PCT * 100).toFixed(2)) : s.maxSlippage,
+            entryOffset: d.ENTRY_OFFSET_PCT !== undefined ? String(d.ENTRY_OFFSET_PCT) : (s.entryOffset || "0.05"),
+            entryLevel: d.OB_ENTRY_LEVEL || s.entryLevel || "OUTER",
+            mergeThreshold: d.OB_MERGE_THRESHOLD_PCT !== undefined ? String(Number((d.OB_MERGE_THRESHOLD_PCT * 100).toFixed(2))) : (s.mergeThreshold || "0.50"),
+            autoMitigation: d.OB_AUTO_MITIGATION !== undefined ? Boolean(d.OB_AUTO_MITIGATION) : (s.autoMitigation ?? true),
+            mergeOverlapping: d.OB_MERGE_OVERLAPPING !== undefined ? Boolean(d.OB_MERGE_OVERLAPPING) : (s.mergeOverlapping ?? true),
           }));
         }
       })
@@ -2716,14 +2740,14 @@ function App() {
   }, [activeBotTab]);
 
   // Reset Capital & Nen
-  const handleResetCapital = async (specifiedAcc = null) => {
+  const handleResetCapital = async (specifiedAcc = null, silent = false) => {
     const isProp = currentPlatform === "e8";
     const targetAcc = specifiedAcc || selectedAccount || effectiveAccId || "";
     const promptMsg = isProp
       ? "Bạn có chắc chắn muốn Reset Vốn Gốc cho Quỹ FX (lấy số dư thực tế hiện tại làm mốc vốn mới)?"
       : `Bạn có chắc chắn muốn Reset Vốn Gốc cho tài khoản [${targetAcc || 'hiện tại'}] (hệ thống sẽ lấy số dư hiện tại từ OKX làm Vốn Gốc mới)?`;
 
-    if (!window.confirm(promptMsg)) return;
+    if (!silent && !window.confirm(promptMsg)) return;
 
     try {
       const curUid = currentUid || localStorage.getItem("tls1_uid") || "default";
@@ -2731,26 +2755,26 @@ function App() {
         const resp = await fetch(`/api/tradelocker/reset_capital?uid=${encodeURIComponent(curUid)}&account_id=${encodeURIComponent(targetAcc)}`, { method: "POST" });
         const data = await resp.json();
         if (resp.ok) {
-          alert(data.message || `✅ Đã Reset Vốn Gốc Quỹ FX thành công! Vốn mới: $${Number(data.total_equity || 0).toLocaleString()}`);
+          if (!silent) alert(data.message || `✅ Đã Reset Vốn Gốc Quỹ FX thành công! Vốn mới: $${Number(data.total_equity || 0).toLocaleString()}`);
           addSystemLog(`♻️ [QUỸ FX]: Đã Reset Vốn Gốc thành công! Mốc vốn mới: $${Number(data.total_equity || 0).toLocaleString()}`);
           if (typeof fetchPropLogs === "function") fetchPropLogs();
         } else {
-          alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+          if (!silent) alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
         }
       } else {
         const resp = await fetch(`/api/bot/reset_capital?uid=${encodeURIComponent(curUid)}&strategy=${activeBotTab}&account_id=${encodeURIComponent(targetAcc)}`, { method: "POST" });
         const data = await resp.json();
         if (resp.ok) {
           const msg = data.message || `✅ Đã Reset Vốn Gốc thành công! Tổng vốn quét từ OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`;
-          alert(msg);
+          if (!silent) alert(msg);
           addSystemLog(`♻️ [HỆ THỐNG]: Đã Reset Vốn Gốc cho tài khoản [${targetAcc}] thành công! Tổng vốn quét từ sàn OKX: ${Number(data.total_equity || 0).toLocaleString()} USDT`);
           refreshBotData();
         } else {
-          alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
+          if (!silent) alert("❌ Lỗi: " + (data.detail || "Không rõ nguyên nhân"));
         }
       }
     } catch (e) {
-      alert("❌ Lỗi kết nối: " + e.message);
+      if (!silent) alert("❌ Lỗi kết nối: " + e.message);
     }
   };
 
@@ -2858,6 +2882,25 @@ function App() {
         ETH_VOL_MULT: parseFloat(entryCfg.ethVolMult) || 1.30,
         ENABLE_TF_VOLUME_MULTIPLIER: Boolean(risk.multiplyVolumeByTf),
       };
+
+      if (activeBotTab === "sub2") {
+        strategyConfig.ENABLE_STRATEGY_SMC = Boolean(strat.main ?? true);
+        strategyConfig.ENABLE_STRATEGY_MAIN = Boolean(strat.main ?? true);
+        strategyConfig.ENABLE_MULTITF_GRID = Boolean(strat.multiTfGrid ?? true);
+        strategyConfig.OB_SOURCE = smcEntryCfg.source || "ALL";
+        strategyConfig.OB_DIRECTION = smcEntryCfg.dir || "BOTH";
+        strategyConfig.OB_VOLATILITY_MULT = parseFloat(smcEntryCfg.obVol) || 2.0;
+        strategyConfig.SWING_LENGTH = parseInt(smcEntryCfg.swingLength) || 50;
+        strategyConfig.INTERNAL_LENGTH = parseInt(smcEntryCfg.internalLength) || 5;
+        strategyConfig.FORCE_MARKET_ENTRY_ON_CROSS = Boolean(smcEntryCfg.forceMarket);
+        strategyConfig.MAX_MARKET_SLIPPAGE_PCT = (parseFloat(smcEntryCfg.maxSlippage) || 0.8) / 100;
+        strategyConfig.ENTRY_OFFSET_PCT = parseFloat(smcEntryCfg.entryOffset || entryCfg.entryOffset) || 0.05;
+        strategyConfig.OB_ENTRY_LEVEL = smcEntryCfg.entryLevel || "OUTER";
+        strategyConfig.OB_MERGE_THRESHOLD_PCT = (parseFloat(smcEntryCfg.mergeThreshold) || 0.50) / 100;
+        strategyConfig.OB_AUTO_MITIGATION = Boolean(smcEntryCfg.autoMitigation ?? true);
+        strategyConfig.OB_MERGE_OVERLAPPING = Boolean(smcEntryCfg.mergeOverlapping ?? true);
+        strategyConfig.OB_TP_MODE = risk.smcTpMode || "RR";
+      }
 
       const res = await fetch(`/api/bot/config?strategy=${activeBotTab}&uid=${currentUid}&account_id=${targetAcc}`, {
         method: "POST",
@@ -2982,11 +3025,24 @@ function App() {
       } else if (activeBotTab === "sub2") {
         setRisk({ posVol: 0.4, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false });
         setStrat({
-          main: true, xole: false, dynamicEma200Tp: false,
+          main: true, multiTfGrid: true, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false, altcoinFollowBtc: false,
           sidewaySafe: false, squeezeEscape: false, safeguardEntry: false,
           trailingSl: false, maxRoi: false, sidewayVap: false, h4Flip: false,
-          timeframeBase: "1H",
+        });
+        setSmcEntryCfg({
+          source: "ALL",
+          dir: "BOTH",
+          obVol: 2.0,
+          swingLength: 50,
+          internalLength: 5,
+          forceMarket: true,
+          maxSlippage: 0.8,
+          entryOffset: "0.05",
+          entryLevel: "OUTER",
+          mergeThreshold: "0.50",
+          autoMitigation: true,
+          mergeOverlapping: true,
         });
         const res = await fetch(`/api/bot/config?strategy=sub2&uid=${currentUid}&account_id=${targetAcc}`, {
           method: "POST",
@@ -2997,7 +3053,24 @@ function App() {
             scalping_sl_pct: 0.01,
             ob_rr_ratio_trend: 5.0,
             ob_rr_ratio_counter: 1.0,
-            strategy_config: { ENABLE_STRATEGY_MAIN: true, ENABLE_STRATEGY_SMC: true }
+            strategy_config: {
+              ENABLE_STRATEGY_MAIN: true,
+              ENABLE_STRATEGY_SMC: true,
+              ENABLE_MULTITF_GRID: true,
+              OB_SOURCE: "ALL",
+              OB_DIRECTION: "BOTH",
+              OB_VOLATILITY_MULT: 2.0,
+              SWING_LENGTH: 50,
+              INTERNAL_LENGTH: 5,
+              FORCE_MARKET_ENTRY_ON_CROSS: true,
+              MAX_MARKET_SLIPPAGE_PCT: 0.008,
+              ENTRY_OFFSET_PCT: 0.05,
+              OB_ENTRY_LEVEL: "OUTER",
+              OB_MERGE_THRESHOLD_PCT: 0.005,
+              OB_AUTO_MITIGATION: true,
+              OB_MERGE_OVERLAPPING: true,
+              ENABLE_TF_VOLUME_MULTIPLIER: false,
+            }
           })
         });
         let cancelMsg = "";
@@ -3827,6 +3900,10 @@ function App() {
                         accountBalance={accountBalance}
                         runningAccId={mergedActiveAccounts[activeBotTab]}
                         accounts={accounts}
+                        propAccounts={propAccounts}
+                        activePropId={activePropId}
+                        risk={risk}
+                        strat={strat}
                       />
                     )}
 

@@ -392,7 +392,8 @@ def main():
     except Exception as e:
         print(f"⚠️ [LỖI API] Không thể kiểm tra số dư ví OKX: {e}")
 
-    print(f"\n✅  SMC ORDER BLOCK BOT KHỞI ĐỘNG TRÊN [{env_file}]...")
+    env_disp = os.path.basename(env_file) if env_file else ".api_sub2"
+    print(f"\n✅  SMC ORDER BLOCK BOT KHỞI ĐỘNG TRÊN [{env_disp}]...")
 
     # Nạp cấu hình JSON ngay khi khởi động
     bot_sub2.load_global_config_from_json(env_paths, bot_config)
@@ -411,6 +412,10 @@ def main():
         last_config_mtime = os.path.getmtime(config_path)
 
     import bots.sub2.bot_ui as bot_ui
+    try:
+        bot_ui.update_wallet_metrics(client, env_paths, system_config)
+    except Exception:
+        pass
 
     while True:
         try:
@@ -463,7 +468,7 @@ def main():
                     # Force-reload bot_models trước để tránh stale cache khi bot_sub2 thay đổi
                     import sys as _sys
                     for _mod_name in list(_sys.modules.keys()):
-                        if 'bots/sub2' in _mod_name and _mod_name != 'bots.sub2.bot_api':
+                        if ('bots.sub2' in _mod_name or 'bots/sub2' in _mod_name) and _mod_name != 'bots.sub2.bot_api':
                             del _sys.modules[_mod_name]
                     import bots.sub2.bot_sub2 as bot_sub2  # re-import fresh
                     import bots.sub2.bot_config as bot_config  # re-import fresh
@@ -543,6 +548,10 @@ def main():
             # 4. CẬP NHẬT GIAO DIỆN TERMINAL (20 giây)
             if now - last_dashboard_update >= 20.0:
                 last_dashboard_update = now
+                try:
+                    bot_ui.update_wallet_metrics(client, env_paths, system_config)
+                except Exception:
+                    pass
                 bot_ui.print_dashboard(state_matrix, env_paths, system_config)
 
             time.sleep(0.1)

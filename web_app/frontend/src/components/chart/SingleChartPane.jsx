@@ -321,7 +321,7 @@ export default function SingleChartPane({
     if (!chartRef.current || !candlesRef.current || candlesRef.current.length === 0) return;
     const total = candlesRef.current.length;
     const candleCount = 60;
-    const rightOffset = 18; // Cách biên phải 16-20 cây nến theo yêu cầu CEO
+    const rightOffset = 24; // Cách biên phải 24 cây nến để hiển thị đủ 2 hộp Dual OB cách nhau 3 nến
     try {
       chartRef.current.priceScale('right').applyOptions({
         autoScale: true,
@@ -555,8 +555,8 @@ export default function SingleChartPane({
 
     if (validObs.length === 0) return [];
 
-    const positions = [];
-    let waitingPos = null;
+        const positions = [];
+    const unhitCandidates = [];
 
     for (let idx = 0; idx < validObs.length; idx++) {
       const ob = validObs[idx];
@@ -565,14 +565,19 @@ export default function SingleChartPane({
       // 1. ENTRY: Luôn đặt tại biên của OB (Long: biên trên ob.high, Short: biên dưới ob.low)
       const entryPrice = isBull ? ob.high : ob.low;
 
-      // 2. STOP LOSS: Luôn đặt tại biên đối diện của OB (Long: biên dưới ob.low, Short: biên trên ob.high)
-      const slTarget = isBull ? ob.low : ob.high;
-
-      // 3. TAKE PROFIT: Tỷ lệ RR theo cấu hình (mặc định 5.0R thuận trend)
+      // 2. STOP LOSS & TAKE PROFIT THEO HỆ SỐ R (Mặc định TP: 5R, SL: 1R = mép đối diện của OB; nếu 2R thì x2 độ dày OB)
       const obHeight = Math.abs(ob.high - ob.low);
+      const slRatio = (riskRef.current && riskRef.current.slPct && !isNaN(riskRef.current.slPct) && Number(riskRef.current.slPct) > 0)
+        ? Number(riskRef.current.slPct)
+        : 1.0;
       const rrRatio = (riskRef.current && riskRef.current.tpPct && !isNaN(riskRef.current.tpPct) && Number(riskRef.current.tpPct) > 0)
         ? Number(riskRef.current.tpPct)
         : 5.0;
+
+      const slTarget = isBull
+        ? (entryPrice - obHeight * slRatio)
+        : (entryPrice + obHeight * slRatio);
+
       const tpTarget = isBull
         ? (entryPrice + obHeight * rrRatio)
         : (entryPrice - obHeight * rrRatio);
@@ -625,23 +630,17 @@ export default function SingleChartPane({
         }
       }
 
-      // TRƯỜNG HỢP 1: Giá CHƯA vòng về chạm Entry -> Box tịnh tiến dóng thẳng hàng theo cây nến hiện tại
+      // TRƯỜNG HỢP 1: Giá CHƯA vòng về chạm Entry -> Thu thập làm ứng viên Waiting Position
       if (hitEntryIdx === -1) {
-        if (idx === validObs.length - 1) {
-          const curIdx = candles.length - 1;
-          waitingPos = {
-            entryTime: candles[curIdx].time,
-            entryPrice,
-            tpTarget,
-            slTarget,
-            exitTime: null,
-            exitResult: null,
-            entryType,
-            state: 'waiting',
-            isSmcBot: true,
-            isWaiting: true,
-          };
-        }
+        unhitCandidates.push({
+          ob,
+          isBull,
+          entryPrice,
+          tpTarget,
+          slTarget,
+          entryType,
+          obIdx,
+        });
         continue;
       }
 
@@ -696,8 +695,124 @@ export default function SingleChartPane({
       });
     }
 
-    if (waitingPos) {
-      positions.push(waitingPos);
+    // DUAL NEAREST OB: Luôn duy trì 2 kịch bản Long & Short chờ sẵn ở 2 dải OB Xanh - Đỏ gần nhất trên cùng chart
+    const curIdx = candles.length - 1;
+    const curCandle = candles[curIdx];
+    const livePrice = curCandle ? curCandle.close : 0;
+
+    const unhitBulls = unhitCandidates.filter(c => c.isBull);
+    const unhitBears = unhitCandidates.filter(c => !c.isBull);
+
+    // 1. Tìm Bullish OB gần nhất ở dưới giá (Cầu đón mua)
+    let bestBull = null;
+    const bullsBelow = unhitBulls.filter(b => b.entryPrice <= livePrice * 1.002);
+    if (bullsBelow.length > 0) {
+      bestBull = bullsBelow.reduce((prev, curr) => (curr.entryPrice > prev.entryPrice ? curr : prev));
+    } else if (unhitBulls.length > 0) {
+      bestBull = unhitBulls[unhitBulls.length - 1];
+    }
+
+    // 2. Tìm Bearish OB gần nhất ở trên giá (Cung đón bán)
+    let bestBear = null;
+    const bearsAbove = unhitBears.filter(b => b.entryPrice >= livePrice * 0.998);
+    if (bearsAbove.length > 0) {
+      bestBear = bearsAbove.reduce((prev, curr) => (curr.entryPrice < prev.entryPrice ? curr : prev));
+    } else if (unhitBears.length > 0) {
+      bestBear = unhitBears[unhitBears.length - 1];
+    }
+
+    // 3. Kiểm tra điều kiện an toàn: Không đè nhau, cách nhau >= 5 nến và >= 0.5% giá
+    let allowBull = bestBull !== null;
+    let allowBear = bestBear !== null;
+
+    if (bestBull && bestBear) {
+      const isOverlapping = bestBull.entryPrice >= bestBear.entryPrice;
+      const candleDist = Math.abs(bestBull.obIdx - bestBear.obIdx);
+      const priceGap = livePrice > 0 ? Math.abs(bestBear.entryPrice - bestBull.entryPrice) / livePrice : 0;
+
+      if (isOverlapping || candleDist < 5 || priceGap < 0.005) {
+        // Vi phạm khoảng cách: Ưu tiên OB gần livePrice hơn
+        const distBull = Math.abs(livePrice - bestBull.entryPrice);
+        const distBear = Math.abs(livePrice - bestBear.entryPrice);
+        if (distBull < distBear) {
+          allowBear = false;
+        } else {
+          allowBull = false;
+        }
+      }
+    }
+
+    const BOX_WIDTH = 8; // Chiều rộng mỗi hộp setup (8 nến)
+    const BOX_GAP = 3;   // Khoảng cách giữa 2 hộp setup (cách nhau 3 nến theo yêu cầu CEO)
+
+    // Xác định hộp nào gần giá hơn để hiển thị trước tại nến hiện tại, hộp xa hơn tịnh tiến ra sau
+    let bullOffset = 0;
+    let bearOffset = 0;
+
+    if (allowBull && allowBear && bestBull && bestBear) {
+      const distBull = Math.abs(livePrice - bestBull.entryPrice);
+      const distBear = Math.abs(livePrice - bestBear.entryPrice);
+
+      if (distBull <= distBear) {
+        // Giá gần Bullish OB (Long) hơn -> Long ở nến hiện tại, Short tịnh tiến ra sau vượt qua hộp 1 và cách 3 nến
+        bullOffset = 0;
+        bearOffset = BOX_WIDTH + BOX_GAP; // 8 + 3 = 11 nến
+      } else {
+        // Giá gần Bearish OB (Short) hơn -> Short ở nến hiện tại, Long tịnh tiến ra sau vượt qua hộp 1 và cách 3 nến
+        bearOffset = 0;
+        bullOffset = BOX_WIDTH + BOX_GAP; // 8 + 3 = 11 nến
+      }
+    }
+
+    // ⚡ CHẾ ĐỘ CHỐT LỜI SMC: "NEAREST_OB" (Chốt lời theo OB ngược chiều) hoặc "RR" (Cố định theo R)
+    const isNearestObMode = (riskRef.current?.smcTpMode === "NEAREST_OB");
+
+    let bullTpTarget = bestBull ? bestBull.tpTarget : 0;
+    let bearTpTarget = bestBear ? bestBear.tpTarget : 0;
+
+    if (bestBull && bestBear && isNearestObMode) {
+      // Long: Ưu tiên chạm mép Entry Short là chốt lời. Nếu số R tính ra nhỏ hơn (chưa tới cản) thì giữ theo số R đó
+      if (bestBear.entryPrice > bestBull.entryPrice) {
+        bullTpTarget = Math.min(bestBull.tpTarget, bestBear.entryPrice);
+      }
+      // Short: Ưu tiên chạm mép Entry Long là chốt lời. Nếu số R tính ra nhỏ hơn (chưa tới cản) thì giữ theo số R đó
+      if (bestBull.entryPrice < bestBear.entryPrice) {
+        bearTpTarget = Math.max(bestBear.tpTarget, bestBull.entryPrice);
+      }
+    }
+
+    if (allowBull && bestBull && curCandle) {
+      positions.push({
+        entryTime: curCandle.time,
+        entryPrice: bestBull.entryPrice,
+        tpTarget: bullTpTarget,
+        slTarget: bestBull.slTarget,
+        exitTime: null,
+        exitResult: null,
+        entryType: 'Long',
+        state: 'waiting',
+        isSmcBot: true,
+        isWaiting: true,
+        offsetBars: bullOffset,
+        boxWidthBars: BOX_WIDTH,
+      });
+    }
+
+    if (allowBear && bestBear && curCandle) {
+      positions.push({
+        entryTime: curCandle.time,
+        entryPrice: bestBear.entryPrice,
+        tpTarget: bearTpTarget,
+        slTarget: bestBear.slTarget,
+        exitTime: null,
+        exitResult: null,
+        entryType: 'Short',
+        state: 'waiting',
+        isSmcBot: true,
+        isWaiting: true,
+        offsetBars: bearOffset,
+        boxWidthBars: BOX_WIDTH,
+      });
     }
 
     return positions;
@@ -893,10 +1008,13 @@ export default function SingleChartPane({
         let startX = null;
         let endX = null;
         const logicalRange = c.timeScale().getVisibleLogicalRange();
+        const offsetBars = pos.offsetBars || 0;
+        const boxWidthBars = pos.boxWidthBars || 8;
 
         if (logicalRange && logicalRange.to > logicalRange.from) {
           const barWidth = maxRightX / (logicalRange.to - logicalRange.from);
-          startX = Math.floor((entryIdx - logicalRange.from) * barWidth);
+          const effectiveEntryIdx = entryIdx + offsetBars;
+          startX = Math.floor((effectiveEntryIdx - logicalRange.from) * barWidth);
 
           if (pos.exitTime) {
             const exitTimeSec = pos.exitTime > 100000000000 ? Math.floor(pos.exitTime / 1000) : pos.exitTime;
@@ -908,7 +1026,7 @@ export default function SingleChartPane({
             }
           } else {
             const curIdx = candles.length - 1;
-            const targetIdx = pos.isWaiting ? (entryIdx + 10) : Math.max(entryIdx + 10, curIdx + 1);
+            const targetIdx = pos.isWaiting ? (effectiveEntryIdx + boxWidthBars) : Math.max(entryIdx + 10, curIdx + 1);
             endX = Math.floor((targetIdx - logicalRange.from) * barWidth);
           }
         } else {
@@ -936,9 +1054,11 @@ export default function SingleChartPane({
             } catch { }
           } else {
             try {
-              const curIdx = candles.length - 1;
-              const count = pos.isWaiting ? 10 : Math.max(10, curIdx - entryIdx + 1);
-              endX = Math.floor(startX + count * barSpacing);
+              if (startX !== null) {
+                startX = Math.floor(startX + offsetBars * barSpacing);
+                const count = pos.isWaiting ? boxWidthBars : Math.max(10, (candles.length - 1) - entryIdx + 1);
+                endX = Math.floor(startX + count * barSpacing);
+              }
             } catch { }
           }
         }
@@ -1457,7 +1577,7 @@ export default function SingleChartPane({
         timeVisible: true,
         secondsVisible: false,
         ticksVisible: false,
-        rightOffset: 18,
+        rightOffset: 24,
         barSpacing: 12,
         minBarSpacing: 3,
         borderColor: '#2a2e39',

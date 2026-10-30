@@ -261,6 +261,7 @@ class ConfigUpdate(BaseModel):
     scalping_sl_pct: Optional[float] = None
     ob_rr_ratio_trend: Optional[float] = None
     ob_rr_ratio_counter: Optional[float] = None
+    ob_tp_mode: Optional[str] = None
     strategy_config: Optional[Dict[str, Any]] = None
     enable_pyramid_dca: Optional[bool] = None
     enable_negative_dca: Optional[bool] = None
@@ -2584,18 +2585,25 @@ def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] =
                     "ENABLE_TF_VOLUME_MULTIPLIER": False,
                     "ENABLE_STRATEGY_MAIN": True,
                     "ENABLE_STRATEGY_SMC": True,
+                    "ENABLE_MULTITF_GRID": True,
+                    "OB_SOURCE": "ALL",
+                    "OB_DIRECTION": "BOTH",
+                    "OB_VOLATILITY_MULT": 2.0,
+                    "OB_TP_MODE": "RR",
+                    "SWING_LENGTH": 50,
+                    "INTERNAL_LENGTH": 5,
+                    "FORCE_MARKET_ENTRY_ON_CROSS": True,
+                    "MAX_MARKET_SLIPPAGE_PCT": 0.008,
+                    "ENTRY_OFFSET_PCT": 0.05,
+                    "OB_ENTRY_LEVEL": "OUTER",
+                    "OB_MERGE_THRESHOLD_PCT": 0.005,
+                    "OB_AUTO_MITIGATION": True,
+                    "OB_MERGE_OVERLAPPING": True,
                     "ENABLE_PYRAMID_DCA": False,
                     "ENABLE_NEGATIVE_DCA": False,
-                    "ENABLE_MULTITF_GRID": True,
                     "ENABLE_STRATEGY_HEDGE": False,
                     "ENABLE_DYNAMIC_EMA200_TP": False,
                     "ALTCOIN_FOLLOW_BTC_EMA": False,
-                    "ENTRY_OFFSET_PCT": 0.05,
-                    "DCA_GAP_PCT": 0.20,
-                    "CONFLUENCE_PCT": 0.23,
-                    "ACCUM_CANDLES": 60,
-                    "ETH_VOL_MULT": 1.30,
-                    "ETH_VOLATILITY_FACTOR": 1.30
                 }
             else:
                 default_cfg = {
@@ -2766,6 +2774,8 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         cfg["OB_RR_RATIO_COUNTER"] = update_data.ob_rr_ratio_counter
         if strategy == "sub2":
             cfg["SCALPING_SL_PCT"] = update_data.ob_rr_ratio_counter / 100.0
+    if update_data.ob_tp_mode is not None:
+        cfg["OB_TP_MODE"] = update_data.ob_tp_mode
     if update_data.strategy_config is not None:
         for k, v in update_data.strategy_config.items():
             cfg[k] = v

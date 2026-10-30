@@ -18,5 +18,5 @@ export const COIN_LIST = [
 ];
 
 export const TF_LIST = ["1m", "5m", "15m", "30m", "1H", "2H", "4H", "1D"];
-export const BOT_TFS = ["M5", "M15", "M30", "H1", "H2", "H4"];
+export const BOT_TFS = ["M5", "M15", "M30", "H1", "H2", "H4", "D1"];
 export const ADMIN_UID = "admin";

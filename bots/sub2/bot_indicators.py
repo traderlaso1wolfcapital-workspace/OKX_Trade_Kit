@@ -346,7 +346,8 @@ def find_order_block(
         raw_low=raw_l,
         bar_time=times[best_i],
         bias=bias,
-        source=source
+        source=source,
+        bar_index=best_i
     )
 
 
@@ -367,9 +368,11 @@ def mitigate_order_blocks(
     for ob in obs:
         if ob.bias == BEARISH and bear_source > ob.bar_high:
             ob.crossed = True
+            ob.mitigated = True
             continue
         elif ob.bias == BULLISH and bull_source < ob.bar_low:
             ob.crossed = True
+            ob.mitigated = True
             continue
         active.append(ob)
     return active
@@ -405,22 +408,154 @@ def nearest_opposite_ob_tp(
 # TRADE SETUP - registerOBTradeSetup()
 # =============================================================================
 
-def register_trade_setups_for_ob(ob: OrderBlock, current_bar: int, swing_trend: int = 0, is_hedge: bool = False) -> list[TradeSetup]:
+def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
     """
-    Logic PineScript gốc: 1 OB → 1 setup theo bias của OB.
-    - Bullish OB: Entry = bar_high, SL = bar_low → LONG
-    - Bearish OB: Entry = bar_low, SL = bar_high → SHORT
-    - MAIN (M15 thuận trend): TP = 1R
-    - HEDGE (M30 ngược trend): TP = 3R (reward cao hơn)
+    Tính toán Order Blocks theo chuẩn chỉ báo trên web chart (đồng bộ 100% với SingleChartPane và backend /api/market/candles).
+    all_candles: danh sách nến từ OKX (từ mới đến cũ hoặc từ cũ đến mới).
     """
-    if ob.source not in ("SWING", "INTERNAL"):
+    if not all_candles or len(all_candles) < 5:
+        return []
+    try:
+        # Chuẩn hóa về thứ tự từ cũ đến mới (oldest to newest)
+        c0_time = int(all_candles[0][0])
+        c1_time = int(all_candles[-1][0])
+        if c0_time > c1_time:
+            candles = all_candles[::-1]
+        else:
+            candles = all_candles.copy()
+
+        # Bỏ nến đang hình thành (unclosed candle) để giá trị OB ổn định 100%, không nhảy theo tick
+        if len(candles) > 10:
+            candles = candles[:-1]
+
+        n = len(candles)
+        times = [int(c[0]) for c in candles]
+        opens = [Decimal(str(c[1])) for c in candles]
+        highs = [Decimal(str(c[2])) for c in candles]
+        lows = [Decimal(str(c[3])) for c in candles]
+        closes = [Decimal(str(c[4])) for c in candles]
+
+        atr_period = 14
+        tr_list = []
+        for i in range(1, n):
+            tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
+            tr_list.append(tr)
+        if len(tr_list) >= atr_period:
+            atr = sum(tr_list[-atr_period:]) / Decimal(atr_period)
+        else:
+            atr = sum(tr_list) / Decimal(len(tr_list)) if tr_list else Decimal("100")
+
+        recent_count = min(n, 150)
+        start_idx = n - recent_count
+        raw_obs = []
+        for i in range(max(2, start_idx), n - 1):
+            # Bullish FVG & Bullish OB
+            if lows[i+1] > highs[i-1]:
+                gap = lows[i+1] - highs[i-1]
+                if gap >= atr * Decimal("0.2"):
+                    for j in range(i, max(-1, i - 4), -1):
+                        if closes[j] < opens[j]:
+                            raw_obs.append({
+                                "bias": BULLISH,
+                                "time": times[j],
+                                "high": highs[j],
+                                "low": lows[j],
+                                "candle_idx": j
+                            })
+                            break
+            # Bearish FVG & Bearish OB
+            elif highs[i+1] < lows[i-1]:
+                gap = lows[i-1] - highs[i+1]
+                if gap >= atr * Decimal("0.2"):
+                    for j in range(i, max(-1, i - 4), -1):
+                        if closes[j] > opens[j]:
+                            raw_obs.append({
+                                "bias": BEARISH,
+                                "time": times[j],
+                                "high": highs[j],
+                                "low": lows[j],
+                                "candle_idx": j
+                            })
+                            break
+
+        # Lọc bỏ OB đã bị giá đóng cửa đâm xuyên (mitigated)
+        unmitigated = []
+        for ob in raw_obs:
+            j = ob.get("candle_idx", 0)
+            ob_low = ob["low"]
+            ob_high = ob["high"]
+            is_pierced = False
+            for k in range(j + 1, n):
+                if ob["bias"] == BULLISH and closes[k] < ob_low:
+                    is_pierced = True
+                    break
+                elif ob["bias"] == BEARISH and closes[k] > ob_high:
+                    is_pierced = True
+                    break
+            if not is_pierced:
+                unmitigated.append(ob)
+
+        # Lọc và gộp các vùng OB đè nhau cùng chiều
+        merged_obs = []
+        for bias in [BULLISH, BEARISH]:
+            biased = [o for o in unmitigated if o["bias"] == bias]
+            biased.sort(key=lambda x: x["low"])
+            merged = []
+            for o in biased:
+                if not merged:
+                    merged.append(o)
+                else:
+                    last = merged[-1]
+                    if last["high"] >= o["low"]:
+                        last["high"] = max(last["high"], o["high"])
+                        if o["time"] > 0 and last["time"] > 0:
+                            last["time"] = min(last["time"], o["time"])
+                        elif o["time"] > 0:
+                            last["time"] = o["time"]
+                    else:
+                        merged.append(o)
+            merged_obs.extend(merged)
+
+        # Tạo OrderBlock objects
+        ob_objects = []
+        for o in merged_obs:
+            ob_obj = OrderBlock(
+                bar_high=o["high"],
+                bar_low=o["low"],
+                raw_high=o["high"],
+                raw_low=o["low"],
+                bar_time=o["time"],
+                bias=o["bias"],
+                source="SWING",
+                bar_index=o.get("candle_idx", 0)
+            )
+            ob_objects.append(ob_obj)
+        return ob_objects
+    except Exception as e:
+        print(f"⚠️ [SMC INDICATOR] Lỗi tính compute_chart_ob_boxes: {e}")
+        return []
+
+def register_trade_setups_for_ob(
+    ob: OrderBlock,
+    current_bar: int,
+    swing_trend: int = 0,
+    is_hedge: bool = False,
+    tf: str = "",
+    entry_offset_pct: Decimal = Decimal("0"),
+    entry_level: str = "OUTER"
+) -> list[TradeSetup]:
+    """
+    Logic PineScript gốc: 1 OB -> 1 setup theo bias của OB.
+    Hỗ trợ Multi-TF độc lập: gắn nhãn tf, tính entry offset và R:R chuẩn.
+    - Bullish OB: Entry = bar_high (hoặc 50% OB), SL = bar_low -> LONG
+    - Bearish OB: Entry = bar_low (hoặc 50% OB), SL = bar_high -> SHORT
+    """
+    if ob.source not in ("SWING", "INTERNAL", "CHART"):
         return []
 
     if ob.bias not in (BULLISH, BEARISH):
         return []
 
-    # Xác định đỉnh/đáy THỰC của OB từ raw (ưu tiên) hoặc bar
-    # Tránh raw_high/raw_low = 0 (chưa set) gây sai lệch
     candidates_high = [ob.bar_high, ob.bar_low]
     candidates_low = [ob.bar_high, ob.bar_low]
     if ob.raw_high > Decimal("0"): candidates_high.append(ob.raw_high)
@@ -428,51 +563,57 @@ def register_trade_setups_for_ob(ob: OrderBlock, current_bar: int, swing_trend: 
     real_high = max(candidates_high)
     real_low = min(candidates_low)
 
-    # Entry & SL theo bias Pinescript gốc:
-    # - Bullish OB: LONG từ barHigh xuống, SL = barLow
-    # - Bearish OB: SHORT từ barLow lên, SL = barHigh
-    if ob.bias == BULLISH:
-        entry = real_high
-        sl = real_low
+    if entry_level == "EQUILIBRIUM":
+        entry = (real_high + real_low) / Decimal("2")
+        sl = real_low if ob.bias == BULLISH else real_high
     else:
-        entry = real_low
-        sl = real_high
+        if ob.bias == BULLISH:
+            entry = real_high
+            sl = real_low
+        else:
+            entry = real_low
+            sl = real_high
 
-    # GUARD: Đảm bảo Entry < SL cho SHORT, Entry > SL cho LONG
+    if entry_offset_pct > Decimal("0"):
+        if ob.bias == BULLISH:
+            entry = entry * (Decimal("1") + entry_offset_pct)
+        else:
+            entry = entry * (Decimal("1") - entry_offset_pct)
+
     if ob.bias == BEARISH and entry >= sl:
         entry, sl = sl, entry
     elif ob.bias == BULLISH and entry <= sl:
         entry, sl = sl, entry
 
     risk = abs(entry - sl)
-
-    # Filter: bỏ qua OB có risk quá nhỏ hoặc entry/sl bất thường
     min_risk_pct = Decimal("0.001")
     if risk <= Decimal("0") or risk < entry * min_risk_pct or entry <= Decimal("0") or sl <= Decimal("0"):
         return []
 
-    # Filter: bỏ qua OB có risk quá nhỏ
-    min_risk_pct = Decimal("0.001")  # 0.1%
-    if risk <= Decimal("0") or risk < max(real_high, real_low) * min_risk_pct:
+    if risk < max(real_high, real_low) * min_risk_pct:
         return []
 
-    # TP: Base timeframe (is_hedge=False) dùng OB_RR_RATIO_TREND, Hedge timeframe (is_hedge=True) dùng OB_RR_RATIO_COUNTER
     from bots.sub2 import bot_config
-    tp_mult = getattr(bot_config, "OB_RR_RATIO_COUNTER", Decimal("1.0")) if is_hedge else getattr(bot_config, "OB_RR_RATIO_TREND", Decimal("5.0"))
+    tp_mult = getattr(bot_config, "OB_RR_RATIO_TREND", Decimal("5.0"))
+    sl_mult = getattr(bot_config, "OB_SL_RATIO", getattr(bot_config, "OB_RR_RATIO_COUNTER", Decimal("1.0")))
 
     if ob.bias == BULLISH:
         tp = entry + risk * tp_mult
+        effective_sl = entry - risk * sl_mult
     else:
         tp = entry - risk * tp_mult
+        effective_sl = entry + risk * sl_mult
 
+    target_tf = tf or getattr(ob, "tf", "")
     source_label = ob.source
     setup = TradeSetup(
         bias=ob.bias,
         entry_price=entry,
-        stop_loss=sl,
+        stop_loss=effective_sl,
         take_profit=tp,
         ob_source=source_label,
-        created_bar=current_bar
+        created_bar=current_bar,
+        tf=target_tf
     )
     return [setup]
 

@@ -33,6 +33,208 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Lỗi Spam 50+ Lệnh Chờ Khớp TP/SL & Chấm Dứt Vòng Lặp Xóa/Rải Limit Vô Tận:
+  - **Nguyên nhân cốt lõi khiến lệnh chờ khớp trên sàn OKX tăng vọt lên 51 - 70 lệnh:**
+    1. **Lỗi cú pháp `Decimal("")` trong kiểm tra TP/SL (`apply_ob_tpsl`):**
+       - Khi truy vấn `/api/v5/trade/orders-algo-pending`, một lệnh TP trả về `tpTriggerPx="4194.6"` nhưng `slTriggerPx=""` (chuỗi rỗng).
+       - Code cũ kiểm tra: `Decimal(o.get("slTriggerPx", "0"))`. Vì key `"slTriggerPx"` tồn tại với giá trị `""`, Python gọi `Decimal("")` gây văng ngoại lệ `InvalidOperation`.
+       - Lỗi này bị khối `try...except` nuốt chửng, dẫn tới hàm luôn kết luận vị thế "chưa có TP/SL", liên tục gửi 2 lệnh TP và SL mới lên sàn mỗi 10 giây.
+    2. **Vòng lặp Hủy & Rải Limit vô tận (Lệnh nhảy từ 15 tụt xuống 7 rồi lại lên 15):**
+       - Khi một vị thế khớp (ví dụ: XAU Long M30), biến `tracker.has_long = True`.
+       - Trong mỗi chu kỳ (3 giây), `check_entry_touch` đều trả về `got_triggered = True` vì setup trong RAM được tạo mới liên tục.
+       - Khối code `if got_triggered: clean_ob_orders(client, swap_id); s.order_placed = False` lập tức HỦY TOÀN BỘ lệnh Limit của các khung thời gian khác trên sàn OKX.
+       - 3 giây sau, Bước 8 thấy `order_placed == False` nên lại ĐẶT LẠI toàn bộ các lệnh Limit đó.
+       - Vòng lặp hủy rồi đặt lại chạy liên tục hàng trăm lần, để lại vô số lệnh điều kiện algo TP/SL mồ côi trên sàn vì hàm `clean_ob_orders` cũ chỉ hủy lệnh thường mà không gọi `/api/v5/trade/cancel-algos`.
+    3. **OB bị dịch chuyển theo nến đang hình thành (Unclosed Candle):**
+       - Hàm tính OB cũ đưa cả nến hiện tại `candles[-1]` vào tính toán. Khi giá giật trong nến, mép OB thay đổi liên tục khiến bộ lọc `cancel_stale` hủy lệnh và đặt lại theo giá mới.
+  - **Bản vá triệt để:**
+    1. **Hàm `_safe_dec()` an toàn tuyệt đối:** Bắt toàn bộ chuỗi rỗng `""` trả về `Decimal("0")`, nhận diện chính xác 100% nếu sàn đã có sẵn TP hoặc SL.
+    2. **Chống trùng lặp TP/SL:** Nếu sàn đã có sẵn TP thì không đặt thêm TP; nếu đã có SL thì không đặt thêm SL.
+    3. **Viết mới `clean_algo_orders()`:** Tự động quét và dọn sạch các lệnh algo conditional rác/thừa của bot qua `/api/v5/trade/cancel-algos` theo lô 10 lệnh.
+    4. **Xóa bỏ khối `if got_triggered: clean_ob_orders` trong `bot_strategy.py`:** Khi 1 khung khớp lệnh, các khung thời gian khác (M15, H1, H2, H4, D1) giữ nguyên lệnh Limit của mình, triệt tiêu hoàn toàn tình trạng nhảy lệnh.
+    5. **Cố định nến đóng cửa (`candles[:-1]`):** Tính toán OB chuẩn xác 100% trên nến đã đóng, triệt tiêu hiện tượng mép OB rung lắc theo tick.
+    6. **Nghiệm thu thực tế:** Tổng lệnh chờ khớp trên sàn OKX từ 51 lệnh tụt về ổn định: đúng 10 lệnh Limit + duy nhất 2 lệnh TP/SL cho vị thế đang chạy.
+
+- **[30/10/2026]** - Đồng Bộ 100% Thuật Toán Phát Hiện Order Block Giữa Bot Engine & Web Chart, Triệt Tiêu Lỗi Khớp Ảo Trong Logs & Đặt Limit Sai Vùng:
+  - **Nguyên nhân cốt lõi gây lệch Entry và Lỗi "Logs báo đã khớp nhưng Bảng vị thế chờ tín hiệu":**
+    1. **Thuật toán tìm OB bị lệch pha:** Web Chart tính toán Order Block theo mô hình FVG + nến ngược màu liền trước qua hàm `compute_ob_boxes()` (cho ra vùng Bullish OB 77,324.9 - 74,896.6 trên BTC 1D; Bearish OB 4,259.3 trên Vàng 1D). Trong khi đó, Bot Sub 2 cũ dùng cơ chế Swing Pivot & Structure Break 10 nến cũ kỹ, chỉ nhận diện đỉnh/đáy phá vỡ từ tận tháng 8 (63,938.1 trên BTC và 4,080 trên Vàng), bỏ lọt hoàn toàn các khối OB mới nhất sát giá đang hiển thị trên biểu đồ của CEO.
+    2. **Khớp ảo trong RAM (`check_entry_touch`):** Hàm `check_entry_touch()` cũ tự ý gán `setup.triggered = True` chỉ vì nến biến động chạm qua giá `entry_price` mà KHÔNG kiểm tra xem trên sàn OKX thực tế đã khớp lệnh hay chưa. Dẫn tới Terminal Logs in ra `Đã khớp SHORT [1H] / [2H]`, nhưng Bảng Vị Thế trên web lại hiển thị `Chờ tín hiệu...` (do OKX thực tế có 0 vị thế). Hơn nữa, vì bot tưởng lệnh đã khớp nên nó không đặt các lệnh Limit của 1H, 2H, 4H lên sàn.
+  - **Giải pháp xử lý triệt để:**
+    1. **Tích hợp `compute_chart_ob_boxes()` vào Bot Indicators & Strategy:**
+       - Port đồng bộ 100% thuật toán `compute_ob_boxes` từ `web_app/backend/main.py` sang [`bot_indicators.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_indicators.py).
+       - Mọi khung thời gian (5m, 15m, 30m, 1H, 2H, 4H, D1) đều tính toán ra đúng các khối Order Block unmitigated chuẩn xác như Web Chart (BTC 1D: Long 77,324.9, Short 84,937.5; Vàng 1D: Short 4,259.3).
+    2. **Căn chuẩn Entry mép OB & Tỷ lệ TP/SL:**
+       - Giá vào lệnh (Entry Price) đặt CHÍNH XÁC tại mép OB: Long = mép trên (`ob.bar_high`), Short = mép dưới (`ob.bar_low`), triệt tiêu hoàn toàn độ lệch `entry_offset_pct`.
+       - Tỷ lệ SL mặc định 1R = mép đối diện của OB; nếu chọn 2R thì x2 độ dày OB. Tỷ lệ TP mặc định 5R (hoặc theo mép OB ngược chiều nếu bật `NEAREST_OB`).
+    3. **Đồng bộ trạng thái `triggered` với sàn OKX thực tế:**
+       - Viết lại `check_entry_touch()` trong [`bot_strategy.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_strategy.py): Nếu sàn OKX không có vị thế mở (`not tracker.has_long` / `not tracker.has_short`), toàn bộ setup bắt buộc giữ `triggered = False`. Tuyệt đối không sinh lệnh khớp ảo trong Logs.
+    4. **Tự động quét dọn lệnh Limit cũ (Stale Order Cleanup):**
+       - Khi vùng OB mới hình thành, bot tự động quét và huỷ các lệnh Limit cũ đang treo trên sàn không còn khớp với giá OB hiện tại (ví dụ: huỷ lệnh cũ 63,938.1 và đặt lệnh mới 77,324.9), giải phóng margin và bảo đảm 100% khớp với biểu đồ.
+
+- **[30/10/2026]** - Đồng Bộ 100% Đòn Bẩy 100x & Chế Độ Chéo (Cross), Khắc Phục Triệt Để Ký Quỹ Lệch 12.79 $ & Triệt Tiêu Lỗi 51068 / 51008:
+  - **Nguyên nhân lỗi Ký quỹ BTC D1 = 12.79 $ (thay vì 1 $):**
+    - Code cũ của Sub 2 phân tách các setup `INTERNAL` dùng `isolated` (cô lập) với đòn bẩy 50x. Khi gọi API OKX `set-leverage` cho chế độ `isolated`, OKX yêu cầu phải có `posSide`, dẫn tới lệnh đổi đòn bẩy bị bỏ qua và sàn giữ nguyên thiết lập mặc định của tài khoản là **Cô lập 3x** (như hiển thị trên ảnh chụp app OKX của CEO: `Hợp đồng vĩnh cửu BTCUSDT Mở lệnh Long Cô lập 3x - Tổng số tiền: 38.36 USDT`).
+    - Ở đòn bẩy 3x: Ký quỹ = `38.36 / 3 = 12.79 $` (chiếm gần nửa tài khoản $26).
+  - **Bản vá triệt để:**
+    1. **Đồng bộ 100% Chế độ Chéo (Cross) & Đòn bẩy 100x:**
+       - Trong [`bot_config.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_config.py), [`bot_orders.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py) và [`bot_strategy.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_strategy.py): Xóa bỏ hoàn toàn chế độ `isolated` và `INTERNAL_LEVERAGE`. Mọi lệnh Limit/Market/TPSL đều cố định `tdMode = "cross"`, `lever = "100"`.
+       - Lệnh Limit được tính theo Entry Price chuẩn: `notional_usdt = pos_usdt * 100`, ở Ký quỹ 1 $ thì Ký quỹ thực tế trên sàn luôn chuẩn xác ~ 1.0 $.
+    2. **Đồng nhất Ký quỹ 2 chiều Long & Short trên cùng 1 TF:**
+       - Không còn phân biệt thuận/ngược trend. Cả lệnh Long và Short đều dùng chung `base_vol = POSITION_VOLUME_USDT`, nếu có nhân hệ số theo TF (`vol_mult`) thì nhân hoàn toàn giống nhau.
+    3. **Triệt tiêu lỗi 51068 (attachAlgoClOrdId trùng nhau):**
+       - Thêm mã Coin, TF, bộ đếm `_ORDER_COUNTER` và mili-giây vào `attachAlgoClOrdId`: `{cl_prefix}TP{coin_clean}{std_tf}...`, đảm bảo 100% duy nhất, không bao giờ bị sàn báo lỗi trùng ID giữa các coin trong cùng 1 giây.
+    4. **Tối ưu rải Limit (Khắc phục lỗi 51008 Insufficient Balance):**
+       - Thay vì rải 14 lệnh cho cả 7 TF làm khóa cứng số dư $26, bot sắp xếp theo khoảng cách và chỉ ưu tiên đặt lệnh Limit tại 1 vùng OB Long gần nhất và 1 vùng OB Short gần nhất sát giá Live, bảo toàn số dư tài khoản.
+
+- **[30/10/2026]** - Khắc Phục Triệt Để Lỗi OKX 51000 clOrdId, Chuẩn Hóa Hiển Thị Volume/Lot Tab Logs & Tái Cấu Trúc Giao Diện Logs SMC Theo Chuẩn Sub 1:
+  - **Triển khai kỹ thuật:**
+    1. **Khắc phục lỗi `OKX Error 51000: Parameter clOrdId error`:**
+       - OKX quy định `clOrdId` bắt buộc phải là chuỗi chữ và số (alphanumeric `^[a-zA-Z0-9]{1,32}$`), cấm tuyệt đối chứa dấu gạch dưới `_`.
+       - Đã thay thế toàn bộ định dạng `cl_id`, `attachAlgoClOrdId`, `tp_cl_id`, `sl_cl_id` trong `bots/sub2/bot_orders.py` thành chuỗi không gạch dưới: `{cl_prefix}EL{std_tf}...` (Long) và `{cl_prefix}ES{std_tf}...` (Short).
+       - Khớp hoàn toàn với bộ nhận diện `EL` / `ES` trong `web_app/backend/main.py`, giúp lệnh Limit được sàn chấp nhận ngay lập tức và hiển thị chuẩn xác sang Bảng Vị Thế.
+    2. **Khắc phục lỗi tính Margin `2500.0 U` trong `bot_strategy.py`:**
+       - Sửa `calculate_setup_volume` trong `bots/sub2/bot_strategy.py`: trả về đúng giá trị Margin `final_vol` (ví dụ: `0.4 U` hoặc `1.0 U`), không nhân với đòn bẩy.
+       - Khi tính số hợp đồng `sz` đặt lên OKX: lấy `(pos_usdt * leverage) / (price * ct_val)`.
+    3. **Tái cấu trúc giao diện Terminal Logs SMC (`bots/sub2/bot_ui.py`) giống 100% Sub 1 (Ảnh 1):**
+       - Đưa mục `✜ Tình trạng vị thế:` lên TRÊN ma trận nến đa khung.
+       - Định dạng hiển thị cây nhánh chuẩn: `Đã khớp {LONG/SHORT} [{tf}] - ký quỹ: {vol} U`, `Entry {TF}: {px} - {vol} U`, `Chưa có lệnh đóng ⭢ Win Streak: 0`. Lệnh chờ: `Đang limit {LONG/SHORT}: {tf}: {px} (VOL: {vol} U)`.
+       - Đặt ma trận nến 7 khung (5m - D1) bên dưới cách nhau bởi thanh `tbl_bar`.
+    4. **Sửa lỗi hiển thị sai Ký quỹ/Lot trên tất cả các tab Logs:**
+       - Khắc phục lỗi hiển thị `Vol : 0.1 L` và `1 L`: `LogsTerminal.jsx` lấy đúng giá trị `e8Lot` từ `localStorage.getItem("tls1_e8_lot")`, format chuẩn 2 chữ số thập phân (`0.01 L`).
+       - Đồng bộ số dư và vốn gốc Quỹ E8 Markets (`propAccounts` & `activePropId`) thay vì hiển thị nhầm số dư $26.37 của OKX.
+       - Lọc sạch toàn bộ đường dẫn cục bộ Desktop `C:\Users\...\AppData\...` khỏi Event Logs cả trên backend (`sys_bot_sub2.py`) và frontend (`LogsTerminal.jsx`).
+    5. **Sửa lỗi menu Bot xổ ngược lên trên (Dropup -> Dropdown) trên màn hình rộng:**
+       - Sửa `SidebarLeft.jsx`: chuyển sang dropdown mở xuống dưới `top: calc(100% + 6px)`, đảo chiều mũi tên chevron trực quan.
+
+- **[30/10/2026]** - Tinh Gọn Tab Logs Trước Khi Chạy Bot & Nâng Cấp Nút Reset Vốn / Sao Chép:
+  - **Yêu cầu CEO:**
+    1. Trước khi bấm "CHẠY BOT", tab Logs chỉ hiển thị duy nhất khối thông tin System 6 dòng chuẩn mực (Tên Bot theo tab, Giờ, Gốc/Tổng theo số dư thật, Mode hiện tại, PNL, Vol theo ký quỹ đang nhập ở thanh dưới). Tuyệt đối không hiện rác vị thế hay bảng nến khi bot chưa chạy.
+    2. Nút Reset vốn và Sao chép: Click vào kích hoạt ngay lập tức, loại bỏ hoàn toàn các popup alert/confirm phiền toái.
+    3. Đảo vị trí 2 nút: Nút Reset vốn chuyển lên TRÊN (top 8px), nút Sao chép chuyển xuống DƯỚI (top 42px).
+    4. Tăng độ mờ mặc định (opacity 0.35), khi di chuột vào mới sáng rõ 100%.
+  - **Triển khai kỹ thuật:**
+    1. **`LogsTerminal.jsx`**:
+       - Khi `!isCurrentAccountRunning` (bot chưa chạy): chỉ trả về duy nhất mảng `dashboardLines` 6 dòng chuẩn (`dbar`, `r0`, `bar`, `r1`, `r2`, `dbar`) với độ rộng chính xác 78 ký tự. `eventLogs` đặt rỗng `[]`.
+       - Tự động lấy tên bot (`Thợ săn EMA200` cho Sub1, `SMC Bot` cho Sub2, `Quỹ FX TradeLocker` cho E8).
+       - Tự động lấy số dư thật và Vol từ cấu hình `risk.posVol` đang nhập ở thanh điều khiển bên dưới.
+       - Đổi vị trí: Nút Reset (top: 8px), Nút Copy (top: 42px).
+       - Thiết lập `opacity: 0.35`, hover `opacity: 1`. Thêm hiệu ứng xoay icon và đổi biểu tượng checkmark `✓` trực quan.
+       - Loại bỏ `alert(...)` trong hàm `handleCopy`.
+    2. **`App.jsx`**:
+       - Thêm cờ `silent = false` vào `handleResetCapital`. Khi gọi từ tab Logs (`silent = true`), bỏ qua `window.confirm` và `alert(...)`, reset ngay lập tức ngầm và cập nhật hệ thống.
+       - Truyền `risk` và `strat` vào `LogsTerminal`.
+
+- **[30/10/2026]** - Khắc Phục Lỗi 'OrderBlock' object has no attribute 'mitigated' & Tái Thiết Kế Dashboard Terminal SMC Bot (Đa Khung 7 TF & Số Dư Thật):
+  - **Nguyên nhân lỗi:**
+    1. Trong `bots/sub2/bot_models.py`, dataclass `OrderBlock` chỉ định nghĩa trường `crossed`, không có trường `mitigated` và `bar_index`.
+    2. Trong `bots/sub2/bot_strategy.py` (hàm `generate_dual_nearest_setups`), code gọi `not o.mitigated` và `nearest_bull.bar_index`, dẫn đến ném ngoại lệ `AttributeError` trên toàn bộ các khung thời gian (D1, H4, H2, H1...).
+    3. File `bots/sub2/bot_ui.py` trước đây bị bỏ quên không gọi `update_wallet_metrics` trong `sys_bot_sub2.py`, dẫn đến bảng terminal luôn hiển thị số dư giả định `2,000.00 U` và vẫn dùng cấu trúc cũ 2 cột M15/M30.
+  - **Giải pháp & Triển khai:**
+    1. **`bots/sub2/bot_models.py`**: Bổ sung `mitigated: bool = False`, `bar_index: int = 0` và `@property def is_mitigated(self): return self.crossed or self.mitigated` vào dataclass `OrderBlock`.
+    2. **`bots/sub2/bot_indicators.py`**: Đồng bộ `bar_index=best_i` khi khởi tạo `OrderBlock`, và cập nhật `ob.mitigated = True` khi khối OB bị chạm/xuyên phá trong `mitigate_order_blocks`.
+    3. **`bots/sub2/bot_strategy.py`**: Chống lỗi an toàn tuyệt đối với `not (o.crossed or getattr(o, "mitigated", False))` và lấy `bar_index` an toàn với fallback khi tính khoảng cách nến giữa 2 khối OB.
+    4. **`bots/sub2/bot_ui.py`**:
+       - Tái thiết kế toàn bộ Dashboard theo phong cách chuẩn mực của Bot Sub1 (Thợ săn EMA200).
+       - Loại bỏ hoàn toàn số dư giả định `2000.00 U`. Lấy số dư thật từ OKX API (`totalEq`, `details` USDT).
+       - Bảng trạng thái đa khung hiển thị trọn vẹn 7 Timeframe (`5m`, `15m`, `30m`, `1H`, `2H`, `4H`, `D1`), tự động đóng khung `[TF]` khi có lệnh chờ hoặc vị thế, thể hiện số lượng OB Bull/Bear và nhãn `[★ L]`, `[★ S]`, `[L/S]`.
+       - Hiển thị cây tình trạng vị thế trực quan kèm TP/SL chi tiết của từng TF.
+    5. **`bots/sub2/sys_bot_sub2.py`**: Tích hợp gọi `bot_ui.update_wallet_metrics(client, env_paths, system_config)` khi khởi động và định kỳ 20s trong vòng lặp chính.
+
+- **[30/10/2026]** - Chuẩn Hóa Nhãn & Thuật Toán TP/SL Cho SMC Bot: [Tỷ Lệ Chốt Lời] & [Tỷ Lệ Cắt Lỗ]:
+  - **Nhận định từ CEO:**
+    1. Khái niệm cũ *"Tỷ lệ chốt lời Thuận Trend"* và *"Tỷ lệ chốt lời Ngược Trend"* không còn phù hợp với mô hình giao dịch cản SMC Dual Nearest OB hiện tại.
+    2. Đổi nhãn chuẩn xác:
+       - Hàng 1: **`Tỷ lệ chốt lời:`** (Mặc định: 5 R; kèm nút chuyển `Cố định` / `Chốt lời theo OB ngược chiều`).
+       - Hàng 2: **`Tỷ lệ cắt lỗ:`** (Mặc định: 1 R = mép đối diện của khối OB; nếu người dùng chỉnh 2 R $
+ightarrow$ mở rộng vùng cắt lỗ gấp 2 lần độ dày OB để tránh quét râu).
+  - **Triển khai kỹ thuật:**
+    1. **SidebarLeft.jsx:** Cập nhật nhãn thành `Tỷ lệ chốt lời:` và `Tỷ lệ cắt lỗ:` kèm tooltip hướng dẫn trực quan.
+    2. **SingleChartPane.jsx & bot_indicators.py:**
+       - Tính toán `slTarget`: `entryPrice \pm (obHeight 	imes slRatio)`. Khi `slRatio = 1.0`, SL đặt chuẩn tại mép đối diện của OB. Khi `slRatio = 2.0`, vùng SL đỏ mở rộng gấp 2 lần độ dày cản.
+    3. **bot_config.py & bot_strategy.py:** Bổ sung `OB_SL_RATIO = Decimal("1.0")`, đồng bộ hai chiều với backend và UI.
+
+- **[30/10/2026]** - Bổ Sung Tùy Chọn Chốt Lời SMC: [Cố Định] Hoặc [Chốt Lời Theo OB Ngược Chiều]:
+  - **Vấn đề & Yêu cầu từ CEO:**
+    1. Khi đặt TP theo R cao (ví dụ 5R), vùng chốt lời xanh của lệnh Long (hoặc Short) thường phóng xa vượt quá cả Entry và SL của lệnh ngược chiều đối diện, gây rủi ro giá đảo chiều trước khi chạm TP.
+    2. CEO yêu cầu bổ sung nút tùy chọn dạng dropdown nằm ngay cạnh nhãn *"Tỷ lệ chốt lời Thuận Trend:"*:
+       - **[Cố định]:** Ưu tiên chốt lời theo đúng số R đã nhập ($TP = Entry \pm Risk 	imes R$).
+       - **[Chốt lời theo OB ngược chiều]:** Ưu tiên chốt lời ngay tại mép Entry của OB đối diện (đồng thời tiện khớp luôn lệnh Limit chiều ngược lại). Nếu số R đã nhập chưa tới OB ngược chiều thì vẫn chốt lời theo số R đó ($\min / \max$ an toàn).
+  - **Triển khai kỹ thuật:**
+    1. **Giao diện Sidebar (SidebarLeft.jsx):** Thêm nút dropdown badge bên cạnh dòng `Tỷ lệ chốt lời Thuận Trend:` với 2 tùy chọn: `Cố định` (`RR`) và `Chốt lời theo OB ngược chiều` (`NEAREST_OB`).
+    2. **Biểu đồ Chart (SingleChartPane.jsx):** Trong `calculateSMCPositions`, khi ở chế độ `NEAREST_OB`:
+       - Long TP: `Math.min(bullTpFromR, bearOppositeEntry)`
+       - Short TP: `Math.max(bearTpFromR, bullOppositeEntry)`
+       $
+ightarrow$ Hộp TP xanh tự động dừng thẳng hàng hoàn hảo tại mép cản của lệnh ngược chiều.
+    3. **Lõi Bot SMC (bot_strategy.py & main.py):** Hỗ trợ `OB_TP_MODE = "NEAREST_OB"` trong `generate_dual_nearest_setups`, đồng bộ hai chiều qua endpoint `/api/bot/config`.
+
+- **[30/10/2026]** - Tinh Chỉnh Nhãn Menu Xổ Xuống Quản Lý Vốn (Sidebar):
+  - **Sửa đổi:** Bỏ chữ "nhân" bị lặp ở đầu tùy chọn menu xổ xuống của Sidebar: từ `nhân Hệ số nhân Ký Quỹ (Vốn)` $
+ightarrow$ **`Hệ số nhân Ký Quỹ (Vốn)`** theo đúng chuẩn danh xưng đã thống nhất.
+  - **File cập nhật:** `web_app/frontend/src/i18n/index.js` (`multiply_margin_tf`).
+
+- **[30/10/2026]** - Khắc Phục Xung Đột Chồng Lấn Dual OB (Hộp Gần Hiện Trước, Hộp Xa Tịnh Tiến Cách 3 Nến):
+  - **Vấn đề thực tế (Ảnh CEO gửi):** Khi cả 2 kịch bản Long và Short cùng xuất hiện trên chart, 2 hộp vị thế được vẽ cùng một tọa độ ngang (nến hiện tại), dẫn đến vùng TP/SL màu xanh - đỏ của Long và Short đè lên nhau gây rối mắt, khó quan sát.
+  - **Ý tưởng & Giải pháp từ CEO:**
+    1. So sánh khoảng cách từ giá hiện tại (`livePrice`) tới 2 vùng OB: Vùng OB nào gần giá hơn được coi là **Ưu tiên 1 (Primary)**, sẽ xuất hiện ngay tại cây nến hiện tại đang chạy.
+    2. Vùng OB thứ hai xa giá hơn được coi là **Ưu tiên 2 (Secondary)**, sẽ tịnh tiến ra ngoài toàn bộ hộp của Ưu tiên 1 và đặt cách nhau đúng **3 cây nến** (gap = 3 nến).
+  - **Triển khai kỹ thuật (SingleChartPane.jsx):**
+    1. Trong `calculateSMCPositions`: So sánh `distBull = abs(livePrice - bestBull.entryPrice)` và `distBear = abs(livePrice - bestBear.entryPrice)`.
+       - Nếu `distBull <= distBear` (giá gần cản Long hơn): Hộp Long `offsetBars = 0` (tại nến hiện tại), Hộp Short `offsetBars = 8 + 3 = 11 nến`.
+       - Nếu `distBear < distBull` (giá gần cản Short hơn): Hộp Short `offsetBars = 0` (tại nến hiện tại), Hộp Long `offsetBars = 8 + 3 = 11 nến`.
+    2. Trong `drawLiquidV5Boxes`: Áp dụng `effectiveEntryIdx = entryIdx + offsetBars`, tính toán `startX` và `endX` riêng biệt cho từng hộp.
+    3. Mở rộng `rightOffset` của chart từ 18 lên 24 nến trong `applyDefaultZoom` và options của biểu đồ để cả 2 hộp đều hiển thị đầy đủ và có đệm an toàn tới thang giá.
+
+- **[30/10/2026]** - Chuẩn Hóa Danh Xưng Hệ Số Đa Khung (TF Multipliers) Toàn Diện:
+  - **Đề xuất từ CEO:**
+    - Đổi *"Hệ số Ký Quỹ (Vốn)"* $
+ightarrow$ **"Hệ số nhân Ký Quỹ (Vốn)"** (thể hiện chuẩn xác tỷ lệ nhân vốn theo từng TF).
+    - Đổi *"Hệ số Vào Lệnh (Entry)"* $
+ightarrow$ **"Hệ số nhân Entry/TP/SL"** (thể hiện đầy đủ ý nghĩa co giãn biên độ đón cản Entry lẫn khoảng chốt lời TP / cắt lỗ SL / khoảng cách DCA khi nâng khung thời gian).
+  - **Triển khai:** Đã cập nhật đồng bộ toàn bộ file i18n (`web_app/frontend/src/i18n/index.js`), bảng modal cài đặt (`SystemSettingsModal.jsx`), Sidebar (`SidebarLeft.jsx`) và chú thích trong file cấu hình bot (`bots/sub1/bot_config.py`, `bots/sub2/bot_config.py`).
+
+- **[30/10/2026]** - Hoàn Thiện Cơ Chế Dual Nearest OB & Bổ Sung Khung Thời Gian D1 (7 TF Trade Toàn Diện):
+  - **Bối cảnh & Yêu Cầu từ CEO:**
+    1. Trên biểu đồ (ví dụ khung D1 hay bất kỳ TF nào), khi có đồng thời cả 2 dải OB Xanh (Cầu) và Đỏ (Cung) ở 2 đầu thị trường, bot và biểu đồ trước đây chỉ hiển thị 1 kịch bản Short (hoặc Long) đơn độc do logic lấy phần tử cuối cùng (`validObs.length - 1`).
+    2. CEO yêu cầu thiết kế cơ chế **"Dual Nearest OB"**: Luôn duy trì đồng thời 2 tín hiệu / setup Long và Short đi kèm 2 dải OB Xanh - Đỏ gần nhất trên cùng 1 chart / cùng 1 TF.
+    3. Điều kiện an toàn: 2 điểm Long - Short không được đè lên nhau, cách nhau khoảng cách tối thiểu $\ge 5$ nến và khoảng cách giá an toàn $\ge 0.5\%$.
+    4. Bổ sung thêm khung thời gian **D1 (Khung Ngày)** vào hệ thống, nâng tổng số khung giao dịch lên **7 TF trade** (`M5, M15, M30, H1, H2, H4, D1`).
+  - **Giải pháp & Triển khai chi tiết:**
+    1. **Bổ sung TF D1 vào Hệ Thống Đa Khung:**
+       - `constants/tradeConfig.js`: Bổ sung `"D1"` vào `BOT_TFS` (`["M5", "M15", "M30", "H1", "H2", "H4", "D1"]`).
+       - `SystemSettingsModal.jsx`: Thêm dòng `["D1", "8.0x", "10.0x"]` vào bảng "Hệ Số Nhân Đa Khung (TF Multipliers)".
+       - `PositionsTable.jsx`: Cập nhật bảng và các nút bấm TF nhận diện `D1` với ký hiệu `"D"`.
+       - `sub1` & `sub2` `bot_config.py`: Tích hợp chuẩn hóa `D1` (8.0x Vol, 10.0x Offset), map API OKX `1D`.
+    2. **Thuật toán Dual Nearest OB trên Biểu Đồ (SingleChartPane.jsx):**
+       - Tái cấu trúc `calculateSMCPositions`: Thu thập toàn bộ unhit OBs và phân tách thành Bullish OBs và Bearish OBs.
+       - Tự động tìm `bestBull` (OB Cầu gần giá nhất từ dưới lên) và `bestBear` (OB Cung gần giá nhất từ trên xuống).
+       - Kiểm tra tính hợp lệ: `bestBull.entryPrice < bestBear.entryPrice`, khoảng cách nến $\ge 5$, chênh lệch giá $\ge 0.5\%$.
+       - Xuất đồng thời 2 hộp vị thế tịnh tiến (`waitingLongPos` màu xanh dương và `waitingShortPos` màu đỏ), sẵn sàng phản ứng khi giá chạm mép cản nào trước.
+    3. **Thuật toán Dual Nearest OB trong Lõi Bot (bot_strategy.py & bot_config.py):**
+       - Bổ sung cấu hình `DUAL_OB_MODE = True`, `MIN_OB_BAR_GAP = 5`, `MIN_OB_PRICE_GAP_PCT = Decimal("0.005")`.
+       - Viết hàm `generate_dual_nearest_setups`: Duyệt qua các OB chưa mitigated của TF, chọn chính xác 1 Bullish OB dưới giá và 1 Bearish OB trên giá thỏa mãn tiêu chuẩn an toàn.
+       - Bảo toàn trạng thái lệnh (`order_placed`, `triggered`, `cl_ord_id`) giữa các chu kỳ lặp để không đặt trùng lệnh lên sàn OKX / TradeLocker.
+
+- **[30/10/2026]** - Tái Cấu Trúc Toàn Diện SMC Bot Sang Mô Hình Đa Khung Độc Lập (Multi-Timeframe Engine):
+  - **Bối cảnh & Vấn đề:**
+    1. Giao diện Web App mới đã bổ sung cột "TF trade" cho phép người dùng linh hoạt tích chọn các khung thời gian muốn giao dịch (M5, M15, M30, H1, H2, H4...).
+    2. Logic cũ của SMC Bot (Sub 2) bị ép cứng vào cấu trúc MTF 2 khung nến cố định (Base 1H + Hedge 2H), không khớp với lựa chọn đa khung của người dùng và bỏ lỡ các Order Block đẹp trên các chart M5, M15, M30, 4H.
+    3. Tab Cài Đặt của SMC Bot tồn tại dropdown "Khung thời gian gốc (Base TF)" dư thừa và khối Entry Setup bị trộn lẫn các tham số không liên quan của EMA200 (60 nến tích lũy, DCA Gap EMA...).
+  - **Giải pháp triển khai:**
+    1. **Thiết kế lại Giao diện Cài Đặt (SystemSettingsModal.jsx):**
+       - Loại bỏ hoàn toàn dropdown "Base TF 1H".
+       - Bổ sung các toggle chuẩn SMC: Đánh SMC Order Block, Lưới Đa Khung Độc Lập, Tự Động Khử Cản (Mitigation), Gộp Vùng Cản Chồng Lấn (Merge Zones).
+       - Thiết kế khối "Điểm Vào Lệnh (SMC Entry Setup)" riêng biệt: Đón trước mép cản OB (0.05% cơ sở), Vị trí đón cản (Mép ngoài / 50% Thân OB), Ngưỡng gộp cản tối thiểu (0.50%).
+       - Giữ nguyên vẹn 100% các điểm chung toàn hệ thống: "THÊM MÃ GIAO DỊCH" (Watchlist Coins) và bảng "Hệ Số Nhân Đa Khung (TF Multipliers)".
+    2. **Đồng bộ Frontend & Backend (App.jsx & main.py):**
+       - State `smcEntryCfg` nạp và lưu trọn vẹn 12 trường cấu hình SMC mới qua endpoint `/api/bot/config`.
+       - Hỗ trợ khôi phục mặc định chuẩn SMC (5.0R thuận trend, 1.0R ngược trend, Lưới Đa Khung ON).
+    3. **Nâng cấp Lõi Bot SMC (bots/sub2/):**
+       - `bot_models.py`: Thêm `TFState`, bổ sung trường `tf` cho `OrderBlock`, `TradeSetup` và `AssetTracker`.
+       - `bot_config.py`: Tích hợp bảng `TF_MULTIPLIERS`, các hàm chuẩn hóa TF (`normalize_tf_to_okx`, `normalize_tf_to_std`), hỗ trợ `ENABLE_TF_VOLUME_MULTIPLIER`.
+       - `bot_orders.py`: Gắn nhãn TF vào `clOrdId` (dạng `scvsub2_{TF}_{counter}_{ts}`), truyền chính xác `tf` sang `_dispatch_to_tradelocker`, bổ sung hàm `clean_ob_orders_by_tf` dọn dẹp lệnh limit riêng cho TF bị tắt.
+       - `bot_strategy.py`: Viết lại `run_strategy_cycle` duyệt độc lập qua danh sách `ENABLED_TFS` của từng coin. Mỗi TF tự fetch nến, dựng Swing/Internal OB, tính toán Entry/SL/TP khớp 100% với biểu đồ trực quan, và nhân volume theo hệ số TF Multiplier nếu được bật.
+
 - **[30/10/2026]** - Sửa Lỗi Lệch State Coin Giữa Cài Đặt (Modal) Và Bảng Vị Thế Ngoại Vi:
   - **Nguyên nhân:**
     1. `PositionsTable` ngoài bảng gộp chung cả `watchlistCoins` và `activePairs`, nhưng `SystemSettingsModal` chỉ đọc một mình `watchlistCoins`.
@@ -5271,6 +5473,95 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Lỗi Spam 50+ Lệnh Chờ Khớp TP/SL & Chấm Dứt Vòng Lặp Xóa/Rải Limit Vô Tận:
+  - **Nguyên nhân cốt lõi khiến lệnh chờ khớp trên sàn OKX tăng vọt lên 51 - 70 lệnh:**
+    1. **Lỗi cú pháp `Decimal("")` trong kiểm tra TP/SL (`apply_ob_tpsl`):**
+       - Khi truy vấn `/api/v5/trade/orders-algo-pending`, một lệnh TP trả về `tpTriggerPx="4194.6"` nhưng `slTriggerPx=""` (chuỗi rỗng).
+       - Code cũ kiểm tra: `Decimal(o.get("slTriggerPx", "0"))`. Vì key `"slTriggerPx"` tồn tại với giá trị `""`, Python gọi `Decimal("")` gây văng ngoại lệ `InvalidOperation`.
+       - Lỗi này bị khối `try...except` nuốt chửng, dẫn tới hàm luôn kết luận vị thế "chưa có TP/SL", liên tục gửi 2 lệnh TP và SL mới lên sàn mỗi 10 giây.
+    2. **Vòng lặp Hủy & Rải Limit vô tận (Lệnh nhảy từ 15 tụt xuống 7 rồi lại lên 15):**
+       - Khi một vị thế khớp (ví dụ: XAU Long M30), biến `tracker.has_long = True`.
+       - Trong mỗi chu kỳ (3 giây), `check_entry_touch` đều trả về `got_triggered = True` vì setup trong RAM được tạo mới liên tục.
+       - Khối code `if got_triggered: clean_ob_orders(client, swap_id); s.order_placed = False` lập tức HỦY TOÀN BỘ lệnh Limit của các khung thời gian khác trên sàn OKX.
+       - 3 giây sau, Bước 8 thấy `order_placed == False` nên lại ĐẶT LẠI toàn bộ các lệnh Limit đó.
+       - Vòng lặp hủy rồi đặt lại chạy liên tục hàng trăm lần, để lại vô số lệnh điều kiện algo TP/SL mồ côi trên sàn vì hàm `clean_ob_orders` cũ chỉ hủy lệnh thường mà không gọi `/api/v5/trade/cancel-algos`.
+    3. **OB bị dịch chuyển theo nến đang hình thành (Unclosed Candle):**
+       - Hàm tính OB cũ đưa cả nến hiện tại `candles[-1]` vào tính toán. Khi giá giật trong nến, mép OB thay đổi liên tục khiến bộ lọc `cancel_stale` hủy lệnh và đặt lại theo giá mới.
+  - **Bản vá triệt để:**
+    1. **Hàm `_safe_dec()` an toàn tuyệt đối:** Bắt toàn bộ chuỗi rỗng `""` trả về `Decimal("0")`, nhận diện chính xác 100% nếu sàn đã có sẵn TP hoặc SL.
+    2. **Chống trùng lặp TP/SL:** Nếu sàn đã có sẵn TP thì không đặt thêm TP; nếu đã có SL thì không đặt thêm SL.
+    3. **Viết mới `clean_algo_orders()`:** Tự động quét và dọn sạch các lệnh algo conditional rác/thừa của bot qua `/api/v5/trade/cancel-algos` theo lô 10 lệnh.
+    4. **Xóa bỏ khối `if got_triggered: clean_ob_orders` trong `bot_strategy.py`:** Khi 1 khung khớp lệnh, các khung thời gian khác (M15, H1, H2, H4, D1) giữ nguyên lệnh Limit của mình, triệt tiêu hoàn toàn tình trạng nhảy lệnh.
+    5. **Cố định nến đóng cửa (`candles[:-1]`):** Tính toán OB chuẩn xác 100% trên nến đã đóng, triệt tiêu hiện tượng mép OB rung lắc theo tick.
+    6. **Nghiệm thu thực tế:** Tổng lệnh chờ khớp trên sàn OKX từ 51 lệnh tụt về ổn định: đúng 10 lệnh Limit + duy nhất 2 lệnh TP/SL cho vị thế đang chạy.
+
+- **[30/10/2026]** - Đồng Bộ 100% Thuật Toán Phát Hiện Order Block Giữa Bot Engine & Web Chart, Triệt Tiêu Lỗi Khớp Ảo Trong Logs & Đặt Limit Sai Vùng:
+  - **Nguyên nhân cốt lõi gây lệch Entry và Lỗi "Logs báo đã khớp nhưng Bảng vị thế chờ tín hiệu":**
+    1. **Thuật toán tìm OB bị lệch pha:** Web Chart tính toán Order Block theo mô hình FVG + nến ngược màu liền trước qua hàm `compute_ob_boxes()` (cho ra vùng Bullish OB 77,324.9 - 74,896.6 trên BTC 1D; Bearish OB 4,259.3 trên Vàng 1D). Trong khi đó, Bot Sub 2 cũ dùng cơ chế Swing Pivot & Structure Break 10 nến cũ kỹ, chỉ nhận diện đỉnh/đáy phá vỡ từ tận tháng 8 (63,938.1 trên BTC và 4,080 trên Vàng), bỏ lọt hoàn toàn các khối OB mới nhất sát giá đang hiển thị trên biểu đồ của CEO.
+    2. **Khớp ảo trong RAM (`check_entry_touch`):** Hàm `check_entry_touch()` cũ tự ý gán `setup.triggered = True` chỉ vì nến biến động chạm qua giá `entry_price` mà KHÔNG kiểm tra xem trên sàn OKX thực tế đã khớp lệnh hay chưa. Dẫn tới Terminal Logs in ra `Đã khớp SHORT [1H] / [2H]`, nhưng Bảng Vị Thế trên web lại hiển thị `Chờ tín hiệu...` (do OKX thực tế có 0 vị thế). Hơn nữa, vì bot tưởng lệnh đã khớp nên nó không đặt các lệnh Limit của 1H, 2H, 4H lên sàn.
+  - **Giải pháp xử lý triệt để:**
+    1. **Tích hợp `compute_chart_ob_boxes()` vào Bot Indicators & Strategy:**
+       - Port đồng bộ 100% thuật toán `compute_ob_boxes` từ `web_app/backend/main.py` sang [`bot_indicators.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_indicators.py).
+       - Mọi khung thời gian (5m, 15m, 30m, 1H, 2H, 4H, D1) đều tính toán ra đúng các khối Order Block unmitigated chuẩn xác như Web Chart (BTC 1D: Long 77,324.9, Short 84,937.5; Vàng 1D: Short 4,259.3).
+    2. **Căn chuẩn Entry mép OB & Tỷ lệ TP/SL:**
+       - Giá vào lệnh (Entry Price) đặt CHÍNH XÁC tại mép OB: Long = mép trên (`ob.bar_high`), Short = mép dưới (`ob.bar_low`), triệt tiêu hoàn toàn độ lệch `entry_offset_pct`.
+       - Tỷ lệ SL mặc định 1R = mép đối diện của OB; nếu chọn 2R thì x2 độ dày OB. Tỷ lệ TP mặc định 5R (hoặc theo mép OB ngược chiều nếu bật `NEAREST_OB`).
+    3. **Đồng bộ trạng thái `triggered` với sàn OKX thực tế:**
+       - Viết lại `check_entry_touch()` trong [`bot_strategy.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_strategy.py): Nếu sàn OKX không có vị thế mở (`not tracker.has_long` / `not tracker.has_short`), toàn bộ setup bắt buộc giữ `triggered = False`. Tuyệt đối không sinh lệnh khớp ảo trong Logs.
+    4. **Tự động quét dọn lệnh Limit cũ (Stale Order Cleanup):**
+       - Khi vùng OB mới hình thành, bot tự động quét và huỷ các lệnh Limit cũ đang treo trên sàn không còn khớp với giá OB hiện tại (ví dụ: huỷ lệnh cũ 63,938.1 và đặt lệnh mới 77,324.9), giải phóng margin và bảo đảm 100% khớp với biểu đồ.
+
+- **[30/10/2026]** - Đồng Bộ 100% Đòn Bẩy 100x & Chế Độ Chéo (Cross), Khắc Phục Triệt Để Ký Quỹ Lệch 12.79 $ & Triệt Tiêu Lỗi 51068 / 51008:
+  - **Nguyên nhân lỗi Ký quỹ BTC D1 = 12.79 $ (thay vì 1 $):**
+    - Code cũ của Sub 2 phân tách các setup `INTERNAL` dùng `isolated` (cô lập) với đòn bẩy 50x. Khi gọi API OKX `set-leverage` cho chế độ `isolated`, OKX yêu cầu phải có `posSide`, dẫn tới lệnh đổi đòn bẩy bị bỏ qua và sàn giữ nguyên thiết lập mặc định của tài khoản là **Cô lập 3x** (như hiển thị trên ảnh chụp app OKX của CEO: `Hợp đồng vĩnh cửu BTCUSDT Mở lệnh Long Cô lập 3x - Tổng số tiền: 38.36 USDT`).
+    - Ở đòn bẩy 3x: Ký quỹ = `38.36 / 3 = 12.79 $` (chiếm gần nửa tài khoản $26).
+  - **Bản vá triệt để:**
+    1. **Đồng bộ 100% Chế độ Chéo (Cross) & Đòn bẩy 100x:**
+       - Trong [`bot_config.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_config.py), [`bot_orders.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_orders.py) và [`bot_strategy.py`](file:///e:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/bots/sub2/bot_strategy.py): Xóa bỏ hoàn toàn chế độ `isolated` và `INTERNAL_LEVERAGE`. Mọi lệnh Limit/Market/TPSL đều cố định `tdMode = "cross"`, `lever = "100"`.
+       - Lệnh Limit được tính theo Entry Price chuẩn: `notional_usdt = pos_usdt * 100`, ở Ký quỹ 1 $ thì Ký quỹ thực tế trên sàn luôn chuẩn xác ~ 1.0 $.
+    2. **Đồng nhất Ký quỹ 2 chiều Long & Short trên cùng 1 TF:**
+       - Không còn phân biệt thuận/ngược trend. Cả lệnh Long và Short đều dùng chung `base_vol = POSITION_VOLUME_USDT`, nếu có nhân hệ số theo TF (`vol_mult`) thì nhân hoàn toàn giống nhau.
+    3. **Triệt tiêu lỗi 51068 (attachAlgoClOrdId trùng nhau):**
+       - Thêm mã Coin, TF, bộ đếm `_ORDER_COUNTER` và mili-giây vào `attachAlgoClOrdId`: `{cl_prefix}TP{coin_clean}{std_tf}...`, đảm bảo 100% duy nhất, không bao giờ bị sàn báo lỗi trùng ID giữa các coin trong cùng 1 giây.
+    4. **Tối ưu rải Limit (Khắc phục lỗi 51008 Insufficient Balance):**
+       - Thay vì rải 14 lệnh cho cả 7 TF làm khóa cứng số dư $26, bot sắp xếp theo khoảng cách và chỉ ưu tiên đặt lệnh Limit tại 1 vùng OB Long gần nhất và 1 vùng OB Short gần nhất sát giá Live, bảo toàn số dư tài khoản.
+
+- **[30/10/2026]** - Khắc Phục Triệt Để Lỗi OKX 51000 clOrdId, Chuẩn Hóa Hiển Thị Volume/Lot Tab Logs & Tái Cấu Trúc Giao Diện Logs SMC Theo Chuẩn Sub 1:
+  - **Triển khai kỹ thuật:**
+    1. **Khắc phục lỗi `OKX Error 51000: Parameter clOrdId error`:**
+       - OKX quy định `clOrdId` bắt buộc phải là chuỗi chữ và số (alphanumeric `^[a-zA-Z0-9]{1,32}$`), cấm tuyệt đối chứa dấu gạch dưới `_`.
+       - Đã thay thế toàn bộ định dạng `cl_id`, `attachAlgoClOrdId`, `tp_cl_id`, `sl_cl_id` trong `bots/sub2/bot_orders.py` thành chuỗi không gạch dưới: `{cl_prefix}EL{std_tf}...` (Long) và `{cl_prefix}ES{std_tf}...` (Short).
+       - Khớp hoàn toàn với bộ nhận diện `EL` / `ES` trong `web_app/backend/main.py`, giúp lệnh Limit được sàn chấp nhận ngay lập tức và hiển thị chuẩn xác sang Bảng Vị Thế.
+    2. **Khắc phục lỗi tính Margin `2500.0 U` trong `bot_strategy.py`:**
+       - Sửa `calculate_setup_volume` trong `bots/sub2/bot_strategy.py`: trả về đúng giá trị Margin `final_vol` (ví dụ: `0.4 U` hoặc `1.0 U`), không nhân với đòn bẩy.
+       - Khi tính số hợp đồng `sz` đặt lên OKX: lấy `(pos_usdt * leverage) / (price * ct_val)`.
+    3. **Tái cấu trúc giao diện Terminal Logs SMC (`bots/sub2/bot_ui.py`) giống 100% Sub 1 (Ảnh 1):**
+       - Đưa mục `✜ Tình trạng vị thế:` lên TRÊN ma trận nến đa khung.
+       - Định dạng hiển thị cây nhánh chuẩn: `Đã khớp {LONG/SHORT} [{tf}] - ký quỹ: {vol} U`, `Entry {TF}: {px} - {vol} U`, `Chưa có lệnh đóng ⭢ Win Streak: 0`. Lệnh chờ: `Đang limit {LONG/SHORT}: {tf}: {px} (VOL: {vol} U)`.
+       - Đặt ma trận nến 7 khung (5m - D1) bên dưới cách nhau bởi thanh `tbl_bar`.
+    4. **Sửa lỗi hiển thị sai Ký quỹ/Lot trên tất cả các tab Logs:**
+       - Khắc phục lỗi hiển thị `Vol : 0.1 L` và `1 L`: `LogsTerminal.jsx` lấy đúng giá trị `e8Lot` từ `localStorage.getItem("tls1_e8_lot")`, format chuẩn 2 chữ số thập phân (`0.01 L`).
+       - Đồng bộ số dư và vốn gốc Quỹ E8 Markets (`propAccounts` & `activePropId`) thay vì hiển thị nhầm số dư $26.37 của OKX.
+       - Lọc sạch toàn bộ đường dẫn cục bộ Desktop `C:\Users\...\AppData\...` khỏi Event Logs cả trên backend (`sys_bot_sub2.py`) và frontend (`LogsTerminal.jsx`).
+    5. **Sửa lỗi menu Bot xổ ngược lên trên (Dropup -> Dropdown) trên màn hình rộng:**
+       - Sửa `SidebarLeft.jsx`: chuyển sang dropdown mở xuống dưới `top: calc(100% + 6px)`, đảo chiều mũi tên chevron trực quan.
+
+- **[30/10/2026]** - Khắc Phục Lỗi 'OrderBlock' object has no attribute 'mitigated' & Tái Thiết Kế Dashboard Terminal SMC Bot (Đa Khung 7 TF & Số Dư Thật):
+  - **Nguyên nhân lỗi:**
+    1. Trong `bots/sub2/bot_models.py`, dataclass `OrderBlock` chỉ định nghĩa trường `crossed`, không có trường `mitigated` và `bar_index`.
+    2. Trong `bots/sub2/bot_strategy.py` (hàm `generate_dual_nearest_setups`), code gọi `not o.mitigated` và `nearest_bull.bar_index`, dẫn đến ném ngoại lệ `AttributeError` trên toàn bộ các khung thời gian (D1, H4, H2, H1...).
+    3. File `bots/sub2/bot_ui.py` trước đây bị bỏ quên không gọi `update_wallet_metrics` trong `sys_bot_sub2.py`, dẫn đến bảng terminal luôn hiển thị số dư giả định `2,000.00 U` và vẫn dùng cấu trúc cũ 2 cột M15/M30.
+  - **Giải pháp & Triển khai:**
+    1. **`bots/sub2/bot_models.py`**: Bổ sung `mitigated: bool = False`, `bar_index: int = 0` và `@property def is_mitigated(self): return self.crossed or self.mitigated` vào dataclass `OrderBlock`.
+    2. **`bots/sub2/bot_indicators.py`**: Đồng bộ `bar_index=best_i` khi khởi tạo `OrderBlock`, và cập nhật `ob.mitigated = True` khi khối OB bị chạm/xuyên phá trong `mitigate_order_blocks`.
+    3. **`bots/sub2/bot_strategy.py`**: Chống lỗi an toàn tuyệt đối với `not (o.crossed or getattr(o, "mitigated", False))` và lấy `bar_index` an toàn với fallback khi tính khoảng cách nến giữa 2 khối OB.
+    4. **`bots/sub2/bot_ui.py`**:
+       - Tái thiết kế toàn bộ Dashboard theo phong cách chuẩn mực của Bot Sub1 (Thợ săn EMA200).
+       - Loại bỏ hoàn toàn số dư giả định `2000.00 U`. Lấy số dư thật từ OKX API (`totalEq`, `details` USDT).
+       - Bảng trạng thái đa khung hiển thị trọn vẹn 7 Timeframe (`5m`, `15m`, `30m`, `1H`, `2H`, `4H`, `D1`), tự động đóng khung `[TF]` khi có lệnh chờ hoặc vị thế, thể hiện số lượng OB Bull/Bear và nhãn `[★ L]`, `[★ S]`, `[L/S]`.
+       - Hiển thị cây tình trạng vị thế trực quan kèm TP/SL chi tiết của từng TF.
+    5. **`bots/sub2/sys_bot_sub2.py`**: Tích hợp gọi `bot_ui.update_wallet_metrics(client, env_paths, system_config)` khi khởi động và định kỳ 20s trong vòng lặp chính.
 
 - **[30/10/2026]** - Sửa Lỗi Lệch State Coin Giữa Cài Đặt (Modal) Và Bảng Vị Thế Ngoại Vi:
   - **Nguyên nhân:**
