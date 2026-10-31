@@ -843,43 +843,10 @@ export default function SingleChartPane({
       return true;
     });
 
-    // BƯỚC 1: BỘ GỘP CẢN LIÊN KỀ: Gộp các OB cùng chiều cách nhau <= mergeDistPct (1.0%)
-    const mergedStage = [];
-    for (const bias of [1, -1]) {
-      const biased = validObs.filter(o => o.bias === bias).sort((a, b) => a.low - b.low);
-      const clusters = [];
-      for (const o of biased) {
-        if (clusters.length === 0) {
-          clusters.push({ ...o });
-        } else {
-          const last = clusters[clusters.length - 1];
-          const refPx = (last.high + last.low) / 2 || 1;
-          const isOverlap = last.high >= o.low;
-          const gap = Math.max(0, o.low - last.high);
-          if (isOverlap || (gap / refPx) <= mergeDistPct) {
-            last.high = Math.max(last.high, o.high);
-            last.low = Math.min(last.low, o.low);
-            if (o.time && last.time) last.time = Math.min(last.time, o.time);
-          } else {
-            clusters.push({ ...o });
-          }
-        }
-      }
-      mergedStage.push(...clusters);
-    }
-
-    // BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ các khối OB sau khi gộp vẫn quá mỏng (< minHeightPct, 0.5%)
-    const mergedObs = mergedStage.filter(ob => {
-      const refPx = (Number(ob.high) + Number(ob.low)) / 2 || 1;
-      const h = Math.abs(Number(ob.high) - Number(ob.low));
-      return (h / refPx) >= minHeightPct;
-    });
-
-    // BƯỚC 3: BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO
-    const oppGapPct = mergeDistPct;
-    const finalObs = filterOppositeOBClash(mergedObs, oppGapPct);
-
-    mergedObs.forEach(ob => {
+    // Theo chuẩn SMC gốc và chỉ đạo CEO:
+    // Vẽ 100% từng khối Order Block gốc sắc nét, không gộp méo mó trên biểu đồ.
+    // Các OB chưa bị đâm thủng (unmitigated) đều được hiển thị đầy đủ chi tiết.
+    validObs.forEach(ob => {
       const y1 = s.priceToCoordinate(ob.high);
       const y2 = s.priceToCoordinate(ob.low);
       if (y1 === null || y2 === null) return;
@@ -888,7 +855,7 @@ export default function SingleChartPane({
       const rawBot = Math.max(y1, y2);
       const topY = Math.min(maxBottomY, Math.max(0, rawTop));
       const botY = Math.min(maxBottomY, Math.max(0, rawBot));
-      const h = Math.max(botY - topY, 4);
+      const h = Math.max(botY - topY, 3);
       const isBull = ob.bias === 1;
 
       let startX = null;
@@ -907,7 +874,8 @@ export default function SingleChartPane({
       const boxWidth = Math.max(0, maxRightX - startX);
       if (boxWidth <= 0) return;
 
-      const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
+      const bg = isBull ? 'rgba(21, 101, 192, 0.22)' : 'rgba(198, 40, 40, 0.22)';
+      const border = isBull ? '1px solid rgba(33, 150, 243, 0.35)' : '1px solid rgba(244, 67, 54, 0.35)';
       const box = document.createElement('div');
       box.style.position = 'absolute';
       box.style.top = topY + 'px';
@@ -915,6 +883,8 @@ export default function SingleChartPane({
       box.style.width = boxWidth + 'px';
       box.style.height = h + 'px';
       box.style.backgroundColor = bg;
+      box.style.borderTop = border;
+      box.style.borderBottom = border;
       box.style.pointerEvents = 'none';
       o.appendChild(box);
     });

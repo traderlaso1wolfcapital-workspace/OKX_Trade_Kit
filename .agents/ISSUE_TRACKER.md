@@ -33,6 +33,28 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[31/10/2026]** - Phân Định Rõ Ràng: Độ Dày OB Tối Thiểu & Khoảng Cách Gộp/Giãn Cản CHỈ Dùng Để Lọc Điều Kiện Tín Hiệu Long/Short & Đặt Limit Bot:
+  - **Chỉ đạo CEO:**
+    - "Độ dày OB tối thiểu (Base): và Khoảng cách gộp & giãn cản (Base): chỉ là công thức để chọn lọc OB đạt yêu cầu, đạt điều kiện để xuất hiện tín hiệu long/short, xuất hiện hộp chỉ báo long/short và có thể đặt entry limit long/short".
+    - Về mặt hình ảnh: Không gộp méo mó khối OB nữa. Thể hiện đúng giá 100% từng khối OB theo công thức gốc PineScript SMC (`TLS1 - SMC OB Auto v2`).
+    - Tất cả các OB gốc chưa bị mitigate vẫn hiển thị đầy đủ chi tiết trên biểu đồ. Chỉ OB nào đạt đủ điều kiện lọc mới xuất hiện hộp tín hiệu Long/Short và đặt lệnh limit entry.
+  - **Bản vá hoàn thiện:**
+    1. **Hiển thị trực quan trên Web Chart (`drawObs`):**
+       - Loại bỏ hoàn toàn cơ chế `mergedStage` trong hàm vẽ `drawObs`.
+       - Vẽ 100% từng khối Order Block gốc (`validObs`) tương ứng vùng râu/thân của cây nến tạo cản. Không một khối nào bị gộp phình to ra bao trùm nhiều sóng.
+    2. **Đồng bộ Engine Bot (`bot_indicators.py` & `main.py`):**
+       - `compute_chart_ob_boxes` và `add_ob_and_merge`: Không can thiệp làm biến dạng `bar_high` và `bar_low` của OB gốc; bảo tồn toàn bộ danh sách OB unmitigated chuẩn SMC.
+    3. **Bộ lọc điều kiện kịch bản lệnh (`calculateSMCPositions` & `bot_strategy.py`):**
+       - Áp dụng các chỉ số `Độ dày tối thiểu (Base * TF Mult)` và `Khoảng cách gộp/giãn cản (Base * TF Mult)` làm điều kiện lọc:
+         + Lọc độ dày: Khối cản (hoặc cụm cản liền kề) phải đủ dày để hấp thụ biến động thị trường.
+         + Lọc giãn cản đối diện: Lọc bỏ các tín hiệu bị kẹt quá sát cản ngược chiều để bảo vệ tỷ lệ R:R và biên độ chốt lời.
+         + Bảo vệ Stop Loss: Stop Loss được dời về sau mép sâu nhất của cụm cản cùng chiều để chống quét râu an toàn.
+       - Chỉ OB nào đạt đủ các tiêu chí trên mới hiển thị hộp chỉ báo Long / Short và sinh lệnh Limit Bot.
+       - Các OB không đạt điều kiện vẫn hiển thị bình thường trên đồ thị như cản quan sát, không sinh lệnh rác.
+  - **Kiểm thử & Đóng gói:**
+    - Test sandbox dữ liệu nến OKX trên 15m, 1H, 4H, 1D: OB hiển thị sắc nét, tách biệt từng khối chuẩn TradingView.
+    - Build Vite frontend hoàn tất 297ms, không lỗi lint/syntax.
+
 - **[31/10/2026]** - Khôi Phục Hiển Thị Order Block Nguyên Bản Chuẩn SMC & Cân Đối Mượt Đường Cong Đa Khung (M5: 0.30% -> D1: 2.00%):
   - **Yêu cầu CEO:**
     1. Cân đối lại chỉ số Độ dày OB tối thiểu và Khoảng cách gộp & giãn cản: Điểm đầu M5 là 0.30%, điểm cuối D1 là 2.00%.
@@ -5832,6 +5854,28 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[31/10/2026]** - Phân Định Rõ Ràng: Độ Dày OB Tối Thiểu & Khoảng Cách Gộp/Giãn Cản CHỈ Dùng Để Lọc Điều Kiện Tín Hiệu Long/Short & Đặt Limit Bot:
+  - **Chỉ đạo CEO:**
+    - "Độ dày OB tối thiểu (Base): và Khoảng cách gộp & giãn cản (Base): chỉ là công thức để chọn lọc OB đạt yêu cầu, đạt điều kiện để xuất hiện tín hiệu long/short, xuất hiện hộp chỉ báo long/short và có thể đặt entry limit long/short".
+    - Về mặt hình ảnh: Không gộp méo mó khối OB nữa. Thể hiện đúng giá 100% từng khối OB theo công thức gốc PineScript SMC (`TLS1 - SMC OB Auto v2`).
+    - Tất cả các OB gốc chưa bị mitigate vẫn hiển thị đầy đủ chi tiết trên biểu đồ. Chỉ OB nào đạt đủ điều kiện lọc mới xuất hiện hộp tín hiệu Long/Short và đặt lệnh limit entry.
+  - **Bản vá hoàn thiện:**
+    1. **Hiển thị trực quan trên Web Chart (`drawObs`):**
+       - Loại bỏ hoàn toàn cơ chế `mergedStage` trong hàm vẽ `drawObs`.
+       - Vẽ 100% từng khối Order Block gốc (`validObs`) tương ứng vùng râu/thân của cây nến tạo cản. Không một khối nào bị gộp phình to ra bao trùm nhiều sóng.
+    2. **Đồng bộ Engine Bot (`bot_indicators.py` & `main.py`):**
+       - `compute_chart_ob_boxes` và `add_ob_and_merge`: Không can thiệp làm biến dạng `bar_high` và `bar_low` của OB gốc; bảo tồn toàn bộ danh sách OB unmitigated chuẩn SMC.
+    3. **Bộ lọc điều kiện kịch bản lệnh (`calculateSMCPositions` & `bot_strategy.py`):**
+       - Áp dụng các chỉ số `Độ dày tối thiểu (Base * TF Mult)` và `Khoảng cách gộp/giãn cản (Base * TF Mult)` làm điều kiện lọc:
+         + Lọc độ dày: Khối cản (hoặc cụm cản liền kề) phải đủ dày để hấp thụ biến động thị trường.
+         + Lọc giãn cản đối diện: Lọc bỏ các tín hiệu bị kẹt quá sát cản ngược chiều để bảo vệ tỷ lệ R:R và biên độ chốt lời.
+         + Bảo vệ Stop Loss: Stop Loss được dời về sau mép sâu nhất của cụm cản cùng chiều để chống quét râu an toàn.
+       - Chỉ OB nào đạt đủ các tiêu chí trên mới hiển thị hộp chỉ báo Long / Short và sinh lệnh Limit Bot.
+       - Các OB không đạt điều kiện vẫn hiển thị bình thường trên đồ thị như cản quan sát, không sinh lệnh rác.
+  - **Kiểm thử & Đóng gói:**
+    - Test sandbox dữ liệu nến OKX trên 15m, 1H, 4H, 1D: OB hiển thị sắc nét, tách biệt từng khối chuẩn TradingView.
+    - Build Vite frontend hoàn tất 297ms, không lỗi lint/syntax.
 
 - **[31/10/2026]** - Khôi Phục Hiển Thị Order Block Nguyên Bản Chuẩn SMC & Cân Đối Mượt Đường Cong Đa Khung (M5: 0.30% -> D1: 2.00%):
   - **Yêu cầu CEO:**

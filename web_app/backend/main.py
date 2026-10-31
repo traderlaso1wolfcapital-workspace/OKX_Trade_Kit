@@ -1114,7 +1114,7 @@ def compute_ob_boxes(all_candles, bar="15m", min_ob_height_pct=0.003, merge_thre
             if lows[i+1] > highs[i-1]:
                 gap = lows[i+1] - highs[i-1]
                 if gap >= atr * (Decimal(str(vol_mult)) / Decimal("10")):
-                    for j in range(i, max(-1, i - 4), -1):
+                    for j in range(i, max(-1, i - 12), -1):
                         if closes[j] < opens[j]:
                             raw_obs.append({
                                 "bias": 1,
@@ -1128,7 +1128,7 @@ def compute_ob_boxes(all_candles, bar="15m", min_ob_height_pct=0.003, merge_thre
             elif highs[i+1] < lows[i-1]:
                 gap = lows[i-1] - highs[i+1]
                 if gap >= atr * (Decimal(str(vol_mult)) / Decimal("10")):
-                    for j in range(i, max(-1, i - 4), -1):
+                    for j in range(i, max(-1, i - 12), -1):
                         if closes[j] > opens[j]:
                             raw_obs.append({
                                 "bias": -1,

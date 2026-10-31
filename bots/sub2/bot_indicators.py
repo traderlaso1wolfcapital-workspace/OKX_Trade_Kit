@@ -504,66 +504,26 @@ def compute_chart_ob_boxes(all_candles, tf: str = "15m") -> List[OrderBlock]:
             if not is_pierced:
                 unmitigated.append(ob)
 
-        # 2. BƯỚC 1: GỘP CÁC OB CÙNG CHIỀU LIÊN KỀ (Tự động nhân hệ số TF theo chỉ đạo của CEO)
-        from bots.sub2 import bot_config
-        from bots.sub2.bot_config import get_tf_multiplier
-        _, tf_mult = get_tf_multiplier(tf) if tf else (Decimal("1.0"), Decimal("1.2"))
-
-        base_min_h = Decimal(str(getattr(bot_config, "OB_MIN_HEIGHT_PCT", "0.003")))
-        base_gap = Decimal(str(getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", "0.005")))
-
-        min_ob_height_pct = base_min_h * tf_mult
-        merge_threshold_pct = base_gap * tf_mult
-        opposite_gap_pct = base_gap * tf_mult
-
-        merged_stage = []
-        for bias in [BULLISH, BEARISH]:
-            biased = [o for o in unmitigated if o["bias"] == bias]
-            biased.sort(key=lambda x: x["low"])
-            merged = []
-            for o in biased:
-                if not merged:
-                    merged.append(o)
-                else:
-                    last = merged[-1]
-                    ref_px = (last["high"] + last["low"]) / Decimal("2") if (last["high"] + last["low"]) > 0 else Decimal("1")
-                    is_overlap = last["high"] >= o["low"]
-                    gap = max(Decimal("0"), o["low"] - last["high"]) if not is_overlap else Decimal("0")
-                    is_close = (gap / ref_px) <= merge_threshold_pct
-
-                    if is_overlap or is_close:
-                        last["high"] = max(last["high"], o["high"])
-                        last["low"] = min(last["low"], o["low"])
-                        if o["time"] > 0 and last["time"] > 0:
-                            last["time"] = min(last["time"], o["time"])
-                        elif o["time"] > 0:
-                            last["time"] = o["time"]
-                    else:
-                        merged.append(o)
-            merged_stage.extend(merged)
-
-        # 3. BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ những khối OB còn lại quá mỏng (< min_ob_height_pct, mặc định 0.5%)
-        merged_obs = []
-        for o in merged_stage:
-            ref_px = (o["high"] + o["low"]) / Decimal("2") if (o["high"] + o["low"]) > 0 else Decimal("1")
-            height = o["high"] - o["low"]
-            if (height / ref_px) >= min_ob_height_pct:
-                merged_obs.append(o)
-
-        # Tạo OrderBlock objects
+        # Theo chuẩn SMC gốc và chỉ đạo CEO:
+        # Giữ nguyên 100% từng khối Order Block sắc nét chưa bị đâm thủng (unmitigated).
+        # Không gộp làm biến dạng hình ảnh khối OB trên biểu đồ.
+        seen = set()
         ob_objects = []
-        for o in merged_obs:
-            ob_obj = OrderBlock(
-                bar_high=o["high"],
-                bar_low=o["low"],
-                raw_high=o["high"],
-                raw_low=o["low"],
-                bar_time=o["time"],
-                bias=o["bias"],
-                source="SWING",
-                bar_index=o.get("candle_idx", 0)
-            )
-            ob_objects.append(ob_obj)
+        for o in unmitigated:
+            key = (o["bias"], round(o["high"], 2), round(o["low"], 2))
+            if key not in seen:
+                seen.add(key)
+                ob_obj = OrderBlock(
+                    bar_high=o["high"],
+                    bar_low=o["low"],
+                    raw_high=o["high"],
+                    raw_low=o["low"],
+                    bar_time=o["time"],
+                    bias=o["bias"],
+                    source="SWING",
+                    bar_index=o.get("candle_idx", 0)
+                )
+                ob_objects.append(ob_obj)
         return ob_objects
     except Exception as e:
         print(f"⚠️ [SMC INDICATOR] Lỗi tính compute_chart_ob_boxes: {e}")
@@ -822,50 +782,14 @@ def round_to_tick(price: Decimal, tick: Decimal) -> Decimal:
 
 def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock, min_height_pct: Decimal = None, merge_threshold_pct: Decimal = None) -> bool:
     """
-    Thêm OB mới vào danh sách:
-    1. Kiểm tra độ dày tối thiểu: nếu (high - low) / price < min_height_pct (0.5%), bỏ qua.
-    2. Nếu có OB nào cùng bias bị giao cắt HOẶC cách nhau <= merge_threshold_pct (1.0%),
-       sẽ gộp 2 OB lại thành 1 vùng lớn vững chắc.
-    Trả về True nếu bị gộp, False nếu thêm mới.
+    Theo chuẩn SMC gốc và chỉ đạo CEO:
+    Không gộp méo mó các khối OB gốc. Giữ nguyên 100% từng khối Order Block sắc nét.
+    Các chỉ số độ dày và khoảng cách gộp được dùng trong bước tính toán kịch bản lệnh (TradeSetup).
     """
-    from bots.sub2 import bot_config
-    if min_height_pct is None:
-        min_height_pct = getattr(bot_config, "OB_MIN_HEIGHT_PCT", Decimal("0.005"))
-    if merge_threshold_pct is None:
-        merge_threshold_pct = getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", Decimal("0.010"))
-
-    top2 = max(new_ob.bar_high, new_ob.bar_low)
-    bot2 = min(new_ob.bar_high, new_ob.bar_low)
-    ref_px2 = (top2 + bot2) / Decimal("2") if (top2 + bot2) > 0 else Decimal("1")
-
-    # 1. Bỏ qua nếu OB quá mỏng (< min_height_pct)
-    if (top2 - bot2) / ref_px2 < min_height_pct:
-        return False
-
-    merged = False
     for ob in ob_list:
-        if ob.bias == new_ob.bias and not ob.crossed:
-            top1 = max(ob.bar_high, ob.bar_low)
-            bot1 = min(ob.bar_high, ob.bar_low)
-            ref_px1 = (top1 + bot1) / Decimal("2") if (top1 + bot1) > 0 else Decimal("1")
-
-            # Check overlap HOẶC khoảng cách < merge_threshold_pct
-            is_overlap = (top1 >= bot2 and bot1 <= top2)
-            gap = max(Decimal("0"), bot2 - top1) if bot2 > top1 else (max(Decimal("0"), bot1 - top2) if bot1 > top2 else Decimal("0"))
-            is_close = (gap / ref_px1) <= merge_threshold_pct
-
-            if is_overlap or is_close:
-                # Gộp thành 1 khối vững chắc
-                ob.bar_high = max(top1, top2)
-                ob.bar_low = min(bot1, bot2)
-                if new_ob.raw_high > Decimal("0"):
-                    ob.raw_high = max(ob.raw_high, new_ob.raw_high) if ob.raw_high > Decimal("0") else new_ob.raw_high
-                if new_ob.raw_low > Decimal("0"):
-                    ob.raw_low = min(ob.raw_low, new_ob.raw_low) if ob.raw_low > Decimal("0") else new_ob.raw_low
-                ob.bar_time = min(ob.bar_time, new_ob.bar_time)
-                return True
-
+        if ob.bias == new_ob.bias and ob.bar_time == new_ob.bar_time and abs(ob.bar_high - new_ob.bar_high) < Decimal("0.1"):
+            return False
     ob_list.insert(0, new_ob)
     if len(ob_list) > 100:
         ob_list.pop()
-    return False
+    return True
