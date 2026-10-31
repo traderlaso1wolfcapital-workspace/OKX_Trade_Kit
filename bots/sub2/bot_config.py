@@ -13,20 +13,21 @@ ENABLE_MULTITF_GRID = True          # Lưới Đa Khung Độc Lập (chạy the
 # ==============================================================================
 # Bảng hệ số Ký Quỹ & Vào Lệnh đa khung chuẩn hóa toàn công ty TLS1
 # (Hệ số nhân Ký Quỹ (Vốn), Hệ số nhân Entry/TP/SL)
+# Bảng hệ số Ký Quỹ & Biên Độ Đa Khung chuẩn hóa toàn công ty TLS1 (Sub1 EMA200 & Sub2 SMC)
 TF_MULTIPLIERS: Dict[str, Tuple[Decimal, Decimal]] = {
     "M5":  (Decimal("1.0"), Decimal("1.0")),
-    "M15": (Decimal("1.2"), Decimal("1.5")),
-    "M30": (Decimal("1.5"), Decimal("2.3")),
-    "H1":  (Decimal("2.0"), Decimal("3.3")),
-    "H2":  (Decimal("3.0"), Decimal("4.7")),
-    "H4":  (Decimal("5.0"), Decimal("6.8")),
-    "D1":  (Decimal("8.0"), Decimal("10.0")),
+    "M15": (Decimal("1.2"), Decimal("1.2")),
+    "M30": (Decimal("1.5"), Decimal("1.5")),
+    "H1":  (Decimal("2.0"), Decimal("2.0")),
+    "H2":  (Decimal("3.0"), Decimal("3.0")),
+    "H4":  (Decimal("5.0"), Decimal("5.0")),
+    "D1":  (Decimal("8.0"), Decimal("8.0")),
 }
 
 # Chế độ Dual Nearest OB (Luôn duy trì 2 kịch bản Long & Short ở 2 đầu cản OB gần nhất)
 DUAL_OB_MODE = True
 MIN_OB_BAR_GAP = 5                   # Khoảng cách tối thiểu giữa 2 nến tạo OB (>= 5 nến)
-MIN_OB_PRICE_GAP_PCT = Decimal("0.005") # Khoảng cách giá an toàn tối thiểu (0.5%)
+MIN_OB_PRICE_GAP_PCT = Decimal("0.005") # 0.50% Base M5 # Khoảng cách giá an toàn tối thiểu (0.8%)
 
 # Cột TF trade từ Web App: {"BTC": ["5m", "15m", "30m", "1H", "4H"], ...}
 ENABLED_TFS: dict = {}
@@ -132,7 +133,9 @@ OB_MAX_ACTIVE_SETUPS = 10           # Số lượng setup chờ tối đa mỗi 
 # Điểm vào lệnh & Đệm đón cản
 ENTRY_OFFSET_PCT = Decimal("0.05")  # Đón trước mép cản OB (0.05% cơ sở, nhân theo TF)
 OB_ENTRY_LEVEL = "OUTER"            # "OUTER" (Mép ngoài OB) | "EQUILIBRIUM" (50% Thân OB)
-OB_MERGE_THRESHOLD_PCT = Decimal("0.005") # 0.5% khoảng cách tối thiểu giữa các OB
+OB_MIN_HEIGHT_PCT = Decimal("0.003")       # 0.30% Base M5       # 0.5% Độ dày OB tối thiểu (lọc bỏ OB mỏng gây SL ngắn)
+OB_MERGE_THRESHOLD_PCT = Decimal("0.005")  # 0.50% Base M5 (Gộp & Giãn cản ngược chiều)  # 1.0% Khoảng cách gộp cản tối thiểu giữa các OB cùng chiều
+OB_OPPOSITE_GAP_PCT = Decimal("0.005")      # 0.50% Base M5      # 0.8% Khoảng cách an toàn tối thiểu giữa 2 OB ngược chiều (lọc cản kẹp giữa)
 OB_AUTO_MITIGATION = True           # Tự động loại bỏ OB khi giá đâm xuyên qua
 OB_MERGE_OVERLAPPING = True         # Tự động gộp các OB đè nhau thành 1 Zone
 OB_CLEANUP_CROSSED = True

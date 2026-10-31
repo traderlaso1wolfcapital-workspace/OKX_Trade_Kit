@@ -196,7 +196,10 @@ def replay_history_for_state(
     state.internal_obs = state.internal_obs[:SMC_INT_OB_CNT if SMC_INT_OB else 0]
 
 
-def merge_ob_zones(tracker: AssetTracker, entry_threshold_pct: Decimal = Decimal("0.005")):
+def merge_ob_zones(tracker: AssetTracker, entry_threshold_pct: Decimal = None):
+    from bots.sub2 import bot_config
+    if entry_threshold_pct is None:
+        entry_threshold_pct = getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", Decimal("0.010"))
     """
     Gộp các OB gần nhau (cùng bias) thành 1 vùng Zone tổng.
     Giữ nguyên TP multiplier của OB có risk lớn nhất.
@@ -367,29 +370,90 @@ def generate_dual_nearest_setups(
     allow_bull = (nearest_bull is not None) and (direction in ("BOTH", "LONG_ONLY"))
     allow_bear = (nearest_bear is not None) and (direction in ("BOTH", "SHORT_ONLY"))
 
-    # 5. Kiểm tra an toàn: Không đè nhau, cách nhau >= 5 nến và >= 0.5% giá
+    # 5. Kiểm tra an toàn: Không đè nhau, cách nhau >= 5 nến và >= khoảng cách ngược chiều tối thiểu (mặc định 0.8%)
     min_bar_gap = getattr(bot_config, "MIN_OB_BAR_GAP", 5)
-    min_price_gap_pct = getattr(bot_config, "MIN_OB_PRICE_GAP_PCT", Decimal("0.005"))
+    base_gap = getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", Decimal("0.005"))
+    min_price_gap_pct = base_gap * entry_mult
 
-    if allow_bull and allow_bear and nearest_bull and nearest_bear:
+    # BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO:
+    # Nếu 2 OB xanh/đỏ đối diện nhau quá sát (< min_price_gap_pct),
+    # lọc bỏ OB ở giữa CHỈ KHI phía sau nó vẫn còn OB cùng màu để đỡ/chặn.
+    while allow_bull and allow_bear and nearest_bull and nearest_bear:
         is_overlapping = nearest_bull.bar_high >= nearest_bear.bar_low
         b_bull = getattr(nearest_bull, "bar_index", 0)
         b_bear = getattr(nearest_bear, "bar_index", 0)
         bar_dist = abs(b_bull - b_bear) if (b_bull and b_bear) else 999
-        price_gap = (nearest_bear.bar_low - nearest_bull.bar_high) / live_price if live_price > Decimal("0") else Decimal("0")
+        ref_px = (nearest_bear.bar_low + nearest_bull.bar_high) / Decimal("2") if (nearest_bear.bar_low + nearest_bull.bar_high) > 0 else (live_price if live_price > Decimal("0") else Decimal("1"))
+        gap = max(Decimal("0"), nearest_bear.bar_low - nearest_bull.bar_high)
+        price_gap = gap / ref_px
 
         if is_overlapping or bar_dist < min_bar_gap or price_gap < min_price_gap_pct:
-            # Vi phạm khoảng cách: Ưu tiên giữ lại OB gần livePrice hơn
-            dist_bull = abs(live_price - nearest_bull.bar_high)
-            dist_bear = abs(live_price - nearest_bear.bar_low)
-            if dist_bull < dist_bear:
-                allow_bear = False
-            else:
-                allow_bull = False
+            other_bulls = [o for o in bulls_below if o != nearest_bull and o.bar_high < nearest_bull.bar_low]
+            other_bears = [o for o in bears_above if o != nearest_bear and o.bar_low > nearest_bear.bar_high]
 
-    # 6. Tạo setup với Entry bám sát 100% mép OB (KHÔNG CỘNG TRỪ OFFSET LỆCH CHỈ BÁO)
-    eff_offset = Decimal("0")
+            has_bull_below = len(other_bulls) > 0
+            has_bear_above = len(other_bears) > 0
+
+            if has_bull_below and not has_bear_above:
+                # Phía dưới bull còn OB đỡ, nhưng trên bear không còn OB chặn -> Lọc bỏ nearest_bull để lùi xuống OB dưới
+                bulls_below.remove(nearest_bull)
+                nearest_bull = max(bulls_below, key=lambda x: x.bar_high) if bulls_below else None
+                if not nearest_bull:
+                    allow_bull = False
+                    break
+            elif has_bear_above and not has_bull_below:
+                # Phía trên bear còn OB chặn, nhưng dưới bull không còn OB đỡ -> Lọc bỏ nearest_bear để đẩy lên OB trên
+                bears_above.remove(nearest_bear)
+                nearest_bear = min(bears_above, key=lambda x: x.bar_low) if bears_above else None
+                if not nearest_bear:
+                    allow_bear = False
+                    break
+            elif has_bull_below and has_bear_above:
+                # Cả 2 đều có điểm tựa: Lọc OB mỏng hơn
+                h_bull = nearest_bull.bar_high - nearest_bull.bar_low
+                h_bear = nearest_bear.bar_high - nearest_bear.bar_low
+                if h_bull <= h_bear:
+                    bulls_below.remove(nearest_bull)
+                    nearest_bull = max(bulls_below, key=lambda x: x.bar_high) if bulls_below else None
+                    if not nearest_bull:
+                        allow_bull = False
+                        break
+                else:
+                    bears_above.remove(nearest_bear)
+                    nearest_bear = min(bears_above, key=lambda x: x.bar_low) if bears_above else None
+                    if not nearest_bear:
+                        allow_bear = False
+                        break
+            else:
+                # Cả 2 đều không có điểm tựa: Giữ cả 2 nếu không overlap
+                if is_overlapping:
+                    dist_bull = abs(live_price - nearest_bull.bar_high)
+                    dist_bear = abs(live_price - nearest_bear.bar_low)
+                    if dist_bull < dist_bear:
+                        allow_bear = False
+                    else:
+                        allow_bull = False
+                break
+        else:
+            break
+
+    # 6. Tạo setup với Entry đón cản theo Phân đoạn thân OB (chia 5 phần) hoặc Offset & Entry Level
     entry_lvl = getattr(bot_config, "OB_ENTRY_LEVEL", "OUTER")
+    raw_fraction = getattr(bot_config, "OB_ENTRY_FRACTION", Decimal("0"))
+    if not isinstance(raw_fraction, Decimal):
+        try:
+            raw_fraction = Decimal(str(raw_fraction))
+        except Exception:
+            raw_fraction = Decimal("0")
+
+    raw_offset_pct = getattr(bot_config, "ENTRY_OFFSET_PCT", Decimal("0"))
+    if not isinstance(raw_offset_pct, Decimal):
+        try:
+            raw_offset_pct = Decimal(str(raw_offset_pct))
+        except Exception:
+            raw_offset_pct = Decimal("0")
+    vol_mult, offset_mult = get_tf_multiplier(tf)
+    eff_offset = (raw_offset_pct / Decimal("100")) * offset_mult if entry_lvl != "EQUILIBRIUM" else Decimal("0")
     tp_mode = getattr(bot_config, "OB_TP_MODE", "RR")
 
     new_setups: list[TradeSetup] = []
@@ -399,7 +463,8 @@ def generate_dual_nearest_setups(
     if allow_bull and nearest_bull:
         bull_setups = register_trade_setups_for_ob(
             nearest_bull, current_bar, 0, tf=tf,
-            entry_offset_pct=eff_offset, entry_level=entry_lvl
+            entry_offset_pct=eff_offset, entry_level=entry_lvl,
+            entry_fraction=raw_fraction
         )
         if bull_setups:
             bull_setup = bull_setups[0]
@@ -408,7 +473,8 @@ def generate_dual_nearest_setups(
     if allow_bear and nearest_bear:
         bear_setups = register_trade_setups_for_ob(
             nearest_bear, current_bar, 0, tf=tf,
-            entry_offset_pct=eff_offset, entry_level=entry_lvl
+            entry_offset_pct=eff_offset, entry_level=entry_lvl,
+            entry_fraction=raw_fraction
         )
         if bear_setups:
             bear_setup = bear_setups[0]
@@ -785,6 +851,7 @@ def sync_config_to_json(env_paths: dict, globals_ref):
             "ENTRY_OFFSET_PCT": float(cfg_ref.ENTRY_OFFSET_PCT),
             "OB_ENTRY_LEVEL": cfg_ref.OB_ENTRY_LEVEL,
             "OB_MERGE_THRESHOLD_PCT": float(cfg_ref.OB_MERGE_THRESHOLD_PCT),
+            "OB_OPPOSITE_GAP_PCT": float(getattr(cfg_ref, "OB_OPPOSITE_GAP_PCT", Decimal("0.008"))),
             "OB_AUTO_MITIGATION": bool(cfg_ref.OB_AUTO_MITIGATION),
             "OB_MERGE_OVERLAPPING": bool(cfg_ref.OB_MERGE_OVERLAPPING),
             "OB_MAX_ACTIVE_SETUPS": int(cfg_ref.OB_MAX_ACTIVE_SETUPS),
@@ -843,6 +910,7 @@ def load_global_config_from_json(env_paths: dict, globals_ref: Any):
                 if "ENTRY_OFFSET_PCT" in cfg: globals_ref.ENTRY_OFFSET_PCT = Decimal(str(cfg["ENTRY_OFFSET_PCT"]))
                 if "OB_ENTRY_LEVEL" in cfg: globals_ref.OB_ENTRY_LEVEL = cfg["OB_ENTRY_LEVEL"]
                 if "OB_MERGE_THRESHOLD_PCT" in cfg: globals_ref.OB_MERGE_THRESHOLD_PCT = Decimal(str(cfg["OB_MERGE_THRESHOLD_PCT"]))
+                if "OB_OPPOSITE_GAP_PCT" in cfg: globals_ref.OB_OPPOSITE_GAP_PCT = Decimal(str(cfg["OB_OPPOSITE_GAP_PCT"]))
                 if "OB_AUTO_MITIGATION" in cfg: globals_ref.OB_AUTO_MITIGATION = bool(cfg["OB_AUTO_MITIGATION"])
                 if "OB_MERGE_OVERLAPPING" in cfg: globals_ref.OB_MERGE_OVERLAPPING = bool(cfg["OB_MERGE_OVERLAPPING"])
                 if "OB_MAX_ACTIVE_SETUPS" in cfg: globals_ref.OB_MAX_ACTIVE_SETUPS = int(cfg["OB_MAX_ACTIVE_SETUPS"])

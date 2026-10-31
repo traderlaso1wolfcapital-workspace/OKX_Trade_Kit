@@ -67,25 +67,33 @@ export default function OnboardingTour({
       return;
     }
 
-    // Trên mobile hoặc trong Modal có thanh cuộn (như Cài Đặt):
-    // Card sẽ nằm ở bottom (hoặc top). Ta cuộn sao cho phần tử nằm trọn vẹn ở nửa trên an toàn!
+    // Trên mobile hoặc khi card docked:
     if (scrollParent && scrollParent !== window) {
       const parentRect = scrollParent.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       const currentScrollTop = scrollParent.scrollTop;
       const relativeTop = elRect.top - parentRect.top;
 
-      // Đưa đỉnh phần tử lên cách đỉnh scrollParent ~10px để phần tử nằm ở trên cùng vùng nhìn thấy
-      const targetScrollTop = currentScrollTop + relativeTop - 10;
-      scrollParent.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: "smooth",
-      });
+      if (placement === "top") {
+        // Khi card nằm ở đỉnh màn hình: Cuộn phần tử sao cho đỉnh phần tử nằm dưới Card Tooltip (~140px)
+        const targetScrollTop = currentScrollTop + relativeTop - 140;
+        scrollParent.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: "smooth",
+        });
+      } else {
+        // Khi card nằm ở đáy: Cuộn phần tử lên gần đỉnh scrollParent (~15px)
+        const targetScrollTop = currentScrollTop + relativeTop - 15;
+        scrollParent.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: "smooth",
+        });
+      }
     } else {
       const elRect = el.getBoundingClientRect();
       const currentScrollY = window.scrollY || window.pageYOffset;
-      // Đưa đỉnh phần tử cách mép trên màn hình ~70px (dưới header)
-      const targetScrollY = currentScrollY + elRect.top - 70;
+      const desiredOffsetFromTop = placement === "top" ? 170 : 65;
+      const targetScrollY = currentScrollY + elRect.top - desiredOffsetFromTop;
       window.scrollTo({
         top: Math.max(0, targetScrollY),
         behavior: "smooth",
@@ -124,8 +132,11 @@ export default function OnboardingTour({
         return;
       }
 
+      // Ưu tiên chọn phần tử chức năng cụ thể để cuộn (tránh chọn trúng Header cố định)
+      const targetToScroll = allEls.find((e) => e.getAttribute && e.getAttribute("data-tour") && !e.getAttribute("data-tour").includes("tab-bar")) || allEls[allEls.length - 1] || el;
+
       if (shouldScroll) {
-        scrollTargetIntoSafeView(el, currentStep.placement);
+        scrollTargetIntoSafeView(targetToScroll, currentStep.placement);
       }
 
       let top, left, right, bottom;
@@ -143,7 +154,7 @@ export default function OnboardingTour({
         bottom = rect.bottom;
       }
 
-      const padding = currentStep.padding !== undefined ? currentStep.padding : 6;
+      const padding = currentStep.padding !== undefined ? currentStep.padding : 12;
 
       // Xử lý các tiêu đề dạng QGroupBox nhô lên ngoài khung viền trên
       const titleEl = el.querySelector && el.querySelector(".settings-group-title");
@@ -177,13 +188,16 @@ export default function OnboardingTour({
       const cardH = tooltipRef.current && tooltipRef.current.offsetHeight > 0 ? tooltipRef.current.offsetHeight : 240;
       const isMobileOrNarrow = winW < 768 || winH < 720;
 
+      const actualCardW = tooltipRef.current && tooltipRef.current.offsetWidth > 0 ? tooltipRef.current.offsetWidth : (isMobileOrNarrow ? Math.min(winW - 24, 380) : 315);
+      const actualCardH = tooltipRef.current && tooltipRef.current.offsetHeight > 0 ? tooltipRef.current.offsetHeight : 140;
+
       // 1. Kiểm tra vị trí ngang trên màn hình Desktop rộng:
-      if (!isMobileOrNarrow && currentStep.placement === "right" && winW - computedRect.right >= cardW + 24) {
-        let cardTop = computedRect.top + (computedRect.height - cardH) / 2;
-        cardTop = Math.max(16, Math.min(cardTop, winH - cardH - 16));
+      if (!isMobileOrNarrow && currentStep.placement === "right" && winW - computedRect.right >= actualCardW + 20) {
+        let cardTop = computedRect.top + (computedRect.height - actualCardH) / 2;
+        cardTop = Math.max(12, Math.min(cardTop, winH - actualCardH - 12));
         setTooltipPos({
           top: cardTop,
-          left: computedRect.right + 14,
+          left: computedRect.right + 12,
           bottom: 0,
           placement: "right",
           isDocked: false,
@@ -191,12 +205,12 @@ export default function OnboardingTour({
         return;
       }
 
-      if (!isMobileOrNarrow && currentStep.placement === "left" && computedRect.left >= cardW + 24) {
-        let cardTop = computedRect.top + (computedRect.height - cardH) / 2;
-        cardTop = Math.max(16, Math.min(cardTop, winH - cardH - 16));
+      if (!isMobileOrNarrow && currentStep.placement === "left" && computedRect.left >= actualCardW + 20) {
+        let cardTop = computedRect.top + (computedRect.height - actualCardH) / 2;
+        cardTop = Math.max(12, Math.min(cardTop, winH - actualCardH - 12));
         setTooltipPos({
           top: cardTop,
-          left: computedRect.left - cardW - 14,
+          left: computedRect.left - actualCardW - 12,
           bottom: 0,
           placement: "left",
           isDocked: false,
@@ -204,27 +218,42 @@ export default function OnboardingTour({
         return;
       }
 
-      // 2. Chế độ DOCKED AN TOÀN TUYỆT ĐỐI (Zero Overlap & Không giật thanh cuộn):
-      // Nếu mục tiêu nằm hẳn ở nửa dưới màn hình (đỉnh > 48% winH và đáy > 70% winH) -> DOCKED TOP
-      if (computedRect.top > winH * 0.48 && computedRect.bottom > winH * 0.7) {
-        setTooltipPos({
-          top: 12,
-          left: 12,
-          bottom: 0,
-          placement: "docked-top",
-          isDocked: true,
-        });
-      } else {
-        // Mặc định an toàn cho mọi trường hợp: DOCKED BOTTOM (Đáy màn hình)
-        // Mục tiêu nằm ở nửa trên, card nằm ở đáy, cách biệt hoàn toàn!
-        setTooltipPos({
-          top: 0,
-          left: 12,
-          bottom: 12,
-          placement: "docked-bottom",
-          isDocked: true,
-        });
+      // 2. Chế độ BÁM SÁT CHỦ THỂ (Attached Contextual Tooltip - Sát phía trên hoặc phía dưới):
+      const wantTop = currentStep.placement === "top";
+      const wantBottom = currentStep.placement === "bottom";
+      const spaceAbove = computedRect.top;
+      const spaceBelow = winH - computedRect.bottom;
+
+      let useTop = wantTop;
+      if (!wantTop && !wantBottom) {
+        useTop = spaceAbove > spaceBelow;
       }
+
+      // Căn giữa card theo chiều ngang chủ thể
+      let cardLeft = isMobileOrNarrow ? 12 : computedRect.left + (computedRect.width - actualCardW) / 2;
+      cardLeft = Math.max(12, Math.min(cardLeft, winW - actualCardW - 12));
+
+      let cardTop;
+      if (useTop) {
+        // Nằm ngay phía TRÊN đỉnh chủ thể, cách 10px
+        cardTop = computedRect.top - actualCardH - 10;
+        cardTop = Math.max(10, Math.min(cardTop, winH - actualCardH - 10));
+      } else if (currentStep.dockBottom) {
+        // Đưa nội dung xuống dưới cùng màn hình theo yêu cầu CEO
+        cardTop = winH - actualCardH - 12;
+      } else {
+        // Nằm ngay phía DƯỚI đáy chủ thể, cách 10px
+        cardTop = computedRect.bottom + 10;
+        cardTop = Math.max(10, Math.min(cardTop, winH - actualCardH - 10));
+      }
+
+      setTooltipPos({
+        top: cardTop,
+        left: cardLeft,
+        bottom: 0,
+        placement: useTop ? "docked-top" : "docked-bottom",
+        isDocked: true,
+      });
     },
     [isOpen, currentStep, scrollTargetIntoSafeView]
   );
@@ -336,16 +365,16 @@ export default function OnboardingTour({
   if (!isOpen || !currentStep) return null;
 
   const isLastStep = currentStepIndex === steps.length - 1;
-  const winW = window.innerWidth;
+  const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const winH = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const isMobileOrNarrow = winW < 768 || winH < 720;
 
   // Tính toạ độ mũi tên trỏ vào phần tử highlight
   let arrowStyle = null;
   if (targetRect && tooltipPos.placement === "docked-bottom") {
     // Mũi tên nằm trên đỉnh Card trỏ thẳng LÊN mục tiêu
     const targetCenterX = targetRect.left + targetRect.width / 2;
-    // Căn toạ độ mũi tên tương đối theo chiều ngang card
-    const cardLeft = Math.max(12, (winW - Math.min(520, winW - 24)) / 2);
-    const arrowX = Math.max(20, Math.min(targetCenterX - cardLeft - 6, Math.min(520, winW - 24) - 24));
+    const arrowX = Math.max(16, Math.min(targetCenterX - (tooltipPos.left || 12) - 6, 290));
     arrowStyle = {
       position: "absolute",
       top: "-6px",
@@ -362,8 +391,7 @@ export default function OnboardingTour({
   } else if (targetRect && tooltipPos.placement === "docked-top") {
     // Mũi tên nằm dưới đáy Card trỏ thẳng XUỐNG mục tiêu
     const targetCenterX = targetRect.left + targetRect.width / 2;
-    const cardLeft = Math.max(12, (winW - Math.min(520, winW - 24)) / 2);
-    const arrowX = Math.max(20, Math.min(targetCenterX - cardLeft - 6, Math.min(520, winW - 24) - 24));
+    const arrowX = Math.max(16, Math.min(targetCenterX - (tooltipPos.left || 12) - 6, 290));
     arrowStyle = {
       position: "absolute",
       bottom: "-6px",
@@ -407,50 +435,27 @@ export default function OnboardingTour({
     };
   }
 
-  // Card Style: Docked vs Floating
-  const cardStyle = tooltipPos.isDocked
-    ? {
-        position: "fixed",
-        ...(tooltipPos.placement === "docked-top" ? { top: "12px" } : { bottom: "12px" }),
-        left: "12px",
-        right: "12px",
-        width: "calc(100vw - 24px)",
-        maxWidth: "520px",
-        margin: "0 auto",
-        backgroundColor: "#17181f",
-        border: "1px solid #42475a",
-        borderRadius: "12px",
-        boxShadow: "0 20px 50px rgba(0,0,0,0.95), 0 0 30px rgba(245,158,11,0.25)",
-        padding: "14px 16px",
-        color: "#e6e8ec",
-        zIndex: 999999,
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        boxSizing: "border-box",
-        maxHeight: "calc(46vh - 8px)",
-        animation: "tourFadeIn 0.2s ease-out",
-      }
-    : {
-        position: "fixed",
-        top: tooltipPos.top,
-        left: tooltipPos.left,
-        width: "360px",
-        maxWidth: "calc(100vw - 32px)",
-        backgroundColor: "#17181f",
-        border: "1px solid #42475a",
-        borderRadius: "10px",
-        boxShadow: "0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(245,158,11,0.25)",
-        padding: "16px 18px",
-        color: "#e6e8ec",
-        zIndex: 999999,
-        display: "flex",
-        flexDirection: "column",
-        gap: "12px",
-        boxSizing: "border-box",
-        maxHeight: "calc(60vh - 16px)",
-        animation: "tourFadeIn 0.2s ease-out",
-      };
+  // Card Style bám sát chủ thể gọn gàng
+  const cardStyle = {
+    position: "fixed",
+    top: tooltipPos.top,
+    left: tooltipPos.left,
+    width: isMobileOrNarrow ? "calc(100vw - 24px)" : "315px",
+    maxWidth: "420px",
+    backgroundColor: "#17181f",
+    border: "1px solid #42475a",
+    borderRadius: "10px",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.92), 0 0 24px rgba(245,158,11,0.25)",
+    padding: "10px 13px",
+    color: "#e6e8ec",
+    zIndex: 999999,
+    display: "flex",
+    flexDirection: "column",
+    gap: "7px",
+    boxSizing: "border-box",
+    maxHeight: "calc(50vh - 10px)",
+    animation: "tourFadeIn 0.18s ease-out",
+  };
 
   return (
     <div
@@ -471,7 +476,7 @@ export default function OnboardingTour({
             left: targetRect.left,
             width: targetRect.width,
             height: targetRect.height,
-            borderRadius: "8px",
+            borderRadius: "12px",
             boxShadow:
               "0 0 0 9999px rgba(0, 0, 0, 0.78), 0 0 24px 6px rgba(245, 158, 11, 0.65), inset 0 0 12px rgba(245, 158, 11, 0.4)",
             border: "2px solid #f59e0b",
@@ -513,9 +518,9 @@ export default function OnboardingTour({
               <span
                 style={{
                   display: "inline-block",
-                  padding: "2px 8px",
+                  padding: "1px 6px",
                   borderRadius: "12px",
-                  fontSize: "10.5px",
+                  fontSize: "9.5px",
                   fontWeight: 800,
                   background: "rgba(245, 158, 11, 0.18)",
                   color: "#f59e0b",
@@ -528,7 +533,7 @@ export default function OnboardingTour({
             <h4
               style={{
                 margin: 0,
-                fontSize: "14px",
+                fontSize: "12.5px",
                 fontWeight: 800,
                 color: "#ffffff",
                 letterSpacing: "0.2px",
@@ -564,8 +569,8 @@ export default function OnboardingTour({
         {/* Nội dung diễn giải (có thanh cuộn nội bộ khi chữ dài) */}
         <div
           style={{
-            fontSize: "12px",
-            lineHeight: 1.5,
+            fontSize: "10.5px",
+            lineHeight: 1.4,
             color: "#c9cedd",
             whiteSpace: "pre-line",
             wordBreak: "break-word",
@@ -589,8 +594,8 @@ export default function OnboardingTour({
               backgroundColor: "rgba(245, 158, 11, 0.08)",
               borderLeft: "3px solid #f59e0b",
               borderRadius: "0 6px 6px 0",
-              padding: "6px 8px",
-              fontSize: "11px",
+              padding: "4px 7px",
+              fontSize: "10px",
               color: "#fbbf24",
               lineHeight: 1.4,
               position: "relative",

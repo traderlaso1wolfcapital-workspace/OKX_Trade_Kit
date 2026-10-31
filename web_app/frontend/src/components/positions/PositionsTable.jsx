@@ -392,7 +392,7 @@ export default function PositionsTable({
                 >
                   <span style={{ fontWeight: "700", fontSize: "14.2px" }}>
                     {upl >= 0 ? "+" : ""}
-                    {upl.toFixed(2)} {isFxOrProp ? "USD" : "USDT"}
+                    {upl.toFixed(2)}
                   </span>
                   <span style={{ fontSize: "11.5px", fontWeight: "600" }}>
                     ({roi > 0 ? "+" : ""}

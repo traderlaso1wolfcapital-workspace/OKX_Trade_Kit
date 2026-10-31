@@ -1066,8 +1066,18 @@ def _background_fill_candles(instId: str, bar: str, pool_key: tuple, target_limi
     finally:
         _bg_fetch_tasks.discard(pool_key)
 
-def compute_ob_boxes(all_candles):
-    """Tính toán Order Blocks từ dữ liệu nến."""
+TF_FACTOR_MAP = {
+    "5m": Decimal("1.0"),
+    "15m": Decimal("1.2"),
+    "30m": Decimal("1.5"),
+    "1H": Decimal("2.0"), "1h": Decimal("2.0"),
+    "2H": Decimal("3.0"), "2h": Decimal("3.0"),
+    "4H": Decimal("5.0"), "4h": Decimal("5.0"),
+    "1D": Decimal("8.0"), "1d": Decimal("8.0"),
+}
+
+def compute_ob_boxes(all_candles, bar="15m", min_ob_height_pct=0.003, merge_threshold_pct=0.005, opposite_gap_pct=0.005, vol_mult=2.0):
+    """Tính toán Order Blocks từ dữ liệu nến với bộ lọc độ dày tối thiểu và gộp cản liên kề."""
     ob_boxes = []
     if not all_candles:
         return ob_boxes
@@ -1079,10 +1089,10 @@ def compute_ob_boxes(all_candles):
             return ob_boxes
             
         times = [int(c[0]) for c in candles]
-        opens = [Decimal(c[1]) for c in candles]
-        highs = [Decimal(c[2]) for c in candles]
-        lows = [Decimal(c[3]) for c in candles]
-        closes = [Decimal(c[4]) for c in candles]
+        opens = [Decimal(str(c[1])) for c in candles]
+        highs = [Decimal(str(c[2])) for c in candles]
+        lows = [Decimal(str(c[3])) for c in candles]
+        closes = [Decimal(str(c[4])) for c in candles]
         
         atr_period = 14
         tr_list = []
@@ -1103,7 +1113,7 @@ def compute_ob_boxes(all_candles):
             # Bullish FVG & Bullish OB
             if lows[i+1] > highs[i-1]:
                 gap = lows[i+1] - highs[i-1]
-                if gap >= atr * Decimal("0.2"):
+                if gap >= atr * (Decimal(str(vol_mult)) / Decimal("10")):
                     for j in range(i, max(-1, i - 4), -1):
                         if closes[j] < opens[j]:
                             raw_obs.append({
@@ -1117,7 +1127,7 @@ def compute_ob_boxes(all_candles):
             # Bearish FVG & Bearish OB
             elif highs[i+1] < lows[i-1]:
                 gap = lows[i-1] - highs[i+1]
-                if gap >= atr * Decimal("0.2"):
+                if gap >= atr * (Decimal(str(vol_mult)) / Decimal("10")):
                     for j in range(i, max(-1, i - 4), -1):
                         if closes[j] > opens[j]:
                             raw_obs.append({
@@ -1129,7 +1139,7 @@ def compute_ob_boxes(all_candles):
                             })
                             break
                             
-        # Lọc bỏ các OB đã bị giá đâm thủng qua (mitigated / lấp hết)
+        # 1. Lọc bỏ các OB đã bị giá đâm thủng qua (mitigated / lấp hết)
         unmitigated_obs = []
         for ob in raw_obs:
             j = ob.get("candle_idx", 0)
@@ -1146,7 +1156,13 @@ def compute_ob_boxes(all_candles):
             if not is_pierced:
                 unmitigated_obs.append(ob)
 
-        # Lọc và gộp các vùng OB đè nhau
+        # 2. BƯỚC 1: GỘP CÁC OB CÙNG CHIỀU LIÊN KỀ (< merge_threshold_pct, mặc định 1.0%)
+        # Giúp các khối cản sát nhau gộp lại thành 1 khối vững chắc
+        tf_mult = TF_FACTOR_MAP.get(str(bar).strip(), Decimal("1.2"))
+        min_h_dec = Decimal(str(min_ob_height_pct)) * tf_mult
+        merge_thr_dec = Decimal(str(merge_threshold_pct)) * tf_mult
+
+        merged_stage = []
         for bias in [1, -1]:
             biased = [o for o in unmitigated_obs if o["bias"] == bias]
             biased.sort(key=lambda x: x["low"])
@@ -1156,21 +1172,95 @@ def compute_ob_boxes(all_candles):
                     merged.append(o)
                 else:
                     last = merged[-1]
-                    if last["high"] >= o["low"]:
-                        last["high"] = max(last["high"], o["high"])
-                        if o["time"] > 0 and last["time"] > 0:
+                    last_h = Decimal(str(last["high"]))
+                    last_l = Decimal(str(last["low"]))
+                    curr_h = Decimal(str(o["high"]))
+                    curr_l = Decimal(str(o["low"]))
+                    ref_px = (last_h + last_l) / Decimal("2") if (last_h + last_l) > 0 else Decimal("1")
+
+                    is_overlap = (last_h >= curr_l and last_l <= curr_h)
+                    gap = max(Decimal("0"), curr_l - last_h) if not is_overlap else Decimal("0")
+                    is_close = (gap / ref_px) <= merge_thr_dec
+
+                    if is_overlap or is_close:
+                        last["high"] = float(max(last_h, curr_h))
+                        last["low"] = float(min(last_l, curr_l))
+                        if o.get("time", 0) > 0 and last.get("time", 0) > 0:
                             last["time"] = min(last["time"], o["time"])
-                        elif o["time"] > 0:
+                        elif o.get("time", 0) > 0:
                             last["time"] = o["time"]
                     else:
                         merged.append(o)
-            ob_boxes.extend(merged)
+            merged_stage.extend(merged)
+
+        # 3. BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ những khối OB còn lại quá nhỏ (< min_ob_height_pct, mặc định 0.5%)
+        # Tránh SL bị quá ngắn dẫn tới dễ quét dính lỗ sớm
+        for ob in merged_stage:
+            ob_h = Decimal(str(ob["high"]))
+            ob_l = Decimal(str(ob["low"]))
+            ob_height = ob_h - ob_l
+            ref_px = (ob_h + ob_l) / Decimal("2") if (ob_h + ob_l) > 0 else Decimal("1")
+            if (ob_height / ref_px) >= min_h_dec:
+                ob_boxes.append(ob)
+
+        # 4. BƯỚC 3: BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO
+        # Nếu 2 OB xanh/đỏ đối diện nhau quá sát (< opposite_gap_pct, mặc định 0.8%),
+        # lọc bỏ OB ở giữa CHỈ KHI phía sau nó vẫn còn OB cùng màu để đỡ/chặn.
+        opp_gap_dec = Decimal(str(opposite_gap_pct)) * tf_mult
+        while True:
+            bulls = [o for o in ob_boxes if o["bias"] == 1]
+            bears = [o for o in ob_boxes if o["bias"] == -1]
+            if not bulls or not bears:
+                break
+
+            bulls.sort(key=lambda x: Decimal(str(x["high"])), reverse=True)
+            bears.sort(key=lambda x: Decimal(str(x["low"])))
+
+            removed_any = False
+            for bull in bulls:
+                b_high = Decimal(str(bull["high"]))
+                b_low = Decimal(str(bull["low"]))
+                for bear in bears:
+                    br_high = Decimal(str(bear["high"]))
+                    br_low = Decimal(str(bear["low"]))
+
+                    if b_high <= br_high:
+                        ref_px = (br_low + b_high) / Decimal("2") if (br_low + b_high) > 0 else Decimal("1")
+                        gap = max(Decimal("0"), br_low - b_high)
+                        gap_pct = gap / ref_px
+
+                        if gap_pct < opp_gap_dec:
+                            has_bull_below = any(Decimal(str(other["high"])) < b_low for other in bulls if other != bull)
+                            has_bear_above = any(Decimal(str(other["low"])) > br_high for other in bears if other != bear)
+
+                            to_remove = None
+                            if has_bull_below and not has_bear_above:
+                                to_remove = bull
+                            elif has_bear_above and not has_bull_below:
+                                to_remove = bear
+                            elif has_bull_below and has_bear_above:
+                                h_bull = b_high - b_low
+                                h_bear = br_high - br_low
+                                to_remove = bull if h_bull <= h_bear else bear
+
+                            if to_remove is not None:
+                                ob_boxes.remove(to_remove)
+                                removed_any = True
+                                break
+                if removed_any:
+                    break
+
+            if not removed_any:
+                break
     except Exception:
         pass
     return ob_boxes
 
 @app.get("/api/market/candles")
-def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
+def proxy_market_candles(
+    instId: str, bar: str = "1H", limit: int = 2500,
+    min_ob_pct: float = 0.003, merge_ob_pct: float = 0.005, opposite_gap_pct: float = 0.005, vol_mult: float = 2.0
+):
     """Proxy OKX candle API với cơ chế 2 Pha Tức Thì (0.15s Pha 1 + Nền Pha 2 lấp đầy 2500 nến)."""
     try:
         limit = int(limit)
@@ -1241,7 +1331,7 @@ def proxy_market_candles(instId: str, bar: str = "1H", limit: int = 2500):
                     _bg_fetch_tasks.add(pool_key)
                     threading.Thread(target=_background_fill_candles, args=(instId, bar, pool_key, limit), daemon=True).start()
 
-        ob_boxes = compute_ob_boxes(all_candles)
+        ob_boxes = compute_ob_boxes(all_candles, bar=bar, min_ob_height_pct=min_ob_pct, merge_threshold_pct=merge_ob_pct, opposite_gap_pct=opposite_gap_pct, vol_mult=vol_mult)
         res_data = {
             "code": "0",
             "msg": "",
@@ -2842,7 +2932,8 @@ def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] =
                     "MAX_MARKET_SLIPPAGE_PCT": 0.008,
                     "ENTRY_OFFSET_PCT": 0.05,
                     "OB_ENTRY_LEVEL": "OUTER",
-                    "OB_MERGE_THRESHOLD_PCT": 0.005,
+                    "OB_MERGE_THRESHOLD_PCT": 0.010,
+                    "OB_OPPOSITE_GAP_PCT": 0.008,
                     "OB_AUTO_MITIGATION": True,
                     "OB_MERGE_OVERLAPPING": True,
                     "ENABLE_PYRAMID_DCA": False,

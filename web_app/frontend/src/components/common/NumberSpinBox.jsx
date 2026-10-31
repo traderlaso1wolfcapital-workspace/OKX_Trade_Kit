@@ -9,6 +9,7 @@ export default function NumberSpinBox({
   suffix = "",
   width = "84px",
   disabled = false,
+  disabledTitle = "Bot đang chạy - Dừng bot để chỉnh sửa ký quỹ",
 }) {
   const inputRef = useRef(null);
 
@@ -31,7 +32,7 @@ export default function NumberSpinBox({
   const handleBlur = (e) => {
     if (disabled) return;
     let val = parseFloat(e.target.value);
-    if (isNaN(val)) val = min !== undefined ? min : 0;
+    if (isNaN(val)) val = 0;
     const stepStr = step.toString();
     const decimals = stepStr.includes(".") ? stepStr.split(".")[1].length : 0;
     if (min !== undefined && val < min) val = min;
@@ -54,10 +55,9 @@ export default function NumberSpinBox({
       style={{
         width,
         opacity: disabled ? 0.65 : 1,
-        pointerEvents: disabled ? "none" : "auto",
         cursor: disabled ? "not-allowed" : "text",
       }}
-      title={disabled ? "Bot đang chạy - Dừng bot để chỉnh sửa ký quỹ" : ""}
+      title={disabled ? disabledTitle : ""}
     >
       <input
         ref={inputRef}

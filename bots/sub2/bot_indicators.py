@@ -80,14 +80,17 @@ def get_volatility_measure(closes: list, highs: list, lows: list) -> Decimal:
         return calculate_cumulative_mean_range(highs, lows)
 
 
-def build_parsed_arrays(highs: list, lows: list, volatility: Decimal) -> Tuple[list, list]:
+def build_parsed_arrays(highs: list, lows: list, volatility: Decimal, mult: Optional[Decimal] = None) -> Tuple[list, list]:
     """
     Port của PineScript:
-        highVolatilityBar = (high - low) >= 2 * volatilityMeasure
+        highVolatilityBar = (high - low) >= OB_VOLATILITY_MULT * volatilityMeasure
         parsedHigh = highVolatilityBar ? low : high
         parsedLow  = highVolatilityBar ? high : low
     """
-    threshold = volatility * Decimal("2")
+    if mult is None:
+        from bots.sub2 import bot_config
+        mult = Decimal(str(getattr(bot_config, "OB_VOLATILITY_MULT", 2.0)))
+    threshold = volatility * mult
     parsed_highs = []
     parsed_lows = []
     for i in range(len(highs)):
@@ -408,7 +411,7 @@ def nearest_opposite_ob_tp(
 # TRADE SETUP - registerOBTradeSetup()
 # =============================================================================
 
-def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
+def compute_chart_ob_boxes(all_candles, tf: str = "15m") -> List[OrderBlock]:
     """
     Tính toán Order Blocks theo chuẩn chỉ báo trên web chart (đồng bộ 100% với SingleChartPane và backend /api/market/candles).
     all_candles: danh sách nến từ OKX (từ mới đến cũ hoặc từ cũ đến mới).
@@ -448,12 +451,18 @@ def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
         recent_count = min(n, 150)
         start_idx = n - recent_count
         raw_obs = []
+
+        from bots.sub2 import bot_config
+        vol_mult = Decimal(str(getattr(bot_config, "OB_VOLATILITY_MULT", "2.0")))
+        fvg_factor = vol_mult / Decimal("10") # 2.0 -> 0.2 ATR, 5.0 -> 0.5 ATR
+        lookback_bars = max(3, min(int(getattr(bot_config, "SWING_LENGTH", 50)) // 5, 15))
+
         for i in range(max(2, start_idx), n - 1):
             # Bullish FVG & Bullish OB
             if lows[i+1] > highs[i-1]:
                 gap = lows[i+1] - highs[i-1]
-                if gap >= atr * Decimal("0.2"):
-                    for j in range(i, max(-1, i - 4), -1):
+                if gap >= atr * fvg_factor:
+                    for j in range(i, max(-1, i - lookback_bars), -1):
                         if closes[j] < opens[j]:
                             raw_obs.append({
                                 "bias": BULLISH,
@@ -466,8 +475,8 @@ def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
             # Bearish FVG & Bearish OB
             elif highs[i+1] < lows[i-1]:
                 gap = lows[i-1] - highs[i+1]
-                if gap >= atr * Decimal("0.2"):
-                    for j in range(i, max(-1, i - 4), -1):
+                if gap >= atr * fvg_factor:
+                    for j in range(i, max(-1, i - lookback_bars), -1):
                         if closes[j] > opens[j]:
                             raw_obs.append({
                                 "bias": BEARISH,
@@ -495,8 +504,19 @@ def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
             if not is_pierced:
                 unmitigated.append(ob)
 
-        # Lọc và gộp các vùng OB đè nhau cùng chiều
-        merged_obs = []
+        # 2. BƯỚC 1: GỘP CÁC OB CÙNG CHIỀU LIÊN KỀ (Tự động nhân hệ số TF theo chỉ đạo của CEO)
+        from bots.sub2 import bot_config
+        from bots.sub2.bot_config import get_tf_multiplier
+        _, tf_mult = get_tf_multiplier(tf) if tf else (Decimal("1.0"), Decimal("1.2"))
+
+        base_min_h = Decimal(str(getattr(bot_config, "OB_MIN_HEIGHT_PCT", "0.003")))
+        base_gap = Decimal(str(getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", "0.005")))
+
+        min_ob_height_pct = base_min_h * tf_mult
+        merge_threshold_pct = base_gap * tf_mult
+        opposite_gap_pct = base_gap * tf_mult
+
+        merged_stage = []
         for bias in [BULLISH, BEARISH]:
             biased = [o for o in unmitigated if o["bias"] == bias]
             biased.sort(key=lambda x: x["low"])
@@ -506,15 +526,29 @@ def compute_chart_ob_boxes(all_candles) -> List[OrderBlock]:
                     merged.append(o)
                 else:
                     last = merged[-1]
-                    if last["high"] >= o["low"]:
+                    ref_px = (last["high"] + last["low"]) / Decimal("2") if (last["high"] + last["low"]) > 0 else Decimal("1")
+                    is_overlap = last["high"] >= o["low"]
+                    gap = max(Decimal("0"), o["low"] - last["high"]) if not is_overlap else Decimal("0")
+                    is_close = (gap / ref_px) <= merge_threshold_pct
+
+                    if is_overlap or is_close:
                         last["high"] = max(last["high"], o["high"])
+                        last["low"] = min(last["low"], o["low"])
                         if o["time"] > 0 and last["time"] > 0:
                             last["time"] = min(last["time"], o["time"])
                         elif o["time"] > 0:
                             last["time"] = o["time"]
                     else:
                         merged.append(o)
-            merged_obs.extend(merged)
+            merged_stage.extend(merged)
+
+        # 3. BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ những khối OB còn lại quá mỏng (< min_ob_height_pct, mặc định 0.5%)
+        merged_obs = []
+        for o in merged_stage:
+            ref_px = (o["high"] + o["low"]) / Decimal("2") if (o["high"] + o["low"]) > 0 else Decimal("1")
+            height = o["high"] - o["low"]
+            if (height / ref_px) >= min_ob_height_pct:
+                merged_obs.append(o)
 
         # Tạo OrderBlock objects
         ob_objects = []
@@ -542,7 +576,8 @@ def register_trade_setups_for_ob(
     is_hedge: bool = False,
     tf: str = "",
     entry_offset_pct: Decimal = Decimal("0"),
-    entry_level: str = "OUTER"
+    entry_level: str = "OUTER",
+    entry_fraction: Decimal = Decimal("0")
 ) -> list[TradeSetup]:
     """
     Logic PineScript gốc: 1 OB -> 1 setup theo bias của OB.
@@ -563,7 +598,16 @@ def register_trade_setups_for_ob(
     real_high = max(candidates_high)
     real_low = min(candidates_low)
 
-    if entry_level == "EQUILIBRIUM":
+    ob_span = real_high - real_low
+    # Vị trí đón cản theo phân đoạn thân OB (chia 5 phần: 0, +-0.2, +-0.4, -0.5, +-0.6, +-0.8)
+    if entry_fraction != Decimal("0"):
+        if ob.bias == BULLISH:
+            entry = real_high + entry_fraction * ob_span
+            sl = real_low
+        else:
+            entry = real_low - entry_fraction * ob_span
+            sl = real_high
+    elif entry_level == "EQUILIBRIUM":
         entry = (real_high + real_low) / Decimal("2")
         sl = real_low if ob.bias == BULLISH else real_high
     else:
@@ -574,16 +618,20 @@ def register_trade_setups_for_ob(
             entry = real_low
             sl = real_high
 
-    if entry_offset_pct > Decimal("0"):
-        if ob.bias == BULLISH:
-            entry = entry * (Decimal("1") + entry_offset_pct)
-        else:
-            entry = entry * (Decimal("1") - entry_offset_pct)
+        if entry_offset_pct != Decimal("0"):
+            if ob.bias == BULLISH:
+                entry = entry * (Decimal("1") + entry_offset_pct)
+            else:
+                entry = entry * (Decimal("1") - entry_offset_pct)
 
-    if ob.bias == BEARISH and entry >= sl:
-        entry, sl = sl, entry
-    elif ob.bias == BULLISH and entry <= sl:
-        entry, sl = sl, entry
+    ob_span = real_high - real_low
+    min_guard = (ob_span * Decimal("0.05")) if ob_span > Decimal("0") else (entry * Decimal("0.0005"))
+    if ob.bias == BULLISH:
+        if entry <= real_low:
+            entry = real_low + min_guard
+    elif ob.bias == BEARISH:
+        if entry >= real_high:
+            entry = real_high - min_guard
 
     risk = abs(entry - sl)
     min_risk_pct = Decimal("0.001")
@@ -772,23 +820,42 @@ def round_to_tick(price: Decimal, tick: Decimal) -> Decimal:
 
 
 
-def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
+def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock, min_height_pct: Decimal = None, merge_threshold_pct: Decimal = None) -> bool:
     """
-    Thêm OB mới vào danh sách. Nếu có OB nào cùng bias bị giao cắt vùng giá,
-    sẽ gộp 2 OB lại thành 1 vùng lớn hơn.
+    Thêm OB mới vào danh sách:
+    1. Kiểm tra độ dày tối thiểu: nếu (high - low) / price < min_height_pct (0.5%), bỏ qua.
+    2. Nếu có OB nào cùng bias bị giao cắt HOẶC cách nhau <= merge_threshold_pct (1.0%),
+       sẽ gộp 2 OB lại thành 1 vùng lớn vững chắc.
     Trả về True nếu bị gộp, False nếu thêm mới.
     """
-    merged = False
+    from bots.sub2 import bot_config
+    if min_height_pct is None:
+        min_height_pct = getattr(bot_config, "OB_MIN_HEIGHT_PCT", Decimal("0.005"))
+    if merge_threshold_pct is None:
+        merge_threshold_pct = getattr(bot_config, "OB_MERGE_THRESHOLD_PCT", Decimal("0.010"))
+
     top2 = max(new_ob.bar_high, new_ob.bar_low)
     bot2 = min(new_ob.bar_high, new_ob.bar_low)
-    
+    ref_px2 = (top2 + bot2) / Decimal("2") if (top2 + bot2) > 0 else Decimal("1")
+
+    # 1. Bỏ qua nếu OB quá mỏng (< min_height_pct)
+    if (top2 - bot2) / ref_px2 < min_height_pct:
+        return False
+
+    merged = False
     for ob in ob_list:
         if ob.bias == new_ob.bias and not ob.crossed:
             top1 = max(ob.bar_high, ob.bar_low)
             bot1 = min(ob.bar_high, ob.bar_low)
-            # Check overlap
-            if top1 >= bot2 and bot1 <= top2:
-                # Gộp
+            ref_px1 = (top1 + bot1) / Decimal("2") if (top1 + bot1) > 0 else Decimal("1")
+
+            # Check overlap HOẶC khoảng cách < merge_threshold_pct
+            is_overlap = (top1 >= bot2 and bot1 <= top2)
+            gap = max(Decimal("0"), bot2 - top1) if bot2 > top1 else (max(Decimal("0"), bot1 - top2) if bot1 > top2 else Decimal("0"))
+            is_close = (gap / ref_px1) <= merge_threshold_pct
+
+            if is_overlap or is_close:
+                # Gộp thành 1 khối vững chắc
                 ob.bar_high = max(top1, top2)
                 ob.bar_low = min(bot1, bot2)
                 if new_ob.raw_high > Decimal("0"):
@@ -796,11 +863,9 @@ def add_ob_and_merge(ob_list: list[OrderBlock], new_ob: OrderBlock) -> bool:
                 if new_ob.raw_low > Decimal("0"):
                     ob.raw_low = min(ob.raw_low, new_ob.raw_low) if ob.raw_low > Decimal("0") else new_ob.raw_low
                 ob.bar_time = min(ob.bar_time, new_ob.bar_time)
-                merged = True
                 return True
-                
-    if not merged:
-        ob_list.insert(0, new_ob)
-        if len(ob_list) > 100:
-            ob_list.pop()
-        return False
+
+    ob_list.insert(0, new_ob)
+    if len(ob_list) > 100:
+        ob_list.pop()
+    return False

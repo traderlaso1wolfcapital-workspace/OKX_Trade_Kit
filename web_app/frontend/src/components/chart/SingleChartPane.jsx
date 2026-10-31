@@ -1,3 +1,12 @@
+const TF_MULTIPLIERS = {
+  "5m": 1.0,
+  "15m": 1.2,
+  "30m": 1.5,
+  "1H": 2.0, "1h": 2.0,
+  "2H": 3.0, "2h": 3.0,
+  "4H": 5.0, "4h": 5.0,
+  "1D": 8.0, "1d": 8.0,
+};
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode } from "lightweight-charts";
 import DrawingCanvasOverlay from "../DrawingCanvasOverlay";
@@ -62,7 +71,10 @@ export default function SingleChartPane({
   layoutSelector = null,
   activeBotTab,
   adminClosedPositions = [],
+  smcEntryCfg = {},
 }) {
+  const smcEntryCfgRef = useRef(smcEntryCfg);
+  useEffect(() => { smcEntryCfgRef.current = smcEntryCfg; }, [smcEntryCfg]);
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const candleSeriesRef = useRef(null);
@@ -539,8 +551,67 @@ export default function SingleChartPane({
     return results;
   };
 
+  // BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO:
+  // Nếu 2 OB xanh/đỏ đối diện nhau quá sát (< oppGapThreshold, mặc định 0.8%),
+  // lọc bỏ OB ở giữa CHỈ KHI phía sau nó vẫn còn OB cùng màu để đỡ/chặn.
+  const filterOppositeOBClash = (obsList, oppGapThreshold = 0.008) => {
+    let result = [...obsList];
+    while (true) {
+      const bulls = result.filter(o => o.bias === 1).sort((a, b) => Number(b.high) - Number(a.high));
+      const bears = result.filter(o => o.bias === -1).sort((a, b) => Number(a.low) - Number(b.low));
+      if (bulls.length === 0 || bears.length === 0) break;
+
+      let removedAny = false;
+      for (const bull of bulls) {
+        const bHigh = Number(bull.high);
+        const bLow = Number(bull.low);
+        for (const bear of bears) {
+          const brHigh = Number(bear.high);
+          const brLow = Number(bear.low);
+
+          if (bHigh <= brHigh) {
+            const refPx = (brLow + bHigh) / 2 || 1;
+            const gap = Math.max(0, brLow - bHigh);
+            const gapPct = gap / refPx;
+
+            if (gapPct < oppGapThreshold) {
+              const hasBullBelow = bulls.some(other => other !== bull && Number(other.high) < bLow);
+              const hasBearAbove = bears.some(other => other !== bear && Number(other.low) > brHigh);
+
+              let toRemove = null;
+              if (hasBullBelow && !hasBearAbove) {
+                toRemove = bull;
+              } else if (hasBearAbove && !hasBullBelow) {
+                toRemove = bear;
+              } else if (hasBullBelow && hasBearAbove) {
+                const hBull = Math.abs(bHigh - bLow);
+                const hBear = Math.abs(brHigh - brLow);
+                toRemove = (hBull <= hBear) ? bull : bear;
+              }
+
+              if (toRemove) {
+                result = result.filter(o => o !== toRemove);
+                removedAny = true;
+                break;
+              }
+            }
+          }
+        }
+        if (removedAny) break;
+      }
+      if (!removedAny) break;
+    }
+    return result;
+  };
+
   const calculateSMCPositions = (candles, obs) => {
     if (!candles || candles.length < 25) return [];
+
+    const tfFactor = TF_MULTIPLIERS[tf] || 1.2;
+    const baseMinH = smcEntryCfgRef.current?.minObHeight ? Number(smcEntryCfgRef.current.minObHeight) / 100 : 0.003;
+    const minHeightPct = baseMinH * tfFactor;
+    const baseGap = smcEntryCfgRef.current?.mergeThreshold ? Number(smcEntryCfgRef.current.mergeThreshold) / 100 : 0.005;
+    const mergeDistPct = baseGap * tfFactor;
 
     // 1. Chỉ lấy các khối OB còn hợp lệ (chưa bị đóng cửa xuyên thủng)
     const validObs = (obs || []).filter(ob => {
@@ -556,6 +627,42 @@ export default function SingleChartPane({
     });
 
     if (validObs.length === 0) return [];
+
+    // BƯỚC 1: BỘ GỘP CẢN LIÊN KỀ: Gộp các OB cùng chiều cách nhau <= mergeDistPct (1.0%)
+    const mergedStage = [];
+    for (const bias of [1, -1]) {
+      const biased = validObs.filter(o => o.bias === bias).sort((a, b) => a.low - b.low);
+      const clusters = [];
+      for (const o of biased) {
+        if (clusters.length === 0) {
+          clusters.push({ ...o });
+        } else {
+          const last = clusters[clusters.length - 1];
+          const refPx = (last.high + last.low) / 2 || 1;
+          const isOverlap = last.high >= o.low;
+          const gap = Math.max(0, o.low - last.high);
+          if (isOverlap || (gap / refPx) <= mergeDistPct) {
+            last.high = Math.max(last.high, o.high);
+            last.low = Math.min(last.low, o.low);
+            if (o.time && last.time) last.time = Math.min(last.time, o.time);
+          } else {
+            clusters.push({ ...o });
+          }
+        }
+      }
+      mergedStage.push(...clusters);
+    }
+
+    // BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ các khối OB sau khi gộp vẫn quá mỏng (< minHeightPct, 0.5%)
+    const mergedObs = mergedStage.filter(ob => {
+      const refPx = (Number(ob.high) + Number(ob.low)) / 2 || 1;
+      const h = Math.abs(Number(ob.high) - Number(ob.low));
+      return (h / refPx) >= minHeightPct;
+    });
+
+    // BƯỚC 3: BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO
+    const oppGapPct = mergeDistPct;
+    const finalObs = filterOppositeOBClash(mergedObs, oppGapPct);
 
     const curIdx = candles.length - 1;
     const curCandle = candles[curIdx];
@@ -573,20 +680,44 @@ export default function SingleChartPane({
 
     // 3. Xây dựng danh sách kịch bản setup cho tất cả các khối OB hợp lệ
     const rawCandidates = [];
-    for (let idx = 0; idx < validObs.length; idx++) {
-      const ob = validObs[idx];
+    // Vị trí đón cản theo phân đoạn thân OB (chia 5 phần)
+    // fraction: 0 (mép cản), +0.2 (+1/5 đón ngoài), -0.2 (-1/5 đón trong), -0.5 (50% thân OB), v.v.
+    let fraction = 0;
+    if (smcEntryCfgRef.current?.entryFraction !== undefined && !isNaN(parseFloat(smcEntryCfgRef.current.entryFraction))) {
+      fraction = parseFloat(smcEntryCfgRef.current.entryFraction);
+    } else if (smcEntryCfgRef.current?.entryLevel === "EQUILIBRIUM") {
+      fraction = -0.5;
+    }
+
+    for (let idx = 0; idx < finalObs.length; idx++) {
+      const ob = finalObs[idx];
       const isBull = ob.bias === 1;
-      const entryPrice = isBull ? ob.high : ob.low;
       const obHeight = Math.abs(ob.high - ob.low);
       if (obHeight <= 0) continue;
 
+      let entryPrice;
+      if (isBull) {
+        // Bullish: mép ngoài là ob.high. fraction > 0 đón ngoài (trên high), fraction < 0 đón sâu trong lòng OB
+        entryPrice = ob.high + fraction * obHeight;
+        if (entryPrice <= ob.low) {
+          entryPrice = ob.low + obHeight * 0.05;
+        }
+      } else {
+        // Bearish: mép ngoài là ob.low. fraction > 0 đón ngoài (dưới low), fraction < 0 đón sâu trong lòng OB
+        entryPrice = ob.low - fraction * obHeight;
+        if (entryPrice >= ob.high) {
+          entryPrice = ob.high - obHeight * 0.05;
+        }
+      }
+
+      const baseRisk = Math.abs(entryPrice - (isBull ? ob.low : ob.high));
       const slTarget = isBull
-        ? (entryPrice - obHeight * slRatio)
-        : (entryPrice + obHeight * slRatio);
+        ? (entryPrice - baseRisk * slRatio)
+        : (entryPrice + baseRisk * slRatio);
 
       let tpTarget = isBull
-        ? (entryPrice + obHeight * rrRatio)
-        : (entryPrice - obHeight * rrRatio);
+        ? (entryPrice + baseRisk * rrRatio)
+        : (entryPrice - baseRisk * rrRatio);
 
       // Chế độ TP theo OB đối diện
       if (isNearestObMode) {
@@ -692,8 +823,14 @@ export default function SingleChartPane({
     o.style.height = maxBottomY + 'px';
     o.style.overflow = 'hidden';
 
-    // Chỉ hiển thị các OB còn đủ điều kiện, chưa bị đâm thủng / lấp hết
+    // Chỉ hiển thị các OB còn đủ điều kiện, chưa bị đâm thủng
     const candles = candlesRef.current || [];
+    const tfFactor = TF_MULTIPLIERS[tf] || 1.2;
+    const baseMinH = smcEntryCfgRef.current?.minObHeight ? Number(smcEntryCfgRef.current.minObHeight) / 100 : 0.003;
+    const minHeightPct = baseMinH * tfFactor;
+    const baseGap = smcEntryCfgRef.current?.mergeThreshold ? Number(smcEntryCfgRef.current.mergeThreshold) / 100 : 0.005;
+    const mergeDistPct = baseGap * tfFactor;
+
     const validObs = obs.filter(ob => {
       if (!ob || !ob.high || !ob.low) return false;
       const obSec = ob.time ? (ob.time > 100000000000 ? Math.floor(ob.time / 1000) : ob.time) : 0;
@@ -706,7 +843,43 @@ export default function SingleChartPane({
       return true;
     });
 
-    validObs.forEach(ob => {
+    // BƯỚC 1: BỘ GỘP CẢN LIÊN KỀ: Gộp các OB cùng chiều cách nhau <= mergeDistPct (1.0%)
+    const mergedStage = [];
+    for (const bias of [1, -1]) {
+      const biased = validObs.filter(o => o.bias === bias).sort((a, b) => a.low - b.low);
+      const clusters = [];
+      for (const o of biased) {
+        if (clusters.length === 0) {
+          clusters.push({ ...o });
+        } else {
+          const last = clusters[clusters.length - 1];
+          const refPx = (last.high + last.low) / 2 || 1;
+          const isOverlap = last.high >= o.low;
+          const gap = Math.max(0, o.low - last.high);
+          if (isOverlap || (gap / refPx) <= mergeDistPct) {
+            last.high = Math.max(last.high, o.high);
+            last.low = Math.min(last.low, o.low);
+            if (o.time && last.time) last.time = Math.min(last.time, o.time);
+          } else {
+            clusters.push({ ...o });
+          }
+        }
+      }
+      mergedStage.push(...clusters);
+    }
+
+    // BƯỚC 2: BỘ LỌC ĐỘ DÀY TỐI THIỂU: Lọc bỏ các khối OB sau khi gộp vẫn quá mỏng (< minHeightPct, 0.5%)
+    const mergedObs = mergedStage.filter(ob => {
+      const refPx = (Number(ob.high) + Number(ob.low)) / 2 || 1;
+      const h = Math.abs(Number(ob.high) - Number(ob.low));
+      return (h / refPx) >= minHeightPct;
+    });
+
+    // BƯỚC 3: BỘ LỌC KHOẢNG CÁCH OB ĐỐI NGHỊCH (OPPOSITE OB GAP FILTER) THEO CHỈ ĐẠO CỦA CEO
+    const oppGapPct = mergeDistPct;
+    const finalObs = filterOppositeOBClash(mergedObs, oppGapPct);
+
+    mergedObs.forEach(ob => {
       const y1 = s.priceToCoordinate(ob.high);
       const y2 = s.priceToCoordinate(ob.low);
       if (y1 === null || y2 === null) return;
@@ -1834,7 +2007,13 @@ export default function SingleChartPane({
     const fetchCandles = async (retryCount = 0) => {
       if (!candleSeriesRef.current) return;
       try {
-        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=2500`);
+        const tfFactor = TF_MULTIPLIERS[tf] || 1.2;
+        const baseMinH = smcEntryCfgRef.current?.minObHeight ? Number(smcEntryCfgRef.current.minObHeight) / 100 : 0.003;
+        const minObPct = baseMinH * tfFactor;
+        const baseGap = smcEntryCfgRef.current?.mergeThreshold ? Number(smcEntryCfgRef.current.mergeThreshold) / 100 : 0.005;
+        const mergeObPct = baseGap * tfFactor;
+        const oppGapPct = baseGap * tfFactor;
+        const res = await fetch(`/api/market/candles?instId=${coin}&bar=${bar}&limit=2500&min_ob_pct=${minObPct}&merge_ob_pct=${mergeObPct}&opposite_gap_pct=${oppGapPct}`);
         if (!res.ok) {
           if (isMounted && retryCount < 3) {
             setTimeout(() => { if (isMounted) fetchCandles(retryCount + 1); }, 600);

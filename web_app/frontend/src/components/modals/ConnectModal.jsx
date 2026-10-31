@@ -220,6 +220,7 @@ export default function ConnectModal({
   activeTab: externalTab,
   onTabChange: externalOnTabChange,
   onSyncSuccess,
+  hwid = "",
 }) {
   const { t } = useTranslation();
   const [internalTab, setInternalTab] = useState("fast"); // 'fast' | 'apikey'
@@ -244,6 +245,30 @@ export default function ConnectModal({
   const [isVerifyingSync, setIsVerifyingSync] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [syncSuccessMsg, setSyncSuccessMsg] = useState("");
+  const [showTransferGuide, setShowTransferGuide] = useState(false);
+  const [copyNotice, setCopyNotice] = useState("");
+  const effectiveHwid = hwid || localStorage.getItem("tls1_hwid") || "WEB-OKX";
+
+  const handleCopyText = (text, label) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopyNotice(label);
+      setTimeout(() => setCopyNotice(""), 2500);
+    } catch (e) {
+      console.warn("Copy error:", e);
+    }
+  };
 
   const handleVerifySyncCode = async (e) => {
     if (e) e.preventDefault();
@@ -626,8 +651,8 @@ export default function ConnectModal({
             padding-top: 6px;
           }
           .connect-card {
-            background-color: #222222;
-            border: 1px solid #333333;
+            background-color: #2c2c2c;
+            border: 1px solid #444444;
             border-radius: 6px;
             padding: 12px 14px;
             display: flex;
@@ -639,9 +664,10 @@ export default function ConnectModal({
             transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
             box-sizing: border-box;
             width: 100%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
           }
           .connect-card:hover:not(.disabled) {
-            background-color: #262626;
+            background-color: #353535;
             border-color: #ff9900;
             transform: translateY(-2px);
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 12px rgba(255, 153, 0, 0.25);
@@ -692,7 +718,44 @@ export default function ConnectModal({
             color: #555555;
             opacity: 0.75;
           }
+          .sync-code-input::placeholder {
+            font-family: monospace !important;
+            font-size: 12.5px !important;
+            letter-spacing: 2px !important;
+            color: #505050 !important;
+            opacity: 0.5 !important;
+            font-weight: 500 !important;
+          }
         `}</style>
+        {/* POPUP THÔNG BÁO COPY NHẸ NHÀNG */}
+        {copyNotice && (
+          <div
+            style={{
+              position: "absolute",
+              top: "12px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "rgba(22, 27, 34, 0.95)",
+              border: "1px solid rgba(46, 160, 67, 0.6)",
+              color: "#f0f6fc",
+              padding: "5px 16px",
+              borderRadius: "20px",
+              fontSize: "12px",
+              fontWeight: "500",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
+              zIndex: 1000,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              pointerEvents: "none",
+              backdropFilter: "blur(6px)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ color: "#3fb950", fontSize: "13px" }}>✓</span>
+            <span>{copyNotice}</span>
+          </div>
+        )}
 
         {/* Modal Header */}
         <div
@@ -741,6 +804,7 @@ export default function ConnectModal({
 
         {/* Navigation Tabs (Giống 100% Cài Đặt Hệ Thống) */}
         <div
+          className="connect-tab-bar"
           style={{
             display: "flex",
             backgroundColor: "#121212",
@@ -766,10 +830,10 @@ export default function ConnectModal({
           </button>
           <button
             type="button"
-            className={`connect-tab-btn ${connectTab === "sync_login" ? "active" : ""}`}
+            className={`connect-tab-btn ${(connectTab === "sync_login" || connectTab === "sync") ? "active" : ""}`}
             onClick={() => handleTabSwitch("sync_login")}
             data-tour="connect-sync-tab"
-            style={connectTab === "sync_login" ? { borderTopColor: "#38bdf8", color: "#38bdf8" } : {}}
+            style={(connectTab === "sync_login" || connectTab === "sync") ? { borderTopColor: "#38bdf8", color: "#38bdf8" } : {}}
           >
             🔑 Đăng Nhập
           </button>
@@ -916,7 +980,7 @@ export default function ConnectModal({
                       style={{
                         marginTop: "10px",
                         paddingTop: "8px",
-                        borderTop: "1px solid #2d2d2d",
+                        borderTop: "1px solid #404040",
                         display: "flex",
                         flexDirection: "column",
                         gap: "6px",
@@ -932,10 +996,11 @@ export default function ConnectModal({
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
-                              padding: "4px 8px 4px 6px",
-                              background: "rgba(255, 255, 255, 0.02)",
+                              padding: "5px 10px 5px 8px",
+                              background: "#363636",
                               borderRadius: "4px",
-                              border: "1px solid rgba(255, 255, 255, 0.05)",
+                              border: "1px solid #4a4a4a",
+                              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
                             }}
                           >
                             {/* Dòng chữ màu xanh nghiêng Đã Connect #Bot-m15 - 4.935,71 USDT */}
@@ -1146,7 +1211,7 @@ export default function ConnectModal({
                           style={{
                             marginTop: "10px",
                             paddingTop: "8px",
-                            borderTop: "1px solid #2d2d2d",
+                            borderTop: "1px solid #404040",
                             display: "flex",
                             flexDirection: "column",
                             gap: "6px",
@@ -1165,10 +1230,11 @@ export default function ConnectModal({
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "space-between",
-                                  padding: "4px 8px 4px 6px",
-                                  background: "rgba(255, 255, 255, 0.02)",
+                                  padding: "5px 10px 5px 8px",
+                                  background: "#363636",
                                   borderRadius: "4px",
-                                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                                  border: "1px solid #4a4a4a",
+                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
                                 }}
                               >
                                 {/* Dòng chữ màu xanh nghiêng */}
@@ -1344,7 +1410,7 @@ export default function ConnectModal({
                           style={{
                             marginTop: "10px",
                             paddingTop: "8px",
-                            borderTop: "1px solid #2d2d2d",
+                            borderTop: "1px solid #404040",
                             display: "flex",
                             flexDirection: "column",
                             gap: "6px",
@@ -1363,10 +1429,11 @@ export default function ConnectModal({
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "space-between",
-                                  padding: "4px 8px 4px 6px",
-                                  background: "rgba(255, 255, 255, 0.02)",
+                                  padding: "5px 10px 5px 8px",
+                                  background: "#363636",
                                   borderRadius: "4px",
-                                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                                  border: "1px solid #4a4a4a",
+                                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
                                 }}
                               >
                                 {/* Dòng chữ màu xanh nghiêng */}
@@ -1872,40 +1939,57 @@ export default function ConnectModal({
           )}
 
           {/* TAB 3: 🔑 ĐĂNG NHẬP / ĐỒNG BỘ THIẾT BỊ MỚI */}
-          {(connectTab === "sync_login" || connectTab === "tradelocker") && (
-            <div data-tour="connect-sync-content" style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%", padding: "10px 4px" }}>
+          {(connectTab === "sync_login" || connectTab === "sync" || connectTab === "tradelocker") && (
+            <div data-tour="connect-sync-content" style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%", padding: "6px 2px 280px 2px" }}>
+              
+              {/* BOX 1: ĐĂNG NHẬP BẰNG MÃ GHÉP ĐÔI 6 SỐ */}
               <div
+                data-tour="connect-sync-code-box"
                 style={{
-                  background: "linear-gradient(180deg, #182234 0%, #0f172a 100%)",
-                  border: "1px solid #1e3a5f",
-                  borderRadius: "10px",
-                  padding: "18px 20px",
+                  backgroundColor: "#222222",
+                  border: "1px solid #333333",
+                  borderRadius: "8px",
+                  padding: "16px",
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "8px",
+                      background: "#181818",
+                      border: "1px solid #3a3a3a",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "18px",
+                    }}
+                  >
                     🔑
                   </div>
                   <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#f8fafc" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
                       Đăng Nhập / Đồng Bộ Thiết Bị Mới
                     </span>
-                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                      Nhập mã ghép đôi 6 số từ thiết bị đang chạy bot để đăng nhập ngay mà không cần quét lại OKX.
+                    <span style={{ fontSize: "11px", color: "#888888" }}>
+                      Nhập mã ghép đôi 6 số từ thiết bị đang chạy bot để đồng bộ điều khiển.
                     </span>
                   </div>
                 </div>
 
                 {/* Input ghép đôi 6 số */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#cbd5e1", textTransform: "uppercase" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  <label style={{ fontSize: "10.5px", fontWeight: "700", color: "#888888", textTransform: "uppercase", letterSpacing: "0.4px" }}>
                     Mã Ghép Đôi (6 Số):
                   </label>
                   <input
                     type="text"
+                    className="sync-code-input"
                     maxLength={8}
                     value={syncCodeInput}
                     onChange={(e) => {
@@ -1919,18 +2003,19 @@ export default function ConnectModal({
                     placeholder="VD: 739 281"
                     style={{
                       width: "100%",
-                      padding: "12px",
-                      fontSize: "22px",
+                      padding: "7px 10px",
+                      fontSize: "14px",
                       fontFamily: "monospace",
-                      letterSpacing: "6px",
+                      letterSpacing: "3px",
                       textAlign: "center",
-                      fontWeight: "800",
-                      color: "#38bdf8",
-                      background: "#090d16",
-                      border: syncError ? "1px solid #ef4444" : "1px solid #334155",
-                      borderRadius: "8px",
+                      fontWeight: "700",
+                      color: "#00ffff",
+                      background: "#161616",
+                      border: syncError ? "1px solid #ef4444" : "1px solid #3e3e3e",
+                      borderRadius: "5px",
                       outline: "none",
                       boxSizing: "border-box",
+                      transition: "border-color 0.2s ease",
                     }}
                   />
                   {syncError && (
@@ -1952,44 +2037,310 @@ export default function ConnectModal({
                   onClick={handleVerifySyncCode}
                   style={{
                     width: "100%",
-                    padding: "11px",
+                    padding: "8px 12px",
                     background: (!syncCodeInput.trim() || isVerifyingSync)
-                      ? "#334155"
-                      : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
-                    border: "none",
+                      ? "#333333"
+                      : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    border: "1px solid " + ((!syncCodeInput.trim() || isVerifyingSync) ? "#444444" : "#10b981"),
                     color: "#ffffff",
-                    fontSize: "13.5px",
+                    fontSize: "12px",
                     fontWeight: "700",
                     borderRadius: "6px",
                     cursor: (!syncCodeInput.trim() || isVerifyingSync) ? "not-allowed" : "pointer",
-                    boxShadow: "0 4px 12px rgba(2, 132, 199, 0.3)",
+                    boxShadow: (!syncCodeInput.trim() || isVerifyingSync) ? "none" : "0 4px 12px rgba(16, 185, 129, 0.25)",
                     transition: "all 0.2s ease",
                   }}
                 >
-                  {isVerifyingSync ? "Đang xác thực..." : "XAC NHAN DANG NHAP"}
+                  {isVerifyingSync ? "Đang xác thực..." : "XÁC NHẬN ĐĂNG NHẬP"}
                 </button>
               </div>
 
-              {/* Hướng dẫn cách lấy mã */}
+              {/* BOX 2: ĐIỀU KIỆN ĐỂ SỬ DỤNG APP (ĐỒNG BỘ 100% STYLE VỚI BOX 1) */}
               <div
+                data-tour="connect-sync-policy-box"
                 style={{
-                  background: "rgba(56, 189, 248, 0.04)",
-                  border: "1px dashed rgba(56, 189, 248, 0.2)",
+                  backgroundColor: "#222222",
+                  border: "1px solid #333333",
                   borderRadius: "8px",
-                  padding: "12px 14px",
-                  fontSize: "11.5px",
-                  color: "#94a3b8",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  textAlign: "left",
+                  fontSize: "12px",
+                  color: "#aaaaaa",
                   lineHeight: "1.6",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
                 }}
               >
-                <p style={{ margin: "0 0 6px 0", color: "#e2e8f0", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>[*]</span> Cách lấy mã 6 số từ thiết bị gốc:
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", paddingLeft: "10px" }}>
-                  <span>1. Mở máy tính/thiết bị đang chạy bot &gt; Bấm nút <strong>[Connect]</strong>.</span>
-                  <span>2. Tại dòng <strong>Đã Connect #...</strong> &gt; Bấm nút <strong>[QR]</strong> màu xanh bên cạnh tài khoản cần đồng bộ.</span>
-                  <span>3. Nhìn mã 6 số hiển thị (hiệu lực 120s) rồi nhập vào ô phía trên, hoặc dùng camera quét mã QR.</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "8px",
+                      background: "#181818",
+                      border: "1px solid #3a3a3a",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "18px",
+                    }}
+                  >
+                    🛡️
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#27ae60" }}>
+                      ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#888888" }}>
+                      Chính sách tài khoản OKX liên kết với AutoTrader.fun
+                    </span>
+                  </div>
                 </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", color: "#cccccc", paddingLeft: "4px" }}>
+                  <div>1. Đăng ký tài khoản OKX dưới Link giới thiệu của AutoTrader.fun</div>
+                  <div>2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.</div>
+                </div>
+
+                {/* 2 Nút Đăng ký OKX (VIP) & Hướng dẫn chuyển Ref */}
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => window.open("https://okx.com/join/AutoTrader", "_blank")}
+                    style={{
+                      flex: 1,
+                      padding: "9px 12px",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      border: "1px solid #10b981",
+                      color: "#ffffff",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    Đăng ký OKX (VIP)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTransferGuide(!showTransferGuide)}
+                    style={{
+                      flex: 1,
+                      padding: "9px 12px",
+                      background: showTransferGuide ? "#2d3748" : "#181818",
+                      border: "1px solid #3b82f6",
+                      color: "#60a5fa",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    Hướng dẫn chuyển Ref {showTransferGuide ? "▲" : "▼"}
+                  </button>
+                </div>
+
+                {/* Chi tiết hướng dẫn chuyển Ref (Thu gọn / Mở rộng) */}
+                {showTransferGuide && (
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      background: "#181818",
+                      border: "1px solid #333333",
+                      borderRadius: "6px",
+                      padding: "12px 14px",
+                      fontSize: "12px",
+                      color: "#bbb",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    {/* Cách 1 */}
+                    <div style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #2a2a2a" }}>
+                      <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
+                        Cách 1: Chuyển Ref (Dành cho người dùng đã có tài khoản OKX)
+                      </strong>
+                      <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div>
+                          1. Truy cập link chuyển Ref:{" "}
+                          <a
+                            href="https://www.okx.com/ul/J6l2R5"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#58a6ff", textDecoration: "none" }}
+                          >
+                            https://www.okx.com/ul/J6l2R5
+                          </a>
+                        </div>
+                        <div>2. Điền form yêu cầu:</div>
+                        <ul style={{ margin: "2px 0 2px 18px", padding: 0 }}>
+                          <li style={{ marginBottom: "4px" }}>
+                            Mã mời (Referral code):{" "}
+                            <strong
+                              style={{
+                                color: "#00ffff",
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                              }}
+                              onClick={() => handleCopyText("AutoTrader", "Đã copy Mã mời: AutoTrader")}
+                              title="Click để copy Mã mời"
+                            >
+                              AutoTrader
+                            </strong>
+                          </li>
+                          <li>
+                            Lý do tham gia:{" "}
+                            <span
+                              style={{
+                                color: "#e6edf3",
+                                cursor: "pointer",
+                                fontStyle: "italic",
+                                display: "inline-block",
+                                marginTop: "3px",
+                              }}
+                              onClick={() =>
+                                handleCopyText(
+                                  "I was invited by an affiliate but forgot to add the code when signing up",
+                                  "Đã copy Lý do tham gia!"
+                                )
+                              }
+                              title="Click để copy Lý do"
+                            >
+                              "I was invited by an affiliate but forgot to add the code when signing up"
+                            </span>
+                          </li>
+                        </ul>
+                        <div>3. Nhấn Submit và chờ OKX duyệt kết quả.</div>
+                      </div>
+                    </div>
+
+                    {/* Cách 2 */}
+                    <div>
+                      <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
+                        Cách 2: Xoá tài khoản cũ, tạo tài khoản mới
+                      </strong>
+                      <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <div>
+                          1. Đóng tài khoản cũ: Vào <strong>Thông tin tài khoản &gt; Bảo mật &gt; Đóng tài khoản</strong>.
+                        </div>
+                        <div>
+                          2. Đăng ký tài khoản mới qua link:{" "}
+                          <a
+                            href="https://okx.com/join/AutoTrader"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#58a6ff", textDecoration: "none" }}
+                          >
+                            https://okx.com/join/AutoTrader
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* BOX 3: LIÊN HỆ ADMIN */}
+              <div
+                style={{
+                  backgroundColor: "#222222",
+                  border: "1px solid #333333",
+                  borderRadius: "8px",
+                  padding: "12px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.25)",
+                }}
+              >
+                <span style={{ fontSize: "12.5px", fontWeight: "bold", color: "#eee" }}>Liên hệ Admin:</span>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <img
+                    src="/media/Telegram.png"
+                    alt="Telegram"
+                    title="Telegram Admin"
+                    style={{ width: "24px", height: "24px", cursor: "pointer", transition: "transform 0.15s ease" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.15)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                    onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
+                  />
+                  <img
+                    src="/media/Messenger.png"
+                    alt="Messenger"
+                    title="Facebook Messenger"
+                    style={{ width: "24px", height: "24px", cursor: "pointer", transition: "transform 0.15s ease" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.15)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                    onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")}
+                  />
+                  <img
+                    src="/media/zalo.png"
+                    alt="Zalo"
+                    title="Zalo Admin"
+                    style={{ width: "24px", height: "24px", cursor: "pointer", transition: "transform 0.15s ease" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.15)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                    onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")}
+                  />
+                  <img
+                    src="/media/Discord.png"
+                    alt="Discord"
+                    title="Discord Community"
+                    style={{ width: "24px", height: "24px", cursor: "pointer", transition: "transform 0.15s ease" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.15)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                    onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")}
+                  />
+                </div>
+              </div>
+
+              {/* FOOTER: MÃ MÁY HWID & HƯỚNG DẪN */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "2px 4px", flexWrap: "wrap", marginBottom: "4px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: "#888", fontSize: "12px" }}>Mã Máy của bạn:</span>
+                  <span
+                    className="hwid-value"
+                    style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
+                    title="Click để copy Mã Máy"
+                    onClick={() => handleCopyText(effectiveHwid, "Đã copy Mã máy thiết bị (HWID)!")}
+                  >
+                    {effectiveHwid}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
+                  style={{
+                    padding: "4px 12px",
+                    background: "#2563eb",
+                    border: "none",
+                    color: "#fff",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    transition: "background 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#1d4ed8"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "#2563eb"; }}
+                >
+                  Video Hướng Dẫn
+                </button>
               </div>
             </div>
           )}

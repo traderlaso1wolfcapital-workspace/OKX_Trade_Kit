@@ -5,6 +5,19 @@ import { COIN_LIST } from '../../constants/tradeConfig';
 import { useTranslation } from '../../i18n';
 import ReviewsTab from './ReviewsTab';
 
+function getObFractionLabel(val) {
+  const num = parseFloat(val);
+  if (isNaN(num) || Math.abs(num) < 0.01) return "0 (Mép cản ngoài)";
+  if (Math.abs(num - 0.2) < 0.05) return "+1/5 OB (Đón trước 20%)";
+  if (Math.abs(num - 0.4) < 0.05) return "+2/5 OB (Đón trước 40%)";
+  if (Math.abs(num - (-0.2)) < 0.05) return "-1/5 OB (Đón trong 20%)";
+  if (Math.abs(num - (-0.4)) < 0.05) return "-2/5 OB (Đón trong 40%)";
+  if (Math.abs(num - (-0.5)) < 0.05) return "50% Thân OB (Cân bằng)";
+  if (Math.abs(num - (-0.6)) < 0.05) return "-3/5 OB (Đón trong 60%)";
+  if (Math.abs(num - (-0.8)) < 0.05) return "-4/5 OB (Đón trong 80%)";
+  return (num > 0 ? "+" : "") + (num * 5).toFixed(1) + "/5 OB";
+}
+
 export default function SystemSettingsModal({
   isOpen,
   onClose,
@@ -53,29 +66,6 @@ export default function SystemSettingsModal({
   onStartSettingsTour,
 }) {
   const { t } = useTranslation();
-  const [showTransferGuide, setShowTransferGuide] = useState(false);
-  const [copyNotice, setCopyNotice] = useState("");
-
-  const handleCopyText = (text, label) => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      setCopyNotice(label);
-      setTimeout(() => setCopyNotice(""), 2500);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -137,37 +127,6 @@ export default function SystemSettingsModal({
         <div className="modal-header">
           <h3>⚙️ {t("system_settings_title")} - {botTitle}</h3>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {typeof onStartSettingsTour === "function" && (
-              <button
-                type="button"
-                className="btn-tour-settings"
-                onClick={onStartSettingsTour}
-                style={{
-                  background: "linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)",
-                  border: "1px solid #6366f1",
-                  color: "#ffffff",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  padding: "3px 9px",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                  boxShadow: "0 1px 6px rgba(79, 70, 229, 0.4)",
-                  transition: "all 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.filter = "brightness(1.15)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.filter = "brightness(1.0)";
-                }}
-                title={t("guide_settings_tooltip", "Xem hướng dẫn chi tiết các cơ chế trong Cài Đặt (DCA, Cầu dao, Nến tích lũy)")}
-              >
-                {t("guide_btn", "Hướng Dẫn")}
-              </button>
-            )}
             <button className="close-btn" onClick={onClose} title={t("close_btn")}>×</button>
           </div>
         </div>
@@ -182,13 +141,6 @@ export default function SystemSettingsModal({
             ⚙️ {t("tab_strategy", "Chiến Thuật")}
           </button>
           <button
-            className={`settings-tab-btn ${settingsTab === "system" || settingsTab === "support" ? "active" : ""}`}
-            onClick={() => setSettingsTab("system")}
-            data-tour="settings-support-tab"
-          >
-            🛠️ {t("tab_system", "Hỗ Trợ")}
-          </button>
-          <button
             className={`settings-tab-btn ${settingsTab === "reviews" ? "active" : ""}`}
             onClick={() => setSettingsTab("reviews")}
             data-tour="settings-reviews-tab"
@@ -201,7 +153,7 @@ export default function SystemSettingsModal({
           {/* ===== TAB 1: CẤU HÌNH CHIẾN THUẬT (MẶC ĐỊNH) ===== */}
           {settingsTab === "strategy" && (
             <div className="settings-tab-content">
-              <div className="settings-tab-scroll">
+              <div className="settings-tab-scroll" style={{ paddingBottom: "280px" }}>
                 {/* 1. THÊM MÃ GIAO DỊCH (Tách 2 phần: Trên là FX, Dưới là COIN, đệm tách dòng nhẹ) */}
                 <div className="settings-group" data-tour="settings-watchlist">
                   <div className="settings-group-title" style={{ margin: 0 }}>{t("watchlist_title")}</div>
@@ -461,56 +413,136 @@ export default function SystemSettingsModal({
                   <div className="settings-group" data-tour="settings-entry-filters">
                     <div className="settings-group-title">Điểm Vào Lệnh (SMC Entry Setup)</div>
                     <div className="entry-setup-list">
+                      {/* ĐÓN TRƯỚC MÉP CẢN OB (CHIA 5 PHẦN THÂN OB) */}
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
                           <span>Đón trước mép cản OB:</span>
-                          <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh đón sớm một khoảng % trước khi giá chạm đúng vào mép Order Block (mặc định 0.05%), giúp lệnh dễ khớp trước khi thị trường phản ứng bật nảy. Chỉ số này sẽ tự động nhân với Hệ số nhân Entry/TP/SL của từng khung thời gian.")} title="Độ lệch đệm đón trước mép OB để dễ khớp trước khi giá phản ứng.">[?]</button>
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert(`Vị trí đón cản theo tỷ lệ thân OB (chia 5 phần):
+- 0 (Mép ngoài): Đón đúng mép cản OB, chạm là khớp tức thì (Mặc định - Dễ khớp nhất).
+- +1/5 OB, +2/5 OB: Đón sớm bên ngoài cản (20%, 40% chiều cao OB) để bắt sóng sớm.
+- -1/5 OB, -2/5 OB: Đón sâu trong lòng cản (20%, 40% chiều cao OB) để có tỷ lệ R:R đẹp hơn.
+- 50% Thân OB: Đón ngay điểm cân bằng (Equilibrium - giữa cản).
+- -3/5 OB, -4/5 OB: Đón cực sâu sát mép cắt lỗ (60%, 80% chiều cao OB).
+
+* Ưu điểm: Tự động co giãn theo biên độ thực tế của từng khối OB và mọi khung thời gian (M5, 15m, 1H, 4H), không cần nhân hệ số % thủ công.`)}
+                            title="Chọn vị trí đón cản theo tỷ lệ thân OB (chia làm 5 phần)."
+                          >
+                            [?]
+                          </button>
                         </div>
-                        <NumberSpinBox
-                          value={smcEntryCfg.entryOffset ?? "0.05"}
-                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, entryOffset: val }))}
-                          step={0.01}
-                          min={0}
-                          max={0.5}
-                          suffix="%"
-                          width="84px"
-                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {/* Styled Dropdown giống nút 'Theo OB ngược chiều ▼' */}
+                          <div style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "0 10px",
+                                height: "26px",
+                                fontSize: "11px",
+                                fontWeight: "bold",
+                                borderRadius: "4px",
+                                border: "1px solid #444",
+                                background: "#222",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                whiteSpace: "nowrap",
+                                boxSizing: "border-box",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <span style={{ color: "#26a69a" }}>
+                                {getObFractionLabel(smcEntryCfg.entryFraction ?? "0")}
+                              </span>
+                              <span style={{ fontSize: "8px", opacity: 0.95, color: "#26a69a" }}>▼</span>
+                            </div>
+
+                            <select
+                              value={smcEntryCfg.entryFraction ?? "0"}
+                              onChange={e => setSmcEntryCfg(s => ({ ...s, entryFraction: e.target.value }))}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                                opacity: 0,
+                                cursor: "pointer",
+                              }}
+                            >
+                              <option value="0.4" style={{ background: "#222", color: "#26a69a" }}>+2/5 OB (Đón trước ngoài cản 40%)</option>
+                              <option value="0.2" style={{ background: "#222", color: "#26a69a" }}>+1/5 OB (Đón trước ngoài cản 20%)</option>
+                              <option value="0" style={{ background: "#222", color: "#fff" }}>0 (Mép cản ngoài - Khớp nhanh nhất)</option>
+                              <option value="-0.2" style={{ background: "#222", color: "#ffb74d" }}>-1/5 OB (Đón sâu trong cản 20%)</option>
+                              <option value="-0.4" style={{ background: "#222", color: "#ffb74d" }}>-2/5 OB (Đón sâu trong cản 40%)</option>
+                              <option value="-0.5" style={{ background: "#222", color: "#42a5f5" }}>50% Thân OB (Cân bằng Equilibrium)</option>
+                              <option value="-0.6" style={{ background: "#222", color: "#ef5350" }}>-3/5 OB (Đón sâu trong cản 60%)</option>
+                              <option value="-0.8" style={{ background: "#222", color: "#ef5350" }}>-4/5 OB (Đón sâu trong cản 80%)</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
 
+                      {/* BỘ LỌC ĐỘ DÀY OB TỐI THIỂU */}
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
-                          <span>Vị trí đón cản trong OB:</span>
-                          <button className="btn-help" onClick={() => alert("Vị trí đón cản:\n- Mép ngoài OB (Conservative): Đặt lệnh tại râu ngoài cùng của nến OB -> Khớp nhanh nhất, an toàn nhất.\n- 50% Khối OB (Equilibrium): Đặt lệnh tại điểm giữa thân OB -> Điểm vào lệnh sâu hơn, tỷ lệ R:R cao hơn.")} title="Chọn điểm đặt lệnh tại mép ngoài hoặc 50% vùng OB.">[?]</button>
-                        </div>
-                        <select
-                          className="styled-select"
-                          style={{ width: "170px" }}
-                          value={smcEntryCfg.entryLevel || "OUTER"}
-                          onChange={e => setSmcEntryCfg(s => ({ ...s, entryLevel: e.target.value }))}
-                        >
-                          <option value="OUTER">Mép ngoài OB (Khớp nhanh)</option>
-                          <option value="EQUILIBRIUM">50% Thân OB (Tối ưu R:R)</option>
-                        </select>
-                      </div>
-
-                      <div className="entry-setup-row">
-                        <div className="entry-label-wrap">
-                          <span>Khoảng cách gộp cản tối thiểu:</span>
-                          <button className="btn-help" onClick={() => alert("Ngưỡng gộp cản (Merge Threshold %): Khoảng cách tối thiểu giữa các lệnh setup OB (mặc định 0.50%). Nếu 2 setup quá gần nhau, bot tự động gộp lại thành 1 lệnh duy nhất để tránh rải lệnh quá dày đặc.")} title="Khoảng cách tối thiểu giữa các setup để tránh rải lệnh vụn.">[?]</button>
+                          <span>Độ dày OB tối thiểu (Base):</span>
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert(`Độ dày OB tối thiểu cơ sở (Base Min OB Size): Lọc bỏ các khối Order Block có biên độ nhỏ hơn mức này (mặc định 0.30% ở M5).
+- Ở các khung lớn hơn (M15, H1, H4...), độ dày này sẽ tự động nhân với Hệ số Đa Khung (ví dụ M15 x1.2 = 0.36%, H1 x2.0 = 0.60%, H4 x5.0 = 1.50%).
+- Giúp loại trừ các vùng cản mỏng dính, đảm bảo khoảng cách Stop Loss đủ an toàn và tránh bị quét râu cắn SL sớm.`)}
+                            title="Lọc bỏ OB nhỏ hơn N% giá để tránh SL quá ngắn (tự động nhân hệ số TF)."
+                          >
+                            [?]
+                          </button>
                         </div>
                         <NumberSpinBox
-                          value={smcEntryCfg.mergeThreshold ?? "0.50"}
-                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, mergeThreshold: val }))}
+                          value={smcEntryCfg.minObHeight ?? "0.30"}
+                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, minObHeight: val }))}
                           step={0.05}
-                          min={0.1}
+                          min={0.05}
                           max={2.0}
                           suffix="%"
                           width="84px"
                         />
                       </div>
 
+                      {/* BỘ GỘP & GIÃN CẢN TỐI THIỂU (GỘP CHUNG 1 DÒNG) */}
+                      <div className="entry-setup-row">
+                        <div className="entry-label-wrap">
+                          <span>Khoảng cách gộp & giãn cản (Base):</span>
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert(`Khoảng cách gộp & giãn cản cơ sở (Base Merge & Opposite Gap):
+- Mặc định: 0.50% ở khung M5, tự động nhân hệ số TF cho các khung lớn hơn (M15 x1.2 = 0.60%, H1 x2.0 = 1.00%, H4 x5.0 = 2.50%).
+
+1. Gộp cản cùng chiều: Các khối OB cùng màu cách nhau nhỏ hơn ngưỡng này sẽ tự động gộp thành 1 khối vững chắc duy nhất để SL dày dặn an toàn.
+2. Giãn cản ngược chiều: Khi 2 cản xanh đỏ đối diện quá sát nhau, bot tự động lọc bỏ khối cản ở giữa khi phía sau vẫn còn cản cùng màu đỡ, giúp khoảng vào lệnh giữa 2 chiều rộng rãi và TP không bị ngắn.`)}
+                            title="Tự động gộp OB cùng chiều sát nhau và lọc giãn cách OB ngược chiều để bảo vệ SL và TP tối ưu."
+                          >
+                            [?]
+                          </button>
+                        </div>
+                        <NumberSpinBox
+                          value={smcEntryCfg.mergeThreshold ?? "0.50"}
+                          onChange={val => setSmcEntryCfg(prev => ({ ...prev, mergeThreshold: val, oppositeGap: val }))}
+                          step={0.05}
+                          min={0.1}
+                          max={3.0}
+                          suffix="%"
+                          width="84px"
+                        />
+                      </div>
+
                       <div style={{ padding: "8px 0 2px 0", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
-                        * Điểm đón trước cản sẽ tự động nhân với Hệ số nhân Entry/TP/SL của từng khung thời gian.
+                        * Các chỉ số Base được tính trên khung M5 và tự động nhân theo Hệ Số Đa Khung ở các khung lớn (M15, H1, H4...) để đảm bảo SL và TP tối ưu.
                       </div>
                     </div>
                   </div>
@@ -521,7 +553,7 @@ export default function SystemSettingsModal({
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
                            <span>{t("base_offset")}</span>
-                          <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh Limit đón sớm hơn một khoảng % trước khi giá chạm đúng vào vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Ở các khung thời gian lớn hơn, độ lệch này sẽ tự động nhân với Hệ số nhân Entry/TP/SL của khung đó (ví dụ H4 x6.8 -> đệm 0.34%).")} title="Độ lệch đệm đón trước cản EMA200 để lệnh dễ khớp trước khi giá bật nảy.">[?]</button>
+                          <button className="btn-help" onClick={() => alert("Độ lệch đệm (Base Offset %): Đặt lệnh Limit đón sớm hơn một khoảng % trước khi giá chạm đúng vào vạch EMA200 (mặc định 0.05% ở M5), giúp lệnh dễ khớp trước khi thị trường kịp phản ứng bật cản. Ở các khung thời gian lớn hơn, độ lệch này sẽ tự động nhân với Hệ số nhân Entry/TP/SL của khung đó (ví dụ H4 x5.0 -> đệm 0.25%).")} title="Độ lệch đệm đón trước cản EMA200 để lệnh dễ khớp trước khi giá bật nảy.">[?]</button>
                         </div>
                         <NumberSpinBox
                           value={entryCfg.entryOffset}
@@ -537,7 +569,7 @@ export default function SystemSettingsModal({
                       <div className="entry-setup-row">
                         <div className="entry-label-wrap">
                           <span>{t("dca_gap")}</span>
-                          <button className="btn-help" onClick={() => alert("Khoảng cách an toàn tối thiểu (Base Gap %): Ngưỡng cách biệt giá tối thiểu giữa 2 đường EMA200 liền kề để được rải lệnh Limit (mặc định 0.20% ở M5). Nếu 2 đường EMA200 quá sát nhau (nhỏ hơn khoảng cách này nhân với Hệ số nhân Entry/TP/SL), bot sẽ tự động bỏ qua khung nhỏ để dồn vào cản khung lớn hơn, tránh rải lệnh quá dày đặc.")} title="Khoảng cách an toàn tối thiểu giữa 2 đường EMA200 để tránh rải lệnh quá dày.">[?]</button>
+                          <button className="btn-help" onClick={() => alert("Khoảng cách an toàn tối thiểu (Base Gap %): Ngưỡng cách biệt giá tối thiểu giữa 2 đường EMA200 liền kề để được rải lệnh Limit (mặc định 0.20% ở M5). Nếu 2 đường EMA200 quá sát nhau, bot sẽ tự động bỏ qua khung nhỏ để dồn vào cản khung lớn hơn, tránh rải lệnh quá dày đặc.")} title="Khoảng cách an toàn tối thiểu giữa 2 đường EMA200 để tránh rải lệnh quá dày.">[?]</button>
                         </div>
                         <NumberSpinBox
                           value={entryCfg.dcaGapPct}
@@ -593,25 +625,42 @@ export default function SystemSettingsModal({
                   <table style={{ width: "100%", fontSize: "11px", textAlign: "center", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ color: "#aaaaaa", borderBottom: "1px solid #333333" }}>
-                        <th style={{ padding: "6px 8px", textAlign: "left" }}>{t("th_tf")}</th>
+                        <th style={{ padding: "6px 8px", textAlign: "left" }}>Khung thời gian</th>
                         <th style={{ padding: "6px 8px" }}>
-                          {t("th_margin_factor")}
+                          Hệ số nhân (Multiplier)
                           <button
                             type="button"
                             className="btn-help"
-                            onClick={() => alert("Hệ số Ký Quỹ (Vốn) theo Khung Thời Gian:\n1. Tỷ lệ nhân khối lượng vào lệnh: Khi bật 'nhân Hệ số Ký Quỹ (Vốn)', khối lượng ký quỹ ở các khung M15, M30, H1, H2, H4 sẽ được nhân tương ứng theo hệ số này (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0).\n2. Hệ số nhân TP và SL: Mức TP và SL cơ sở của khung M5 sẽ được nhân với hệ số này để mở rộng biên độ tương ứng cho từng khung thời gian.")}
-                            title="Hệ số nhân khối lượng vốn và biên độ TP/SL cho từng khung thời gian."
+                            onClick={() => alert(`Hệ số Nhân Đa Khung áp dụng thống nhất cho tất cả các Bot:\n1. Khối lượng Ký quỹ (Vốn): Khi bật nhân hệ số TF, vốn ở các khung lớn sẽ được nhân tương ứng (M5 x1.0, M15 x1.2, M30 x1.5, H1 x2.0, H2 x3.0, H4 x5.0, D1 x8.0).\n2. Biên độ TP & SL: Mức TP/SL cơ sở của M5 sẽ được nhân tỷ lệ để mở rộng tương thích với biên độ nến khung lớn.`)}
+                            title="Hệ số nhân theo từng khung thời gian."
                           >
                             [?]
                           </button>
                         </th>
-                        <th style={{ padding: "6px 8px" }}>
-                          {t("th_entry_factor")}
+                        <th style={{ padding: "6px 8px", textAlign: "right" }}>
+                          {activeBotTab === "sub2" ? "Độ dày OB tối thiểu" : "Vùng đệm đón cản"}
                           <button
                             type="button"
                             className="btn-help"
-                            onClick={() => alert("Hệ số Vào Lệnh (Entry) theo Khung Thời Gian:\n- Dùng để nhân tỷ lệ với thông số 'Đón trước cản' (Base Offset %) và 'Khoảng cách nhồi DCA' (Base Gap %).\n- Giúp khung thời gian càng lớn thì vùng đệm đón cản và khoảng cách giữa các tầng Limit càng rộng, phù hợp với biên độ nến của khung đó.")}
-                            title="Hệ số nhân vùng đệm đón cản và khoảng cách tối thiểu giữa các đường EMA200."
+                            onClick={() => alert(activeBotTab === "sub2"
+                              ? `Độ dày OB tối thiểu cho từng khung thời gian = Độ dày Base (M5) x Hệ số nhân TF.\n- Các OB mỏng hơn ngưỡng này sẽ được tự động lọc bỏ để bảo vệ SL an toàn.`
+                              : `Vùng đệm đón cản EMA200 cho từng khung thời gian = Base Offset x Hệ số nhân TF.`
+                            )}
+                            title="Ngưỡng độ dày tối thiểu tính tự động theo từng khung thời gian."
+                          >
+                            [?]
+                          </button>
+                        </th>
+                        <th style={{ padding: "6px 8px", textAlign: "right" }}>
+                          {activeBotTab === "sub2" ? "Khoảng cách gộp & giãn cản" : "Khoảng cách nhồi DCA"}
+                          <button
+                            type="button"
+                            className="btn-help"
+                            onClick={() => alert(activeBotTab === "sub2"
+                              ? `Khoảng cách gộp cản cùng chiều và giãn cản ngược chiều = Base Merge & Gap x Hệ số nhân TF.\n- Các OB cùng chiều cách nhau < ngưỡng này sẽ gộp lại.\n- Các OB ngược chiều cách nhau < ngưỡng này sẽ tự động lọc cản kẹp giữa.`
+                              : `Khoảng cách an toàn tối thiểu giữa các vạch EMA200 liền kề để nhồi lệnh DCA.`
+                            )}
+                            title="Khoảng cách gộp và giãn cản tính tự động theo từng khung thời gian."
                           >
                             [?]
                           </button>
@@ -620,20 +669,33 @@ export default function SystemSettingsModal({
                     </thead>
                     <tbody>
                       {[
-                        ["M5",  "1.0x", "1.0x"],
-                        ["M15", "1.2x", "1.5x"],
-                        ["M30", "1.5x", "2.3x"],
-                        ["H1",  "2.0x", "3.3x"],
-                        ["H2",  "3.0x", "4.7x"],
-                        ["H4",  "5.0x", "6.8x"],
-                        ["D1",  "8.0x", "10.0x"],
-                      ].map(([tf, vol, offset]) => (
-                        <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
-                          <td style={{ padding: "6px 8px", textAlign: "left", color: "#e0e0e0" }}>{tf}</td>
-                          <td style={{ padding: "6px 8px", color: "#26a69a", fontWeight: "bold" }}>{vol}</td>
-                          <td style={{ padding: "6px 8px", color: "#ff9900", fontWeight: "bold" }}>{offset}</td>
-                        </tr>
-                      ))}
+                        ["M5",  1.0],
+                        ["M15", 1.2],
+                        ["M30", 1.5],
+                        ["H1",  2.0],
+                        ["H2",  3.0],
+                        ["H4",  5.0],
+                        ["D1",  8.0],
+                      ].map(([tf, mult]) => {
+                        const isSub2 = activeBotTab === "sub2";
+                        const base1 = isSub2
+                          ? (parseFloat(smcEntryCfg.minObHeight) || 0.30)
+                          : (parseFloat(entryCfg.entryOffset) || 0.05);
+                        const base2 = isSub2
+                          ? (parseFloat(smcEntryCfg.mergeThreshold) || 0.50)
+                          : (parseFloat(entryCfg.dcaGapPct) || 0.20);
+                        const val1 = (base1 * mult).toFixed(2) + "%";
+                        const val2 = (base2 * mult).toFixed(2) + "%";
+
+                        return (
+                          <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>
+                            <td style={{ padding: "6px 8px", textAlign: "left", color: "#e0e0e0" }}>{tf}</td>
+                            <td style={{ padding: "6px 8px", color: "#26a69a", fontWeight: "bold" }}>{mult.toFixed(1)}x</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", color: "#ff9900", fontWeight: "bold" }}>{val1}</td>
+                            <td style={{ padding: "6px 8px", textAlign: "right", color: "#42a5f5", fontWeight: "bold" }}>{val2}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -656,324 +718,10 @@ export default function SystemSettingsModal({
             </div>
           )}
 
-          {/* ===== TAB 2: QUẢN TRỊ HỆ THỐNG / HỖ TRỢ ===== */}
-          {(settingsTab === "system" || settingsTab === "support") && (
-            <div className="settings-tab-content" data-tour="settings-support-tab-content" style={{ position: "relative" }}>
-              {/* POPUP THÔNG BÁO COPY NHẸ NHÀNG */}
-              {copyNotice && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "rgba(22, 27, 34, 0.95)",
-                    border: "1px solid rgba(46, 160, 67, 0.6)",
-                    color: "#f0f6fc",
-                    padding: "5px 16px",
-                    borderRadius: "20px",
-                    fontSize: "12px",
-                    fontWeight: "500",
-                    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.5)",
-                    zIndex: 1000,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    pointerEvents: "none",
-                    backdropFilter: "blur(6px)",
-                    whiteSpace: "nowrap",
-                    animation: "fadeIn 0.15s ease",
-                  }}
-                >
-                  <span style={{ color: "#3fb950", fontSize: "13px" }}>✓</span>
-                  <span>{copyNotice}</span>
-                </div>
-              )}
-
-              <div className="settings-tab-scroll" style={{ padding: "4px 8px 16px 8px" }}>
-
-                {/* 1. ĐIỀU KIỆN ĐỂ SỬ DỤNG APP (BO VIỀN CẢ CỤM, BỎ ICON) */}
-                <div
-                  style={{
-                    border: "1px solid #383838",
-                    borderRadius: "8px",
-                    background: "#1e1e1e",
-                    padding: "14px 16px",
-                    marginBottom: "16px",
-                    textAlign: "left",
-                    fontSize: "12px",
-                    color: "#aaaaaa",
-                    lineHeight: "1.6",
-                  }}
-                >
-                  <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 6px 0", fontSize: "14px" }}>
-                    ĐIỀU KIỆN ĐỂ SỬ DỤNG APP:
-                  </p>
-                  <p style={{ margin: "0 0 6px 0" }}>
-                    1. Đăng ký tài khoản OKX dưới Link giới thiệu của AutoTrader.fun
-                  </p>
-                  <p style={{ margin: "0 0 14px 0" }}>
-                    2. Hoặc thực hiện chuyển Ref về AutoTrader.fun nếu đã có sẵn tài khoản OKX.
-                  </p>
-
-                  {/* 2 Nút giữ lại màu sắc nổi bật */}
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                      type="button"
-                      onClick={() => window.open("https://okx.com/join/AutoTrader", "_blank")}
-                      style={{
-                        flex: 1,
-                        padding: "9px 12px",
-                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                        border: "1px solid #10b981",
-                        color: "#ffffff",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
-                    >
-                      Đăng ký OKX (VIP)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowTransferGuide(!showTransferGuide)}
-                      style={{
-                        flex: 1,
-                        padding: "9px 12px",
-                        background: showTransferGuide ? "#2d3748" : "#1f2937",
-                        border: "1px solid #3b82f6",
-                        color: "#60a5fa",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "#2d3748"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = showTransferGuide ? "#2d3748" : "#1f2937"; }}
-                    >
-                      Hướng dẫn chuyển Ref {showTransferGuide ? "▲" : "▼"}
-                    </button>
-                  </div>
-
-                  {/* Chi tiết hướng dẫn chuyển Ref (Thu gọn / Mở rộng) */}
-                  {showTransferGuide && (
-                    <div
-                      style={{
-                        marginTop: "12px",
-                        background: "#161b22",
-                        border: "1px solid #30363d",
-                        borderRadius: "6px",
-                        padding: "12px 14px",
-                        fontSize: "12px",
-                        color: "#bbb",
-                        lineHeight: "1.6",
-                      }}
-                    >
-                      {/* Cách 1 */}
-                      <div style={{ marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #2a2a2a" }}>
-                        <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
-                          Cách 1: Chuyển Ref (Dành cho người dùng đã có tài khoản OKX)
-                        </strong>
-                        <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <div>
-                            1. Truy cập link chuyển Ref:{" "}
-                            <a
-                              href="https://www.okx.com/ul/J6l2R5"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#58a6ff", textDecoration: "none" }}
-                            >
-                              https://www.okx.com/ul/J6l2R5
-                            </a>
-                          </div>
-                          <div>2. Điền form yêu cầu:</div>
-                          <ul style={{ margin: "2px 0 2px 18px", padding: 0 }}>
-                            <li style={{ marginBottom: "4px" }}>
-                              Mã mời (Referral code):{" "}
-                              <strong
-                                style={{
-                                  color: "#00ffff",
-                                  cursor: "pointer",
-                                }}
-                                onClick={() => handleCopyText("AutoTrader", "Đã copy Mã mời: AutoTrader")}
-                                onTouchEnd={(e) => { e.preventDefault(); handleCopyText("AutoTrader", "Đã copy Mã mời: AutoTrader"); }}
-                                title="Click hoặc chạm để copy Mã mời"
-                              >
-                                AutoTrader
-                              </strong>
-                            </li>
-                            <li>
-                              Lý do tham gia:{" "}
-                              <span
-                                style={{
-                                  color: "#e6edf3",
-                                  cursor: "pointer",
-                                  fontStyle: "italic",
-                                  display: "inline-block",
-                                  marginTop: "3px",
-                                }}
-                                onClick={() =>
-                                  handleCopyText(
-                                    "I was invited by an affiliate but forgot to add the code when signing up",
-                                    "Đã copy Lý do tham gia!"
-                                  )
-                                }
-                                onTouchEnd={(e) => {
-                                  e.preventDefault();
-                                  handleCopyText(
-                                    "I was invited by an affiliate but forgot to add the code when signing up",
-                                    "Đã copy Lý do tham gia!"
-                                  );
-                                }}
-                                title="Click hoặc chạm để copy Lý do"
-                              >
-                                "I was invited by an affiliate but forgot to add the code when signing up"
-                              </span>
-                            </li>
-                          </ul>
-                          <div>3. Nhấn Submit và chờ OKX duyệt kết quả.</div>
-                        </div>
-                      </div>
-
-                      {/* Cách 2 */}
-                      <div>
-                        <strong style={{ color: "#26a69a", display: "block", marginBottom: "6px", fontSize: "13px" }}>
-                          Cách 2: Xoá tài khoản cũ, tạo tài khoản mới
-                        </strong>
-                        <div style={{ paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                          <div>
-                            1. Đóng tài khoản cũ: Vào <strong>Thông tin tài khoản &gt; Bảo mật &gt; Đóng tài khoản</strong>.
-                          </div>
-                          <div>
-                            2. Đăng ký tài khoản mới qua link:{" "}
-                            <a
-                              href="https://okx.com/join/AutoTrader"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#58a6ff", textDecoration: "none" }}
-                            >
-                              https://okx.com/join/AutoTrader
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                  {/* 2. LIÊN HỆ ADMIN (Y HỆT BẢN CŨ) */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      border: "1px solid #444",
-                      borderRadius: "6px",
-                      background: "#262626",
-                      marginBottom: "20px",
-                    }}
-                  >
-                    <span style={{ fontSize: "12px", fontWeight: "bold", color: "#eee" }}>Liên hệ Admin:</span>
-                    <div style={{ display: "flex", gap: "12px" }}>
-                      <img
-                        src="/media/Telegram.png"
-                        alt="Telegram"
-                        title="Telegram Admin"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
-                      />
-                      <img
-                        src="/media/Messenger.png"
-                        alt="Messenger"
-                        title="Facebook Messenger"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")}
-                      />
-                      <img
-                        src="/media/zalo.png"
-                        alt="Zalo"
-                        title="Zalo Admin"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")}
-                      />
-                      <img
-                        src="/media/Discord.png"
-                        alt="Discord"
-                        title="Discord Community"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")}
-                      />
-                    </div>
-                  </div>
-
-                {/* 3. PHẦN PHỤ KỸ THUẬT & CÔNG CỤ (ĐÁY TAB) */}
-                <div style={{ borderTop: "1px solid #333", paddingTop: "14px" }}>
-                  {/* Mã Máy HWID */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px", flexWrap: "wrap" }}>
-                    <span style={{ color: "#888", fontSize: "12px" }}>{t("your_hwid")}</span>
-                    <span
-                      className="hwid-value"
-                      style={{ color: "#00ffff", fontWeight: "bold", fontSize: "13px", cursor: "pointer", fontFamily: "Consolas, monospace" }}
-                      title="Click để copy Mã Máy"
-                      onClick={() => handleCopyText(hwid, "Đã copy Mã máy thiết bị (HWID)!")}
-                      onTouchEnd={(e) => { e.preventDefault(); handleCopyText(hwid, "Đã copy Mã máy thiết bị (HWID)!"); }}
-                    >
-                      {hwid}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => window.open("https://www.youtube.com/watch?v=4GfuqIcKf4U&list=PLdzvL_bHCpls&index=2", "_blank", "noopener,noreferrer")}
-                      style={{
-                        background: "#1e3a5f",
-                        border: "1px solid #2563eb",
-                        color: "#ffffff",
-                        borderRadius: "4px",
-                        padding: "2px 10px",
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                      title="Xem video Hướng Dẫn trên YouTube"
-                    >
-                      {t("guide_btn")}
-                    </button>
-                  </div>
-
-                  {/* Lệnh Can Thiệp Nhanh (Dành riêng cho Quản trị viên) */}
-                  {(Boolean(localStorage.getItem('tls1_uid') || loginUid) && (localStorage.getItem('tls1_uid') || loginUid).toLowerCase() === "admtls12021") && (
-                    <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                      <button className="btn-audit" onClick={handleResetNen}>
-                        ♻️ {t("reset_nen_btn")}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </div>
-          )}
-
           {/* ===== TAB 3: ĐÁNH GIÁ (SHOPEE STYLE) ===== */}
           {settingsTab === "reviews" && (
             <div className="settings-tab-content" data-tour="settings-reviews-tab-content">
-              <div className="settings-tab-scroll" style={{ padding: "12px 14px 20px 14px" }}>
+              <div className="settings-tab-scroll" style={{ padding: "12px 14px 280px 14px" }}>
                 <ReviewsTab
                   apiKey={apiKey}
                   accounts={accounts}

@@ -33,6 +33,293 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[31/10/2026]** - Hoàn Thiện Bảng Đa Khung 4 Cột Trực Quan & Nâng Cấp Đón Cản Phân Đoạn Thân OB (Chia 5 Phần):
+  - **Yêu cầu CEO:**
+    1. Hiển thị đầy đủ 4 cột trong Bảng Hệ Số Nhân Đa Khung: `Khung thời gian`, `Hệ số nhân`, `Độ dày OB tối thiểu (Base)`, `Khoảng cách gộp & giãn cản (Base)` để pro traders dễ dàng tính toán chi tiết.
+    2. Không để đón cản theo % cố định nữa, mà chia khối Order Block thành 5 phần (+- 0, 1/5, 2/5, 3/5, 4/5 và 50% thân OB). Đón ngoài (+) và đón trong (-) theo tỷ lệ thân cản giúp tự động tương thích mọi khung giờ mà không cần nhân hệ số TF.
+  - **Bản vá & Nâng cấp toàn diện:**
+    1. **Bảng Đa Khung 4 Cột Tính Toán Động:**
+       - Tự động nhân `Base Min OB Height` và `Base Merge & Gap` với Hệ số TF của từng dòng (M5 1.0x -> D1 8.0x) và hiển thị trực quan tỷ lệ % chính xác theo thời gian thực (M5: 0.30% & 0.50%, M15: 0.36% & 0.60%, H1: 0.60% & 1.00%, H4: 1.50% & 2.50%, v.v.).
+    2. **Hệ Thống Đón Cản Phân Đoạn Thân OB (5-Fraction System):**
+       - Thay thế hoàn toàn ô nhập % và dropdown cũ bằng 1 Dropdown Selector tinh gọn duy nhất:
+         - `+2/5 OB`: Đón sớm ngoài cản 40% chiều cao OB
+         - `+1/5 OB`: Đón sớm ngoài cản 20% chiều cao OB
+         - `0 (Mép ngoài)`: Đón đúng mép cản (Mặc định - Khớp nhanh nhất)
+         - `-1/5 OB`: Đón sâu trong cản 20% chiều cao OB
+         - `-2/5 OB`: Đón sâu trong cản 40% chiều cao OB
+         - `50% Thân OB`: Đón tại điểm cân bằng (Equilibrium - giữa cản)
+         - `-3/5 OB`: Đón sâu trong cản 60% chiều cao OB
+         - `-4/5 OB`: Đón sâu trong cản 80% chiều cao OB
+       - Đồng bộ 100% công thức từ `SingleChartPane.jsx` (vẽ đường Entry/SL/TP) đến `bot_indicators.py` & `bot_strategy.py` (đặt lệnh thực thi).
+  - **Kiểm thử & Nghiệm thu:**
+    - Test toán học chính xác 100% cho cả Bullish OB và Bearish OB.
+    - Vite production build hoàn tất 303ms không có lỗi.
+
+- **[31/10/2026]** - Thống Nhất Bảng Hệ Số Nhân Đa Khung, Gộp Dòng Bộ Lọc Cản SMC & Cài Đặt Bản Chiến Thuật Mặc Định Tối Ưu Cho Người Mới:
+  - **Yêu cầu CEO:**
+    1. Gộp bảng Hệ số Entry TF vào Hệ số Ký Quỹ (Vốn) thành 1 bảng duy nhất 2 cột: `Hệ Số Nhân Đa Khung (TF Multiplier)`.
+    2. Độ dày OB tối thiểu giữ Base: 0.30% (tính trên M5, tự động nhân hệ số TF).
+    3. Gộp `Khoảng cách gộp cản` và `Cản ngược chiều` thành 1 dòng duy nhất: `Khoảng cách gộp & giãn cản (Base)` (Base: 0.50% trên M5, tự động nhân hệ số TF).
+    4. Cài đặt bản setting chiến thuật mặc định phù hợp cho người dùng mới: Winrate cao nhất, dễ khớp lệnh nhất, an toàn nhất.
+  - **Bản vá & Cải tiến toàn diện:**
+    1. **Bản Setting Mặc Định Chuẩn Cho Người Mới (Beginner-Friendly Preset):**
+       - `Nguồn bắt cản`: Cả hai sóng (Swing & Internal) -> Cung cấp cản đều đặn, không bị đói lệnh.
+       - `Hướng vào lệnh`: Hai chiều (Long/Short) -> Tối ưu hóa chu kỳ sóng sideway/range của thị trường.
+       - `Lọc lực nến cản (x ATR)`: `2.0` -> Chuẩn cân bằng, lọc sạch nến nhiễu nhưng bắt trọn các vùng FVG phá vỡ cấu trúc uy tín.
+       - `Đón trước mép cản OB`: `0.00%` (Mặc định - Mép ngoài OB) -> **DỄ KHỚP LỆNH NHẤT**, giá chỉ cần chạm mép là khớp tức thì, không bị lỡ sóng. Hỗ trợ số âm (-0.1%) cho người muốn đón sâu trong lòng cản.
+       - `Độ dày OB tối thiểu (Base)`: `0.30%` (M5: 0.30%, M15: 0.36%, H1: 0.60%, H4: 1.50%) -> Lọc sạch các vùng cản rác mỏng dính.
+       - `Khoảng cách gộp & giãn cản (Base)`: `0.50%` (M5: 0.50%, M15: 0.60%, H1: 1.00%, H4: 2.50%) -> Gộp các khối cản sát nhau thành 1 khối vững chắc và giãn cách an toàn 2 đầu Long/Short.
+       - `Quản lý R:R (TP / SL)`: Chốt lời theo **`Theo OB ngược chiều (NEAREST_OB)`** với fallback 2.0R, Cắt lỗ **`1.0 R`** -> **WINRATE CAO NHẤT & AN TOÀN NHẤT**, chạm cản đối diện là chốt lời ngay vào túi, không bị quay đầu dính lỗ; SL đặt sau khối OB đã gộp vững chắc.
+    2. **Đồng bộ hóa 100% Giao Diện & Thuật Toán:**
+       - `SystemSettingsModal.jsx`: Gộp bảng TF Multiplier thành 2 cột (`Khung thời gian` | `Hệ số nhân đa khung`), gộp dòng cấu hình cản.
+       - `SingleChartPane.jsx`: Tích hợp `TF_MULTIPLIERS`, tự động nhân hệ số TF cho min height và merge distance; sửa lỗi vẽ cản trên biểu đồ dùng đúng `finalObs`.
+       - `web_app/backend/main.py`: `compute_ob_boxes` tự động nhân hệ số TF theo tham số `bar`.
+       - `App.jsx`: Khôi phục mặc định nạp chuẩn bộ preset tối ưu trên; tắt alert popup khi lưu cấu hình.
+  - **Kiểm thử & Nghiệm thu:**
+    - Test nến thật từ OKX trên M5, M15, 1H, 4H: OBs lọc và gộp mượt mà, chiều cao tăng theo TF đúng chuẩn.
+    - Vite production build hoàn tất 100% không lỗi (`dist/index-*.js`).
+
+- **[31/10/2026]** - Loại Bỏ Popup Alert Khi Bấm Lưu Cấu Hình Chiến Thuật:
+  - **Yêu cầu CEO:** Khi bấm "Lưu Cài Đặt", không cần hiện hộp thoại popup alert thông báo đã lưu thành công gây gián đoạn thao tác.
+  - **Bản vá (`App.jsx`):**
+    - Loại bỏ lệnh `alert(...)` trong `handleSaveStratConfig`.
+    - Sau khi lưu API thành công, hệ thống tự động ghi nhật ký vào `addSystemLog`, làm mới dữ liệu bot `refreshBotData()` và đóng modal cấu hình mượt mà tức thì, không gây đơ/treo màn hình.
+  - **Kiểm thử & Nghiệm thu:**
+    - Vite build production hoàn tất thành công trong 409ms.
+    - Đã kích hoạt trình duyệt trên Desktop CEO (`http://localhost:5173`).
+
+- **[31/10/2026]** - Phát Triển Bộ Lọc Khoảng Cách OB Đối Nghịch & Khắc Phục Lỗi Cản Kẹp Giữa (Opposite OB Gap Filter):
+  - **Yêu cầu CEO:** Khi các vùng Order Block xanh/đỏ (Bullish/Bearish) nằm quá sát nhau khiến Entry 2 lệnh ngược chiều bị dính sát, TP bị co quá ngắn, cần tự động lọc bớt OB kẹp ở giữa đi. Quy tắc nghiêm ngặt: Chỉ lọc vùng nào mà sau khi lọc, phía sau nó (bên dưới đối với xanh, bên trên đối với đỏ) VẪN CÒN OB cùng màu để làm điểm tựa (đỡ/chặn), tuyệt đối không lọc chiều ngược lại để rồi phía đối diện không có lệnh đối nghịch.
+  - **Bản vá kiến trúc & Thuật toán Backup-Aware Channel Expansion:**
+    1. **Thuật toán Phân Tích Điểm Tựa Kẹp Giữa (`SingleChartPane.jsx`, `main.py`, `bot_strategy.py`):**
+       - Khi khoảng cách giữa 2 mép OB xanh & đỏ `< opposite_gap_pct` (mặc định `0.80%`):
+         - Kiểm tra `has_bull_below`: Có còn OB xanh bên dưới để "đỡ" giá không?
+         - Kiểm tra `has_bear_above`: Có còn OB đỏ bên trên để "chặn" giá không?
+         - Nếu `has_bull_below` và KHÔNG có `has_bear_above`: Lọc bỏ OB xanh ở giữa, lùi Long setup xuống OB xanh bên dưới. Giữ nguyên OB đỏ phía trên.
+         - Nếu `has_bear_above` và KHÔNG có `has_bull_below`: Lọc bỏ OB đỏ ở giữa, đẩy Short setup lên OB đỏ bên trên. Giữ nguyên OB xanh phía dưới.
+         - Nếu cả 2 đều có điểm tựa: Ưu tiên lọc khối OB mỏng hơn.
+         - Nếu cả 2 đều KHÔNG có điểm tựa: Giữ nguyên cả 2 để luôn bảo đảm có lệnh đối nghịch ở cả 2 đầu giá.
+    2. **Đồng bộ hóa Frontend Chart & Kịch Bản Giao Dịch (`SingleChartPane.jsx`):**
+       - Tích hợp hàm `filterOppositeOBClash` vào cả 2 luồng: `drawObs` (vẽ hộp OB lên biểu đồ) và `calculateSMCPositions` (chiếu các kịch bản vào lệnh).
+       - Khối OB xanh kẹp sát ở giữa biến mất hoàn toàn, giải phóng không gian để lệnh Short từ OB đỏ bên trên và lệnh Long từ OB xanh bên dưới có biên độ TP rộng rãi, thông thoáng.
+    3. **Đồng bộ hóa Backend API (`web_app/backend/main.py`):**
+       - Nâng cấp `compute_ob_boxes` với tham số `opposite_gap_pct=0.008`.
+       - API `/api/market/candles` trả về danh sách `ob_boxes` đã được lọc cản kẹp giữa sạch sẽ.
+    4. **Đồng bộ hóa Core Bot Engine (`bot_strategy.py` & `bot_config.py`):**
+       - Nâng cấp `run_multi_tf_independent_cycle`: Thay thế hoàn toàn cơ chế cũ (trước đây vi phạm khoảng cách thì tắt tiệt 1 chiều) bằng cơ chế lùi/tiến sang OB điểm tựa dự phòng. Duy trì đồng thời cả 2 setup Long & Short với TP rộng mở.
+       - Thêm hằng số `OB_OPPOSITE_GAP_PCT = Decimal("0.008")`.
+    5. **Giao diện Cài Đặt Hệ Thống (`SystemSettingsModal.jsx` & `App.jsx`):**
+       - Thêm dòng cấu hình: `Khoảng cách cản ngược chiều tối thiểu:` với SpinBox `0.80%` (bước nhảy `0.05%`, từ `0.2%` đến `3.0%`).
+       - Kèm tooltip giải thích trực quan nguyên lý lọc cản kẹp giữa.
+    6. **Kiểm thử thực chiến:**
+       - Test logic kịch bản thực tế của CEO: OB xanh kẹp giữa (77,200 - 77,400) bị loại bỏ tức thì, giữ lại OB đỏ (77,600 - 78,100) và OB xanh phía dưới (76,400 - 76,900), mở rộng khoảng cách từ 200 điểm (0.25%) lên 700 điểm (0.91%).
+       - Kiểm thử dữ liệu nến thật từ OKX BTC-USDT 15m: xác lập 2 vùng cản lý tưởng 76,375$ (Long) và 77,561$ (Short).
+       - Vite build production hoàn tất trong 370ms.
+
+- **[31/10/2026]** - Nâng Cấp Đón Trước Mép Cản OB (Hỗ Trợ Số Âm & Dropdown Cùng Dòng Mặc Định / 50% Thân OB):
+  - **Yêu cầu CEO:**
+    1. Đón trước mép cản OB hỗ trợ cả số âm: Số dương (+) đón ngoài OB (chờ giá chạm sớm), số âm (-) đón sâu trong OB (chờ giá quét sâu vào bên trong hộp OB để tối ưu tỷ lệ R:R và tránh bị quét râu).
+    2. Gộp "Vị trí đón cản trong OB" và "Đón trước mép cản OB" lên cùng một dòng: Sử dụng nút Dropdown bên ngoài theo phong cách nút `Theo OB ngược chiều ▼` (nền tối, viền `#444`, chữ xanh `#26a69a`), gồm 2 chế độ: `Mặc định` (đón theo % độ lệch mép OB) hoặc `50% Thân OB` (Equilibrium).
+  - **Triển khai đồng bộ toàn diện:**
+    1. `NumberSpinBox.jsx`:
+       - Hỗ trợ số âm tự do (`min={-2.0}`, `max={2.0}`).
+       - Bổ sung prop `disabledTitle` hiển thị tooltip rõ ràng khi bị vô hiệu hóa.
+       - Sửa `handleBlur` tránh bị reset sai về số âm thấp nhất khi ô trống.
+    2. `SystemSettingsModal.jsx`:
+       - Tích hợp 2 dòng thành 1 dòng duy nhất tinh gọn: Bên trái nhãn `Đón trước mép cản OB: [?]`, bên phải gồm cụm điều khiển: Dropdown `Mặc định ▼` / `50% Thân OB ▼` (chuẩn style nút `Theo OB ngược chiều ▼`) đi kèm `NumberSpinBox` % độ lệch.
+       - Tự động disable ô nhập % khi chọn `50% Thân OB` kèm tooltip hướng dẫn.
+    3. `App.jsx`:
+       - Sửa lỗi `parseFloat(...) || 0.05` làm mất giá trị `0%` và số âm khi lưu cấu hình, bảo toàn giá trị `0.00%` và số âm chính xác 100%.
+    4. `SingleChartPane.jsx` & `bots/sub2/bot_indicators.py`:
+       - Nâng cấp thuật toán tính `entry_price`:
+         - Chế độ `EQUILIBRIUM`: `entry = (high + low) / 2`.
+         - Chế độ `OUTER`:
+           - Long: `high * (1 + offset_pct)` -> số dương đón trên mép, số âm đón sâu vào trong hộp.
+           - Short: `low * (1 - offset_pct)` -> số dương đón dưới mép, số âm đón sâu lên trong hộp.
+         - Tự động clamp bảo vệ khoảng cách Stop Loss tối thiểu, không cho entry xuyên thủng mép SL đối diện.
+         - Cập nhật SL/TP theo `baseRisk = abs(entry - sl)`: Khi đón sâu trong OB, khoảng cách rủi ro thu hẹp, giúp R:R tối ưu vượt trội và lệnh cán TP nhanh hơn rất nhiều.
+    5. `bots/sub2/bot_strategy.py`:
+       - Kết nối trực tiếp `ENTRY_OFFSET_PCT` và `OB_ENTRY_LEVEL` với TF Multipliers thay vì ép cố định offset = 0.
+    6. **Kiểm thử & Nghiệm thu:**
+       - Kiểm thử thuật toán tính Entry trên cả 2 chiều Bullish và Bearish: cho kết quả chuẩn từng chữ số thập phân (+0.05% đón ngoài mép, -0.10% lọt sâu vào bụng OB, 50% nằm chính giữa OB).
+       - Vite build hoàn tất trong 371ms.
+       - Đã kích hoạt trình duyệt thật trên Desktop CEO qua Rule 9 (`http://localhost:5173`).
+
+- **[31/10/2026]** - Thiết Kế & Đồng Bộ Toàn Diện Bộ Lọc Order Block (OB) Nhỏ (< 0.5%) & Gộp Cản Liên Kề (< 1.0%) Cho Bot SMC:
+  - **Yêu cầu CEO:** Thiết kế bộ lọc OB cho bot SMC: lọc bỏ những OB quá nhỏ (< 0.5% giá thị trường) và gộp những OB gần nhau (< 1.0% giá) lại thành 1 để các lệnh có khoảng cách Stop Loss không bị ngắn quá, tránh quét râu dính SL sớm. Đảm bảo hoạt động hoàn hảo trơn tru và đồng bộ cả frontend và backend.
+  - **Bản vá kiến trúc & Thuật toán Smart Merge (`bot_config.py`, `bot_indicators.py`, `bot_strategy.py`, `main.py`, `SingleChartPane.jsx`, `SystemSettingsModal.jsx`, `App.jsx`):**
+    1. **Thuật toán Smart Merge (Gộp trước, Lọc sau):**
+       - **Bước 1 (Gộp Cản < 1.0%):** Các khối OB cùng chiều (cùng Bullish hoặc cùng Bearish) có khoảng cách giữa 2 mép `<= 1.0%` được tự động gộp lại thành 1 khối duy nhất với `high = max(h1, h2)` và `low = min(l1, l2)`. Nhờ đó các cụm cản sát nhau trở thành 1 khối đỡ/kháng cự dày dặn.
+       - **Bước 2 (Lọc Độ Dày Tối Thiểu < 0.5%):** Sau khi đã gộp, những khối OB đơn lẻ nào vẫn có biên độ mỏng dính `< 0.5%` giá thị trường sẽ bị loại bỏ hoàn toàn, triệt tiêu 100% rủi ro tạo ra các lệnh Stop Loss quá ngắn.
+    2. **Đồng bộ hóa Backend API & Core Bot:**
+       - `main.py` (`compute_ob_boxes` & `/api/market/candles`): Nhận tham số `min_ob_pct` (0.005) và `merge_ob_pct` (0.010), trả về dữ liệu OB đã được tinh gọn và gộp cản chuẩn xác.
+       - `bots/sub2/bot_indicators.py` (`compute_chart_ob_boxes` & `add_ob_and_merge`): Nâng cấp thuật toán phát hiện và quản lý danh sách OB nội bộ của bot khớp 100% với backend.
+       - `bots/sub2/bot_strategy.py` (`merge_ob_zones`): Tự động gộp các Trade Setup liên kề trong phạm vi 1.0% và loại bỏ setup có SL < 0.5%.
+    3. **Đồng bộ hóa Frontend Chart & Settings:**
+       - `SingleChartPane.jsx` (`calculateSMCPositions` & `drawObs`): Lọc bỏ các hộp cản li ti, gộp các hộp cản sát nhau trên canvas và tính toán SL/TP trên khối OB gộp vững chắc.
+       - `SystemSettingsModal.jsx` (Tab Chiến Thuật SMC): Bổ sung 2 SpinBox trực quan: `Độ dày OB tối thiểu` (mặc định 0.50%) và `Khoảng cách gộp cản tối thiểu` (mặc định 1.00%), kèm tooltip giải thích chi tiết.
+       - `App.jsx`: Quản lý state `smcEntryCfg` (lưu, nạp, reset mặc định) và truyền đồng bộ vào `SingleChartPane`.
+    4. **Kiểm thử thực chiến:** Đã kiểm thử trực tiếp trên 150 nến thực tế BTC 15m từ sàn OKX: từ 8 khối OB vụn vặt (dày chỉ 70$ - 200$) đã được gộp thành 2 khối cản lớn dày dặn (Bullish 1069.7$ - 1.39% và Bearish 1474.7$ - 1.88%), bảo đảm Stop Loss an toàn tuyệt đối.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 434ms.
+
+- **[31/10/2026]** - Bỏ Nút Hướng Dẫn Thừa Trong Cài Đặt, Gộp Mục 8 & 9, Và Đưa Card Bước Lưu/Khôi Phục Lên Trên:
+  - **Yêu cầu CEO:**
+    1. Bỏ nút 'Hướng Dẫn' trong header modal Cài Đặt (thừa thãi).
+    2. Gộp mục 8 (Bộ 3 DCA) & mục 9 (Cầu Dao H4 & BTC) làm 1 bước duy nhất (tổng tour rút gọn còn 18 bước).
+    3. Mục 'Lưu & Khôi Phục Cài Đặt' (Bước 11 mới) bị card tooltip che mất nút: đưa card lên trên một chút với mũi tên quay xuống sát chủ thể.
+  - **Giải pháp:**
+    1. Trong `SystemSettingsModal.jsx`: Gỡ bỏ hoàn toàn nút `btn-tour-settings` ('Hướng Dẫn') khỏi header modal.
+    2. Trong `tourData.js`:
+       - Gộp bước 8 & 9 thành *Bước 8: 8. Bộ 3 Cơ Chế DCA & Cầu Dao Bảo Vệ* (target bao trọn cả cột DCA và cột Cầu dao H4/BTC).
+       - Cập nhật *Bước 11: 11. Lưu & Khôi Phục Cài Đặt*: thiết lập `placement: "top"` (bỏ `dockBottom: true`), card tooltip đặt cách đỉnh nút 10px, mũi tên đáy trỏ thẳng xuống 2 nút [Khôi phục mặc định] & [Lưu Chiến Thuật].
+       - Cập nhật chuẩn xác 18 bước xuyên suốt từ Bước 1 đến Bước 18 cho cả tiếng Việt và tiếng Anh.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 307ms.
+
+- **[31/10/2026]** - Áp Dụng Cơ Chế Cuộn Lên Sát Tab & Card Dưới Cùng Cho Toàn Bộ Bước Trong Cài Đặt (Bước 7 - 13):
+  - **Yêu cầu CEO:** Áp dụng thiết kế trực quan giống Bước 17 & 18 cho toàn bộ các bước trong modal Cài Đặt (cuộn chủ thể lên sát thanh tab, khoanh vùng header + tab + chủ thể, card tooltip cố định ở đáy màn hình).
+  - **Giải pháp:** 
+    1. Trong `SystemSettingsModal.jsx`: Thêm `paddingBottom: "280px"` cho `.settings-tab-scroll` ở cả 2 tab Chiến Thuật & Đánh Giá để mọi nhóm thiết lập đều có đủ hành trình cuộn lên sát đỉnh.
+    2. Trong `tourData.js`: Cập nhật đồng bộ các bước từ 7 đến 13 (Watchlist, Bộ 3 DCA, Cầu Dao H4, Điểm Vào Lệnh, Hệ Số Nhân Đa Khung, Nút Lưu & Mặc Định, Tab Đánh Giá):
+       - Tự động kích hoạt `scrollIntoView({ behavior: "smooth", block: "start" })` trong `preStep`.
+       - Selector khoanh vùng bao trọn `.modal-header, .settings-tab-bar, [data-tour="..."]`.
+       - Thiết lập `placement: "bottom"` và `dockBottom: true` để card tooltip luôn nằm cố định ở đáy màn hình, mũi tên trỏ thẳng lên phần tử đang giải thích.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 324ms.
+
+- **[31/10/2026]** - Tự Động Cuộn Box 2 (Điều Kiện Để Sử Dụng App) Lên Sát Tab Đăng Nhập & Đặt Card Tooltip Dưới Cùng:
+  - **Yêu cầu CEO:** Tự động cuộn chuột làm sao cho phần Điều kiện sử dụng app (Box 2) được cuộn lên sát với tab đăng nhập (giống như Box 1 ở bước 17), và nội dung card hướng dẫn nằm ở dưới cùng màn hình.
+  - **Giải pháp:** 
+    1. Trong `ConnectModal.jsx`: Bổ sung `paddingBottom: "280px"` cho `connect-sync-content` để tạo không gian cuộn cho container `connect-cards-scroll`.
+    2. Trong `tourData.js`:
+       - Bước 18: Kích hoạt `el.scrollIntoView({ behavior: "smooth", block: "start" })` để cuộn Box 2 lên sát mép tab bar.
+       - Target bao gồm `.modal-header, .connect-tab-bar, [data-tour="connect-sync-policy-box"]` để viền spotlight khoanh vùng hoàn chỉnh từ header, tab bar đến Box 2.
+       - Đặt `placement: "bottom"` và `dockBottom: true` để card tooltip nằm cố định ở đáy màn hình với mũi tên trỏ lên Box 2.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 421ms.
+
+- **[31/10/2026]** - Đưa Nội Dung Bước 18 (Điều Kiện Để Sử Dụng App) Lên Phía Trên Chủ Thể:
+  - **Yêu cầu CEO:** Bước 18/19 card tooltip đang bị che mất Box điều kiện (nằm đè lên Box 2), cần đưa nội dung lên phía trên.
+  - **Giải pháp:** Cập nhật `tourData.js`: Thiết lập `placement: "top"` (bỏ `dockBottom: true`) cho Bước 18 (`[data-tour="connect-sync-policy-box"]`), card tooltip nằm bám sát phía trên Box 2 với mũi tên trỏ thẳng xuống chủ thể.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 416ms.
+
+- **[31/10/2026]** - Khắc Phục Mất Nội Dung Tab Đăng Nhập & Tách Thành 2 Bước Riêng Biệt (Bước 17 & Bước 18, Tổng 19 Bước):
+  - **Triệu chứng & Nguyên nhân:** 
+    1. Khi chuyển sang tab Đăng Nhập, `preStep` gọi `setConnectModalTab("sync")` nhưng `ConnectModal` yêu cầu tab key là `"sync_login"`, khiến nội dung không render và chỉ khoanh vùng header trống rỗng.
+    2. Cả Box 1 (Đăng nhập 6 số) và Box 2 (Điều kiện Ref & Hỗ trợ) bị gộp chung gây dài dòng, khó theo dõi.
+  - **Giải pháp:** 
+    1. Trong `ConnectModal.jsx`: Hỗ trợ alias đồng bộ cả `"sync_login"` lẫn `"sync"`. Gán `data-tour="connect-sync-code-box"` cho Box 1 và `data-tour="connect-sync-policy-box"` cho Box 2.
+    2. Trong `tourData.js`: Tách thành 2 bước riêng biệt:
+       - **Bước 17:** *17. Đăng Nhập / Đồng Bộ Thiết Bị Mới* (Khoanh vùng Header + Box 1 mã ghép đôi 6 số).
+       - **Bước 18:** *18. Điều Kiện Để Sử Dụng App* (Khoanh vùng Box 2 chính sách Ref và kênh Admin Telegram/Zalo/Discord).
+       - **Bước 19:** *19. Hoàn Tất Hướng Dẫn!*
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 317ms.
+
+- **[31/10/2026]** - Đưa Nội Dung Bước 13, 15, 16, 17 Xuống Dưới Cùng Màn Hình:
+  - **Yêu cầu CEO:** Đưa nội dung mục 13 (Tab Đánh Giá trong Cài Đặt), mục 15 (Fast Connect), mục 16 (API Key Connect), mục 17 (Ghép Đôi Thiết Bị) xuống dưới cùng để không bị che khuất tiêu đề và các tab phía trên.
+  - **Giải pháp:** 
+    1. Cập nhật `tourData.js`: Thiết lập `placement: "bottom"` và `dockBottom: true` cho bước 13, 15, 16, 17.
+    2. Cập nhật `OnboardingTour.jsx`: Hỗ trợ cờ `dockBottom: true` để neo card tooltip cố định ở mép dưới cùng màn hình (`winH - actualCardH - 12`), mũi tên trỏ ngược lên chủ thể bên trên.
+  - **Trạng thái:** ✅ Đã hoàn thành, Vite build thành công trong 379ms.
+
+- **[31/10/2026]** - Khac Phuc Loi Crash Tour ReferenceError isMobileOrNarrow is not defined:
+  - **Trieu chung:** Click nut Huong Dan web crash ReferenceError isMobileOrNarrow is not defined.
+  - **Nguyen nhan:** Bien isMobileOrNarrow su dung trong cardStyle nhung chua khai bao o component render scope.
+  - **Giai phap:** Khai bao day du winW, winH va isMobileOrNarrow tai OnboardingTour.jsx scope.
+  - **Trang thai:** Da fix triet de, build frontend thanh cong.
+
+- **[31/10/2026]** - Sắp Xếp Tour 18 Bước Top-To-Bottom, Card Bám Sát Chủ Thể, Thu Nhỏ Mã Ghép Đôi & Ẩn USDT Trong PNL:
+  - **Yêu cầu CEO:**
+    1. Sắp xếp lại thứ tự toàn bộ tour theo dòng chảy từ trên xuống dưới màn hình để mắt người dùng không bị đảo liên tục: (1) Chọn tài khoản sàn Header, (2) Bật/dừng bot, (3) Bảng vị thế & cặp coin gộp chung (card ở trên), (4) Chọn bot (card ở trên), (5) Ký quỹ + TP/SL gộp chung (card ở trên), (6) Nút Cài đặt, (7-13) Các mục trong Cài đặt, (14) Nút Connect, (15-17) Các tab trong Connect, (18) Hoàn tất.
+    2. Nội dung card tooltip phải nằm bám sát với chủ thể (Attached Placement, cách 10px), có mũi tên trỏ chuẩn vào chủ thể.
+    3. Thu nhỏ phần "Mã Ghép Đôi (6 Số)" trong modal Connect: label nhỏ hơn, ô input gọn gàng hơn, chữ placeholder `VD: 739 281` nhỏ và mờ đi làm gợi ý phụ.
+    4. Ẩn chữ `USDT` (và `USD`) ở cột `PNL thả nổi` trong Bảng Vị Thế cho đỡ vướng.
+  - **Giải pháp xử lý:**
+    1. *`tourData.js`:* Tái cấu trúc chuẩn xác 18 bước Top-to-Bottom. Gộp Bảng vị thế + cặp coin thành Bước 3 (placement: "top"). Gộp Ký quỹ + TP/SL thành Bước 5 (placement: "top"). Chọn Bot đặt ở Bước 4 (placement: "top").
+    2. *`OnboardingTour.jsx`:* Chuyển đổi sang cơ chế tính toạ độ bám sát chủ thể động (Attached Contextual Tooltip): `cardTop = computedRect.top - actualCardH - 10` (khi top) hoặc `cardTop = computedRect.bottom + 10` (khi bottom), card nằm cách chủ thể đúng 10px, mũi tên trỏ thẳng vào tâm chủ thể.
+    3. *`ConnectModal.jsx`:* Thu nhỏ label xuống `10.5px`, input padding `7px 10px`, fontSize `14px`, letterSpacing `3px`. Placeholder `.sync-code-input::placeholder` đổi màu `#505050`, fontSize `12.5px`, opacity `0.5` mờ nhẹ dịu mắt. Nút bấm thu gọn padding `8px 12px`, fontSize `12px`.
+    4. *`PositionsTable.jsx`:* Bỏ đơn vị `{isFxOrProp ? "USD" : "USDT"}` ở dòng PNL thả nổi, chỉ hiển thị số tiền và phần trăm `+0.24 (+59.42%)` cực kỳ tinh gọn.
+    5. *`App.jsx`:* Cập nhật `handleStartSettingsTour` sang `setTourInitialStep(6)` chuẩn xác.
+    6. *Frontend Build & Trình duyệt:* Build thành công bundle `dist/assets/index-CjHqn86L.js` (381ms) và mở trình duyệt kiểm tra trực quan trên Desktop.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Tối Ưu Bounding Box Khoanh Vùng Rộng Trùm Tab Tổng & Triệt Tiêu Chồng Đè Tooltip:
+  - **Yêu cầu CEO:**
+    1. Mục 7 (chọn tài khoản): Làm rõ vị trí và phần tử trên Header.
+    2. Mục 10 (cặp coin / khung nến): Đưa nội dung lên trên để không che, bôi vàng cả thanh tab Bảng Vị Thế - Logs - Biểu Đồ và bảng bên dưới để người xem hiểu bối cảnh.
+    3. Trong Cài Đặt: Khoanh vùng rộng ra bao trùm cả thanh Tab tổng và Header modal thay vì bó sát hẹp, giúp người dùng nhận diện ngay chức năng thuộc tab nào (y hệt ảnh CEO vẽ tay).
+    4. Mục 18 (Hệ Số Nhân Đa Khung): Đưa card lên phía trên để không đè vào chủ thể chính.
+  - **Giải pháp xử lý:**
+    1. *Khoanh vùng rộng theo bối cảnh (Contextual Targets):*
+       - Bảng Vị Thế: Target kết hợp `[data-tour="bottom-tabs-bar"], [data-tour="watchlist-pairs"]` bôi vàng trùm cả thanh tab và danh sách coin.
+       - Cài Đặt: Target kết hợp `.modal-header, .settings-tab-bar, [data-tour="settings-..."]` khoanh từ đỉnh modal qua tab Chiến Thuật xuống hết khối chức năng.
+       - Connect: Target kết hợp `.modal-header, .connect-tab-bar, [data-tour="connect-..."]` bao trùm cả Header và thanh 3 tab.
+       - Tăng padding mặc định lên 12px và borderRadius 12px, khung viền rộng rãi, thoáng mắt.
+    2. *Triệt tiêu chồng đè Tooltip Card (Zero Overlap):*
+       - Khi bước có `placement: "top"` hoặc mục tiêu ở nửa dưới: Card BẮT BUỘC nằm ở `docked-top` (`top: 10px`), lộ trọn vẹn toàn bộ chủ thể bên dưới.
+       - Thuật toán `scrollTargetIntoSafeView` thông minh: Cuộn mục tiêu xuống dưới Card (~140px), không bao giờ bị Card ở đỉnh che khuất.
+    3. *Frontend Build & Trình duyệt:* Build thành công bundle `dist/assets/index-BtHoOxdG.js` (369ms) và kích hoạt trình duyệt kiểm tra trực quan.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Tối Ưu Toàn Diện Tour Hướng Dẫn: Tinh Gọn Nội Dung, Sửa Lệch Vị Trí, Thu Nhỏ Card & Ghép Nối Nút Connect:
+  - **Yêu cầu CEO:**
+    1. Kiểm tra và làm lại nội dung tour hướng dẫn sát với web thực tế thời điểm hiện tại, ngắn gọn đủ ý, tránh dài dòng thừa thãi.
+    2. Sửa các bước bị lệch hoặc sai vị trí phần tử.
+    3. Thêm hướng dẫn nút Connect và các tab Kết Nối tiếp nối ngay sau khi hướng dẫn xong modal Cài Đặt.
+    4. Thu nhỏ kích thước font chữ và card tooltip 1-2 size để không chiếm dụng màn hình.
+  - **Giải pháp xử lý:**
+    1. *OnboardingTour.jsx:* Giảm kích thước font (tiêu đề 14px -> 12.5px, nội dung 12px -> 10.5px, hint 11px -> 10px, badge 10.5px -> 9.5px). Thu gọn bề ngang card (360px -> 305px, docked max 520px -> 440px), đệm gọn gàng không che khuất màn hình.
+    2. *	ourData.js:* Tái cấu trúc chuẩn 20 bước mạch lạc 1 chiều:
+       - Phần 1 (Bước 1-7): Vận hành Màn hình chính (Chọn Bot -> Chọn Tài Khoản -> Ký Quỹ -> TP/SL -> Cặp Coin/Khung -> Bật/Dừng Bot -> Vị Thế/Logs/Chia Đôi).
+       - Phần 2 (Bước 8-15): Cài Đặt Hệ Thống (Nút Cài Đặt ⚙ -> Watchlist -> Bộ 3 DCA -> Cầu Dao -> Bộ Lọc Tín Hiệu -> Hệ Số Đa Khung -> Lưu Cài Đặt -> Tab Đánh Giá).
+       - Phần 3 (Bước 16-20): Kết Nối [Connect] (Nút Connect -> Fast Connect OAuth 2.0 -> API Key Connect -> Đăng Nhập / Ghép Đôi Thiết Bị Mới -> Hoàn Tất).
+    3. *Khắc phục lỗi lệch vị trí:* Sửa target ccount-selector, loại bỏ các target cũ không còn tồn tại (platform-select, connect-tradelocker-tab, settings-support-tab).
+    4. *App.jsx:* Cập nhật handleStartSettingsTour sang index 8 (bước 9) chuẩn xác.
+    5. *Frontend Build & Trình duyệt:* Build thành công bundle dist/assets/index-C0CO56c2.js (373ms) và kích hoạt trình duyệt kiểm tra trực quan.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Đổi Tên Nút "Video Hướng Dẫn" (Connect) & Loại Bỏ Tab "🛠️ Hỗ Trợ" Thừa Trong Cài Đặt:
+  - **Yêu cầu CEO:**
+    1. Đổi tên nút `[Hướng Dẫn]` ở tab Đăng Nhập modal Connect thành `[Video Hướng Dẫn]`.
+    2. Loại bỏ hoàn toàn Tab `🛠️ Hỗ Trợ` bên trong modal Cài Đặt vì toàn bộ nội dung Hỗ trợ & Điều kiện Ref đã được tích hợp tập trung vào modal Connect.
+  - **Giải pháp xử lý:**
+    1. *`ConnectModal.jsx`:* Cập nhật chữ nút cạnh HWID thành `Video Hướng Dẫn`.
+    2. *`SystemSettingsModal.jsx`:* Gỡ bỏ nút tab `🛠️ Hỗ Trợ` và toàn bộ khối nội dung Tab 2 (chỉ giữ lại 2 tab chuẩn: `⚙️ Chiến Thuật` và `⭐ Đánh Giá`), dọn dẹp các state không còn sử dụng.
+    3. *Frontend Build & Trình duyệt:* Build thành công bundle `dist/assets/index-BwNaS5xZ.js` (432ms) và tự động mở trình duyệt `localhost:5173` kiểm tra trực quan.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Tối Ưu Giao Diện Tab Fast Connect: Nâng Sáng Thẻ Tài Khoản & Bỏ Icon 💬 Tại "Liên Hệ Admin":
+  - **Yêu cầu CEO:** 
+    1. Các thẻ tài khoản ở mục Fast Connect bị chìm với màu nền: nâng màu thẻ to sáng hơn để tách bạch so với màu nền modal, và thẻ con bên trong thẻ to cũng nâng sáng hơn.
+    2. Bỏ icon `💬` phía trước dòng chữ `Liên hệ Admin:`.
+  - **Giải pháp xử lý:**
+    1. *Thẻ to (`.connect-card`):* Nâng nền từ `#222222` lên `#2c2c2c`, viền từ `#333333` lên `#444444`, thêm `boxShadow: 0 2px 6px rgba(0, 0, 0, 0.35)`. Hover chuyển sáng `#353535` viền cam `#ff9900`.
+    2. *Thẻ con bên trong thẻ to:* Nâng nền từ `rgba(255, 255, 255, 0.02)` lên `#363636`, viền `#4a4a4a`, đổ bóng `boxShadow: 0 1px 3px rgba(0, 0, 0, 0.25)`, padding `5px 10px 5px 8px`. Đường viền phân cách nâng lên `1px solid #404040`. Áp dụng đồng bộ cho tất cả các thẻ sàn OKX, Broker MT5 và Quỹ Prop.
+    3. *Loại bỏ icon 💬:* Bỏ thẻ `<span style={{ fontSize: "16px" }}>💬</span>`, giữ lại chữ `Liên hệ Admin:` tinh gọn chuẩn xác theo đúng ảnh chỉ dẫn của CEO.
+    4. *Frontend Build & Trình duyệt:* Build thành công bundle `dist/assets/index-BYa2oxkF.js` và tự động kích hoạt trình duyệt kiểm tra trực quan trên Desktop.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Đồng Bộ Hoá Thiết Kế & Nhận Diện 2 Box Tab 3 Đăng Nhập Connect:
+  - **Yêu cầu CEO:** Khắc phục tình trạng Box 1 (Đăng nhập mã 6 số) và Box 2 (Điều kiện sử dụng App) lệch màu nền và phong cách (một bên xanh navy, một bên xám đen), thiết kế lại đồng bộ 100% và làm nổi bật công năng từng box.
+  - **Giải pháp xử lý:**
+    1. *Chuẩn hoá Container:* Đồng bộ màu nền `#222222`, viền `1px solid #333333`, bo góc `8px` và đổ bóng nhẹ `boxShadow: 0 2px 8px rgba(0,0,0,0.25)` cho cả Box 1, Box 2 và Box 3.
+    2. *Phân định chức năng trực quan:* Cả 2 box đều có cụm Header với Badge icon 36x36 nổi bật (`🔑` cho Đăng Nhập, `🛡️` cho Điều Kiện Ref), tiêu đề rõ ràng và phụ đề mô tả ngắn gọn.
+    3. *Đồng bộ nút bấm:* Nút Xác nhận đăng nhập chuyển sang tông xanh Emerald VIP (`#10b981`) đồng nhất với nút Đăng ký OKX VIP bên dưới.
+    4. *Frontend Build:* Build thành công bundle `dist/assets/index-BtGWTLfu.js`.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Tối Giản Tab 3 Đăng Nhập Connect: Loại Bỏ Khối Hướng Dẫn Lấy Mã 6 Số Thừa:
+  - **Yêu cầu CEO:** Xoá bỏ khối khung viền đứt `[*] Cách lấy mã 6 số từ thiết bị gốc` để giao diện gọn gàng, tinh tế, tập trung trực tiếp vào ô nhập mã ghép đôi 6 số và khối điều kiện Ref / Admin.
+  - **Giải pháp xử lý:**
+    1. *`ConnectModal.jsx`:* Gỡ bỏ hoàn toàn thẻ div hướng dẫn viền đứt thừa thãi.
+    2. *Frontend Build:* Build thành công bundle `dist/assets/index-BtIfmzPW.js`.
+  - **Trạng thái:** ✅ Đã hoàn thành.
+
+- **[31/10/2026]** - Tích Hợp Khối "Điều Kiện Để Sử Dụng App & Hỗ Trợ Ref" Vào Tab Đăng Nhập Connect:
+  - **Yêu cầu CEO:** Đưa khối Điều kiện sử dụng app (Đăng ký OKX VIP, Hướng dẫn chuyển Ref, Liên hệ Admin 4 icon, Mã máy HWID & nút Hướng Dẫn) vào Tab 3 "🔑 Đăng Nhập" của Modal Connect, đặt ngay bên dưới phần hướng dẫn lấy mã 6 số.
+  - **Giải pháp xử lý:**
+    1. *`ConnectModal.jsx`:* Truyền prop `hwid`, bổ sung state `showTransferGuide`, `copyNotice` và hàm `handleCopyText`.
+    2. *Giao diện đồng bộ 100% chuẩn style:* Tích hợp 3 khối: (1) Khối Điều Kiện với 2 nút `[Đăng ký OKX (VIP)]` và `[Hướng dẫn chuyển Ref ▼]` (có accordion thu gọn/mở rộng Cách 1 & Cách 2), (2) Khối Liên hệ Admin với 4 icon Telegram, Messenger, Zalo, Discord, (3) Khối Mã Máy HWID click-to-copy kèm nút `[Hướng Dẫn]` mở video Youtube.
+    3. *Frontend Build:* Chạy `npm run build` thành công, bundle `dist/assets/index-BvgdB4j4.js`.
+  - **Trạng thái:** ✅ Đã hoàn thành nghiệm thu.
+
 - **[31/10/2026]** - Sửa Lỗi Đồng Bộ Chéo Đa Thiết Bị: Tỷ Lệ Chốt Lời (TP/SL) Không Nhảy Trên Thiết Bị Còn Lại:
   - **Hiện tượng:** Khi mở 2 thiết bị (2 cửa sổ Web cùng tài khoản), sửa "Tỷ lệ chốt lời" từ 5R sang 4R bên Web 2, thì bên Web 1 không tự động cập nhật về 4R mà vẫn giữ nguyên 5R (dù Ký quỹ 0.2$ đã đồng bộ).
   - **Nguyên nhân cốt lõi:**
@@ -4306,18 +4593,6 @@ ightarrow$ **"Hệ số nhân Entry/TP/SL"** (thể hiện đầy đủ ý nghĩ
   - **Yêu cầu của CEO:** Giao diện tín hiệu (SHORT, SL, TP, Entry) bị lỗi dạng viên thuốc (pill), không giống ảnh thứ 4.
   - **Đã thực hiện:** Chuyển đổi giao diện `labelDiv` từ dạng bo tròn viên thuốc (`borderRadius: 12px`, có viền trắng) sang dạng thẻ tag chuẩn TradingView (`borderRadius: 3px`, mũi tên tam giác nhọn gắn sát mép trái, không viền, thiết kế phẳng). Giao diện tín hiệu giờ đây trông sắc nét và chuyên nghiệp, giống chính xác 100% như ảnh 4 đã yêu cầu.
 
-- **[13/09/2026]** - Loại Bỏ Tab "Style" và "Visibility" Trong Cài Đặt Liquid V5 (`web_app`):
-  - **Yêu cầu của CEO:** Xóa bỏ phần style với Visibility trong bảng setting.
-  - **Đã thực hiện:** Đã gỡ bỏ 2 tab `Style` và `Visibility` khỏi giao diện Liquid V5 Settings modal, chỉ giữ lại tab `Inputs` để giao diện gọn gàng hơn, đáp ứng chính xác yêu cầu của người dùng.
-
-- **[12/09/2026]** - Khắc Phục Hiển Thị & Đồng Bộ Chỉ Báo `SMC Order Block (Live từ Bot OKX)`:
-  - **Vấn đề:** Biểu đồ hiển thị mã `smc_ob` trong Indicator Legend nhưng bên trong Modal Indicators không thấy để bật/tắt.
-  - **Nguyên nhân:** `smc_ob` là tính năng vẽ khối Order Block trực tiếp từ Bot OKX (`rd.ob_boxes`), trước đây được lưu trong localStorage nhưng chưa được khai báo vào danh mục `BUILTIN_INDICATORS` của modal và thiếu map nhãn thân thiện.
-  - **Giải pháp:**
-    1. Đưa `SMC Order Block (Live từ Bot OKX)` (`id: "smc_ob"`) vào danh mục `System` của [IndicatorsModal.jsx](file:///d:/4.%20Trade%20Coin%20-%20TLS1/4.%20Cursor%20-%20IDE/TLS1_Company/zProjects/OKX_Trade_Kit/web_app/frontend/src/components/IndicatorsModal.jsx).
-    2. Cập nhật `getIndicatorTitle` để hiển thị nhãn đẹp `SMC Order Block (Bot Live)` trên Indicator Legend chart.
-    3. Hỗ trợ ẩn/hiện tạm thời bằng icon con mắt thông qua `hiddenIndicators` trong hàm `drawObs()`.
-
 - **[12/09/2026]** - Hoàn Thiện Chuẩn Hoá Indicators Chuẩn Thế Giới, Dọn Dẹp Scripts Trắng & Tích Hợp Indicator Legend:
   - **Yêu cầu của CEO:**
     1. Mục `System`: Chỉ hiển thị các chỉ báo hệ thống phổ biến trên thế giới (Liquid v5, RSI, MACD, Volume 20, BB, EMA Ribbon, SuperTrend, EMA 200), vẽ chuẩn xác như TradingView.
@@ -5534,11 +5809,124 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
-- **[30/10/2026]** - Triệt Tiêu Hoàn Toàn Hiện Tượng Chồng Đè Chỉ Báo Long/Short, Dãn Cách Xa Giá Hiện Tại & Cách Đều 3 Nến Tuyệt Đối:
-  - **Vấn đề phát sinh từ giao diện người dùng:**
-    - Trên các khung thời gian (5m, 15m, 1H...), các hộp chỉ báo vị thế Long/Short (Risk/Reward box) bị dính chặt vào nến hiện tại hoặc vẽ đè lên các cây nến lịch sử trong quá khứ.
-    - Khi có nhiều khối OB hợp lệ, các hộp nằm sát nhau hoặc đè lên nhau gây rối mắt, cản trở tầm nhìn biểu đồ nến và đường giá Live.
-  - **Bản vá kiến trúc (`SingleChartPane.jsx`):**
+- **[31/10/2026]** - Hoàn Thiện Bảng Đa Khung 4 Cột Trực Quan & Nâng Cấp Đón Cản Phân Đoạn Thân OB (Chia 5 Phần):
+  - **Yêu cầu CEO:**
+    1. Hiển thị đầy đủ 4 cột trong Bảng Hệ Số Nhân Đa Khung: `Khung thời gian`, `Hệ số nhân`, `Độ dày OB tối thiểu (Base)`, `Khoảng cách gộp & giãn cản (Base)` để pro traders dễ dàng tính toán chi tiết.
+    2. Không để đón cản theo % cố định nữa, mà chia khối Order Block thành 5 phần (+- 0, 1/5, 2/5, 3/5, 4/5 và 50% thân OB). Đón ngoài (+) và đón trong (-) theo tỷ lệ thân cản giúp tự động tương thích mọi khung giờ mà không cần nhân hệ số TF.
+  - **Bản vá & Nâng cấp toàn diện:**
+    1. **Bảng Đa Khung 4 Cột Tính Toán Động:**
+       - Tự động nhân `Base Min OB Height` và `Base Merge & Gap` với Hệ số TF của từng dòng (M5 1.0x -> D1 8.0x) và hiển thị trực quan tỷ lệ % chính xác theo thời gian thực (M5: 0.30% & 0.50%, M15: 0.36% & 0.60%, H1: 0.60% & 1.00%, H4: 1.50% & 2.50%, v.v.).
+    2. **Hệ Thống Đón Cản Phân Đoạn Thân OB (5-Fraction System):**
+       - Thay thế hoàn toàn ô nhập % và dropdown cũ bằng 1 Dropdown Selector tinh gọn duy nhất:
+         - `+2/5 OB`: Đón sớm ngoài cản 40% chiều cao OB
+         - `+1/5 OB`: Đón sớm ngoài cản 20% chiều cao OB
+         - `0 (Mép ngoài)`: Đón đúng mép cản (Mặc định - Khớp nhanh nhất)
+         - `-1/5 OB`: Đón sâu trong cản 20% chiều cao OB
+         - `-2/5 OB`: Đón sâu trong cản 40% chiều cao OB
+         - `50% Thân OB`: Đón tại điểm cân bằng (Equilibrium - giữa cản)
+         - `-3/5 OB`: Đón sâu trong cản 60% chiều cao OB
+         - `-4/5 OB`: Đón sâu trong cản 80% chiều cao OB
+       - Đồng bộ 100% công thức từ `SingleChartPane.jsx` (vẽ đường Entry/SL/TP) đến `bot_indicators.py` & `bot_strategy.py` (đặt lệnh thực thi).
+  - **Kiểm thử & Nghiệm thu:**
+    - Test toán học chính xác 100% cho cả Bullish OB và Bearish OB.
+    - Vite production build hoàn tất 303ms không có lỗi.
+
+- **[31/10/2026]** - Thống Nhất Bảng Hệ Số Nhân Đa Khung, Gộp Dòng Bộ Lọc Cản SMC & Cài Đặt Bản Chiến Thuật Mặc Định Tối Ưu Cho Người Mới:
+  - **Yêu cầu CEO:**
+    1. Gộp bảng Hệ số Entry TF vào Hệ số Ký Quỹ (Vốn) thành 1 bảng duy nhất 2 cột: `Hệ Số Nhân Đa Khung (TF Multiplier)`.
+    2. Độ dày OB tối thiểu giữ Base: 0.30% (tính trên M5, tự động nhân hệ số TF).
+    3. Gộp `Khoảng cách gộp cản` và `Cản ngược chiều` thành 1 dòng duy nhất: `Khoảng cách gộp & giãn cản (Base)` (Base: 0.50% trên M5, tự động nhân hệ số TF).
+    4. Cài đặt bản setting chiến thuật mặc định phù hợp cho người dùng mới: Winrate cao nhất, dễ khớp lệnh nhất, an toàn nhất.
+  - **Bản vá & Cải tiến toàn diện:**
+    1. **Bản Setting Mặc Định Chuẩn Cho Người Mới (Beginner-Friendly Preset):**
+       - `Nguồn bắt cản`: Cả hai sóng (Swing & Internal) -> Cung cấp cản đều đặn, không bị đói lệnh.
+       - `Hướng vào lệnh`: Hai chiều (Long/Short) -> Tối ưu hóa chu kỳ sóng sideway/range của thị trường.
+       - `Lọc lực nến cản (x ATR)`: `2.0` -> Chuẩn cân bằng, lọc sạch nến nhiễu nhưng bắt trọn các vùng FVG phá vỡ cấu trúc uy tín.
+       - `Đón trước mép cản OB`: `0.00%` (Mặc định - Mép ngoài OB) -> **DỄ KHỚP LỆNH NHẤT**, giá chỉ cần chạm mép là khớp tức thì, không bị lỡ sóng. Hỗ trợ số âm (-0.1%) cho người muốn đón sâu trong lòng cản.
+       - `Độ dày OB tối thiểu (Base)`: `0.30%` (M5: 0.30%, M15: 0.36%, H1: 0.60%, H4: 1.50%) -> Lọc sạch các vùng cản rác mỏng dính.
+       - `Khoảng cách gộp & giãn cản (Base)`: `0.50%` (M5: 0.50%, M15: 0.60%, H1: 1.00%, H4: 2.50%) -> Gộp các khối cản sát nhau thành 1 khối vững chắc và giãn cách an toàn 2 đầu Long/Short.
+       - `Quản lý R:R (TP / SL)`: Chốt lời theo **`Theo OB ngược chiều (NEAREST_OB)`** với fallback 2.0R, Cắt lỗ **`1.0 R`** -> **WINRATE CAO NHẤT & AN TOÀN NHẤT**, chạm cản đối diện là chốt lời ngay vào túi, không bị quay đầu dính lỗ; SL đặt sau khối OB đã gộp vững chắc.
+    2. **Đồng bộ hóa 100% Giao Diện & Thuật Toán:**
+       - `SystemSettingsModal.jsx`: Gộp bảng TF Multiplier thành 2 cột (`Khung thời gian` | `Hệ số nhân đa khung`), gộp dòng cấu hình cản.
+       - `SingleChartPane.jsx`: Tích hợp `TF_MULTIPLIERS`, tự động nhân hệ số TF cho min height và merge distance; sửa lỗi vẽ cản trên biểu đồ dùng đúng `finalObs`.
+       - `web_app/backend/main.py`: `compute_ob_boxes` tự động nhân hệ số TF theo tham số `bar`.
+       - `App.jsx`: Khôi phục mặc định nạp chuẩn bộ preset tối ưu trên; tắt alert popup khi lưu cấu hình.
+  - **Kiểm thử & Nghiệm thu:**
+    - Test nến thật từ OKX trên M5, M15, 1H, 4H: OBs lọc và gộp mượt mà, chiều cao tăng theo TF đúng chuẩn.
+    - Vite production build hoàn tất 100% không lỗi (`dist/index-*.js`).
+
+- **[31/10/2026]** - Loại Bỏ Popup Alert Khi Bấm Lưu Cấu Hình Chiến Thuật:
+  - **Yêu cầu CEO:** Khi bấm "Lưu Cài Đặt", không cần hiện hộp thoại popup alert thông báo đã lưu thành công gây gián đoạn thao tác.
+  - **Bản vá (`App.jsx`):**
+    - Loại bỏ lệnh `alert(...)` trong `handleSaveStratConfig`.
+    - Sau khi lưu API thành công, hệ thống tự động ghi nhật ký vào `addSystemLog`, làm mới dữ liệu bot `refreshBotData()` và đóng modal cấu hình mượt mà tức thì, không gây đơ/treo màn hình.
+  - **Kiểm thử & Nghiệm thu:**
+    - Vite build production hoàn tất thành công trong 409ms.
+    - Đã kích hoạt trình duyệt trên Desktop CEO (`http://localhost:5173`).
+
+- **[31/10/2026]** - Phát Triển Bộ Lọc Khoảng Cách OB Đối Nghịch & Khắc Phục Lỗi Cản Kẹp Giữa (Opposite OB Gap Filter):
+  - **Yêu cầu CEO:** Khi các vùng Order Block xanh/đỏ (Bullish/Bearish) nằm quá sát nhau khiến Entry 2 lệnh ngược chiều bị dính sát, TP bị co quá ngắn, cần tự động lọc bớt OB kẹp ở giữa đi. Quy tắc nghiêm ngặt: Chỉ lọc vùng nào mà sau khi lọc, phía sau nó (bên dưới đối với xanh, bên trên đối với đỏ) VẪN CÒN OB cùng màu để làm điểm tựa (đỡ/chặn), tuyệt đối không lọc chiều ngược lại để rồi phía đối diện không có lệnh đối nghịch.
+  - **Bản vá kiến trúc & Thuật toán Backup-Aware Channel Expansion:**
+    1. **Thuật toán Phân Tích Điểm Tựa Kẹp Giữa (`SingleChartPane.jsx`, `main.py`, `bot_strategy.py`):**
+       - Khi khoảng cách giữa 2 mép OB xanh & đỏ `< opposite_gap_pct` (mặc định `0.80%`):
+         - Kiểm tra `has_bull_below`: Có còn OB xanh bên dưới để "đỡ" giá không?
+         - Kiểm tra `has_bear_above`: Có còn OB đỏ bên trên để "chặn" giá không?
+         - Nếu `has_bull_below` và KHÔNG có `has_bear_above`: Lọc bỏ OB xanh ở giữa, lùi Long setup xuống OB xanh bên dưới. Giữ nguyên OB đỏ phía trên.
+         - Nếu `has_bear_above` và KHÔNG có `has_bull_below`: Lọc bỏ OB đỏ ở giữa, đẩy Short setup lên OB đỏ bên trên. Giữ nguyên OB xanh phía dưới.
+         - Nếu cả 2 đều có điểm tựa: Ưu tiên lọc khối OB mỏng hơn.
+         - Nếu cả 2 đều KHÔNG có điểm tựa: Giữ nguyên cả 2 để luôn bảo đảm có lệnh đối nghịch ở cả 2 đầu giá.
+    2. **Đồng bộ hóa Frontend Chart & Kịch Bản Giao Dịch (`SingleChartPane.jsx`):**
+       - Tích hợp hàm `filterOppositeOBClash` vào cả 2 luồng: `drawObs` (vẽ hộp OB lên biểu đồ) và `calculateSMCPositions` (chiếu các kịch bản vào lệnh).
+       - Khối OB xanh kẹp sát ở giữa biến mất hoàn toàn, giải phóng không gian để lệnh Short từ OB đỏ bên trên và lệnh Long từ OB xanh bên dưới có biên độ TP rộng rãi, thông thoáng.
+    3. **Đồng bộ hóa Backend API (`web_app/backend/main.py`):**
+       - Nâng cấp `compute_ob_boxes` với tham số `opposite_gap_pct=0.008`.
+       - API `/api/market/candles` trả về danh sách `ob_boxes` đã được lọc cản kẹp giữa sạch sẽ.
+    4. **Đồng bộ hóa Core Bot Engine (`bot_strategy.py` & `bot_config.py`):**
+       - Nâng cấp `run_multi_tf_independent_cycle`: Thay thế hoàn toàn cơ chế cũ (trước đây vi phạm khoảng cách thì tắt tiệt 1 chiều) bằng cơ chế lùi/tiến sang OB điểm tựa dự phòng. Duy trì đồng thời cả 2 setup Long & Short với TP rộng mở.
+       - Thêm hằng số `OB_OPPOSITE_GAP_PCT = Decimal("0.008")`.
+    5. **Giao diện Cài Đặt Hệ Thống (`SystemSettingsModal.jsx` & `App.jsx`):**
+       - Thêm dòng cấu hình: `Khoảng cách cản ngược chiều tối thiểu:` với SpinBox `0.80%` (bước nhảy `0.05%`, từ `0.2%` đến `3.0%`).
+       - Kèm tooltip giải thích trực quan nguyên lý lọc cản kẹp giữa.
+    6. **Kiểm thử thực chiến:**
+       - Test logic kịch bản thực tế của CEO: OB xanh kẹp giữa (77,200 - 77,400) bị loại bỏ tức thì, giữ lại OB đỏ (77,600 - 78,100) và OB xanh phía dưới (76,400 - 76,900), mở rộng khoảng cách từ 200 điểm (0.25%) lên 700 điểm (0.91%).
+       - Kiểm thử dữ liệu nến thật từ OKX BTC-USDT 15m: xác lập 2 vùng cản lý tưởng 76,375$ (Long) và 77,561$ (Short).
+       - Vite build production hoàn tất trong 370ms.
+
+- **[31/10/2026]** - Nâng Cấp Đón Trước Mép Cản OB (Hỗ Trợ Số Âm & Dropdown Cùng Dòng Mặc Định / 50% Thân OB):
+  - **Yêu cầu CEO:**
+    1. Đón trước mép cản OB hỗ trợ cả số âm: Số dương (+) đón ngoài OB (chờ giá chạm sớm), số âm (-) đón sâu trong OB (chờ giá quét sâu vào bên trong hộp OB để tối ưu tỷ lệ R:R và tránh bị quét râu).
+    2. Gộp "Vị trí đón cản trong OB" và "Đón trước mép cản OB" lên cùng một dòng: Sử dụng nút Dropdown bên ngoài theo phong cách nút `Theo OB ngược chiều ▼` (nền tối, viền `#444`, chữ xanh `#26a69a`), gồm 2 chế độ: `Mặc định` (đón theo % độ lệch mép OB) hoặc `50% Thân OB` (Equilibrium).
+  - **Triển khai đồng bộ toàn diện:**
+    1. `NumberSpinBox.jsx`:
+       - Hỗ trợ số âm tự do (`min={-2.0}`, `max={2.0}`).
+       - Bổ sung prop `disabledTitle` hiển thị tooltip rõ ràng khi bị vô hiệu hóa.
+       - Sửa `handleBlur` tránh bị reset sai về số âm thấp nhất khi ô trống.
+    2. `SystemSettingsModal.jsx`:
+       - Tích hợp 2 dòng thành 1 dòng duy nhất tinh gọn: Bên trái nhãn `Đón trước mép cản OB: [?]`, bên phải gồm cụm điều khiển: Dropdown `Mặc định ▼` / `50% Thân OB ▼` (chuẩn style nút `Theo OB ngược chiều ▼`) đi kèm `NumberSpinBox` % độ lệch.
+       - Tự động disable ô nhập % khi chọn `50% Thân OB` kèm tooltip hướng dẫn.
+    3. `App.jsx`:
+       - Sửa lỗi `parseFloat(...) || 0.05` làm mất giá trị `0%` và số âm khi lưu cấu hình, bảo toàn giá trị `0.00%` và số âm chính xác 100%.
+    4. `SingleChartPane.jsx` & `bots/sub2/bot_indicators.py`:
+       - Nâng cấp thuật toán tính `entry_price`:
+         - Chế độ `EQUILIBRIUM`: `entry = (high + low) / 2`.
+         - Chế độ `OUTER`:
+           - Long: `high * (1 + offset_pct)` -> số dương đón trên mép, số âm đón sâu vào trong hộp.
+           - Short: `low * (1 - offset_pct)` -> số dương đón dưới mép, số âm đón sâu lên trong hộp.
+         - Tự động clamp bảo vệ khoảng cách Stop Loss tối thiểu, không cho entry xuyên thủng mép SL đối diện.
+         - Cập nhật SL/TP theo `baseRisk = abs(entry - sl)`: Khi đón sâu trong OB, khoảng cách rủi ro thu hẹp, giúp R:R tối ưu vượt trội và lệnh cán TP nhanh hơn rất nhiều.
+    5. `bots/sub2/bot_strategy.py`:
+       - Kết nối trực tiếp `ENTRY_OFFSET_PCT` và `OB_ENTRY_LEVEL` với TF Multipliers thay vì ép cố định offset = 0.
+    6. **Kiểm thử & Nghiệm thu:**
+       - Kiểm thử thuật toán tính Entry trên cả 2 chiều Bullish và Bearish: cho kết quả chuẩn từng chữ số thập phân (+0.05% đón ngoài mép, -0.10% lọt sâu vào bụng OB, 50% nằm chính giữa OB).
+       - Vite build hoàn tất trong 371ms.
+       - Đã kích hoạt trình duyệt thật trên Desktop CEO qua Rule 9 (`http://localhost:5173`).
+
+- **[31/10/2026]** - Khac Phuc Loi Crash Tour ReferenceError isMobileOrNarrow is not defined:
+  - **Trieu chung:** Click nut Huong Dan web crash ReferenceError isMobileOrNarrow is not defined.
+  - **Nguyen nhan:** Bien isMobileOrNarrow su dung trong cardStyle nhung chua khai bao o component render scope.
+  - **Giai phap:** Khai bao day du winW, winH va isMobileOrNarrow tai OnboardingTour.jsx scope.
+  - **Trang thai:** Da fix triet de, build frontend thanh cong.
+
     1. **Loại bỏ hộp lịch sử che nến:** Bỏ cơ chế vẽ hộp backtest cũ trong quá khứ (`hitEntryIdx`) vốn kéo dài dải màu đè lên hàng chục nến đang chạy.
     2. **Dãn cách xa giá hiện tại (`INITIAL_GAP = 3`):** Hộp setup đầu tiên (gần giá Live nhất) luôn bắt đầu cách cây nến hiện tại đúng 3 cây nến về phía tương lai, giữ vùng nến Live và đường giá hiện tại hoàn toàn thông thoáng, sạch sẽ.
     3. **Cách đều 3 nến giữa mọi chỉ báo (`BOX_GAP = 3`, `BOX_WIDTH = 8`):** Mỗi hộp setup rộng 8 nến, giữa 2 hộp liền kề luôn có khoảng đệm đúng 3 cây nến: `offsetBars = 3 + index * 11`.

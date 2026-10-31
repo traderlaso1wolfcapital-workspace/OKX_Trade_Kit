@@ -71,13 +71,13 @@ def tf_weight(tf: str) -> int:
 
 # --- CẤU TRÚC ĐA KHUNG TẬP TRUNG (UNIFIED TF PROFILES) ---
 TF_CONFIG = {
-    "M5":  {"offset": Decimal("1.0"),    "vol": Decimal("1.0")},
-    "M15": {"offset": Decimal("1.5333"), "vol": Decimal("1.2")},
-    "M30": {"offset": Decimal("2.3333"), "vol": Decimal("1.5")},
-    "H1":  {"offset": Decimal("3.333"),  "vol": Decimal("2.0")},
-    "H2":  {"offset": Decimal("4.667"),  "vol": Decimal("3.0")},
-    "H4":  {"offset": Decimal("6.772"),  "vol": Decimal("5.0")},
-    "D1":  {"offset": Decimal("10.0"),   "vol": Decimal("8.0")},
+    "M5":  {"offset": Decimal("1.0"), "vol": Decimal("1.0")},
+    "M15": {"offset": Decimal("1.2"), "vol": Decimal("1.2")},
+    "M30": {"offset": Decimal("1.5"), "vol": Decimal("1.5")},
+    "H1":  {"offset": Decimal("2.0"), "vol": Decimal("2.0")},
+    "H2":  {"offset": Decimal("3.0"), "vol": Decimal("3.0")},
+    "H4":  {"offset": Decimal("5.0"), "vol": Decimal("5.0")},
+    "D1":  {"offset": Decimal("8.0"), "vol": Decimal("8.0")},
 }
 
 HEDGE_TF_CONFIG = {

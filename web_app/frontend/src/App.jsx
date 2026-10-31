@@ -1118,7 +1118,7 @@ function App() {
       const savedVol = Number(localStorage.getItem(`tls1_risk_posVol_${active}_${selAcc}`) || localStorage.getItem(`tls1_risk_posVol_${active}`));
       const initVol = (savedVol && savedVol > 0) ? savedVol : 0.4;
       if (active === "sub2") {
-        return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false, smcTpMode: "RR" };
+        return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 2.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false, smcTpMode: "NEAREST_OB" };
       }
       return { posVol: initVol, volUsdt: initVol, volPct: 0.1, tpPct: 0.80, slPct: 0.80, volUnit: "USDT", multiplyVolumeByTf: false };
     } catch {
@@ -1151,9 +1151,12 @@ function App() {
     internalLength: 5,
     forceMarket: true,
     maxSlippage: 0.8,
-    entryOffset: "0.05",
+    entryOffset: "0.00",
+    entryFraction: "0",
     entryLevel: "OUTER",
+    minObHeight: "0.30",
     mergeThreshold: "0.50",
+    oppositeGap: "0.50",
     autoMitigation: true,
     mergeOverlapping: true,
   });
@@ -3215,9 +3218,16 @@ function App() {
         strategyConfig.INTERNAL_LENGTH = parseInt(smcEntryCfg.internalLength) || 5;
         strategyConfig.FORCE_MARKET_ENTRY_ON_CROSS = Boolean(smcEntryCfg.forceMarket);
         strategyConfig.MAX_MARKET_SLIPPAGE_PCT = (parseFloat(smcEntryCfg.maxSlippage) || 0.8) / 100;
-        strategyConfig.ENTRY_OFFSET_PCT = parseFloat(smcEntryCfg.entryOffset || entryCfg.entryOffset) || 0.05;
+        const rawOffsetVal = (smcEntryCfg.entryOffset !== undefined && smcEntryCfg.entryOffset !== "")
+          ? smcEntryCfg.entryOffset
+          : entryCfg.entryOffset;
+        const parsedOffsetVal = parseFloat(rawOffsetVal);
+        strategyConfig.ENTRY_OFFSET_PCT = !isNaN(parsedOffsetVal) ? parsedOffsetVal : 0.0;
         strategyConfig.OB_ENTRY_LEVEL = smcEntryCfg.entryLevel || "OUTER";
+        strategyConfig.OB_ENTRY_FRACTION = parseFloat(smcEntryCfg.entryFraction !== undefined ? smcEntryCfg.entryFraction : 0);
+        strategyConfig.OB_MIN_HEIGHT_PCT = (parseFloat(smcEntryCfg.minObHeight) || 0.30) / 100;
         strategyConfig.OB_MERGE_THRESHOLD_PCT = (parseFloat(smcEntryCfg.mergeThreshold) || 0.50) / 100;
+        strategyConfig.OB_OPPOSITE_GAP_PCT = (parseFloat(smcEntryCfg.mergeThreshold) || 0.50) / 100;
         strategyConfig.OB_AUTO_MITIGATION = Boolean(smcEntryCfg.autoMitigation ?? true);
         strategyConfig.OB_MERGE_OVERLAPPING = Boolean(smcEntryCfg.mergeOverlapping ?? true);
         strategyConfig.OB_TP_MODE = risk.smcTpMode || "RR";
@@ -3249,7 +3259,7 @@ function App() {
       }
 
       const curBotName = activeBotTab === "sub1" ? "EMA200 Bot" : activeBotTab === "sub2" ? "SMC Bot" : "Liquidation Bot";
-      alert(`Đã lưu Cấu Hình Chiến Thuật cho [${curBotName}] thành công!${cancelMsg}`);
+      // silent save - no alert popup
       const dcaMode = strat.pyramidDca ? "DCA Dương" : strat.negativeDca ? "DCA Âm" : "Lưới Đa Khung (Hedge)";
       addSystemLog(`⚙️ [SYSTEM] Đã cập nhật cấu hình ${curBotName}: Chế độ = ${dcaMode}${cancelMsg}`);
       refreshBotData();
@@ -3344,7 +3354,7 @@ function App() {
         addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định EMA200 Bot: Ký quỹ 0.4$, TP 0.8%, SL 0.8%, Lưới Đa Khung (Hedge), XAU/BTC/ETH${cancelMsg}`);
         refreshBotData();
       } else if (activeBotTab === "sub2") {
-        setRisk({ posVol: 0.4, tpPct: 5.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false });
+        setRisk({ posVol: 0.4, tpPct: 2.0, slPct: 1.0, volUnit: "USDT", multiplyVolumeByTf: false, smcTpMode: "NEAREST_OB" });
         setStrat({
           main: true, multiTfGrid: true, xole: false, dynamicEma200Tp: false,
           dynamicPingpongTp: false, altcoinFollowBtc: false,
@@ -3359,9 +3369,12 @@ function App() {
           internalLength: 5,
           forceMarket: true,
           maxSlippage: 0.8,
-          entryOffset: "0.05",
+          entryOffset: "0.00",
+          entryFraction: "0",
           entryLevel: "OUTER",
+          minObHeight: "0.30",
           mergeThreshold: "0.50",
+          oppositeGap: "0.50",
           autoMitigation: true,
           mergeOverlapping: true,
         });
@@ -3370,9 +3383,9 @@ function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             position_volume: 0.4,
-            scalping_tp_pct: 0.05,
+            scalping_tp_pct: 0.02,
             scalping_sl_pct: 0.01,
-            ob_rr_ratio_trend: 5.0,
+            ob_rr_ratio_trend: 2.0,
             ob_rr_ratio_counter: 1.0,
             strategy_config: {
               ENABLE_STRATEGY_MAIN: true,
@@ -3385,11 +3398,15 @@ function App() {
               INTERNAL_LENGTH: 5,
               FORCE_MARKET_ENTRY_ON_CROSS: true,
               MAX_MARKET_SLIPPAGE_PCT: 0.008,
-              ENTRY_OFFSET_PCT: 0.05,
+              ENTRY_OFFSET_PCT: 0.0,
+              OB_ENTRY_FRACTION: 0.0,
               OB_ENTRY_LEVEL: "OUTER",
+              OB_MIN_HEIGHT_PCT: 0.003,
               OB_MERGE_THRESHOLD_PCT: 0.005,
+              OB_OPPOSITE_GAP_PCT: 0.005,
               OB_AUTO_MITIGATION: true,
               OB_MERGE_OVERLAPPING: true,
+              OB_TP_MODE: "NEAREST_OB",
               ENABLE_TF_VOLUME_MULTIPLIER: false,
             }
           })
@@ -3399,8 +3416,8 @@ function App() {
           const d = await res.json().catch(() => ({}));
           if (d?.canceled_count > 0) cancelMsg = ` (Đã hủy ${d.canceled_count} lệnh Limit cũ trên OKX)`;
         }
-        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho SMC Bot thành công! (Thuận trend: 5.0R, Ngược trend: 1.0R)${cancelMsg}`);
-        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định SMC Bot: Thuận 5.0R | Ngược 1.0R${cancelMsg}`);
+        alert(`✅ Đã khôi phục Cấu Hình Mặc Định cho SMC Bot thành công! (Dễ khớp nhất - Chốt lời theo OB ngược chiều 2.0R, SL 1.0R)${cancelMsg}`);
+        addSystemLog(`🔄 [HỆ THỐNG] Đã khôi phục Cấu Hình Mặc Định SMC Bot: Dễ khớp - Chốt lời theo OB ngược chiều 2.0R | SL 1.0R${cancelMsg}`);
         refreshBotData();
       } else {
         setRisk({ posVol: 1, tpPct: 1.0, slPct: 1.0, volUnit: "USDT" });
@@ -3947,6 +3964,7 @@ function App() {
                           <SingleChartPane
                             key={`split_chart_${idx}_${cfg.coin}_${cfg.tf}`}
                             activeBotTab={activeBotTab}
+                            smcEntryCfg={smcEntryCfg}
                             adminClosedPositions={adminClosedPositions}
                             chartIndex={idx}
                             coin={cfg.coin}
@@ -4111,6 +4129,7 @@ function App() {
                             <SingleChartPane
                               key={`chart_${idx}_${cfg.coin}_${cfg.tf}`}
                               activeBotTab={activeBotTab}
+                              smcEntryCfg={smcEntryCfg}
                               adminClosedPositions={adminClosedPositions}
                               chartIndex={idx}
                               coin={cfg.coin}
