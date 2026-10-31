@@ -3,9 +3,9 @@ const TF_MULTIPLIERS = {
   "15m": 1.2,
   "30m": 1.5,
   "1H": 2.0, "1h": 2.0,
-  "2H": 3.0, "2h": 3.0,
-  "4H": 5.0, "4h": 5.0,
-  "1D": 8.0, "1d": 8.0,
+  "2H": 2.8, "2h": 2.8,
+  "4H": 4.2, "4h": 4.2,
+  "1D": 6.7, "1d": 6.7,
 };
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createChart, CandlestickSeries, LineSeries, HistogramSeries, CrosshairMode } from "lightweight-charts";

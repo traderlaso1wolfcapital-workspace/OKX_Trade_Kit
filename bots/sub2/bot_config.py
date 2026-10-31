@@ -19,9 +19,9 @@ TF_MULTIPLIERS: Dict[str, Tuple[Decimal, Decimal]] = {
     "M15": (Decimal("1.2"), Decimal("1.2")),
     "M30": (Decimal("1.5"), Decimal("1.5")),
     "H1":  (Decimal("2.0"), Decimal("2.0")),
-    "H2":  (Decimal("3.0"), Decimal("3.0")),
-    "H4":  (Decimal("5.0"), Decimal("5.0")),
-    "D1":  (Decimal("8.0"), Decimal("8.0")),
+    "H2":  (Decimal("2.8"), Decimal("2.8")),
+    "H4":  (Decimal("4.2"), Decimal("4.2")),
+    "D1":  (Decimal("6.7"), Decimal("6.7")),
 }
 
 # Chế độ Dual Nearest OB (Luôn duy trì 2 kịch bản Long & Short ở 2 đầu cản OB gần nhất)

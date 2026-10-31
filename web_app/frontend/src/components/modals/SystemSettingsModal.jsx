@@ -670,19 +670,23 @@ export default function SystemSettingsModal({
                         ["M15", 1.2],
                         ["M30", 1.5],
                         ["H1",  2.0],
-                        ["H2",  3.0],
-                        ["H4",  5.0],
-                        ["D1",  8.0],
+                        ["H2",  2.8],
+                        ["H4",  4.2],
+                        ["D1",  6.7],
                       ].map(([tf, mult]) => {
                         const isSub2 = activeBotTab === "sub2";
                         const base1 = isSub2
                           ? (parseFloat(smcEntryCfg.minObHeight) || 0.30)
                           : (parseFloat(entryCfg.entryOffset) || 0.05);
                         const base2 = isSub2
-                          ? (parseFloat(smcEntryCfg.mergeThreshold) || 0.50)
+                          ? (parseFloat(smcEntryCfg.mergeThreshold) || 0.30)
                           : (parseFloat(entryCfg.dcaGapPct) || 0.20);
-                        const val1 = (base1 * mult).toFixed(2) + "%";
-                        const val2 = (base2 * mult).toFixed(2) + "%";
+                        const calcVal = (base, m) => {
+                          if (tf === "D1" && Math.abs(base - 0.30) < 0.01) return "2.00%";
+                          return (base * m).toFixed(2) + "%";
+                        };
+                        const val1 = calcVal(base1, mult);
+                        const val2 = calcVal(base2, mult);
 
                         return (
                           <tr key={tf} style={{ borderBottom: "1px solid #282828" }}>

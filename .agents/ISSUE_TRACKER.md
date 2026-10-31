@@ -33,6 +33,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[31/10/2026]** - Khôi Phục Hiển Thị Order Block Nguyên Bản Chuẩn SMC & Cân Đối Mượt Đường Cong Đa Khung (M5: 0.30% -> D1: 2.00%):
+  - **Yêu cầu CEO:**
+    1. Cân đối lại chỉ số Độ dày OB tối thiểu và Khoảng cách gộp & giãn cản: Điểm đầu M5 là 0.30%, điểm cuối D1 là 2.00%.
+    2. Khôi phục lại khối OB nguyên bản của mã nguồn gốc SMC: Trên biểu đồ phải hiển thị đầy đủ, sắc nét từng khối OB gốc, tuyệt đối không được gộp các khối cản trên biểu đồ thành 1 hộp khổng lồ (như lỗi hộp D1 từ 58k đến 77k).
+    3. Điểm khác biệt thể hiện ra chart và lệnh entry limit trong mã nguồn chính là chỉ báo Long/Short trên hình để nhận biết (chỉ báo/entry bot tự động tính toán điểm đón trước và gộp bảo vệ SL).
+  - **Bản vá & Cải tiến toàn diện:**
+    1. **Khôi Phục Hiển Thị OB Gốc SMC Sắc Nét (`SingleChartPane.jsx` & `main.py`):**
+       - Trong `drawObs`: Vẽ trực tiếp các khối Order Block gốc (`validObs`), loại bỏ hoàn toàn cơ chế `mergedStage` xâu chuỗi gây phình to OB. Mỗi khối OB giữ nguyên vị trí nến, mốc thời gian và độ cao chuẩn của SMC.
+       - Trong `main.py`: `compute_ob_boxes` trả về danh sách OB gốc sắc nét của SMC, loại bỏ tình trạng kết hợp gộp nến xuyên suốt 2 tháng thành khối 19,000$.
+    2. **Tách Biệt Logic Giữa Vẽ Cản & Đặt Lệnh (`calculateSMCPositions`):**
+       - Khối cản trên biểu đồ giữ nguyên bản sắc SMC.
+       - Hộp vị thế lệnh Long/Short là nơi bot áp dụng phân đoạn thân OB (fraction: `0`, `+-1/5`, `+-2/5`, `+-3/5`, `+-4/5`), tính toán mở rộng Stop Loss an toàn nếu có cản cùng chiều kế cận trong phạm vi `mergeDistPct`, và chốt lời theo mép cản đối diện (`NEAREST_OB`).
+    3. **Đường Cong Hệ Số Đa Khung Chuẩn (M5 0.30% -> D1 2.00%):**
+       - M5: `1.0x` -> `0.30%`
+       - M15: `1.2x` -> `0.36%`
+       - M30: `1.5x` -> `0.45%`
+       - H1: `2.0x` -> `0.60%`
+       - H2: `2.8x` -> `0.84%`
+       - H4: `4.2x` -> `1.26%`
+       - D1: `6.7x` -> `2.00%` chuẩn tuyệt đối.
+  - **Kiểm thử Sandbox & Nghiệm thu:**
+    - Chạy Sandbox với nến thật OKX trên cả 5 khung giờ (M5, 15m, 1H, 4H, 1D): Toàn bộ OB hiển thị riêng lẻ, gọn gàng và chuẩn xác.
+    - Vite production build hoàn tất 288ms không có lỗi.
+
 - **[31/10/2026]** - Hoàn Thiện Bảng Đa Khung 4 Cột Trực Quan & Nâng Cấp Đón Cản Phân Đoạn Thân OB (Chia 5 Phần):
   - **Yêu cầu CEO:**
     1. Hiển thị đầy đủ 4 cột trong Bảng Hệ Số Nhân Đa Khung: `Khung thời gian`, `Hệ số nhân`, `Độ dày OB tối thiểu (Base)`, `Khoảng cách gộp & giãn cản (Base)` để pro traders dễ dàng tính toán chi tiết.
@@ -5808,6 +5832,30 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[31/10/2026]** - Khôi Phục Hiển Thị Order Block Nguyên Bản Chuẩn SMC & Cân Đối Mượt Đường Cong Đa Khung (M5: 0.30% -> D1: 2.00%):
+  - **Yêu cầu CEO:**
+    1. Cân đối lại chỉ số Độ dày OB tối thiểu và Khoảng cách gộp & giãn cản: Điểm đầu M5 là 0.30%, điểm cuối D1 là 2.00%.
+    2. Khôi phục lại khối OB nguyên bản của mã nguồn gốc SMC: Trên biểu đồ phải hiển thị đầy đủ, sắc nét từng khối OB gốc, tuyệt đối không được gộp các khối cản trên biểu đồ thành 1 hộp khổng lồ (như lỗi hộp D1 từ 58k đến 77k).
+    3. Điểm khác biệt thể hiện ra chart và lệnh entry limit trong mã nguồn chính là chỉ báo Long/Short trên hình để nhận biết (chỉ báo/entry bot tự động tính toán điểm đón trước và gộp bảo vệ SL).
+  - **Bản vá & Cải tiến toàn diện:**
+    1. **Khôi Phục Hiển Thị OB Gốc SMC Sắc Nét (`SingleChartPane.jsx` & `main.py`):**
+       - Trong `drawObs`: Vẽ trực tiếp các khối Order Block gốc (`validObs`), loại bỏ hoàn toàn cơ chế `mergedStage` xâu chuỗi gây phình to OB. Mỗi khối OB giữ nguyên vị trí nến, mốc thời gian và độ cao chuẩn của SMC.
+       - Trong `main.py`: `compute_ob_boxes` trả về danh sách OB gốc sắc nét của SMC, loại bỏ tình trạng kết hợp gộp nến xuyên suốt 2 tháng thành khối 19,000$.
+    2. **Tách Biệt Logic Giữa Vẽ Cản & Đặt Lệnh (`calculateSMCPositions`):**
+       - Khối cản trên biểu đồ giữ nguyên bản sắc SMC.
+       - Hộp vị thế lệnh Long/Short là nơi bot áp dụng phân đoạn thân OB (fraction: `0`, `+-1/5`, `+-2/5`, `+-3/5`, `+-4/5`), tính toán mở rộng Stop Loss an toàn nếu có cản cùng chiều kế cận trong phạm vi `mergeDistPct`, và chốt lời theo mép cản đối diện (`NEAREST_OB`).
+    3. **Đường Cong Hệ Số Đa Khung Chuẩn (M5 0.30% -> D1 2.00%):**
+       - M5: `1.0x` -> `0.30%`
+       - M15: `1.2x` -> `0.36%`
+       - M30: `1.5x` -> `0.45%`
+       - H1: `2.0x` -> `0.60%`
+       - H2: `2.8x` -> `0.84%`
+       - H4: `4.2x` -> `1.26%`
+       - D1: `6.7x` -> `2.00%` chuẩn tuyệt đối.
+  - **Kiểm thử Sandbox & Nghiệm thu:**
+    - Chạy Sandbox với nến thật OKX trên cả 5 khung giờ (M5, 15m, 1H, 4H, 1D): Toàn bộ OB hiển thị riêng lẻ, gọn gàng và chuẩn xác.
+    - Vite production build hoàn tất 288ms không có lỗi.
 
 - **[31/10/2026]** - Hoàn Thiện Bảng Đa Khung 4 Cột Trực Quan & Nâng Cấp Đón Cản Phân Đoạn Thân OB (Chia 5 Phần):
   - **Yêu cầu CEO:**
