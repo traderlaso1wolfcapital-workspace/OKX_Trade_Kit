@@ -12,7 +12,6 @@ function getObFractionLabel(val) {
   if (Math.abs(num - 0.4) < 0.05) return "+2/5 OB (Đón trước 40%)";
   if (Math.abs(num - (-0.2)) < 0.05) return "-1/5 OB (Đón trong 20%)";
   if (Math.abs(num - (-0.4)) < 0.05) return "-2/5 OB (Đón trong 40%)";
-  if (Math.abs(num - (-0.5)) < 0.05) return "50% Thân OB (Cân bằng)";
   if (Math.abs(num - (-0.6)) < 0.05) return "-3/5 OB (Đón trong 60%)";
   if (Math.abs(num - (-0.8)) < 0.05) return "-4/5 OB (Đón trong 80%)";
   return (num > 0 ? "+" : "") + (num * 5).toFixed(1) + "/5 OB";
@@ -424,7 +423,6 @@ export default function SystemSettingsModal({
 - 0 (Mép ngoài): Đón đúng mép cản OB, chạm là khớp tức thì (Mặc định - Dễ khớp nhất).
 - +1/5 OB, +2/5 OB: Đón sớm bên ngoài cản (20%, 40% chiều cao OB) để bắt sóng sớm.
 - -1/5 OB, -2/5 OB: Đón sâu trong lòng cản (20%, 40% chiều cao OB) để có tỷ lệ R:R đẹp hơn.
-- 50% Thân OB: Đón ngay điểm cân bằng (Equilibrium - giữa cản).
 - -3/5 OB, -4/5 OB: Đón cực sâu sát mép cắt lỗ (60%, 80% chiều cao OB).
 
 * Ưu điểm: Tự động co giãn theo biên độ thực tế của từng khối OB và mọi khung thời gian (M5, 15m, 1H, 4H), không cần nhân hệ số % thủ công.`)}
@@ -479,7 +477,6 @@ export default function SystemSettingsModal({
                               <option value="0" style={{ background: "#222", color: "#fff" }}>0 (Mép cản ngoài - Khớp nhanh nhất)</option>
                               <option value="-0.2" style={{ background: "#222", color: "#ffb74d" }}>-1/5 OB (Đón sâu trong cản 20%)</option>
                               <option value="-0.4" style={{ background: "#222", color: "#ffb74d" }}>-2/5 OB (Đón sâu trong cản 40%)</option>
-                              <option value="-0.5" style={{ background: "#222", color: "#42a5f5" }}>50% Thân OB (Cân bằng Equilibrium)</option>
                               <option value="-0.6" style={{ background: "#222", color: "#ef5350" }}>-3/5 OB (Đón sâu trong cản 60%)</option>
                               <option value="-0.8" style={{ background: "#222", color: "#ef5350" }}>-4/5 OB (Đón sâu trong cản 80%)</option>
                             </select>
