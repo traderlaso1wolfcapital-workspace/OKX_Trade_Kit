@@ -874,8 +874,7 @@ export default function SingleChartPane({
       const boxWidth = Math.max(0, maxRightX - startX);
       if (boxWidth <= 0) return;
 
-      const bg = isBull ? 'rgba(21, 101, 192, 0.22)' : 'rgba(198, 40, 40, 0.22)';
-      const border = isBull ? '1px solid rgba(33, 150, 243, 0.35)' : '1px solid rgba(244, 67, 54, 0.35)';
+      const bg = isBull ? 'rgba(21, 101, 192, 0.2)' : 'rgba(198, 40, 40, 0.2)';
       const box = document.createElement('div');
       box.style.position = 'absolute';
       box.style.top = topY + 'px';
@@ -883,8 +882,8 @@ export default function SingleChartPane({
       box.style.width = boxWidth + 'px';
       box.style.height = h + 'px';
       box.style.backgroundColor = bg;
-      box.style.borderTop = border;
-      box.style.borderBottom = border;
+      box.style.border = 'none';
+      box.style.outline = 'none';
       box.style.pointerEvents = 'none';
       o.appendChild(box);
     });

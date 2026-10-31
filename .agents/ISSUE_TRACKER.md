@@ -33,6 +33,13 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[31/10/2026]** - Loại Bỏ Viền Khối Order Block Trên Biểu Đồ (Clean Borderless OB Rectangles):
+  - **Chỉ đạo CEO:** Chú ý các box OB không được có viền ngoài, rất rối mắt (loại bỏ hoàn toàn viền top/bottom, trả lại nền màu trong suốt mượt mà như ảnh gốc).
+  - **Bản vá (`SingleChartPane.jsx`):**
+    - Loại bỏ thuộc tính `borderTop` và `borderBottom` trong hàm `drawObs`.
+    - Thiết lập `box.style.border = 'none'` và `box.style.outline = 'none'`.
+    - Khối Order Block hiển thị dạng mảng màu phẳng bán trong suốt `rgba(21, 101, 192, 0.2)` (Bullish) và `rgba(198, 40, 40, 0.2)` (Bearish), êm dịu cho mắt và không bị rối đường kẻ.
+
 - **[31/10/2026]** - Phân Định Rõ Ràng: Độ Dày OB Tối Thiểu & Khoảng Cách Gộp/Giãn Cản CHỈ Dùng Để Lọc Điều Kiện Tín Hiệu Long/Short & Đặt Limit Bot:
   - **Chỉ đạo CEO:**
     - "Độ dày OB tối thiểu (Base): và Khoảng cách gộp & giãn cản (Base): chỉ là công thức để chọn lọc OB đạt yêu cầu, đạt điều kiện để xuất hiện tín hiệu long/short, xuất hiện hộp chỉ báo long/short và có thể đặt entry limit long/short".
@@ -5854,6 +5861,13 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
+
+- **[31/10/2026]** - Loại Bỏ Viền Khối Order Block Trên Biểu Đồ (Clean Borderless OB Rectangles):
+  - **Chỉ đạo CEO:** Chú ý các box OB không được có viền ngoài, rất rối mắt (loại bỏ hoàn toàn viền top/bottom, trả lại nền màu trong suốt mượt mà như ảnh gốc).
+  - **Bản vá (`SingleChartPane.jsx`):**
+    - Loại bỏ thuộc tính `borderTop` và `borderBottom` trong hàm `drawObs`.
+    - Thiết lập `box.style.border = 'none'` và `box.style.outline = 'none'`.
+    - Khối Order Block hiển thị dạng mảng màu phẳng bán trong suốt `rgba(21, 101, 192, 0.2)` (Bullish) và `rgba(198, 40, 40, 0.2)` (Bearish), êm dịu cho mắt và không bị rối đường kẻ.
 
 - **[31/10/2026]** - Phân Định Rõ Ràng: Độ Dày OB Tối Thiểu & Khoảng Cách Gộp/Giãn Cản CHỈ Dùng Để Lọc Điều Kiện Tín Hiệu Long/Short & Đặt Limit Bot:
   - **Chỉ đạo CEO:**
