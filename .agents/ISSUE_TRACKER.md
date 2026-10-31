@@ -33,6 +33,14 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[30/10/2026]** - Chuẩn Hóa Giao Diện Modal Điều Kiện Volume 14 Ngày & Chưa Ref Theo Form Chuẩn SystemSettingsModal + Khóa Trade Quỹ & FX:
+  - **Yêu cầu nghiệp vụ từ CEO:** Giao diện thông báo phải chuẩn 100% style của form Cài Đặt Hỗ Trợ (dark slate `#1e1e1e`, border `#333333`, khung trong `#383838`, màu chữ, nút VIP xanh gradient, nút chuyển Ref xanh dương viền xanh, 4 icon Admin chính hãng Telegram/Messenger/Zalo/Discord, footer mã máy HWID). Bỏ nút Giao dịch OKX ở modal chưa ref, giữ lại ở modal thiếu volume. Đồng thời khóa cổng Trade Quỹ / FX (TradeLocker / MT5) khi khách chưa ref FX và điều hướng liên hệ Admin.
+  - **Bản vá kiến trúc (`AccountPromptModals.jsx`, `ConnectModal.jsx`, `App.jsx`, `demo_preview_volume_modal.html`):**
+    1. **Đồng bộ hóa 100% Layout Chuẩn:** Cập nhật `VolumeRequirementModal` trong `AccountPromptModals.jsx` và `demo_preview_volume_modal.html` sử dụng đúng bảng màu, kích thước font, viền thẻ và 4 icon mạng xã hội từ `SystemSettingsModal`.
+    2. **Tối giản hóa luồng Chưa Ref:** Bỏ hẳn nút "Giao Dịch OKX" ở hộp thoại Chưa Ref (chỉ giữ nút `[ Đóng ]`), tích hợp sẵn form hướng dẫn chuyển Ref và liên hệ Admin.
+    3. **Khóa cổng Trade Quỹ & Forex:** Tại `ConnectModal.jsx` (tab TradeLocker & MT5) và `App.jsx` (`handleStartPropBot`), chặn truy cập đối với non-admin và hiển thị giao diện hướng dẫn liên hệ Admin nhận link đăng ký Quỹ độc quyền. Giữ bypass cho Admin (`admtls12021` & `523019992975987626`).
+    4. **Nghiệm thu bản build:** Frontend build thành công 100%, đồng bộ ra `dist` và `public`, tự động mở trực quan trên desktop CEO.
+
 - **[30/10/2026]** - Đồng Bộ Hóa Đa Thiết Bị (Máy A & Máy B) Khi Đăng Nhập API Key / Fast API (No-Kill Policy & OKX Order Fingerprint):
   - **Yêu cầu nghiệp vụ từ CEO:** Khi khởi động bot ở Máy A, sang Máy B đăng nhập bằng API Key hoặc Fast API (OAuth) thì Máy B phải nhận diện được tài khoản đang chạy bot ở Máy A, tự động chuyển đúng tab bot, khóa vàng 🔒 và hiển thị nút đỏ `[ ⏹ DỪNG BOT ]`.
   - **Bản vá kiến trúc (`main.py` & `App.jsx`):**
@@ -6454,3 +6462,26 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
   - Test 4 (Admin & CEO Master UID `523019992975987626`): PASS -> Bypass cấp quyền đầy đủ 🟢.
   - Test 5 (REST API `/api/affiliate/check`): PASS -> Phản hồi dữ liệu JSON chuẩn xác 🟢.
 - **Trạng thái:** ✅ Đã hoàn tất 100% và nghiệm thu sandbox.
+
+
+### [TASK-2026-10-31-01] Khắc Phục Triệt Để Lỗi Kẹt Nút Dừng Bot (Không Chuyển Sang Chạy Bot) & Bóc Tách Lỗi API 50119
+- **Yêu cầu CEO:** Sau khi bấm nút dừng bot, màn hình báo đã dừng thành công: 🛑 [BOT] Đã dừng bot thành công (Đã hủy 0 lệnh Limit chưa khớp, bảo lưu 100% TP/SL) kèm log lỗi [14:29:43] ❌ [LỖI API]: Không thể khởi tạo kết nối OKX: OKX Error 50119: API key doesn't exist, nhưng chữ '■ DỪNG BOT' màu đỏ vẫn kẹt, không chuyển sang '▶ CHẠY BOT'.
+- **Nguyên nhân gốc rễ:**
+  1. **Lỗi API 50119:** API Key của tài khoản phụ #1705 (sub_6722) trên sàn OKX bị xoá, hết hạn quyền IP hoặc sai Passphrase. Khi bot chạy, OKX từ chối xác thực nên tiến trình bot tự động crash/thoát để bảo vệ tài khoản.
+  2. **Kẹt nút do cơ chế đồng bộ lệnh từ xa (_detect_remote_bot_strategy):** Hàm này kiểm tra danh sách open orders trên OKX và dính tag TPSL mà không lọc lệnh 
+educeOnly. Khi bot dừng, các lệnh chốt lời/cắt lỗ của vị thế mở vẫn được bảo lưu 100% trên sàn mang tiền tố TPSL. Backend quét thấy lệnh này nên hiểu nhầm bot đang chạy từ xa (_okx_remote_active_accounts[target_acc] = 'sub1').
+  3. **Hàm stop_bot không dọn _okx_remote_active_accounts:** Khi dừng bot, backend không xóa các alias của tài khoản khỏi _okx_remote_active_accounts, khiến get_bot_status luôn ép is_running = True và trả về status = RUNNING.
+  4. **Frontend App.jsx:** Khi dừng bot thành công, handleStopBot chỉ xóa đúng 1 định danh thô của tài khoản mà bỏ sót các alias (sub_6722, #1705), đồng thời otStatus được set thành SHADOW khiến overrideBotRunning bị huỷ quá sớm, dẫn đến polling kéo trạng thái RUNNING từ backend đè ngược lại.
+- **Triển khai khắc phục:**
+  - web_app/backend/main.py:
+    - Loại bỏ triệt để tag TPSL và bỏ qua toàn bộ lệnh 
+educeOnly trong _detect_remote_bot_strategy. Chỉ nhận diện bot khi tồn tại lệnh Limit mở vị thế mới (Entry).
+    - Cập nhật stop_bot: Dọn sạch 100% mọi alias và key liên quan đến tài khoản khỏi _okx_remote_active_accounts.
+    - Cập nhật get_bot_status & background loop: Kiểm tra cờ dừng stop_{alias}.flag. Nếu tài khoản có cờ dừng hoặc pid <= 0, tuyệt đối không cho phép _okx_remote_active_accounts ghi đè trạng thái thành RUNNING.
+  - web_app/frontend/src/App.jsx:
+    - handleStopBot: Set otStatus = 'STOPPED' và dọn sạch mọi biến thể alias của tài khoản khỏi httpActiveAccounts và wsActiveAccountsState.
+    - Giữ cờ overrideBotRunning = false ít nhất 3 giây để chống giật trạng thái từ WebSocket/Polling cũ.
+    - isTargetOkxRunning: Bổ sung điều kiện ngắn mạch: nếu otStatus === 'STOPPED', trả về ngay alse.
+  - Đã chạy 
+pm run build xuất xưởng bundle production sạch 100%.
+- **Trạng thái:** 🟢 Đã hoàn tất 100%.

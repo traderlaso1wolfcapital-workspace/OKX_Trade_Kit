@@ -13,7 +13,7 @@ import OnboardingTour from "./components/common/OnboardingTour";
 import LanguageSelector from "./components/common/LanguageSelector";
 import { useTranslation } from "./i18n";
 import { getTourSteps } from "./i18n/tourData";
-import { AddAccountModal, DeleteAccountModal, ConfirmStopBotModal, ApiPermissionErrorModal } from "./components/modals/AccountPromptModals";
+import { AddAccountModal, DeleteAccountModal, ConfirmStopBotModal, ApiPermissionErrorModal, VolumeRequirementModal } from "./components/modals/AccountPromptModals";
 import useBotWebSocket from "./hooks/useBotWebSocket";
 import { getRunningStrategyForAccount, getBotDisplayName } from "./utils/accountUtils";
 import "./App.css";
@@ -44,6 +44,8 @@ function App() {
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
   const [loginPassphrase, setLoginPassphrase] = useState("");
   const [lockMessage, setLockMessage] = useState("");
+  const [showVolumeModal, setShowVolumeModal] = useState(false);
+  const [volumeModalData, setVolumeModalData] = useState({ current: 0, required: 20000, missing: 20000, isUnderRef: true, channel: "AutoTrader" });
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [connectModalTab, setConnectModalTab] = useState("fast");
   const [fastConnectStatus, setFastConnectStatus] = useState(null);
@@ -528,6 +530,7 @@ function App() {
   const isPropRunning = overridePropBotRunning !== null ? overridePropBotRunning : (propBotStatus === "RUNNING");
   const isTargetOkxRunning = useMemo(() => {
     if (overrideBotRunning !== null) return overrideBotRunning;
+    if (botStatus === "STOPPED") return false;
     const runningStrat = getRunningStrategyForAccount(mergedActiveAccounts, effectiveAccId, accounts);
     if (runningStrat) {
       return runningStrat === activeBotTab;
@@ -578,7 +581,10 @@ function App() {
     if (overrideBotRunning === true && botStatus === "RUNNING") {
       setOverrideBotRunning(null);
     } else if (overrideBotRunning === false && (botStatus === "SHADOW" || botStatus === "STOPPED")) {
-      setOverrideBotRunning(null);
+      const t = setTimeout(() => {
+        setOverrideBotRunning(null);
+      }, 3000);
+      return () => clearTimeout(t);
     }
   }, [botStatus, overrideBotRunning]);
 
@@ -2362,6 +2368,12 @@ function App() {
 
   const handleStartPropBot = async () => {
     if (isStartingPropBot || isStoppingPropBot) return;
+    const botUid = currentUid || localStorage.getItem("tls1_uid") || "";
+    const isPropAdmin = botUid && (botUid.toLowerCase() === "admtls12021" || botUid === "523019992975987626");
+    if (!isPropAdmin) {
+      alert("⚠️ Tính năng Trade Quỹ & Forex hiện yêu cầu đăng ký qua link đối tác độc quyền. Vui lòng liên hệ Admin để nhận link mở khóa!");
+      return;
+    }
     try {
       setIsStartingPropBot(true);
       const botUid = currentUid || localStorage.getItem("tls1_uid") || "default";
@@ -2562,12 +2574,24 @@ function App() {
           alert(errMsg);
           setConnectModalTab("fast");
           setShowConnectModal(true);
+        } else if (errMsg.includes("Volume") || errMsg.includes("volume") || r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký")) {
+          // Mở Modal Thiết Kế Sang Trọng hiển thị tiến độ Volume và điều kiện Ref
+          try {
+            const affRes = await fetch(`/api/affiliate/check?uid=${encodeURIComponent(botUid)}`);
+            if (affRes.ok) {
+              const affData = await affRes.json();
+              setVolumeModalData({
+                current: affData.volume_14d || 0,
+                required: affData.required_volume || 20000,
+                missing: affData.missing_volume || 20000,
+                isUnderRef: affData.is_invitee !== false,
+                channel: affData.channel_name || "AutoTrader"
+              });
+            }
+          } catch {}
+          setShowVolumeModal(true);
         } else if (errMsg.includes("liên hệ Admin") || errMsg.includes("kích hoạt") || errMsg.includes("bị khóa")) {
           alert("Vui lòng liên hệ Admin để kích hoạt.");
-        } else if (r.status === 403 || errMsg.includes("chưa đăng ký dưới Link Ref") || errMsg.includes("chưa đăng ký dưới link") || errMsg.includes("chưa đăng ký")) {
-          alert("UID tài khoản này của quý khách chưa đăng ký dưới Link Ref của AutoTrader.fun!");
-          setShowSettings(true);
-          setSettingsTab("system");
         } else {
           alert(`❌ Lỗi khởi động bot: ${errMsg || r.statusText}`);
         }
@@ -2596,23 +2620,34 @@ function App() {
       if (r.ok) {
         const resData = await r.json().catch(() => ({}));
         setOverrideBotRunning(false);
-        if (setBotStatus) setBotStatus("SHADOW");
-        setHttpActiveAccounts(prev => {
+        if (setBotStatus) setBotStatus("STOPPED");
+        const matched = (accounts || []).find(a => a.id === targetAcc || a.name === targetAcc);
+        const aliasesToDelete = new Set([
+          targetAcc,
+          String(targetAcc).replace(/^#/, ""),
+          matched?.id,
+          matched?.name,
+          matched?.id ? String(matched.id).replace(/^#/, "") : "",
+          matched?.name ? String(matched.name).replace(/^#/, "") : "",
+        ].filter(Boolean));
+
+        const cleanMap = (prev) => {
           const next = { ...prev };
-          delete next[`${targetStrat}_${targetAcc}`];
-          delete next[targetAcc];
-          if (next[targetStrat] === targetAcc) delete next[targetStrat];
+          aliasesToDelete.forEach(al => {
+            delete next[`${targetStrat}_${al}`];
+            delete next[al];
+            ["sub1", "sub2", "sub3"].forEach(st => {
+              delete next[`${st}_${al}`];
+              if (next[st] === al) delete next[st];
+            });
+          });
+          if (aliasesToDelete.has(next[targetStrat])) delete next[targetStrat];
           try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
           return next;
-        });
-        setWsActiveAccountsState(prev => {
-          const next = { ...prev };
-          delete next[`${targetStrat}_${targetAcc}`];
-          delete next[targetAcc];
-          if (next[targetStrat] === targetAcc) delete next[targetStrat];
-          try { localStorage.setItem("tls1_active_accounts", JSON.stringify(next)); } catch {}
-          return next;
-        });
+        };
+
+        setHttpActiveAccounts(cleanMap);
+        setWsActiveAccountsState(cleanMap);
         const cancelCount = resData.canceled_count !== undefined ? ` (Đã hủy ${resData.canceled_count} lệnh Limit chưa khớp, bảo lưu 100% TP/SL)` : "";
         addSystemLog(`🛑 [BOT] Đã dừng bot thành công${cancelCount}.`);
         refreshBotData();
@@ -3546,8 +3581,31 @@ function App() {
   return (
     <div className="app-container">
       {lockMessage && (
-        <div style={{ background: "#c0392b", color: "#fff", padding: "10px 16px", fontSize: "14px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0 }}>
-          {lockMessage}
+        <div 
+          onClick={async () => {
+            const curUid = loginUid || currentUid || localStorage.getItem("tls1_uid") || "";
+            if (curUid) {
+              try {
+                const affRes = await fetch(`/api/affiliate/check?uid=${encodeURIComponent(curUid)}`);
+                if (affRes.ok) {
+                  const affData = await affRes.json();
+                  setVolumeModalData({
+                    current: affData.volume_14d || 0,
+                    required: affData.required_volume || 20000,
+                    missing: affData.missing_volume || 20000,
+                    isUnderRef: affData.is_invitee !== false,
+                    channel: affData.channel_name || "AutoTrader"
+                  });
+                }
+              } catch {}
+            }
+            setShowVolumeModal(true);
+          }}
+          style={{ background: "#b91c1c", color: "#fff", padding: "9px 16px", fontSize: "13px", fontWeight: "bold", textAlign: "center", zIndex: 9999, position: "fixed", top: 0, left: 0, right: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.5)" }}
+          title="Bấm để xem chi tiết tiến độ Volume"
+        >
+          <span>{lockMessage}</span>
+          <span style={{ textDecoration: "underline", fontSize: "12px", background: "rgba(0,0,0,0.25)", padding: "2px 8px", borderRadius: "4px" }}>Xem Chi Tiết ➔</span>
         </div>
       )}
 
@@ -4209,6 +4267,18 @@ function App() {
           }
           setShowStopBotModal(false);
         }}
+      />
+
+      <VolumeRequirementModal
+        isOpen={showVolumeModal}
+        onClose={() => setShowVolumeModal(false)}
+        uid={loginUid || currentUid || localStorage.getItem("tls1_uid") || ""}
+        currentVolume={volumeModalData.current}
+        requiredVolume={volumeModalData.required}
+        missingVolume={volumeModalData.missing}
+        isUnderRef={volumeModalData.isUnderRef}
+        channelName={volumeModalData.channel}
+        hwid={hwid}
       />
 
       <ApiPermissionErrorModal

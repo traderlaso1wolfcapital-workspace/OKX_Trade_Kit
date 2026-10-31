@@ -254,6 +254,12 @@ export default function ConnectModal({
   const [mt5Success, setMt5Success] = useState("");
 
   const handleOpenMt5Modal = (brokerKey, existingAccount = null) => {
+    const curUid = isAuthenticated ? (currentUid || localStorage.getItem("tls1_uid") || "") : "";
+    const isPropAdmin = curUid && (curUid.toLowerCase() === "admtls12021" || curUid === "523019992975987626");
+    if (!isPropAdmin) {
+      alert("⚠️ Tính năng Trade Quỹ & Forex hiện yêu cầu đăng ký qua link đối tác độc quyền. Vui lòng liên hệ Admin để nhận link mở khóa!");
+      return;
+    }
     setMt5BrokerModal(brokerKey);
     setMt5Error("");
     setMt5Success("");
@@ -466,6 +472,7 @@ export default function ConnectModal({
   const botTitle = getBotTitle();
   const effectiveUid = isAuthenticated ? (currentUid || localStorage.getItem("tls1_uid") || "") : "";
   const isConnected = !!(isAuthenticated && effectiveUid);
+  const isPropAdmin = effectiveUid && (effectiveUid.toLowerCase() === "admtls12021" || effectiveUid === "523019992975987626");
   const isPropTab = connectTab === "tradelocker";
   const activePropAcc = propAccounts.find(a => a.id === activePropId) || (propAccounts.length > 0 ? propAccounts[0] : null);
   const isPropConnected = Boolean(activePropAcc || propAccounts.length > 0);
@@ -1774,13 +1781,108 @@ export default function ConnectModal({
           {/* TAB 3: TRADELOCKER / E8 MARKETS PROP FIRM */}
           {connectTab === "tradelocker" && (
             <div data-tour="connect-tradelocker-content" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-              <TradeLockerTab
-                currentUid={effectiveUid}
-                t={t}
-                initialSelectedId={selectedPropId}
-                activeBotTab={activeBotTab}
-                onAccountsUpdated={fetchPropAccounts}
-              />
+              {isPropAdmin ? (
+                <TradeLockerTab
+                  currentUid={effectiveUid}
+                  t={t}
+                  initialSelectedId={selectedPropId}
+                  activeBotTab={activeBotTab}
+                  onAccountsUpdated={fetchPropAccounts}
+                />
+              ) : (
+                <div style={{ padding: "12px 4px" }}>
+                  <div
+                    style={{
+                      border: "1px solid #383838",
+                      borderRadius: "8px",
+                      background: "#1e1e1e",
+                      padding: "16px 18px",
+                      marginBottom: "16px",
+                      textAlign: "left",
+                      fontSize: "12.5px",
+                      color: "#aaaaaa",
+                      lineHeight: "1.6"
+                    }}
+                  >
+                    <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 8px 0", fontSize: "14px" }}>
+                      ĐIỀU KIỆN SỬ DỤNG TRADE QUỸ & FOREX:
+                    </p>
+                    <p style={{ margin: "0 0 6px 0", color: "#ddd" }}>
+                      1. Tính năng giao dịch Quỹ (TradeLocker / E8 Markets / MT5) hiện đang áp dụng chính sách đối tác riêng biệt.
+                    </p>
+                    <p style={{ margin: "0 0 16px 0", color: "#ddd" }}>
+                      2. Vui lòng liên hệ Admin để nhận Link đăng ký Ref đối tác Quỹ & kích hoạt tài khoản của bạn.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        border: "1px solid #10b981",
+                        color: "#ffffff",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "13.5px",
+                        fontWeight: "bold",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)"
+                      }}
+                    >
+                      Nhận Link Đăng Ký Quỹ & Mở Khóa
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      border: "1px solid #444444",
+                      borderRadius: "6px",
+                      background: "#262626",
+                      marginBottom: "16px"
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", fontWeight: "bold", color: "#eeeeee" }}>Liên hệ Admin hỗ trợ:</span>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                      <img
+                        src="/media/Telegram.png"
+                        alt="Telegram"
+                        title="Telegram Admin"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
+                      />
+                      <img
+                        src="/media/Messenger.png"
+                        alt="Messenger"
+                        title="Facebook Messenger"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")}
+                      />
+                      <img
+                        src="/media/zalo.png"
+                        alt="Zalo"
+                        title="Zalo Admin"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")}
+                      />
+                      <img
+                        src="/media/Discord.png"
+                        alt="Discord"
+                        title="Discord Community"
+                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
+                        onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

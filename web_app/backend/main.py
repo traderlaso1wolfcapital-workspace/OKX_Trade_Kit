@@ -279,13 +279,16 @@ active_connections = {}
 _okx_remote_active_accounts = {}
 
 def _detect_remote_bot_strategy(raw_pending_orders: list) -> str:
-    """Nhận diện chiến thuật bot đang chạy từ xa qua tiền tố clOrdId của lệnh chờ trên sàn OKX."""
+    """Nhận diện chiến thuật bot đang chạy từ xa qua tiền tố clOrdId của lệnh chờ trên sàn OKX.
+    TUYỆT ĐỐI KHÔNG nhận diện lệnh TP/SL (reduceOnly hoặc tag TPSL) vì đây là lệnh bảo lưu sau khi bot dừng."""
     if not raw_pending_orders:
         return ""
     for o in raw_pending_orders:
+        if str(o.get("reduceOnly", "")).lower() in ("true", "1"):
+            continue
         cl_id = str(o.get("clOrdId", "")).upper()
         if not cl_id: continue
-        if any(tag in cl_id for tag in ["SCVLMT", "SCV25", "EM15", "TLS1_EM", "TPSL"]):
+        if any(tag in cl_id for tag in ["SCVLMT", "SCV25", "EM15", "TLS1_EM"]):
             return "sub1"
         if any(tag in cl_id for tag in ["TLS1_OB", "OB_", "ELM", "ESM", "ELH", "ESH", "ELD", "ESD"]):
             return "sub2"
@@ -1794,10 +1797,21 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
     active_accounts = {}
     
     # 🌐 Đồng bộ các tài khoản đang chạy bot từ xa (phát hiện qua sàn OKX)
+    has_stop_flag = False
+    flag_dir = _get_flag_dir(uid, strategy)
+    aliases = _resolve_all_account_aliases(uid, strategy, target_acc) if target_acc else [strategy]
+    for al in aliases:
+        if os.path.exists(os.path.join(flag_dir, f"stop_{al}.flag")):
+            has_stop_flag = True
+            break
+
     if _okx_remote_active_accounts:
-        for r_k, r_v in _okx_remote_active_accounts.items():
-            active_accounts[r_k] = r_v
-        if target_acc and _okx_remote_active_accounts.get(target_acc) == strategy:
+        for r_k, r_v in list(_okx_remote_active_accounts.items()):
+            if any(al in r_k or (isinstance(r_v, str) and al == r_v) for al in aliases) and has_stop_flag:
+                _okx_remote_active_accounts.pop(r_k, None)
+            else:
+                active_accounts[r_k] = r_v
+        if not has_stop_flag and target_acc and _okx_remote_active_accounts.get(target_acc) == strategy:
             is_running = True
     
     # 1. Quét theo danh sách tài khoản đã kết nối của user
@@ -1855,6 +1869,8 @@ def get_bot_status(uid: str, strategy: str = "sub1", account_id: str = None):
         # Phân biệt RUNNING (live) vs SHADOW (dry-run)
         is_remote = bool(_okx_remote_active_accounts and (_okx_remote_active_accounts.get(target_acc) == strategy or _okx_remote_active_accounts.get(f"{strategy}_{target_acc}")))
         shadow = False if is_remote else _is_shadow_mode(uid, strategy, target_acc)
+        if has_stop_flag and pid <= 0 and not is_remote:
+            return {"status": "STOPPED", "uptime": 0, "strategy": strategy, "dry_run": True, "active_accounts": active_accounts}
         return {
             "status": "SHADOW" if shadow else "RUNNING",
             "uptime": uptime,
@@ -2463,6 +2479,15 @@ async def stop_bot(uid: str, strategy: str = "sub1", account_id: str = None):
             bot_log_queues[uid][bot_key].clear()
         if strategy in bot_log_queues[uid]:
             bot_log_queues[uid][strategy].clear()
+
+    # 7. Dọn sạch triệt để mọi alias của tài khoản này khỏi runtime remote map
+    for nm in acc_flag_names:
+        _okx_remote_active_accounts.pop(nm, None)
+        _okx_remote_active_accounts.pop(f"{strategy}_{nm}", None)
+    _okx_remote_active_accounts.pop(target_acc, None)
+    _okx_remote_active_accounts.pop(f"{strategy}_{target_acc}", None)
+    if _okx_remote_active_accounts.get(strategy) in acc_flag_names or _okx_remote_active_accounts.get(strategy) == target_acc:
+        _okx_remote_active_accounts.pop(strategy, None)
 
     msg = f"Bot {strategy} cho tài khoản {target_acc} đã dừng hoàn toàn! Đã giải phóng RAM và hủy {canceled_orders} lệnh Limit chờ. Vị thế và TP/SL vẫn chạy an toàn 100% trên sàn OKX."
     return {"message": msg, "status": "STOPPED", "canceled_count": canceled_orders}
@@ -3675,7 +3700,14 @@ def get_bot_positions(uid: str, strategy: str = "sub1", account_id: str = None):
             get_running_pid(uid, strategy, target_acc) > 0
         )
         # 🌐 KIỂM TRA ĐỒNG BỘ ĐA THIẾT BỊ: Nhận diện bot đang chạy từ Máy A qua dấu vân tay clOrdId
-        if not is_bot_running_on_acc and raw_pending_orders:
+        has_local_stop = False
+        target_flag_dir = _get_flag_dir(uid, strategy)
+        for al in _resolve_all_account_aliases(uid, strategy, target_acc):
+            if os.path.exists(os.path.join(target_flag_dir, f"stop_{al}.flag")):
+                has_local_stop = True
+                break
+
+        if not is_bot_running_on_acc and not has_local_stop and raw_pending_orders:
             remote_strat = _detect_remote_bot_strategy(raw_pending_orders)
             if remote_strat:
                 is_bot_running_on_acc = True
