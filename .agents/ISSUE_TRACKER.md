@@ -33,6 +33,17 @@ File này đóng vai trò là bảng theo dõi toàn bộ các lỗi (bugs) ho�
 
 ## ✅ CÁC LỖI ĐÃ GIẢI QUYẾT (RESOLVED BUGS)
 
+- **[31/10/2026]** - Sửa Lỗi Đồng Bộ Chéo Đa Thiết Bị: Tỷ Lệ Chốt Lời (TP/SL) Không Nhảy Trên Thiết Bị Còn Lại:
+  - **Hiện tượng:** Khi mở 2 thiết bị (2 cửa sổ Web cùng tài khoản), sửa "Tỷ lệ chốt lời" từ 5R sang 4R bên Web 2, thì bên Web 1 không tự động cập nhật về 4R mà vẫn giữ nguyên 5R (dù Ký quỹ 0.2$ đã đồng bộ).
+  - **Nguyên nhân cốt lõi:**
+    1. *Frontend (`App.jsx`):* Hook `useEffect([liveConfig])` trước đó chỉ đồng bộ `vol` (ký quỹ) và danh sách coins/TFs, hoàn toàn bỏ quên cập nhật `risk.tpPct`, `risk.slPct`, `risk.smcTpMode` và `risk.volUnit` từ `liveConfig` WebSocket.
+    2. *Backend (`main.py`):* Endpoint `@app.post("/api/bot/config")` được định nghĩa là hàm đồng bộ thông thường `def update_bot_config(...)` thay vì `async def`. Khi chạy trên worker thread, `asyncio.get_event_loop()` thất bại và không kích hoạt được `broadcast_bot_data_now` qua WebSocket tức thì.
+  - **Giải pháp xử lý:**
+    1. *Backend (`main.py`):* Chuyển `update_bot_config` sang `async def`, gọi trực tiếp `await broadcast_bot_data_now(uid, strategy, target_acc)` và `await asyncio.to_thread(_cancel_unfilled_limit_orders, ...)` để bắn cấu hình mới nhất qua WebSocket tới mọi kết nối trong 0.1s.
+    2. *Frontend (`App.jsx`):* Viết mới hook `10.1 Real-time Cross-Device Config Sync via WebSocket`: Phân tích đầy đủ `OB_RR_RATIO_TREND`, `OB_RR_RATIO_COUNTER`, `SCALPING_TP_PCT`, `SCALPING_SL_PCT`, `OB_TP_MODE`, `VOL_UNIT`, đồng thời cập nhật `prevRiskRef.current` để triệt tiêu loop auto-save. Bổ sung log `⚡ [SYNC ĐA THIẾT BỊ]` trên terminal để người dùng dễ theo dõi trực quan.
+    3. *Frontend Build:* Đã build thành công bundle production `dist/assets/index-CfocEx-N.js`.
+  - **Trạng thái:** ✅ Đã khắc phục triệt để.
+
 - **[30/10/2026]** - Chuẩn Hóa Giao Diện Modal Điều Kiện Volume 14 Ngày & Chưa Ref Theo Form Chuẩn SystemSettingsModal + Khóa Trade Quỹ & FX:
   - **Yêu cầu nghiệp vụ từ CEO:** Giao diện thông báo phải chuẩn 100% style của form Cài Đặt Hỗ Trợ (dark slate `#1e1e1e`, border `#333333`, khung trong `#383838`, màu chữ, nút VIP xanh gradient, nút chuyển Ref xanh dương viền xanh, 4 icon Admin chính hãng Telegram/Messenger/Zalo/Discord, footer mã máy HWID). Bỏ nút Giao dịch OKX ở modal chưa ref, giữ lại ở modal thiếu volume. Đồng thời khóa cổng Trade Quỹ / FX (TradeLocker / MT5) khi khách chưa ref FX và điều hướng liên hệ Admin.
   - **Bản vá kiến trúc (`AccountPromptModals.jsx`, `ConnectModal.jsx`, `App.jsx`, `demo_preview_volume_modal.html`):**
@@ -6482,6 +6493,34 @@ educeOnly trong _detect_remote_bot_strategy. Chỉ nhận diện bot khi tồn t
     - handleStopBot: Set otStatus = 'STOPPED' và dọn sạch mọi biến thể alias của tài khoản khỏi httpActiveAccounts và wsActiveAccountsState.
     - Giữ cờ overrideBotRunning = false ít nhất 3 giây để chống giật trạng thái từ WebSocket/Polling cũ.
     - isTargetOkxRunning: Bổ sung điều kiện ngắn mạch: nếu otStatus === 'STOPPED', trả về ngay alse.
+  - Đã chạy 
+pm run build xuất xưởng bundle production sạch 100%.
+- **Trạng thái:** 🟢 Đã hoàn tất 100%.
+
+
+### [TASK-2026-10-31-02] Đổi Mới Cơ Chế Đăng Nhập Đa Thiết Bị: Mã QR Động 120s Từng Tài Khoản Phụ & Đồng Bộ Chéo WebSocket Realtime 0.1s
+- **Yêu cầu CEO:** 
+  1. Đổi Tab 3 trong ConnectModal ('Quỹ FX Connect') thành tab '🔑 Đăng Nhập' để thiết bị mới đăng nhập bằng UID/Mã ghép đôi mà không phải kết nối lại OKX (tránh bị OKX xoá đè API cũ gây lỗi 50119).
+  2. Bổ sung nút [QR] vuông nhỏ cạnh nút [Đăng Xuất] tại dòng 'Đã Connect #...'. Mỗi lần click nút [QR] sẽ sinh 1 mã QR và mã 6 số mới hoàn toàn, có thời hạn hiệu lực đúng 120 giây.
+  3. Mã QR và mã ghép đôi sinh ra chỉ đại diện cho riêng tài khoản phụ đó (sub-account), thiết bị 2 quét/nhập chỉ nhận duy nhất tài khoản phụ này.
+  4. Triển khai cơ chế WebSocket đồng bộ chéo theo thời gian thực (0.1s): Máy 2 đổi Ký quỹ thành 2 USDT, đổi coin, đổi TF, bấm Chạy/Dừng bot thì Máy 1 và các thiết bị khác tự động nhảy số tức thì mà không cần F5.
+- **Triển khai kỹ thuật:**
+  - web_app/backend/main.py:
+    - Thêm cơ chế quản lý phiên _sync_sessions với thời gian sống nghiêm ngặt 120s (expires_at = now + 120.0), mỗi lần click sinh mã mới tinh 100%.
+    - Thêm API POST /api/auth/sync/create sinh token và mã pairing 6 số (secrets.randbelow).
+    - Thêm API POST /api/auth/sync/verify xác thực mã 6 số / token QR, kiểm tra hạn 120s, cấp phiên làm việc và danh sách tài khoản tương ứng.
+    - Nâng cấp get_state_payload đưa config vào payload WebSocket ot_data.
+    - Thêm hàm roadcast_bot_data_now(uid, strategy, acc) và kích hoạt phát sóng tức thì mỗi khi gọi update_bot_config.
+  - web_app/frontend/src/hooks/useBotWebSocket.js:
+    - Bổ sung state liveConfig, bắt và cập nhật cấu hình tức thì từ kênh WebSocket ws/bot_data.
+  - web_app/frontend/src/components/modals/SyncQrModal.jsx (Tạo mới):
+    - Modal hiển thị mã QR to rõ bằng thư viện qrcode, mã 6 số nổi bật [ XXX - XXX ] kèm nút sao chép nhanh, đồng hồ đếm ngược 120s trực quan, tự động mờ đi khi hết hạn kèm nút 'Lấy mã mới'.
+  - web_app/frontend/src/components/modals/ConnectModal.jsx:
+    - Thêm nút [QR] màu xanh cyan vuông vức cạnh nút [Đăng Xuất] trên từng tài khoản đã kết nối.
+    - Đổi Tab 3 thành 🔑 Đăng Nhập: Giao diện nhập mã ghép đôi 6 số to đẹp (font 22px monospace letter-spacing 6px), nút '🚀 XÁC NHẬN ĐĂNG NHẬP', hướng dẫn chi tiết.
+  - web_app/frontend/src/App.jsx:
+    - Lắng nghe liveConfig từ WebSocket: Tự động nhảy ô Ký Quỹ (posVol), cập nhật TF và cặp coin đồng bộ giữa các máy trong 0.1s.
+    - Xử lý quét QR bằng camera điện thoại mở thẳng utotrader.fun/?sync_code=...: Tự động xác thực và đăng nhập tài khoản phụ ngay lập tức.
   - Đã chạy 
 pm run build xuất xưởng bundle production sạch 100%.
 - **Trạng thái:** 🟢 Đã hoàn tất 100%.

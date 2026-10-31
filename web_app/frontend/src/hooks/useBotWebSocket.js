@@ -22,6 +22,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
   const [positions, setPositions] = useState([]);
   const [availBal, setAvailBal] = useState(null);
   const [closedPositions, setClosedPositions] = useState([]);
+  const [liveConfig, setLiveConfig] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
   const wsRef = useRef(null);
@@ -57,15 +58,15 @@ export function useBotWebSocket(uid, strategy, accountId) {
               setActiveAccounts(data.status.active_accounts);
             }
           }
+          if (data.config && typeof data.config === "object") {
+            setLiveConfig(data.config);
+          }
           if (!accountIdRef.current) {
             setPositions([]);
             setClosedPositions([]);
-            // preserve availBal
             return;
           }
           // Chống rò rỉ dữ liệu chéo tài khoản:
-          // Nếu payload từ WebSocket không trùng khớp 100% với account_id đang chọn,
-          // TUYỆT ĐỐI không ghi đè dữ liệu của account cũ vào account mới!
           if (String(data.account_id || "").trim() !== String(accountIdRef.current || "").trim()) {
             return;
           }
@@ -120,7 +121,6 @@ export function useBotWebSocket(uid, strategy, accountId) {
 
   // Handle switching account
   useEffect(() => {
-    // Ngay khi đổi account: reset positions và closedPositions để tránh lưu vết lệnh của tài khoản trước
     setPositions([]);
     setClosedPositions([]);
     if (!accountId) {
@@ -151,6 +151,7 @@ export function useBotWebSocket(uid, strategy, accountId) {
     availBal,
     closedPositions,
     setClosedPositions,
+    liveConfig,
     isConnected,
     refresh,
   };

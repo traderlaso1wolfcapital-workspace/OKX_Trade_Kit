@@ -170,6 +170,34 @@ function App() {
     return accounts[0]?.id || "";
   }, [selectedAccount, activeBotTab, accounts]);
 
+  // 4.9 Real-time Device Sync via URL query params (?sync_code=...)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const syncCode = urlParams.get("sync_code") || urlParams.get("sync_token");
+      if (syncCode) {
+        fetch("/api/auth/sync/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: syncCode }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d && d.status === "success") {
+              if (d.uid) localStorage.setItem("tls1_uid", d.uid);
+              if (d.token) localStorage.setItem("tls1_jwt_token", d.token);
+              if (d.account_id) localStorage.setItem("tls1_selected_account", d.account_id);
+              if (Array.isArray(d.accounts)) localStorage.setItem("tls1_accounts", JSON.stringify(d.accounts));
+              localStorage.setItem("tls1_auth", "true");
+              window.history.replaceState({}, document.title, window.location.pathname);
+              window.location.reload();
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {}
+  }, []);
+
   // 5. Real-time Bot Data via WebSocket (replaces HTTP polling for status, positions, balance)
   const currentUid = localStorage.getItem("tls1_uid") || loginUid || "";
   const {
@@ -181,8 +209,10 @@ function App() {
     availBal,
     closedPositions,
     setClosedPositions,
+    liveConfig,
     refresh: refreshBotData,
   } = useBotWebSocket(currentUid, activeBotTab, effectiveAccId);
+
 
   const [currentPlatform, setCurrentPlatform] = useState(() => localStorage.getItem("tls1_trading_platform") || "okx");
   const [propPositions, setPropPositions] = useState([]);
@@ -1329,6 +1359,116 @@ function App() {
     }, 400);
     return () => clearTimeout(timer);
   }, [risk, activeBotTab, currentUid, effectiveAccId, accounts]);
+
+  // 10.1 Real-time Cross-Device Config Sync via WebSocket (0.1s - Đồng bộ tức thì giữa các thiết bị)
+  useEffect(() => {
+    if (!liveConfig || typeof liveConfig !== "object") return;
+    const isSub2 = activeBotTab === "sub2";
+
+    // 1. Ký quỹ
+    const vol = (liveConfig.POSITION_VOLUME_HIGH_CONFIDENCE !== undefined && liveConfig.POSITION_VOLUME_HIGH_CONFIDENCE !== null)
+      ? Number(liveConfig.POSITION_VOLUME_HIGH_CONFIDENCE)
+      : (liveConfig.POSITION_VOLUME_USDT ? Number(liveConfig.POSITION_VOLUME_USDT) : null);
+
+    // 2. Chốt lời (tpPct) & Cắt lỗ (slPct)
+    let targetTp = null;
+    let targetSl = null;
+
+    if (isSub2) {
+      if (liveConfig.OB_RR_RATIO_TREND !== undefined && liveConfig.OB_RR_RATIO_TREND !== null) {
+        targetTp = Number(liveConfig.OB_RR_RATIO_TREND);
+      } else if (liveConfig.SCALPING_TP_PCT !== undefined && liveConfig.SCALPING_TP_PCT !== null) {
+        const tpVal = Number((Number(liveConfig.SCALPING_TP_PCT) * 100).toFixed(2));
+        targetTp = (tpVal === 0.60 || tpVal === 1.5) ? 5.0 : tpVal;
+      }
+
+      if (liveConfig.OB_RR_RATIO_COUNTER !== undefined && liveConfig.OB_RR_RATIO_COUNTER !== null) {
+        targetSl = Number(liveConfig.OB_RR_RATIO_COUNTER);
+      } else if (liveConfig.SCALPING_SL_PCT !== undefined && liveConfig.SCALPING_SL_PCT !== null) {
+        const slVal = Number((Number(liveConfig.SCALPING_SL_PCT) * 100).toFixed(2));
+        targetSl = (slVal === 0.60 || slVal === 1.5) ? 1.0 : slVal;
+      }
+    } else {
+      if (liveConfig.SCALPING_TP_PCT !== undefined && liveConfig.SCALPING_TP_PCT !== null) {
+        targetTp = Number((Number(liveConfig.SCALPING_TP_PCT) * 100).toFixed(2));
+      }
+      if (liveConfig.SCALPING_SL_PCT !== undefined && liveConfig.SCALPING_SL_PCT !== null) {
+        targetSl = Number((Number(liveConfig.SCALPING_SL_PCT) * 100).toFixed(2));
+      }
+    }
+
+    setRisk((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      if (vol !== null && vol > 0 && prev.posVol !== vol) {
+        next.posVol = vol;
+        next.volUsdt = vol;
+        changed = true;
+      }
+      if (targetTp !== null && !isNaN(targetTp) && prev.tpPct !== targetTp) {
+        next.tpPct = targetTp;
+        changed = true;
+      }
+      if (targetSl !== null && !isNaN(targetSl) && prev.slPct !== targetSl) {
+        next.slPct = targetSl;
+        changed = true;
+      }
+      if (liveConfig.OB_TP_MODE && prev.smcTpMode !== liveConfig.OB_TP_MODE) {
+        next.smcTpMode = liveConfig.OB_TP_MODE;
+        changed = true;
+      }
+      if (liveConfig.VOL_UNIT && prev.volUnit !== liveConfig.VOL_UNIT) {
+        next.volUnit = liveConfig.VOL_UNIT;
+        changed = true;
+      }
+      if (liveConfig.ENABLE_TF_VOLUME_MULTIPLIER !== undefined && prev.multiplyVolumeByTf !== Boolean(liveConfig.ENABLE_TF_VOLUME_MULTIPLIER)) {
+        next.multiplyVolumeByTf = Boolean(liveConfig.ENABLE_TF_VOLUME_MULTIPLIER);
+        changed = true;
+      }
+
+      if (changed) {
+        hasLoadedConfigFromBackendRef.current = true;
+        prevRiskRef.current = next;
+        try {
+          if (effectiveAccId) {
+            localStorage.setItem(`tls1_risk_${activeBotTab}_${effectiveAccId}`, JSON.stringify(next));
+            localStorage.setItem(`tls1_risk_posVol_${activeBotTab}_${effectiveAccId}`, String(next.posVol));
+          }
+        } catch {}
+        const accName = accounts?.find(a => a.id === effectiveAccId)?.name || effectiveAccId;
+        addSystemLog(`⚡ [SYNC ĐA THIẾT BỊ] Đồng bộ cấu hình [${accName}]: Ký quỹ=${next.posVol} ${next.volUnit || "USDT"} | Chốt lời=${next.tpPct}${isSub2 ? "R" : "%"} | Cắt lỗ=${next.slPct}${isSub2 ? "R" : "%"}`);
+        return next;
+      }
+      return prev;
+    });
+
+    // 3. Khung thời gian trade (ENABLED_TFS)
+    if (liveConfig.ENABLED_TFS && typeof liveConfig.ENABLED_TFS === "object") {
+      setEnabledTfs(liveConfig.ENABLED_TFS);
+    }
+
+    // 4. Danh sách Coin trade (ENABLED_COINS)
+    if (Array.isArray(liveConfig.ENABLED_COINS) && liveConfig.ENABLED_COINS.length > 0) {
+      const coinPairs = liveConfig.ENABLED_COINS.map((c) => `${c}-USDT-SWAP`);
+      setActivePairs(coinPairs);
+      setWatchlistCoins((prev) => Array.from(new Set([...(prev || []), ...coinPairs])));
+    }
+
+    // 5. Cấu hình chiến lược nâng cao (Strategy Switches)
+    if (liveConfig.ENABLE_STRATEGY_MAIN !== undefined || liveConfig.ENABLE_PYRAMID_DCA !== undefined || liveConfig.ENABLE_MULTITF_GRID !== undefined) {
+      setStrat((s) => ({
+        ...s,
+        main: activeBotTab === "sub1" ? true : (liveConfig.ENABLE_STRATEGY_MAIN !== undefined ? Boolean(liveConfig.ENABLE_STRATEGY_MAIN) : s.main),
+        pyramidDca: liveConfig.ENABLE_PYRAMID_DCA !== undefined ? Boolean(liveConfig.ENABLE_PYRAMID_DCA) : s.pyramidDca,
+        negativeDca: liveConfig.ENABLE_NEGATIVE_DCA !== undefined ? Boolean(liveConfig.ENABLE_NEGATIVE_DCA) : s.negativeDca,
+        multiTfGrid: liveConfig.ENABLE_MULTITF_GRID !== undefined ? Boolean(liveConfig.ENABLE_MULTITF_GRID) : s.multiTfGrid,
+        hedge: liveConfig.ENABLE_STRATEGY_HEDGE !== undefined ? Boolean(liveConfig.ENABLE_STRATEGY_HEDGE) : s.hedge,
+        dynamicEma200Tp: liveConfig.ENABLE_DYNAMIC_EMA200_TP !== undefined ? Boolean(liveConfig.ENABLE_DYNAMIC_EMA200_TP) : s.dynamicEma200Tp,
+      }));
+    }
+  }, [liveConfig, activeBotTab, effectiveAccId, accounts]);
+
 
   // Bootstrap accounts & credentials unconditionally on mount
   useEffect(() => {
@@ -3617,6 +3757,21 @@ function App() {
         handleFastConnectClick={handleFastConnectClick}
         okxOAuthUrl={okxOAuthUrl}
         onSaveApiKey={handleSaveApiKey}
+        onSyncSuccess={(syncData) => {
+          if (syncData.uid) {
+            setOkxUid(syncData.uid);
+            localStorage.setItem("tls1_uid", syncData.uid);
+          }
+          if (syncData.account_id) {
+            setSelectedAccount(syncData.account_id);
+            localStorage.setItem("tls1_selected_account", syncData.account_id);
+          }
+          if (Array.isArray(syncData.accounts)) {
+            setAccounts(syncData.accounts);
+            localStorage.setItem("tls1_accounts", JSON.stringify(syncData.accounts));
+          }
+          setIsAuthenticated(true);
+        }}
         isAuthenticated={isAuthenticated}
         currentUid={okxUid || currentUid || localStorage.getItem("tls1_uid") || ""}
         accounts={accounts}

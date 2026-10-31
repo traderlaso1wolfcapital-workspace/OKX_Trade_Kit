@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "../../i18n";
 import { ConfirmLogoutModal } from "./AccountPromptModals";
+import SyncQrModal from "./SyncQrModal";
 import TradeLockerTab from "./TradeLockerTab";
 import { formatOkxAccountTag } from "../sidebar/SidebarLeft";
 import { getRunningStrategyForAccount } from "../../utils/accountUtils";
@@ -218,6 +219,7 @@ export default function ConnectModal({
   onLogout,
   activeTab: externalTab,
   onTabChange: externalOnTabChange,
+  onSyncSuccess,
 }) {
   const { t } = useTranslation();
   const [internalTab, setInternalTab] = useState("fast"); // 'fast' | 'apikey'
@@ -237,6 +239,60 @@ export default function ConnectModal({
   const [propAccounts, setPropAccounts] = useState([]);
   const [activePropId, setActivePropId] = useState("");
   const [selectedPropId, setSelectedPropId] = useState(null);
+  const [syncModalAccount, setSyncModalAccount] = useState(null);
+  const [syncCodeInput, setSyncCodeInput] = useState("");
+  const [isVerifyingSync, setIsVerifyingSync] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState("");
+
+  const handleVerifySyncCode = async (e) => {
+    if (e) e.preventDefault();
+    const clean = syncCodeInput.trim().replace(/\s+/g, "").replace(/-/g, "");
+    if (!clean) {
+      setSyncError("Vui lòng nhập mã ghép đôi 6 số!");
+      return;
+    }
+    setIsVerifyingSync(true);
+    setSyncError("");
+    setSyncSuccessMsg("");
+    try {
+      const res = await fetch("/api/auth/sync/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: clean }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        setSyncSuccessMsg(data.message || "Đăng nhập thành công!");
+        if (data.uid) {
+          localStorage.setItem("tls1_uid", data.uid);
+          localStorage.setItem("tls1_auth", "true");
+        }
+        if (data.token) {
+          localStorage.setItem("tls1_jwt_token", data.token);
+        }
+        if (data.account_id) {
+          localStorage.setItem("tls1_selected_account", data.account_id);
+        }
+        if (Array.isArray(data.accounts)) {
+          localStorage.setItem("tls1_accounts", JSON.stringify(data.accounts));
+        }
+        if (onSyncSuccess) {
+          onSyncSuccess(data);
+        }
+        setTimeout(() => {
+          if (onClose) onClose();
+          window.location.reload();
+        }, 800);
+      } else {
+        setSyncError(data.detail || data.message || "Mã không hợp lệ hoặc đã hết hạn!");
+      }
+    } catch (err) {
+      setSyncError("Lỗi kết nối tới máy chủ. Vui lòng thử lại!");
+    } finally {
+      setIsVerifyingSync(false);
+    }
+  };
 
   // MT5 Broker Modal States (Vantage, Exness)
   const [mt5BrokerModal, setMt5BrokerModal] = useState(null); // 'vantage' | 'exness' | null
@@ -710,12 +766,12 @@ export default function ConnectModal({
           </button>
           <button
             type="button"
-            className={`connect-tab-btn ${connectTab === "tradelocker" ? "active" : ""}`}
-            onClick={() => handleTabSwitch("tradelocker")}
-            data-tour="connect-tradelocker-tab"
-            style={connectTab === "tradelocker" ? { borderTopColor: "#00e676", color: "#00e676" } : {}}
+            className={`connect-tab-btn ${connectTab === "sync_login" ? "active" : ""}`}
+            onClick={() => handleTabSwitch("sync_login")}
+            data-tour="connect-sync-tab"
+            style={connectTab === "sync_login" ? { borderTopColor: "#38bdf8", color: "#38bdf8" } : {}}
           >
-            Quỹ FX Connect
+            🔑 Đăng Nhập
           </button>
         </div>
 
@@ -912,41 +968,78 @@ export default function ConnectModal({
                               })()}`}
                             </span>
 
-                            {/* Nút Delete size nhỏ vừa phải kích thước chữ này */}
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onDisconnectAccount) onDisconnectAccount(acc.id);
-                              }}
-                              style={{
-                                fontSize: "10px",
-                                fontWeight: "600",
-                                color: "#ff4d4f",
-                                background: "rgba(255, 77, 79, 0.08)",
-                                border: "1px solid rgba(255, 77, 79, 0.45)",
-                                padding: "2px 8px",
-                                borderRadius: "3px",
-                                whiteSpace: "nowrap",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                userSelect: "none",
-                                cursor: "pointer",
-                                transition: "all 0.15s ease",
-                                lineHeight: "1.2",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
-                                e.currentTarget.style.borderColor = "#ff4d4f";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
-                                e.currentTarget.style.borderColor = "rgba(255, 77, 79, 0.45)";
-                              }}
-                              title={`Đăng xuất tài khoản #${raw}`}
-                            >
-                              Đăng Xuất
-                            </span>
+                            {/* Cụm Nút [QR] Đồng Bộ + [Đăng Xuất] */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSyncModalAccount(acc);
+                                }}
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: "700",
+                                  color: "#38bdf8",
+                                  background: "rgba(56, 189, 248, 0.12)",
+                                  border: "1px solid rgba(56, 189, 248, 0.45)",
+                                  padding: "2px 7px",
+                                  borderRadius: "3px",
+                                  whiteSpace: "nowrap",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  userSelect: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                  lineHeight: "1.2",
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.backgroundColor = "rgba(56, 189, 248, 0.25)";
+                                  e.currentTarget.style.borderColor = "#38bdf8";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.backgroundColor = "rgba(56, 189, 248, 0.12)";
+                                  e.currentTarget.style.borderColor = "rgba(56, 189, 248, 0.45)";
+                                }}
+                                title={`Mã QR Đồng bộ tài khoản #${raw} sang thiết bị khác (Hiệu lực 120s)`}
+                              >
+                                QR
+                              </span>
+
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onDisconnectAccount) onDisconnectAccount(acc.id);
+                                }}
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: "600",
+                                  color: "#ff4d4f",
+                                  background: "rgba(255, 77, 79, 0.08)",
+                                  border: "1px solid rgba(255, 77, 79, 0.45)",
+                                  padding: "2px 8px",
+                                  borderRadius: "3px",
+                                  whiteSpace: "nowrap",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  userSelect: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                  lineHeight: "1.2",
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.22)";
+                                  e.currentTarget.style.borderColor = "#ff4d4f";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.backgroundColor = "rgba(255, 77, 79, 0.08)";
+                                  e.currentTarget.style.borderColor = "rgba(255, 77, 79, 0.45)";
+                                }}
+                                title={`Đăng xuất tài khoản #${raw}`}
+                              >
+                                Đăng Xuất
+                              </span>
+                            </div>
                           </div>
                         );
                       })}
@@ -1778,117 +1871,140 @@ export default function ConnectModal({
             </div>
           )}
 
-          {/* TAB 3: TRADELOCKER / E8 MARKETS PROP FIRM */}
-          {connectTab === "tradelocker" && (
-            <div data-tour="connect-tradelocker-content" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-              {isPropAdmin ? (
-                <TradeLockerTab
-                  currentUid={effectiveUid}
-                  t={t}
-                  initialSelectedId={selectedPropId}
-                  activeBotTab={activeBotTab}
-                  onAccountsUpdated={fetchPropAccounts}
-                />
-              ) : (
-                <div style={{ padding: "12px 4px" }}>
-                  <div
-                    style={{
-                      border: "1px solid #383838",
-                      borderRadius: "8px",
-                      background: "#1e1e1e",
-                      padding: "16px 18px",
-                      marginBottom: "16px",
-                      textAlign: "left",
-                      fontSize: "12.5px",
-                      color: "#aaaaaa",
-                      lineHeight: "1.6"
-                    }}
-                  >
-                    <p style={{ color: "#27ae60", fontWeight: "bold", margin: "0 0 8px 0", fontSize: "14px" }}>
-                      ĐIỀU KIỆN SỬ DỤNG TRADE QUỸ & FOREX:
-                    </p>
-                    <p style={{ margin: "0 0 6px 0", color: "#ddd" }}>
-                      1. Tính năng giao dịch Quỹ (TradeLocker / E8 Markets / MT5) hiện đang áp dụng chính sách đối tác riêng biệt.
-                    </p>
-                    <p style={{ margin: "0 0 16px 0", color: "#ddd" }}>
-                      2. Vui lòng liên hệ Admin để nhận Link đăng ký Ref đối tác Quỹ & kích hoạt tài khoản của bạn.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                        border: "1px solid #10b981",
-                        color: "#ffffff",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "13.5px",
-                        fontWeight: "bold",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        boxShadow: "0 2px 8px rgba(16, 185, 129, 0.25)"
-                      }}
-                    >
-                      Nhận Link Đăng Ký Quỹ & Mở Khóa
-                    </button>
+          {/* TAB 3: 🔑 ĐĂNG NHẬP / ĐỒNG BỘ THIẾT BỊ MỚI */}
+          {(connectTab === "sync_login" || connectTab === "tradelocker") && (
+            <div data-tour="connect-sync-content" style={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%", padding: "10px 4px" }}>
+              <div
+                style={{
+                  background: "linear-gradient(180deg, #182234 0%, #0f172a 100%)",
+                  border: "1px solid #1e3a5f",
+                  borderRadius: "10px",
+                  padding: "18px 20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                    🔑
                   </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      border: "1px solid #444444",
-                      borderRadius: "6px",
-                      background: "#262626",
-                      marginBottom: "16px"
-                    }}
-                  >
-                    <span style={{ fontSize: "12px", fontWeight: "bold", color: "#eeeeee" }}>Liên hệ Admin hỗ trợ:</span>
-                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                      <img
-                        src="/media/Telegram.png"
-                        alt="Telegram"
-                        title="Telegram Admin"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://t.me/baotran_tls1", "_blank")}
-                      />
-                      <img
-                        src="/media/Messenger.png"
-                        alt="Messenger"
-                        title="Facebook Messenger"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://www.facebook.com/baotran.tls1/", "_blank")}
-                      />
-                      <img
-                        src="/media/zalo.png"
-                        alt="Zalo"
-                        title="Zalo Admin"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("zalo://conversation?phone=84377333096", "_blank")}
-                      />
-                      <img
-                        src="/media/Discord.png"
-                        alt="Discord"
-                        title="Discord Community"
-                        style={{ width: "24px", height: "24px", cursor: "pointer" }}
-                        onClick={() => window.open("https://discord.gg/8NXaSCvZ6u", "_blank")}
-                      />
-                    </div>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#f8fafc" }}>
+                      Đăng Nhập / Đồng Bộ Thiết Bị Mới
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                      Nhập mã ghép đôi 6 số từ thiết bị đang chạy bot để đăng nhập ngay mà không cần quét lại OKX.
+                    </span>
                   </div>
                 </div>
-              )}
+
+                {/* Input ghép đôi 6 số */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#cbd5e1", textTransform: "uppercase" }}>
+                    Mã Ghép Đôi (6 Số):
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    value={syncCodeInput}
+                    onChange={(e) => {
+                      setSyncCodeInput(e.target.value.toUpperCase());
+                      setSyncError("");
+                      setSyncSuccessMsg("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleVerifySyncCode();
+                    }}
+                    placeholder="VD: 739 281"
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      fontSize: "22px",
+                      fontFamily: "monospace",
+                      letterSpacing: "6px",
+                      textAlign: "center",
+                      fontWeight: "800",
+                      color: "#38bdf8",
+                      background: "#090d16",
+                      border: syncError ? "1px solid #ef4444" : "1px solid #334155",
+                      borderRadius: "8px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  {syncError && (
+                    <span style={{ fontSize: "11.5px", color: "#ef4444", fontWeight: "600" }}>
+                      {syncError}
+                    </span>
+                  )}
+                  {syncSuccessMsg && (
+                    <span style={{ fontSize: "11.5px", color: "#4ade80", fontWeight: "600" }}>
+                      {syncSuccessMsg}
+                    </span>
+                  )}
+                </div>
+
+                {/* Nút bấm xác nhận */}
+                <button
+                  type="button"
+                  disabled={isVerifyingSync || !syncCodeInput.trim()}
+                  onClick={handleVerifySyncCode}
+                  style={{
+                    width: "100%",
+                    padding: "11px",
+                    background: (!syncCodeInput.trim() || isVerifyingSync)
+                      ? "#334155"
+                      : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                    border: "none",
+                    color: "#ffffff",
+                    fontSize: "13.5px",
+                    fontWeight: "700",
+                    borderRadius: "6px",
+                    cursor: (!syncCodeInput.trim() || isVerifyingSync) ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 12px rgba(2, 132, 199, 0.3)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {isVerifyingSync ? "Đang xác thực..." : "XAC NHAN DANG NHAP"}
+                </button>
+              </div>
+
+              {/* Hướng dẫn cách lấy mã */}
+              <div
+                style={{
+                  background: "rgba(56, 189, 248, 0.04)",
+                  border: "1px dashed rgba(56, 189, 248, 0.2)",
+                  borderRadius: "8px",
+                  padding: "12px 14px",
+                  fontSize: "11.5px",
+                  color: "#94a3b8",
+                  lineHeight: "1.6",
+                }}
+              >
+                <p style={{ margin: "0 0 6px 0", color: "#e2e8f0", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>[*]</span> Cách lấy mã 6 số từ thiết bị gốc:
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px", paddingLeft: "10px" }}>
+                  <span>1. Mở máy tính/thiết bị đang chạy bot &gt; Bấm nút <strong>[Connect]</strong>.</span>
+                  <span>2. Tại dòng <strong>Đã Connect #...</strong> &gt; Bấm nút <strong>[QR]</strong> màu xanh bên cạnh tài khoản cần đồng bộ.</span>
+                  <span>3. Nhìn mã 6 số hiển thị (hiệu lực 120s) rồi nhập vào ô phía trên, hoặc dùng camera quét mã QR.</span>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Footer đã được loại bỏ hoàn toàn nút Đăng Xuất lớn thừa thãi, chuyển về nút Đăng Xuất riêng trên từng thẻ tài khoản */}
         </div>
       </div>
+
+      {/* SYNC QR MODAL (MA QR & MA 6 SO GHEP DOI 120S) */}
+      <SyncQrModal
+        isOpen={Boolean(syncModalAccount)}
+        onClose={() => setSyncModalAccount(null)}
+        account={syncModalAccount}
+        uid={effectiveUid}
+      />
 
       {/* CONFIRM LOGOUT MODAL (YES/NO) */}
       <ConfirmLogoutModal

@@ -755,6 +755,122 @@ def okx_oauth_callback(request: Request, req: OAuthCallbackRequest):
     except Exception as e:
         return {"status": "error", "message": f"Lỗi server khi gọi OKX: {str(e)}"}
 
+
+# ---------------------------------------------------------------------------
+# 🔗 REAL-TIME DEVICE SYNC & ONE-TIME PAIRING (ĐỒNG BỘ ĐA THIẾT BỊ 120S)
+# ---------------------------------------------------------------------------
+_sync_sessions = {}  # dict[token_or_code] -> session dict
+
+class SyncCreateRequest(BaseModel):
+    uid: str
+    account_id: str
+
+class SyncVerifyRequest(BaseModel):
+    code: str
+
+@app.post("/api/auth/sync/create")
+def create_device_sync_session(req: SyncCreateRequest):
+    """Tạo mã ghép đôi 6 số và QR Token mới tinh cho một tài khoản phụ / tài khoản cụ thể.
+    Hiệu lực nghiêm ngặt đúng 120 giây. Mỗi lần click là sinh mã mới 100%."""
+    uid = req.uid.strip() if req.uid else ""
+    account_id = req.account_id.strip() if req.account_id else ""
+    if not uid:
+        raise HTTPException(status_code=400, detail="UID is required")
+    if not account_id:
+        raise HTTPException(status_code=400, detail="account_id is required")
+
+    now = time.time()
+    # Dọn dẹp session cũ đã hết hạn
+    expired_keys = [k for k, v in list(_sync_sessions.items()) if isinstance(v, dict) and v.get("expires_at", 0) < now]
+    for k in expired_keys:
+        _sync_sessions.pop(k, None)
+
+    import secrets
+    token = secrets.token_urlsafe(18)
+    code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = now + 120.0  # Chuẩn 120 giây
+
+    session_data = {
+        "token": token,
+        "code": code,
+        "uid": uid,
+        "account_id": account_id,
+        "expires_at": expires_at,
+        "used": False,
+        "created_at": now
+    }
+    _sync_sessions[token] = session_data
+    _sync_sessions[code] = session_data
+
+    return {
+        "status": "success",
+        "token": token,
+        "code": code,
+        "account_id": account_id,
+        "expires_in": 120,
+        "expires_at": int(expires_at)
+    }
+
+@app.post("/api/auth/sync/verify")
+def verify_device_sync_session(req: SyncVerifyRequest):
+    """Xác thực mã ghép đôi 6 số hoặc Token QR từ thiết bị mới.
+    Cấp quyền đăng nhập ngay lập tức cho riêng tài khoản phụ đó."""
+    raw_code = str(req.code).strip().replace(" ", "").replace("-", "")
+    if not raw_code:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập mã ghép đôi hoặc quét mã QR!")
+
+    now = time.time()
+    session = _sync_sessions.get(raw_code)
+    if not session or not isinstance(session, dict):
+        raise HTTPException(status_code=400, detail="Mã ghép đôi không hợp lệ hoặc không tồn tại!")
+
+    if session.get("used"):
+        raise HTTPException(status_code=400, detail="Mã ghép đôi này đã được sử dụng rồi!")
+
+    if now > session.get("expires_at", 0):
+        raise HTTPException(status_code=400, detail="Mã ghép đôi đã hết hạn (quá 120 giây)! Vui lòng lấy mã mới trên thiết bị gốc.")
+
+    session["used"] = True
+    uid = session.get("uid")
+    account_id = session.get("account_id")
+
+    all_accounts = get_user_accounts(uid)
+    matched_acc = next((a for a in all_accounts if a.get("id") == account_id), None)
+
+    jwt_token = ""
+    try:
+        jwt_token = create_jwt_token(uid)
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "message": f"✅ Ghép đôi thiết bị thành công cho tài khoản #{account_id}!",
+        "uid": uid,
+        "account_id": account_id,
+        "account_info": matched_acc or {"id": account_id, "name": f"#{account_id}"},
+        "accounts": all_accounts,
+        "token": jwt_token
+    }
+
+async def broadcast_bot_data_now(uid: str, strategy: str = "sub1", acc: str = ""):
+    """Bắn dữ liệu trạng thái và cấu hình tức thì qua WebSocket tới tất cả các thiết bị của UID đó."""
+    if not uid: return
+    strategies = [strategy] if strategy else ["sub1", "sub2", "sub3"]
+    for strat in strategies:
+        conns = bot_data_connections.get(uid, {}).get(strat, [])
+        if not conns: continue
+        try:
+            for c in list(conns):
+                try:
+                    c_acc = c.get("acc") or acc
+                    payload = await get_state_payload(uid, strat, c_acc)
+                    await c["ws"].send_text(json.dumps(payload))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
 async def log_reader_task(stream, uid, strategy, target_acc: str = ""):
     """Đọc stdout/stderr của tiến trình bot và đẩy vào ring buffer (deque) riêng biệt của UID"""
     if uid not in bot_log_queues: bot_log_queues[uid] = {}
@@ -2841,7 +2957,7 @@ def get_bot_config(uid: str, strategy: str = "sub1", account_id: Optional[str] =
         raise HTTPException(status_code=500, detail=f"Failed to read config: {e}")
 
 @app.post("/api/bot/config")
-def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1", account_id: str = None):
+async def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1", account_id: str = None):
     config_dir = os.path.join(get_user_data_dir(uid), f"bots/{strategy}", "json_data")
     os.makedirs(config_dir, exist_ok=True)
     target_acc = account_id.strip() if (account_id and account_id.strip()) else ""
@@ -2952,7 +3068,12 @@ def update_bot_config(update_data: ConfigUpdate, uid: str, strategy: str = "sub1
         is_running = (get_running_pid(uid, strategy) > 0) or (get_nested(bot_processes, uid, strategy) and get_nested(bot_processes, uid, strategy).poll() is None)
         canceled_orders = 0
         if not is_running:
-            canceled_orders = _cancel_unfilled_limit_orders(uid, strategy, target_acc, action_name="RELOAD CONFIG")
+            canceled_orders = await asyncio.to_thread(_cancel_unfilled_limit_orders, uid, strategy, target_acc, action_name="RELOAD CONFIG")
+
+        try:
+            await broadcast_bot_data_now(uid, strategy, target_acc)
+        except Exception as bex:
+            logger.warning(f"[broadcast_bot_data_now] error: {bex}")
 
         return {"message": "Config updated successfully.", "config": cfg, "canceled_count": canceled_orders}
     except Exception as e:
@@ -4497,6 +4618,11 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
     except Exception:
         closed_data = []
         
+    try:
+        cfg_data = await asyncio.to_thread(get_bot_config, uid, strategy, acc)
+    except Exception:
+        cfg_data = {}
+
     return {
         "type": "bot_data",
         "strategy": strategy,
@@ -4504,7 +4630,8 @@ async def get_state_payload(uid: str, strategy: str, acc: str):
         "status": status_data,
         "positions": pos_data if isinstance(pos_data, list) else [],
         "balance": bal_data,
-        "closed_positions": closed_data if isinstance(closed_data, list) else []
+        "closed_positions": closed_data if isinstance(closed_data, list) else [],
+        "config": cfg_data
     }
 
 async def bg_push_for_uid_strategy(uid: str, strategy: str):
